@@ -1,0 +1,42 @@
+[package]
+name = "concordium-rust-sdk"
+version = "0.1.0"
+authors = ["Concordium <developers@concordium.com>"]
+edition = "2018"
+license-file = "LICENSE"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tonic = "0.4.2"
+prost = "0.7.0"
+tokio = { version = "1.5.0", features = ["full"] }
+futures = "0.3"
+serde_json = "1.0.60"
+serde = {version = "1", features = ["derive"]}
+chrono = {version = "0.4", features = ["serde"] }
+thiserror = "1"
+hex = "0.4.3"
+derive_more = "0.99"
+semver = "0.11"
+anyhow = "1.0"
+# See https://github.com/serde-rs/json/issues/505 for how to be careful.
+rust_decimal = { version = "1.14", features = ["serde-float", "serde-arbitrary-precision"]}
+ed25519-dalek = "=1.0"
+sha2 = "0.9"
+
+crypto_common = { version = "*", path = "./concordium-base/rust-src/crypto_common" }
+id = { version = "*", path = "./concordium-base/rust-src/id" }
+elgamal = { version = "*", path = "./concordium-base/rust-src/elgamal" }
+ecvrf = { version = "*", path = "./concordium-base/rust-src/ecvrf" }
+aggregate_sig = { version = "*", path = "./concordium-base/rust-src/aggregate_sig" }
+encrypted_transfers = { version = "*", path = "./concordium-base/rust-src/encrypted_transfers" }
+eddsa_ed25519 = { version = "*", path = "./concordium-base/rust-src/eddsa_ed25519/" }
+concordium-contracts-common = { version = "*", path = "../concordium-contracts-common/"}
+
+
+structopt = "0.3"
+clap = "2.33.3"
+
+[build-dependencies]
+tonic-build = "0.4.2"
