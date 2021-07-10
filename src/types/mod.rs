@@ -451,7 +451,69 @@ pub enum BlockItemResult {
     #[serde(rename_all = "camelCase")]
     /// The intended action was not completed due to an error. The sender was
     /// charged, but no other effect is seen on the chain.
-    Reject { reject_reason: RejectReason },
+    Reject { reject_reason: Box<RejectReason> },
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+/// Event generated when an account receives a new encrypted amount.
+pub struct NewEncryptedAmountEvent {
+    /// The account onto which the amount was added.
+    account:          AccountAddress,
+    /// The index the amount was assigned.
+    new_index:        encrypted_transfers::types::EncryptedAmountIndex,
+    /// The encrypted amount that was added.
+    encrypted_amount: encrypted_transfers::types::EncryptedAmount<id::constants::ArCurve>,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+/// Event generated when one or more encrypted amounts are consumed from the
+/// account.
+pub struct EncryptedAmountRemovedEvent {
+    /// The affected account.
+    account:      AccountAddress,
+    /// The new self encrypted amount on the affected account.
+    new_amount:   encrypted_transfers::types::EncryptedAmount<id::constants::ArCurve>,
+    /// The input encrypted amount that was removed.
+    input_amount: encrypted_transfers::types::EncryptedAmount<id::constants::ArCurve>,
+    /// The index indicating which amounts were used.
+    up_to_index:  encrypted_transfers::types::EncryptedAmountAggIndex,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct BakerAddedEvent {
+    #[serde(flatten)]
+    /// The keys with which the baker registered.
+    keys_event:       BakerKeysEvent,
+    /// The amount the account staked to become a baker. This amount is
+    /// locked.
+    stake:            Amount,
+    /// Whether the baker will automatically add earnings to their stake or
+    /// not.
+    restake_earnings: bool,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct BakerKeysEvent {
+    baker_id:        BakerId,
+    account:         AccountAddress,
+    sign_key:        BakerSignVerifyKey,
+    election_key:    BakerElectionVerifyKey,
+    aggregation_key: BakerAggregationVerifyKey,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct EncryptedSelfAmountAddedEvent {
+    /// The affected account.
+    account:    AccountAddress,
+    /// The new self encrypted amount of the account.
+    new_amount: encrypted_transfers::types::EncryptedAmount<id::constants::ArCurve>,
+    /// The amount that was transferred from public to encrypted balance.
+    amount:     Amount,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
@@ -518,21 +580,10 @@ pub enum Event {
         reg_id:  CredentialRegistrationID,
         account: AccountAddress,
     },
-    #[serde(rename_all = "camelCase")]
     /// A new baker was registered, with the given ID and keys.
     BakerAdded {
-        baker_id:         BakerId,
-        /// The account address that became a baker.
-        account:          AccountAddress,
-        sign_key:         BakerSignVerifyKey,
-        election_key:     BakerElectionVerifyKey,
-        aggregation_key:  BakerAggregationVerifyKey,
-        /// The amount the account staked to become a baker. This amount is
-        /// locked.
-        stake:            Amount,
-        /// Whether the baker will automatically add earnings to their stake or
-        /// not.
-        restake_earnings: bool,
+        #[serde(flatten)]
+        data: Box<BakerAddedEvent>,
     },
     #[serde(rename_all = "camelCase")]
     /// A baker was scheduled to be removed.
@@ -565,14 +616,10 @@ pub enum Event {
         /// The new value of the flag.
         restake_earnings: bool,
     },
-    #[serde(rename_all = "camelCase")]
     /// The baker keys were updated. The new keys are listed.
     BakerKeysUpdated {
-        baker_id:        BakerId,
-        account:         AccountAddress,
-        sign_key:        BakerSignVerifyKey,
-        election_key:    BakerElectionVerifyKey,
-        aggregation_key: BakerAggregationVerifyKey,
+        #[serde(flatten)]
+        data: Box<BakerKeysEvent>,
     },
     #[serde(rename_all = "camelCase")]
     /// Keys of the given credential were updated.
@@ -580,25 +627,15 @@ pub enum Event {
     #[serde(rename_all = "camelCase")]
     /// A new encrypted amount was added to the account.
     NewEncryptedAmount {
-        /// The account onto which the amount was added.
-        account:          AccountAddress,
-        /// The index the amount was assigned.
-        new_index:        encrypted_transfers::types::EncryptedAmountIndex,
-        /// The encrypted amount that was added.
-        encrypted_amount: encrypted_transfers::types::EncryptedAmount<id::constants::ArCurve>,
+        #[serde(flatten)]
+        data: Box<NewEncryptedAmountEvent>,
     },
     #[serde(rename_all = "camelCase")]
     /// One or more encrypted amounts were removed from an account as part of a
     /// transfer or decryption.
     EncryptedAmountsRemoved {
-        /// The affected account.
-        account:      AccountAddress,
-        /// The new self encrypted amount on the affected account.
-        new_amount:   encrypted_transfers::types::EncryptedAmount<id::constants::ArCurve>,
-        /// The input encrypted amount that was removed.
-        input_amount: encrypted_transfers::types::EncryptedAmount<id::constants::ArCurve>,
-        /// The index indicating which amounts were used.
-        up_to_index:  encrypted_transfers::types::EncryptedAmountAggIndex,
+        #[serde(flatten)]
+        data: Box<EncryptedAmountRemovedEvent>,
     },
     #[serde(rename_all = "camelCase")]
     /// The public balance of the account was increased via a transfer from
@@ -607,16 +644,11 @@ pub enum Event {
         account: AccountAddress,
         amount:  Amount,
     },
-    #[serde(rename_all = "camelCase")]
     /// The encrypted balance of the account was updated due to transfer from
     /// public to encrypted balance of the account.
     EncryptedSelfAmountAdded {
-        /// The affected account.
-        account:    AccountAddress,
-        /// The new self encrypted amount of the account.
-        new_amount: encrypted_transfers::types::EncryptedAmount<id::constants::ArCurve>,
-        /// The amount that was transferred from public to encrypted balance.
-        amount:     Amount,
+        #[serde(flatten)]
+        data: Box<EncryptedSelfAmountAddedEvent>,
     },
     #[serde(rename_all = "camelCase")]
     /// An update was enqueued for the given time.
@@ -679,9 +711,9 @@ pub enum UpdatePayload {
     #[serde(rename = "level1")]
     Level1(Level1Update),
     #[serde(rename = "addAnonymityRevoker")]
-    AddAnonymityRevoker(id::types::ArInfo<id::constants::ArCurve>),
+    AddAnonymityRevoker(Box<id::types::ArInfo<id::constants::ArCurve>>),
     #[serde(rename = "addIdentityProvider")]
-    AddIdentityProvider(id::types::IpInfo<id::constants::IpPairing>),
+    AddIdentityProvider(Box<id::types::IpInfo<id::constants::IpPairing>>),
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
@@ -738,7 +770,7 @@ pub struct GASRewards {
 pub enum RootUpdate {
     RootKeysUpdate(HigherLevelAccessStructure<RootKeysKind>),
     Level1KeysUpdate(HigherLevelAccessStructure<Level1KeysKind>),
-    Level2KeysUpdate(Authorizations),
+    Level2KeysUpdate(Box<Authorizations>),
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize)]
@@ -748,7 +780,7 @@ pub enum RootUpdate {
 /// updates must be a separate transaction.
 pub enum Level1Update {
     Level1KeysUpdate(HigherLevelAccessStructure<Level1KeysKind>),
-    Level2KeysUpdate(Authorizations),
+    Level2KeysUpdate(Box<Authorizations>),
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -1012,7 +1044,9 @@ pub enum RejectReason {
     /// another change
     BakerInCooldown,
     /// A baker with the given aggregation key already exists
-    DuplicateAggregationKey { contents: BakerAggregationVerifyKey },
+    DuplicateAggregationKey {
+        contents: Box<BakerAggregationVerifyKey>,
+    },
     /// Encountered credential ID that does not exist
     NonExistentCredentialID,
     /// Attempted to add an account key to a key index already in use

@@ -151,6 +151,38 @@ impl Deserial for AccountTransaction<Payload> {
 
 #[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize)]
 #[serde(rename_all = "camelCase")]
+pub struct BakerKeysPayload {
+    /// New public key for participating in the election lottery.
+    pub election_verify_key:    BakerElectionVerifyKey,
+    /// New public key for verifying this baker's signatures.
+    pub signature_verify_key:   BakerSignVerifyKey,
+    /// New public key for verifying this baker's signature on finalization
+    /// records.
+    pub aggregation_verify_key: BakerAggregationVerifyKey,
+    /// Proof of knowledge of the secret key corresponding to the signature
+    /// verification key.
+    pub proof_sig:              eddsa_ed25519::Ed25519DlogProof,
+    /// Proof of knowledge of the election secret key.
+    pub proof_election:         eddsa_ed25519::Ed25519DlogProof,
+    /// Proof of knowledge of the secret key for signing finalization
+    /// records.
+    pub proof_aggregation:      aggregate_sig::Proof<AggregateSigPairing>,
+}
+
+#[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddBakerPayload {
+    /// The keys with which the baker registered.
+    #[serde(flatten)]
+    pub keys:             BakerKeysPayload,
+    /// Initial baking stake.
+    pub baking_stake:     Amount,
+    /// Whether to add earnings to the stake automatically or not.
+    pub restake_earnings: bool,
+}
+
+#[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize)]
+#[serde(rename_all = "camelCase")]
 /// Payload of an account transaction.
 pub enum Payload {
     /// Deploy a Wasm module with the given source.
@@ -190,25 +222,8 @@ pub enum Payload {
     },
     /// Register the sender account as a baker.
     AddBaker {
-        /// Public key for participating in the election lottery.
-        election_verify_key:    BakerElectionVerifyKey,
-        /// Public key for verifying this baker's signatures.
-        signature_verify_key:   BakerSignVerifyKey,
-        /// Public key for verifying this baker's signature on finalization
-        /// records.
-        aggregation_verify_key: BakerAggregationVerifyKey,
-        /// Proof of knowledge of the secret key corresponding to the signature
-        /// verification key.
-        proof_sig:              eddsa_ed25519::Ed25519DlogProof,
-        /// Proof of knowledge of the election secret key.
-        proof_election:         eddsa_ed25519::Ed25519DlogProof,
-        /// Proof of knowledge of the secret key for signing finalization
-        /// records.
-        proof_aggregation:      aggregate_sig::Proof<AggregateSigPairing>,
-        /// Initial baking stake.
-        baking_stake:           Amount,
-        /// Whether to add earnings to the stake automatically or not.
-        restake_earnings:       bool,
+        #[serde(flatten)]
+        payload: Box<AddBakerPayload>,
     },
     /// Deregister the account as a baker.
     RemoveBaker,
@@ -224,21 +239,8 @@ pub enum Payload {
     },
     /// Update the baker's keys.
     UpdateBakerKeys {
-        /// New public key for participating in the election lottery.
-        election_verify_key:    BakerElectionVerifyKey,
-        /// New public key for verifying this baker's signatures.
-        signature_verify_key:   BakerSignVerifyKey,
-        /// New public key for verifying this baker's signature on finalization
-        /// records.
-        aggregation_verify_key: BakerAggregationVerifyKey,
-        /// Proof of knowledge of the secret key corresponding to the signature
-        /// verification key.
-        proof_sig:              eddsa_ed25519::Ed25519DlogProof,
-        /// Proof of knowledge of the election secret key.
-        proof_election:         eddsa_ed25519::Ed25519DlogProof,
-        /// Proof of knowledge of the secret key for signing finalization
-        /// records.
-        proof_aggregation:      aggregate_sig::Proof<AggregateSigPairing>,
+        #[serde(flatten)]
+        payload: Box<BakerKeysPayload>,
     },
     /// Update signing keys of a specific credential.
     UpdateCredentialKeys {
@@ -263,7 +265,8 @@ pub enum Payload {
     /// Transfer an amount from encrypted to the public balance of the account.
     TransferToPublic {
         /// The amount to transfer and proof of correctness of accounting.
-        data: SecToPubAmountTransferData<id::constants::ArCurve>,
+        #[serde(flatten)]
+        data: Box<SecToPubAmountTransferData<id::constants::ArCurve>>,
     },
     /// Transfer an amount with schedule.
     TransferWithSchedule {
@@ -331,25 +334,9 @@ impl Serial for Payload {
                 out.put(to_address);
                 out.put(amount);
             }
-            Payload::AddBaker {
-                election_verify_key,
-                signature_verify_key,
-                aggregation_verify_key,
-                proof_sig,
-                proof_election,
-                proof_aggregation,
-                baking_stake,
-                restake_earnings,
-            } => {
+            Payload::AddBaker { payload } => {
                 out.put(&4u8);
-                out.put(election_verify_key);
-                out.put(signature_verify_key);
-                out.put(aggregation_verify_key);
-                out.put(proof_sig);
-                out.put(proof_election);
-                out.put(proof_aggregation);
-                out.put(baking_stake);
-                out.put(restake_earnings);
+                out.put(payload);
             }
             Payload::RemoveBaker => {
                 out.put(&5u8);
@@ -362,21 +349,9 @@ impl Serial for Payload {
                 out.put(&7u8);
                 out.put(restake_earnings);
             }
-            Payload::UpdateBakerKeys {
-                election_verify_key,
-                signature_verify_key,
-                aggregation_verify_key,
-                proof_sig,
-                proof_election,
-                proof_aggregation,
-            } => {
+            Payload::UpdateBakerKeys { payload } => {
                 out.put(&8u8);
-                out.put(election_verify_key);
-                out.put(signature_verify_key);
-                out.put(aggregation_verify_key);
-                out.put(proof_sig);
-                out.put(proof_election);
-                out.put(proof_aggregation);
+                out.put(payload)
             }
             Payload::UpdateCredentialKeys { cred_id, keys } => {
                 out.put(&13u8);
@@ -400,10 +375,7 @@ impl Serial for Payload {
                 out.put(&19u8);
                 out.put(to);
                 out.put(&(schedule.len() as u8));
-                for (ts, release) in schedule {
-                    out.put(ts);
-                    out.put(release);
-                }
+                crypto_common::serial_vector_no_length(schedule, out);
             }
             Payload::UpdateCredentials {
                 new_cred_infos,
@@ -463,23 +435,9 @@ impl Deserial for Payload {
                 Ok(Payload::Transfer { to_address, amount })
             }
             4 => {
-                let election_verify_key = source.get()?;
-                let signature_verify_key = source.get()?;
-                let aggregation_verify_key = source.get()?;
-                let proof_sig = source.get()?;
-                let proof_election = source.get()?;
-                let proof_aggregation = source.get()?;
-                let baking_stake = source.get()?;
-                let restake_earnings = source.get()?;
+                let payload_data = source.get()?;
                 Ok(Payload::AddBaker {
-                    election_verify_key,
-                    signature_verify_key,
-                    aggregation_verify_key,
-                    proof_sig,
-                    proof_election,
-                    proof_aggregation,
-                    baking_stake,
-                    restake_earnings,
+                    payload: Box::new(payload_data),
                 })
             }
             5 => Ok(Payload::RemoveBaker),
@@ -492,19 +450,9 @@ impl Deserial for Payload {
                 Ok(Payload::UpdateBakerRestakeEarnings { restake_earnings })
             }
             8 => {
-                let election_verify_key = source.get()?;
-                let signature_verify_key = source.get()?;
-                let aggregation_verify_key = source.get()?;
-                let proof_sig = source.get()?;
-                let proof_election = source.get()?;
-                let proof_aggregation = source.get()?;
+                let payload_data = source.get()?;
                 Ok(Payload::UpdateBakerKeys {
-                    election_verify_key,
-                    signature_verify_key,
-                    aggregation_verify_key,
-                    proof_sig,
-                    proof_election,
-                    proof_aggregation,
+                    payload: Box::new(payload_data),
                 })
             }
             13 => {
@@ -522,8 +470,10 @@ impl Deserial for Payload {
                 Ok(Payload::TransferToEncrypted { amount })
             }
             18 => {
-                let data = source.get()?;
-                Ok(Payload::TransferToPublic { data })
+                let data_data = source.get()?;
+                Ok(Payload::TransferToPublic {
+                    data: Box::new(data_data),
+                })
             }
             19 => {
                 let to = source.get()?;
@@ -713,6 +663,57 @@ impl<PayloadType> BlockItem<PayloadType> {
         let mut hasher = sha2::Sha256::new();
         hasher.put(&self);
         hashes::HashBytes::new(hasher.result())
+    }
+}
+
+impl Serial for BakerKeysPayload {
+    fn serial<B: Buffer>(&self, out: &mut B) {
+        out.put(&self.election_verify_key);
+        out.put(&self.signature_verify_key);
+        out.put(&self.aggregation_verify_key);
+        out.put(&self.proof_sig);
+        out.put(&self.proof_election);
+        out.put(&self.proof_aggregation);
+    }
+}
+
+impl Deserial for BakerKeysPayload {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let election_verify_key = source.get()?;
+        let signature_verify_key = source.get()?;
+        let aggregation_verify_key = source.get()?;
+        let proof_sig = source.get()?;
+        let proof_election = source.get()?;
+        let proof_aggregation = source.get()?;
+        Ok(Self {
+            election_verify_key,
+            signature_verify_key,
+            aggregation_verify_key,
+            proof_sig,
+            proof_election,
+            proof_aggregation,
+        })
+    }
+}
+
+impl Serial for AddBakerPayload {
+    fn serial<B: Buffer>(&self, out: &mut B) {
+        out.put(&self.keys);
+        out.put(&self.baking_stake);
+        out.put(&self.restake_earnings);
+    }
+}
+
+impl Deserial for AddBakerPayload {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let keys = source.get()?;
+        let baking_stake = source.get()?;
+        let restake_earnings = source.get()?;
+        Ok(Self {
+            keys,
+            baking_stake,
+            restake_earnings,
+        })
     }
 }
 
