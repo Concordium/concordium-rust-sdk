@@ -1,9 +1,9 @@
 [submodule "concordium-base"]
 	path = concordium-base
-	url = ./concordium-base
+	url = ../concordium-base
 [submodule "concordium-grpc-api"]
 	path = concordium-grpc-api
-	url = ./concordium-grpc-api
+	url = ../concordium-grpc-api
 [submodule "concordium-contracts-common"]
 	path = concordium-contracts-common
-	url = ./concordium-contracts-common
+	url = ../concordium-contracts-common
