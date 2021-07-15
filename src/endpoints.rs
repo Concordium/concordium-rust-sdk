@@ -684,8 +684,6 @@ impl Client {
     }
 }
 
-pub const DEFAULT_NETWORK_ID: network::NetworkId = network::NetworkId { network_id: 100u16 };
-
 /// Parse a response which is either `null` or can be parsed as a specified
 /// value. `null` is mapped to [QueryError::NotFound].
 fn parse_json_response<A: serde::de::DeserializeOwned>(

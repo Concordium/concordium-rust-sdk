@@ -50,32 +50,81 @@ pub struct BlockInfo {
 #[serde(rename_all = "camelCase")]
 /// Summary of the current state of consensus.
 pub struct ConsensusInfo {
+    /// Height of the last finalized block. Genesis block has height 0.
     pub last_finalized_block_height:    BlockHeight,
+    /// The exponential moving average standard deviation of the time between a
+    /// block's nominal slot time, and the time at which it is verified.
     pub block_arrive_latency_e_m_s_d:   f64,
+    /// Exponential moving average standard deviation of block receive latency
+    /// (in seconds), i.e. the time between a block's nominal slot time, and
+    /// the time at which is received.
     pub block_receive_latency_e_m_s_d:  f64,
+    /// Hash of the last, i.e., most recent, finalized block.
     pub last_finalized_block:           BlockHash,
+    /// Exponential moving average standard deviation of the time between
+    /// receiving blocks (in seconds).
     pub block_receive_period_e_m_s_d:   Option<f64>,
+    /// Exponential moving average standard deviation of the time between blocks
+    /// being verified.
     pub block_arrive_period_e_m_s_d:    Option<f64>,
+    /// The number of blocks that have been received.
     pub blocks_received_count:          u64,
+    /// Exponential moving average standard deviation of the number of
+    /// transactions per block.
     pub transactions_per_block_e_m_s_d: f64,
+    /// Exponential moving average of the time between finalizations. Will be
+    /// `None` if there are no finalizations yet since the node start.
     pub finalization_period_e_m_a:      Option<f64>,
+    /// Height of the best block. See [ConsensusInfo::best_block].
     pub best_block_height:              BlockHeight,
+    /// Time at which a block last became finalized. Note that this is the local
+    /// time of the node at the time the block was finalized.
     pub last_finalized_time:            Option<chrono::DateTime<chrono::Utc>>,
+    /// The number of completed finalizations.
     pub finalization_count:             u64,
     #[serde(with = "crate::internal::duration_millis")]
+    /// Duration of an epoch.
     pub epoch_duration:                 chrono::Duration,
+    /// Number of blocks that arrived, i.e., were added to the tree. Note that
+    /// in some cases this can be more than
+    /// [ConsensusInfo::blocks_received_count] since blocks that the node itself
+    /// produces count towards this, but are not received.
     pub blocks_verified_count:          u64,
+    /// Duration of a slot.
     pub slot_duration:                  SlotDuration,
+    /// Slot time of the genesis block.
     pub genesis_time:                   chrono::DateTime<chrono::Utc>,
+    /// Exponential moving average standard deviation of the time between
+    /// finalizations. Will be `None` if there are no finalizations yet
+    /// since the node start.
     pub finalization_period_e_m_s_d:    Option<f64>,
+    /// Exponential moving average of the number of
+    /// transactions per block.
     pub transactions_per_block_e_m_a:   f64,
+    /// The exponential moving average of the time between a block's nominal
+    /// slot time, and the time at which it is verified.
     pub block_arrive_latency_e_m_a:     f64,
+    /// Exponential moving average of block receive latency (in seconds), i.e.
+    /// the time between a block's nominal slot time, and the time at which is
+    /// received.
     pub block_receive_latency_e_m_a:    f64,
+    /// Exponential moving average of the time between receiving blocks (in
+    /// seconds).
     pub block_arrive_period_e_m_a:      Option<f64>,
+    /// Exponential moving average of the time between receiving blocks (in
+    /// seconds).
     pub block_receive_period_e_m_a:     Option<f64>,
+    /// The time (local time of the node) that a block last arrived, i.e., was
+    /// verified and added to the node's tree.
     pub block_last_arrived_time:        Option<chrono::DateTime<chrono::Utc>>,
+    /// Hash of the current best block. The best block is a protocol defined
+    /// block that the node must use a parent block to build the chain on.
+    /// Note that this is subjective, in the sense that it is only the best
+    /// block among the blocks the node knows about.
     pub best_block:                     BlockHash,
+    /// Hash of the genesis block.
     pub genesis_block:                  BlockHash,
+    /// The time (local time of the node) that a block was last received.
     pub block_last_received_time:       Option<chrono::DateTime<chrono::Utc>>,
 }
 

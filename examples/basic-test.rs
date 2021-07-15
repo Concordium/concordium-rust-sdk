@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    endpoints::{self, DEFAULT_NETWORK_ID},
+    constants::DEFAULT_NETWORK_ID,
+    endpoints,
     types::{
         self,
         transactions::{make_and_sign_transaction, BlockItem, Payload},
@@ -122,13 +123,13 @@ async fn main() -> anyhow::Result<()> {
                 let x = futures::future::join_all(handles).await;
                 for res in x {
                     // check the account response was OK.
-                    let info = res?;
+                    let _info = res?;
                 }
             }
-            let birks = client.get_birk_parameters(&cb).await?;
+            let _birks = client.get_birk_parameters(&cb).await?;
             // println!("{:?}", birks);
 
-            let summary = client.get_block_summary(&cb).await?;
+            let _summary = client.get_block_summary(&cb).await?;
             // println!("{:?}", summary);
         }
         cb = bi.block_parent;

@@ -199,7 +199,7 @@ pub struct RewardsOverview {
     pub gas_account:                 Amount,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 // Since all variants are fieldless, the default JSON serialization will convert
 // all the variants to simple strings.
@@ -235,7 +235,7 @@ pub enum UpdateType {
     UpdateLevel2Keys,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 // Since all variants are fieldless, the default JSON serialization will convert
 // all the variants to simple strings.
@@ -251,7 +251,7 @@ pub enum CredentialType {
     Normal,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 // Since all variants are fieldless, the default JSON serialization will convert
 // all the variants to simple strings.
@@ -291,7 +291,7 @@ pub enum TransactionType {
     RegisterData,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(tag = "type", content = "contents", rename_all = "camelCase")]
 /// The type of the block item.
 pub enum BlockItemType {
@@ -343,7 +343,7 @@ pub enum TransactionStatus {
     Committed(BTreeMap<hashes::TransactionHash, BlockItemSummary>),
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(tag = "tag")]
 /// In addition to the user initiated transactions the protocol generates some
 /// events which are deemed "Special outcomes". These are rewards for running
@@ -416,7 +416,7 @@ pub struct BlockSummary {
     updates:               Updates, // FIXME: Add the finalization data.
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 /// Summary of the outcome of a block item.
 pub struct BlockItemSummary {
@@ -440,7 +440,7 @@ pub struct BlockItemSummary {
     pub index:        TransactionIndex,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(tag = "outcome", rename_all = "camelCase")]
 /// Outcome of a block item execution.
 pub enum BlockItemResult {
@@ -454,7 +454,7 @@ pub enum BlockItemResult {
     Reject { reject_reason: Box<RejectReason> },
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 /// Event generated when an account receives a new encrypted amount.
 pub struct NewEncryptedAmountEvent {
@@ -466,7 +466,7 @@ pub struct NewEncryptedAmountEvent {
     encrypted_amount: encrypted_transfers::types::EncryptedAmount<id::constants::ArCurve>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 /// Event generated when one or more encrypted amounts are consumed from the
 /// account.
@@ -481,7 +481,7 @@ pub struct EncryptedAmountRemovedEvent {
     up_to_index:  encrypted_transfers::types::EncryptedAmountAggIndex,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct BakerAddedEvent {
     #[serde(flatten)]
@@ -495,7 +495,7 @@ pub struct BakerAddedEvent {
     restake_earnings: bool,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct BakerKeysEvent {
     baker_id:        BakerId,
@@ -505,7 +505,7 @@ pub struct BakerKeysEvent {
     aggregation_key: BakerAggregationVerifyKey,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct EncryptedSelfAmountAddedEvent {
     /// The affected account.
@@ -516,7 +516,7 @@ pub struct EncryptedSelfAmountAddedEvent {
     amount:     Amount,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(tag = "tag")]
 /// An event describing the changes that occurred to the state of the chain.
 pub enum Event {
@@ -684,7 +684,7 @@ pub enum Event {
     DataRegistered { data: RegisteredData },
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(tag = "updateType", content = "update")]
 /// The type of an update payload.
 pub enum UpdatePayload {
@@ -716,7 +716,7 @@ pub enum UpdatePayload {
     AddIdentityProvider(Box<id::types::IpInfo<id::constants::IpPairing>>),
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 /// A generic protocol update. This is essentially an announcement of the
 /// update. The details of the update will be communicated in some off-chain
@@ -731,7 +731,7 @@ pub struct ProtocolUpdate {
     specification_auxiliary_data: Vec<u8>,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 #[serde(try_from = "transaction_fee_distribution::TransactionFeeDistributionUnchecked")]
 /// Update the transaction fee distribution to the specified value.
@@ -743,7 +743,7 @@ pub struct TransactionFeeDistribution {
     gas_account: RewardFraction,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 /// The reward fractions related to the gas account and inclusion of special
 /// transactions.
@@ -762,7 +762,7 @@ pub struct GASRewards {
     chain_update:       RewardFraction,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(tag = "typeOfUpdate", content = "updatePayload")]
 #[serde(rename_all = "camelCase")]
 /// An update with root keys of some other set of governance keys, or the root
@@ -773,7 +773,7 @@ pub enum RootUpdate {
     Level2KeysUpdate(Box<Authorizations>),
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(tag = "typeOfUpdate", content = "updatePayload")]
 #[serde(rename_all = "camelCase")]
 /// An update with level 1 keys of either level 1 or level 2 keys. Each of the
@@ -797,7 +797,7 @@ pub enum RootKeysKind {}
 /// type-level marker.
 pub enum Level1KeysKind {}
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 #[serde(bound = "Kind: Sized")]
 /// Either root, level1, or level 2 access structure. They all have the same
@@ -811,7 +811,7 @@ pub struct HigherLevelAccessStructure<Kind> {
     pub _phantom:  PhantomData<Kind>,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 /// And access structure for performing chain updates. The access structure is
 /// only meaningful in the context of a list of update keys to which the indices
@@ -821,7 +821,7 @@ pub struct AccessStructure {
     pub threshold:       UpdateKeysThreshold,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 /// Access structures for each of the different possible chain updates, togehter
 /// with the context giving all the possible keys.
@@ -922,7 +922,7 @@ pub struct RewardParameters {
     pub gas_rewards:                  GASRewards,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 /// A scheduled update of a given type.
 pub struct ScheduledUpdate<T> {
@@ -930,7 +930,7 @@ pub struct ScheduledUpdate<T> {
     pub update:         T,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 /// A queue of updates of a given type.
 pub struct UpdateQueue<T> {
@@ -940,7 +940,7 @@ pub struct UpdateQueue<T> {
     pub queue:                Vec<ScheduledUpdate<T>>,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PendingUpdates {
     pub root_keys:                    UpdateQueue<HigherLevelAccessStructure<RootKeysKind>>,
@@ -976,7 +976,7 @@ pub struct Updates {
     pub update_queues:    PendingUpdates,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(tag = "tag")]
 /// A reason for why a transaction was rejected. Rejected means included in a
 /// block, but the desired action was not achieved. The only effect of a

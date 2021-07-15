@@ -13,6 +13,16 @@ pub struct SlotDuration {
     pub millis: u64,
 }
 
+impl From<SlotDuration> for chrono::Duration {
+    fn from(s: SlotDuration) -> Self {
+        // this is technically iffy in cases
+        // where slot duration would exceed
+        // i64::MAX. But that will not
+        // happen.
+        Self::milliseconds(s.millis as i64)
+    }
+}
+
 /// Internal short id of the baker.
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
@@ -132,7 +142,13 @@ pub struct ContractAddress {
     pub subindex: ContractSubIndex,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+impl ContractAddress {
+    pub fn new(index: ContractIndex, subindex: ContractSubIndex) -> Self {
+        Self { index, subindex }
+    }
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(tag = "type", content = "address")]
 /// Either an account or contract address. Some operations are allowed on both
 /// types of items, hence the need for this type.
@@ -144,7 +160,7 @@ pub enum Address {
 }
 
 /// Position of the transaction in a block.
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Serialize)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Serialize, Clone, Copy)]
 #[serde(transparent)]
 pub struct TransactionIndex {
     pub index: u64,
@@ -181,7 +197,7 @@ impl fmt::Display for CredentialRegistrationID {
     }
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(transparent)]
 /// A single public key that can sign updates.
 pub struct UpdatePublicKey {

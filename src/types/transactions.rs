@@ -1,3 +1,6 @@
+//! Definition of transactions and other transaction-like messages, together
+//! with their serialization, signing, and similar auxiliary methods.
+
 use super::{
     hashes, smart_contracts, AccountThreshold, AggregateSigPairing, BakerAggregationVerifyKey,
     BakerElectionVerifyKey, BakerSignVerifyKey, ContractAddress, CredentialIndex,
@@ -86,6 +89,26 @@ pub fn get_encoded_payload<R: ReadBytesExt>(
     Ok(EncodedPayload { payload })
 }
 
+/// A helper trait so that we can treat payload and encoded payload in the same
+/// place.
+pub trait PayloadLike {
+    /// Encode the transaction payload by serializing.
+    fn encode(&self) -> EncodedPayload;
+    /// Encode the payload directly to a buffer. This will in general be more
+    /// efficient than `encode`. However this will only matter if serialization
+    /// was to be done in a tight loop.
+    fn encode_to_buffer<B: Buffer>(&self, out: &mut B);
+}
+
+impl PayloadLike for EncodedPayload {
+    fn encode(&self) -> EncodedPayload { self.clone() }
+
+    fn encode_to_buffer<B: Buffer>(&self, out: &mut B) {
+        out.write_all(&self.payload)
+            .expect("Writing to buffer is always safe.");
+    }
+}
+
 #[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize)]
 #[serde(rename_all = "camelCase")]
 /// An account transaction signed and paid for by a sender account.
@@ -100,15 +123,7 @@ pub struct AccountTransaction<PayloadType> {
     pub payload:   PayloadType,
 }
 
-impl Serial for AccountTransaction<EncodedPayload> {
-    fn serial<B: Buffer>(&self, out: &mut B) {
-        out.put(&self.signature);
-        out.put(&self.header);
-        out.put(&self.payload);
-    }
-}
-
-impl Serial for AccountTransaction<Payload> {
+impl<P: PayloadLike> Serial for AccountTransaction<P> {
     fn serial<B: Buffer>(&self, out: &mut B) {
         out.put(&self.signature);
         out.put(&self.header);
@@ -136,21 +151,33 @@ impl Deserial for AccountTransaction<Payload> {
         let payload_len = u64::from(u32::from(header.payload_size));
         let mut limited = <&mut R as std::io::Read>::take(source, payload_len);
         let payload = limited.get()?;
-        // ensure the payload length matches the stated size.
-        if limited.limit() == 0 {
-            Ok(AccountTransaction {
-                signature,
-                header,
-                payload,
-            })
-        } else {
-            anyhow::bail!("Payload length information is inaccurate: bytes of input remaining.")
-        }
+        // ensure payload length matches the stated size.
+        anyhow::ensure!(
+            limited.limit() == 0,
+            "Payload length information is inaccurate: {} bytes of input remaining.",
+            limited.limit()
+        );
+        Ok(AccountTransaction {
+            signature,
+            header,
+            payload,
+        })
+    }
+}
+
+impl<P: PayloadLike> AccountTransaction<P> {
+    /// Verify signature on the transaction given the public keys.
+    pub fn verify_transaction_signature(&self, keys: &impl HasAccountAccessStructure) -> bool {
+        let hash = compute_transaction_sign_hash(&self.header, &self.payload);
+        verify_signature_transaction_sign_hash(keys, &hash, &self.signature)
     }
 }
 
 #[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize)]
 #[serde(rename_all = "camelCase")]
+/// Auxiliary type that contains public keys and proof of ownership of those
+/// keys. This is used in the `AddBaker` and `UpdateBakerKeys` transaction
+/// types.
 pub struct BakerKeysPayload {
     /// New public key for participating in the election lottery.
     pub election_verify_key:    BakerElectionVerifyKey,
@@ -171,6 +198,8 @@ pub struct BakerKeysPayload {
 
 #[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize)]
 #[serde(rename_all = "camelCase")]
+/// Payload of the `AddBaker` transaction. This transaction registers the
+/// account as a baker.
 pub struct AddBakerPayload {
     /// The keys with which the baker registered.
     #[serde(flatten)]
@@ -506,17 +535,13 @@ impl Deserial for Payload {
     }
 }
 
-impl Payload {
-    /// Encode the transaction payload by serializing.
-    pub fn encode(&self) -> EncodedPayload {
+impl PayloadLike for Payload {
+    fn encode(&self) -> EncodedPayload {
         let payload = crypto_common::to_bytes(&self);
         EncodedPayload { payload }
     }
 
-    /// Encode the payload directly to a buffer. This will in general be more
-    /// efficient than `encode`. However this will only matter if serialization
-    /// was to be done in a tight loop.
-    pub fn encode_to_buffer<B: Buffer>(&self, out: &mut B) { out.put(&self) }
+    fn encode_to_buffer<B: Buffer>(&self, out: &mut B) { out.put(&self) }
 }
 
 impl EncodedPayload {
@@ -526,13 +551,10 @@ impl EncodedPayload {
     }
 }
 
-/// Compute the transaction sign hash from the header and payload.
-/// This is semantically equivalent, but a bit more efficient, than first
-/// serializing the [Payload] to [EncodedPayload] and then using
-/// [compute_transaction_sign_hash_encoded]
+/// Compute the transaction sign hash from an encoded payload and header.
 pub fn compute_transaction_sign_hash(
     header: &TransactionHeader,
-    payload: &Payload,
+    payload: &impl PayloadLike,
 ) -> hashes::TransactionSignHash {
     let mut hasher = sha2::Sha256::new();
     hasher.put(header);
@@ -540,45 +562,16 @@ pub fn compute_transaction_sign_hash(
     hashes::HashBytes::new(hasher.result())
 }
 
-/// Compute the transaction sign hash from an encoded payload and header.
-pub fn compute_transaction_sign_hash_encoded(
-    header: &TransactionHeader,
-    payload: &EncodedPayload,
-) -> hashes::TransactionSignHash {
-    let mut hasher = sha2::Sha256::new();
-    hasher.put(header);
-    hasher.put(payload);
-    hashes::HashBytes::new(hasher.result())
-}
-
-/// Sign the given transaction with provided keys.
-pub fn sign_transaction<'a, I, J: 'a>(
+/// Sign the transaction whose payload has already been serialized.
+pub fn sign_transaction<'a, I, J, P: PayloadLike>(
     keys: I,
     header: TransactionHeader,
-    payload: Payload,
-) -> AccountTransaction<Payload>
+    payload: P,
+) -> AccountTransaction<P>
 where
     I: IntoIterator<Item = (&'a CredentialIndex, J)>,
     J: IntoIterator<Item = (&'a KeyIndex, &'a KeyPairDef)>, {
     let hash_to_sign = compute_transaction_sign_hash(&header, &payload);
-    let signature = sign_transaction_hash(keys, &hash_to_sign);
-    AccountTransaction {
-        signature,
-        header,
-        payload,
-    }
-}
-
-/// Sign the transaction whose payload has already been serialized.
-pub fn sign_transaction_encoded<'a, I, J>(
-    keys: I,
-    header: TransactionHeader,
-    payload: EncodedPayload,
-) -> AccountTransaction<EncodedPayload>
-where
-    I: IntoIterator<Item = (&'a CredentialIndex, J)>,
-    J: IntoIterator<Item = (&'a KeyIndex, &'a KeyPairDef)>, {
-    let hash_to_sign = compute_transaction_sign_hash_encoded(&header, &payload);
     let signature = sign_transaction_hash(keys, &hash_to_sign);
     AccountTransaction {
         signature,
@@ -609,7 +602,7 @@ where
         payload_size,
         expiry,
     };
-    sign_transaction_encoded(keys, header, encoded)
+    sign_transaction(keys, header, encoded)
 }
 
 /// Sign the pre-hashed transaction.
@@ -629,6 +622,57 @@ where
         signatures.insert(*ci, cred_sigs);
     }
     TransactionSignature { signatures }
+}
+
+pub trait HasAccountAccessStructure {
+    fn threshold(&self) -> AccountThreshold;
+    fn credential_keys(&self, idx: CredentialIndex) -> Option<&CredentialPublicKeys>;
+}
+
+#[derive(Debug, Clone)]
+pub struct AccountAccessStructure {
+    pub threshold: AccountThreshold,
+    pub keys:      BTreeMap<CredentialIndex, CredentialPublicKeys>,
+}
+
+impl HasAccountAccessStructure for AccountAccessStructure {
+    fn threshold(&self) -> AccountThreshold { self.threshold }
+
+    fn credential_keys(&self, idx: CredentialIndex) -> Option<&CredentialPublicKeys> {
+        self.keys.get(&idx)
+    }
+}
+
+/// Verify a signature on the transaction sign hash. This is a low-level
+/// operation that is useful to avoid recomputing the transaction hash.
+pub fn verify_signature_transaction_sign_hash(
+    keys: &impl HasAccountAccessStructure,
+    hash: &hashes::TransactionSignHash,
+    signature: &TransactionSignature,
+) -> bool {
+    if usize::from(u8::from(keys.threshold())) > signature.signatures.len() {
+        return false;
+    }
+    // There are enough signatures.
+    for (&ci, cred_sigs) in signature.signatures.iter() {
+        if let Some(cred_keys) = keys.credential_keys(ci) {
+            if usize::from(u8::from(cred_keys.threshold)) > cred_sigs.len() {
+                return false;
+            }
+            for (&ki, sig) in cred_sigs {
+                if let Some(pk) = cred_keys.get(ki) {
+                    if !pk.verify(hash, &sig) {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            }
+        } else {
+            return false;
+        }
+    }
+    true
 }
 
 #[derive(Debug, Clone)]
@@ -747,5 +791,63 @@ impl Deserial for BlockItem<EncodedPayload> {
             2 => todo!("Update instruction"),
             _ => anyhow::bail!("Unsupported block item type: {}.", tag),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::types::hashes::TransactionSignHash;
+    use id::types::{SignatureThreshold, VerifyKey};
+    use rand::Rng;
+    use std::convert::TryFrom;
+
+    use super::*;
+    #[test]
+    fn test_transaction_signature_check() {
+        let mut rng = rand::thread_rng();
+        let mut keys = BTreeMap::<CredentialIndex, BTreeMap<KeyIndex, KeyPairDef>>::new();
+        let bound: usize = rng.gen_range(1, 20);
+        for _ in 0..bound {
+            let c_idx = CredentialIndex::from(rng.gen::<u8>());
+            if keys.get(&c_idx).is_none() {
+                let inner_bound: usize = rng.gen_range(1, 20);
+                let mut cred_keys = BTreeMap::new();
+                for _ in 0..inner_bound {
+                    let k_idx = KeyIndex::from(rng.gen::<u8>());
+                    cred_keys.insert(k_idx, KeyPairDef::generate(&mut rng));
+                }
+                keys.insert(c_idx, cred_keys);
+            }
+        }
+        let hash = TransactionSignHash::new(rng.gen());
+        let sig = sign_transaction_hash(&keys, &hash);
+        let threshold =
+            AccountThreshold::try_from(rng.gen_range(1, (keys.len() + 1) as u8)).unwrap();
+        let pub_keys = keys
+            .iter()
+            .map(|(&ci, keys)| {
+                let threshold = SignatureThreshold(rng.gen_range(1, keys.len() + 1) as u8);
+                let keys = keys
+                    .into_iter()
+                    .map(|(&ki, kp)| (ki, VerifyKey::from(kp)))
+                    .collect();
+                (ci, CredentialPublicKeys { threshold, keys })
+            })
+            .collect::<BTreeMap<_, _>>();
+        let mut access_structure = AccountAccessStructure {
+            threshold,
+            keys: pub_keys,
+        };
+        assert!(
+            verify_signature_transaction_sign_hash(&access_structure, &hash, &sig),
+            "Transaction signature must validate."
+        );
+
+        access_structure.threshold = AccountThreshold::try_from((keys.len() + 1) as u8).unwrap();
+
+        assert!(
+            !verify_signature_transaction_sign_hash(&access_structure, &hash, &sig),
+            "Transaction signature must not validate with invalid threshold."
+        );
     }
 }
