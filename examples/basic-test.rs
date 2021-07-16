@@ -6,7 +6,7 @@ use concordium_rust_sdk::{
     endpoints,
     types::{
         self,
-        transactions::{make_and_sign_transaction, BlockItem, Payload},
+        transactions::{send, BlockItem},
     },
 };
 use crypto_common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize};
@@ -62,21 +62,13 @@ async fn main() -> anyhow::Result<()> {
     println!("{:?}", acc_info);
     let expiry: TransactionTime =
         TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
-    let keys_to_sign = keys
-        .account_keys
-        .keys
-        .iter()
-        .map(|(k, v)| (k, v.keys.iter()));
-    let tx = make_and_sign_transaction(
-        keys_to_sign,
+    let tx = send::transfer(
+        &keys.account_keys,
         keys.address,
         acc_info.account_nonce,
-        600.into(),
         expiry,
-        &Payload::Transfer {
-            to_address: keys.address,
-            amount:     1.into(),
-        },
+        keys.address,
+        1.into(),
     );
     let item = BlockItem::AccountTransaction(tx);
     let transaction_hash = item.hash();

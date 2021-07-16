@@ -2,7 +2,7 @@ use crypto_common::{
     derive::{SerdeBase16Serialize, Serial, Serialize},
     Buffer, Deserial, Get, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
 };
-use derive_more::{Display, From, FromStr, Into};
+use derive_more::{Add, Display, From, FromStr, Into};
 use std::{convert::TryFrom, fmt};
 
 /// Duration of a slot in milliseconds.
@@ -52,6 +52,18 @@ pub struct Epoch {
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
 pub struct Nonce {
     pub nonce: u64,
+}
+
+impl Nonce {
+    /// Get the next nonce.
+    pub fn next(self) -> Self {
+        Self {
+            nonce: self.nonce + 1,
+        }
+    }
+
+    /// Increase the nonce to the next nonce.
+    pub fn next_mut(&mut self) { self.nonce += 1; }
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
@@ -115,7 +127,7 @@ pub struct AccountIndex {
 /// Energy measure.
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into, Add)]
 pub struct Energy {
     pub energy: u64,
 }

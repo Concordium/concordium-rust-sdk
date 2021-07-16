@@ -24,3 +24,7 @@ pub const MAX_WASM_MODULE_SIZE: u32 = 65536;
 /// This is also the only currently supported network.
 pub const DEFAULT_NETWORK_ID: super::types::network::NetworkId =
     super::types::network::NetworkId { network_id: 100u16 };
+
+/// Curve used for encrypted transfers. This is the same as the anonymity
+/// revoker curve.
+pub type EncryptedAmountsCurve = id::constants::ArCurve;

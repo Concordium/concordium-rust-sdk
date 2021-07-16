@@ -463,7 +463,7 @@ pub struct NewEncryptedAmountEvent {
     /// The index the amount was assigned.
     new_index:        encrypted_transfers::types::EncryptedAmountIndex,
     /// The encrypted amount that was added.
-    encrypted_amount: encrypted_transfers::types::EncryptedAmount<id::constants::ArCurve>,
+    encrypted_amount: encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -474,9 +474,9 @@ pub struct EncryptedAmountRemovedEvent {
     /// The affected account.
     account:      AccountAddress,
     /// The new self encrypted amount on the affected account.
-    new_amount:   encrypted_transfers::types::EncryptedAmount<id::constants::ArCurve>,
+    new_amount:   encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
     /// The input encrypted amount that was removed.
-    input_amount: encrypted_transfers::types::EncryptedAmount<id::constants::ArCurve>,
+    input_amount: encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
     /// The index indicating which amounts were used.
     up_to_index:  encrypted_transfers::types::EncryptedAmountAggIndex,
 }
@@ -511,7 +511,7 @@ pub struct EncryptedSelfAmountAddedEvent {
     /// The affected account.
     account:    AccountAddress,
     /// The new self encrypted amount of the account.
-    new_amount: encrypted_transfers::types::EncryptedAmount<id::constants::ArCurve>,
+    new_amount: encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
     /// The amount that was transferred from public to encrypted balance.
     amount:     Amount,
 }

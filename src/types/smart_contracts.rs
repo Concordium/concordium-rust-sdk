@@ -8,6 +8,7 @@ use crypto_common::{
     types::Amount,
     Buffer, Deserial, Get, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
 };
+use derive_more::*;
 use id::types::AccountAddress;
 use std::convert::TryFrom;
 
@@ -91,7 +92,7 @@ impl Deserial for InitName {
 }
 
 /// FIXME: Move to Wasm.
-#[derive(SerdeSerialize, SerdeDeserialize, derive::Serial, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, derive::Serial, Debug, Clone, AsRef, Into)]
 #[serde(transparent)]
 pub struct Parameter {
     #[serde(with = "crate::internal::byte_array_hex")]
@@ -118,7 +119,7 @@ pub enum ModuleRefMarker {}
 /// Reference to a deployed Wasm module on the chain.
 pub type ModuleRef = hashes::HashBytes<ModuleRefMarker>;
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, AsRef, Into)]
 #[serde(transparent)]
 /// An event logged by a smart contract initialization.
 pub struct ContractEvent {
@@ -126,7 +127,7 @@ pub struct ContractEvent {
     bytes: Vec<u8>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Serial, Clone, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Clone, Debug, AsRef, From, Into)]
 #[serde(transparent)]
 /// Unparsed Wasm module source.
 /// FIXME: Make this structured based on what we have in wasm-chain-integration.
@@ -134,6 +135,10 @@ pub struct ModuleSource {
     #[serde(with = "crate::internal::byte_array_hex")]
     #[size_length = 4]
     bytes: Vec<u8>,
+}
+
+impl ModuleSource {
+    pub fn size(&self) -> u64 { self.bytes.len() as u64 }
 }
 
 impl Deserial for ModuleSource {
@@ -153,6 +158,6 @@ impl Deserial for ModuleSource {
 /// Unparsed module with a version indicating what operations are allowed.
 /// FIXME: Make this structured based on what we have in wasm-chain-integration.
 pub struct WasmModule {
-    version: u32,
-    source:  ModuleSource,
+    pub version: u32,
+    pub source:  ModuleSource,
 }

@@ -2,9 +2,9 @@
 //! with their serialization, signing, and similar auxiliary methods.
 
 use super::{
-    hashes, smart_contracts, AccountThreshold, AggregateSigPairing, BakerAggregationVerifyKey,
-    BakerElectionVerifyKey, BakerSignVerifyKey, ContractAddress, CredentialIndex,
-    CredentialRegistrationID, Energy, Nonce, RegisteredData,
+    hashes, smart_contracts, AccountInfo, AccountThreshold, AggregateSigPairing,
+    BakerAggregationVerifyKey, BakerElectionVerifyKey, BakerSignVerifyKey, ContractAddress,
+    CredentialIndex, CredentialRegistrationID, Energy, Nonce, RegisteredData,
 };
 use crate::constants::*;
 use crypto_common::{
@@ -17,7 +17,7 @@ use crypto_common::{
 use derive_more::*;
 use encrypted_transfers::types::{EncryptedAmountTransferData, SecToPubAmountTransferData};
 use id::types::{
-    AccountAddress, AccountCredential, CredentialDeploymentInfo, CredentialPublicKeys,
+    AccountAddress, AccountCredential, AccountKeys, CredentialDeploymentInfo, CredentialPublicKeys,
 };
 use sha2::Digest;
 use std::collections::BTreeMap;
@@ -284,7 +284,7 @@ pub enum Payload {
         to:   AccountAddress,
         /// The (encrypted) amount to transfer and proof of correctness of
         /// accounting.
-        data: Box<EncryptedAmountTransferData<id::constants::ArCurve>>,
+        data: Box<EncryptedAmountTransferData<EncryptedAmountsCurve>>,
     },
     /// Transfer from public to encrypted balance of the sender account.
     TransferToEncrypted {
@@ -295,7 +295,7 @@ pub enum Payload {
     TransferToPublic {
         /// The amount to transfer and proof of correctness of accounting.
         #[serde(flatten)]
-        data: Box<SecToPubAmountTransferData<id::constants::ArCurve>>,
+        data: Box<SecToPubAmountTransferData<EncryptedAmountsCurve>>,
     },
     /// Transfer an amount with schedule.
     TransferWithSchedule {
@@ -562,17 +562,91 @@ pub fn compute_transaction_sign_hash(
     hashes::HashBytes::new(hasher.result())
 }
 
-/// Sign the transaction whose payload has already been serialized.
-pub fn sign_transaction<'a, I, J, P: PayloadLike>(
-    keys: I,
+/// Abstraction of private keys.
+pub trait TransactionSigner {
+    /// Sign the specified transaction hash, allocating and returning the
+    /// signatures.
+    fn sign_transaction_hash(
+        &self,
+        hash_to_sign: &hashes::TransactionSignHash,
+    ) -> TransactionSignature;
+}
+
+/// A signing implementation that knows the number of keys up-front.
+pub trait ExactSizeTransactionSigner: TransactionSigner {
+    /// Return the number of keys that the signer will sign with.
+    /// This must match what [TransactionSigner::sign_transaction_hash] returns.
+    fn num_keys(&self) -> u32;
+}
+
+/// This signs with the first `threshold` credentials and for each
+/// credential with the first threshold keys for that credential.
+impl TransactionSigner for AccountKeys {
+    fn sign_transaction_hash(
+        &self,
+        hash_to_sign: &hashes::TransactionSignHash,
+    ) -> TransactionSignature {
+        let iter = self
+            .keys
+            .iter()
+            .take(usize::from(u8::from(self.threshold)))
+            .map(|(k, v)| {
+                (k, {
+                    let num = u8::from(v.threshold);
+                    v.keys.iter().take(num.into())
+                })
+            });
+        let mut signatures = BTreeMap::<CredentialIndex, BTreeMap<KeyIndex, _>>::new();
+        for (ci, cred_keys) in iter {
+            let cred_sigs = cred_keys
+                .into_iter()
+                .map(|(ki, kp)| (*ki, kp.sign(hash_to_sign.as_ref())))
+                .collect::<BTreeMap<_, _>>();
+            signatures.insert(*ci, cred_sigs);
+        }
+        TransactionSignature { signatures }
+    }
+}
+
+impl ExactSizeTransactionSigner for AccountKeys {
+    fn num_keys(&self) -> u32 {
+        self.keys
+            .values()
+            .take(usize::from(u8::from(self.threshold)))
+            .map(|v| u32::from(u8::from(v.threshold)))
+            .sum::<u32>()
+    }
+}
+
+impl TransactionSigner for BTreeMap<CredentialIndex, BTreeMap<KeyIndex, KeyPairDef>> {
+    fn sign_transaction_hash(
+        &self,
+        hash_to_sign: &hashes::TransactionSignHash,
+    ) -> TransactionSignature {
+        let mut signatures = BTreeMap::<CredentialIndex, BTreeMap<KeyIndex, _>>::new();
+        for (ci, cred_keys) in self {
+            let cred_sigs = cred_keys
+                .iter()
+                .map(|(ki, kp)| (*ki, kp.sign(hash_to_sign.as_ref())))
+                .collect::<BTreeMap<_, _>>();
+            signatures.insert(*ci, cred_sigs);
+        }
+        TransactionSignature { signatures }
+    }
+}
+
+impl ExactSizeTransactionSigner for BTreeMap<CredentialIndex, BTreeMap<KeyIndex, KeyPairDef>> {
+    fn num_keys(&self) -> u32 { self.values().map(|v| v.len() as u32).sum::<u32>() }
+}
+
+/// Sign the header and payload, construct the transaction, and return it.
+pub fn sign_transaction<S: TransactionSigner, P: PayloadLike>(
+    signer: &S,
     header: TransactionHeader,
     payload: P,
-) -> AccountTransaction<P>
-where
-    I: IntoIterator<Item = (&'a CredentialIndex, J)>,
-    J: IntoIterator<Item = (&'a KeyIndex, &'a KeyPairDef)>, {
+) -> AccountTransaction<P> {
     let hash_to_sign = compute_transaction_sign_hash(&header, &payload);
-    let signature = sign_transaction_hash(keys, &hash_to_sign);
+    let signature = signer.sign_transaction_hash(&hash_to_sign);
     AccountTransaction {
         signature,
         header,
@@ -580,58 +654,20 @@ where
     }
 }
 
-/// A convenience wrapper around sign_transaction that construct the transaction
-/// and signs it.
-pub fn make_and_sign_transaction<'a, I, J>(
-    keys: I,
-    sender: AccountAddress,
-    nonce: Nonce,
-    energy_amount: Energy,
-    expiry: TransactionTime,
-    payload: &Payload,
-) -> AccountTransaction<EncodedPayload>
-where
-    I: IntoIterator<Item = (&'a CredentialIndex, J)>,
-    J: IntoIterator<Item = (&'a KeyIndex, &'a KeyPairDef)>, {
-    let encoded = payload.encode();
-    let payload_size = encoded.size();
-    let header = TransactionHeader {
-        sender,
-        nonce,
-        energy_amount,
-        payload_size,
-        expiry,
-    };
-    sign_transaction(keys, header, encoded)
-}
-
-/// Sign the pre-hashed transaction.
-pub fn sign_transaction_hash<'a, I, J>(
-    keys: I,
-    hash_to_sign: &hashes::TransactionSignHash,
-) -> TransactionSignature
-where
-    I: IntoIterator<Item = (&'a CredentialIndex, J)>,
-    J: IntoIterator<Item = (&'a KeyIndex, &'a KeyPairDef)>, {
-    let mut signatures = BTreeMap::<CredentialIndex, BTreeMap<KeyIndex, _>>::new();
-    for (ci, cred_keys) in keys.into_iter() {
-        let cred_sigs = cred_keys
-            .into_iter()
-            .map(|(ki, kp)| (*ki, kp.sign(hash_to_sign.as_ref())))
-            .collect::<BTreeMap<_, _>>();
-        signatures.insert(*ci, cred_sigs);
-    }
-    TransactionSignature { signatures }
-}
-
+/// Implementations of this trait are structures which can produce public keys
+/// with which transaction signatures can be verified.
 pub trait HasAccountAccessStructure {
     fn threshold(&self) -> AccountThreshold;
     fn credential_keys(&self, idx: CredentialIndex) -> Option<&CredentialPublicKeys>;
 }
 
 #[derive(Debug, Clone)]
+/// The most straighforward account access structure is a map of public keys
+/// with the account threshold.
 pub struct AccountAccessStructure {
+    /// The number of credentials that needed to sign a transaction.
     pub threshold: AccountThreshold,
+    /// Keys indexed by credential.
     pub keys:      BTreeMap<CredentialIndex, CredentialPublicKeys>,
 }
 
@@ -640,6 +676,22 @@ impl HasAccountAccessStructure for AccountAccessStructure {
 
     fn credential_keys(&self, idx: CredentialIndex) -> Option<&CredentialPublicKeys> {
         self.keys.get(&idx)
+    }
+}
+
+impl HasAccountAccessStructure for AccountInfo {
+    fn threshold(&self) -> AccountThreshold { self.account_threshold }
+
+    fn credential_keys(&self, idx: CredentialIndex) -> Option<&CredentialPublicKeys> {
+        let versioned_cred = self.account_credentials.get(&idx)?;
+        match versioned_cred.value {
+            id::types::AccountCredentialWithoutProofs::Initial { ref icdv } => {
+                Some(&icdv.cred_account)
+            }
+            id::types::AccountCredentialWithoutProofs::Normal { ref cdv, .. } => {
+                Some(&cdv.cred_key_info)
+            }
+        }
     }
 }
 
@@ -761,7 +813,7 @@ impl Deserial for AddBakerPayload {
     }
 }
 
-impl Serial for BlockItem<EncodedPayload> {
+impl<P: PayloadLike> Serial for BlockItem<P> {
     fn serial<B: Buffer>(&self, out: &mut B) {
         match &self {
             BlockItem::AccountTransaction(at) => {
@@ -794,6 +846,474 @@ impl Deserial for BlockItem<EncodedPayload> {
     }
 }
 
+/// Energy costs of transactions.
+pub mod cost {
+    use crate::types::CredentialType;
+
+    use super::*;
+
+    /// The B constant for NRG assignment. This scales the effect of the number
+    /// of signatures on the energy.
+    pub const A: u64 = 100;
+
+    /// The A constant for NRG assignment. This scales the effect of transaction
+    /// size on the energy.
+    pub const B: u64 = 1;
+
+    /// Base cost of a transaction is the minimum cost that accounts for
+    /// transaction size and signature checking. In addition to base cost
+    /// each transaction has a transaction-type specific cost.
+    pub fn base_cost(transaction_size: u64, num_signatures: u32) -> Energy {
+        Energy::from(B * transaction_size + A * u64::from(num_signatures))
+    }
+
+    /// Additional cost of a normal, account to account, transfer.
+    pub const SIMPLE_TRANSFER: Energy = Energy { energy: 300 };
+
+    /// Additional cost of an encrypted transfer.
+    pub const ENCRYPTED_TRANSFER: Energy = Energy { energy: 27000 };
+
+    /// Additional cost of a transfer from public to encrypted balance.
+    pub const TRANSFER_TO_ENCRYPTED: Energy = Energy { energy: 600 };
+
+    /// Additional cost of a transfer from encrypted to public balance.
+    pub const TRANSFER_TO_PUBLIC: Energy = Energy { energy: 14850 };
+
+    /// Cost of a scheduled transfer, parametrized by the number of releases.
+    pub fn scheduled_transfer(num_releases: u16) -> Energy {
+        Energy::from(u64::from(num_releases) * (300 + 64))
+    }
+
+    /// Additional cost of registerding the account as a baker.
+    pub const ADD_BAKER: Energy = Energy { energy: 4050 };
+
+    /// Additional cost of updating baker's keys.
+    pub const UPDATE_BAKER_KEYS: Energy = Energy { energy: 4050 };
+
+    /// Additional cost of updating the baker's stake, either increasing or
+    /// lowering it.
+    pub const UPDATE_BAKER_STAKE: Energy = Energy { energy: 300 };
+
+    /// Additional cost of updating the baker's restake flag.
+    pub const UPDATE_BAKER_RESTAKE: Energy = Energy { energy: 300 };
+
+    /// Additional cost of removing a baker.
+    pub const REMOVE_BAKER: Energy = Energy { energy: 300 };
+
+    /// Additional cost of updating account's credentials, parametrized by
+    /// - the number of credentials on the account before the update
+    /// - list of keys of credentials to be added.
+    pub fn update_credentials(num_credentials_before: u16, num_keys: &[u16]) -> Energy {
+        UPDATE_CREDENTIALS_BASE + update_credentials_variable(num_credentials_before, num_keys)
+    }
+
+    /// Additional cost of registering a piece of data.
+    pub const REGISTER_DATA: Energy = Energy { energy: 300 };
+
+    /// Additional cost of deploying a smart contract module, parametrized by
+    /// the size of the module, which is defined to be the size of
+    /// the binary `.wasm` file that is sent as part of the transaction.
+    pub fn deploy_module(module_size: u64) -> Energy { Energy::from(module_size / 10) }
+
+    /// There is a non-trivial amount of lookup
+    /// that needs to be done before we can start any checking. This ensures
+    /// that those lookups are not a problem. If the credential updates are
+    /// genuine then this cost is going to be negligible compared to
+    /// verifying the credential.
+    const UPDATE_CREDENTIALS_BASE: Energy = Energy { energy: 500 };
+
+    /// Additional cost of deploying a credential of the given type and with the
+    /// given number of keys.
+    pub fn deploy_credential(ty: CredentialType, num_keys: u16) -> Energy {
+        match ty {
+            CredentialType::Initial => Energy::from(1000 + 100 * u64::from(num_keys)),
+            CredentialType::Normal => Energy::from(54000 + 100 * u64::from(num_keys)),
+        }
+    }
+
+    /// Helper function. This together with [UPDATE_CREDENTIALS_BASE] determine
+    /// the cost of deploying a credential.
+    fn update_credentials_variable(num_credentials_before: u16, num_keys: &[u16]) -> Energy {
+        // the 500 * num_credentials_before is to account for transactions which do
+        // nothing, e.g., don't add don't remove, and don't update the
+        // threshold. These still have a cost since the way the accounts are
+        // stored it will update the stored account data, which does take up
+        // quite a bit of space per credential.
+        let energy: u64 = 500 * u64::from(num_credentials_before)
+            + num_keys
+                .iter()
+                .map(|&nk| u64::from(deploy_credential(CredentialType::Normal, nk)))
+                .sum::<u64>();
+        Energy::from(energy)
+    }
+}
+
+/// High level wrappers for making transactions with minimal user input.
+/// These wrappers handle encoding, setting energy costs when those are fixed
+/// for transaction.
+pub mod send {
+    use super::*;
+
+    /// Helper structure to store the intermediate state of a transaction.
+    /// The problem this helps solve is that to compute the exact energy
+    /// requirements for the transaction we need to know its exact size when
+    /// serialized. For some we could compute this manually, but in general it
+    /// is less error prone to serialize and get the length. To avoid doing
+    /// double work we first serialize with a dummy `energy_amount` value, then
+    /// in the [TransactionBuilder::finalize] method we compute the correct
+    /// energy amount and overwrite it in the transaction, before signing
+    /// it.
+    struct TransactionBuilder {
+        header:  TransactionHeader,
+        encoded: EncodedPayload,
+    }
+
+    /// Size of a transaction header. This is currently always 60 bytes.
+    /// Future chain updates might revise this, but this is a big change so this
+    /// is expected to change seldomly.
+    const TRANSACTION_HEADER_SIZE: u64 = 32 + 8 + 8 + 4 + 8;
+
+    impl TransactionBuilder {
+        pub fn new(
+            sender: AccountAddress,
+            nonce: Nonce,
+            expiry: TransactionTime,
+            payload: &Payload,
+        ) -> Self {
+            let encoded = payload.encode();
+            let header = TransactionHeader {
+                sender,
+                nonce,
+                energy_amount: 0.into(),
+                payload_size: encoded.size(),
+                expiry,
+            };
+            Self { header, encoded }
+        }
+
+        #[inline]
+        fn size(&self) -> u64 {
+            TRANSACTION_HEADER_SIZE + u64::from(u32::from(self.header.payload_size))
+        }
+
+        #[inline]
+        pub fn finalize(
+            mut self,
+            signer: &impl TransactionSigner,
+            f: impl FnOnce(u64) -> Energy,
+        ) -> AccountTransaction<EncodedPayload> {
+            let size = self.size();
+            self.header.energy_amount = f(size);
+            sign_transaction(signer, self.header, self.encoded)
+        }
+    }
+
+    /// Construct a transfer transaction.
+    pub fn transfer(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        receiver: AccountAddress,
+        amount: Amount,
+    ) -> AccountTransaction<EncodedPayload> {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let payload = Payload::Transfer {
+            to_address: receiver,
+            amount,
+        };
+        make_and_sign_transaction(
+            signer,
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add(cost::SIMPLE_TRANSFER),
+            &payload,
+        )
+    }
+
+    /// Make an encrypted transfer. The payload can be constructed using
+    /// [encrypted_transfers::make_transfer_data].
+    pub fn encrypted_transfer(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        receiver: AccountAddress,
+        data: EncryptedAmountTransferData<EncryptedAmountsCurve>,
+    ) -> AccountTransaction<EncodedPayload> {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let payload = Payload::EncryptedAmountTransfer {
+            to:   receiver,
+            data: Box::new(data),
+        };
+        make_and_sign_transaction(
+            signer,
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add(cost::ENCRYPTED_TRANSFER),
+            &payload,
+        )
+    }
+
+    /// Transfer the given amount from public to encrypted balance of the given
+    /// account.
+    pub fn transfer_to_encrypted(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        amount: Amount,
+    ) -> AccountTransaction<EncodedPayload> {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let payload = Payload::TransferToEncrypted { amount };
+        make_and_sign_transaction(
+            signer,
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add(cost::TRANSFER_TO_ENCRYPTED),
+            &payload,
+        )
+    }
+
+    /// Transfer the given amount from encrypted to public balance of the given
+    /// account. The payload may be constructed using
+    /// [encrypted_transfers::make_sec_to_pub_transfer_data]
+    pub fn transfer_to_public(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        data: SecToPubAmountTransferData<EncryptedAmountsCurve>,
+    ) -> AccountTransaction<EncodedPayload> {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let payload = Payload::TransferToPublic {
+            data: Box::new(data),
+        };
+        make_and_sign_transaction(
+            signer,
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add(cost::TRANSFER_TO_PUBLIC),
+            &payload,
+        )
+    }
+
+    /// Construct a transfer with schedule transaction, sending to the given
+    /// account.
+    pub fn transfer_with_schedule(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        receiver: AccountAddress,
+        schedule: Vec<(Timestamp, Amount)>,
+    ) -> AccountTransaction<EncodedPayload> {
+        let num_releases = schedule.len() as u16;
+        let payload = Payload::TransferWithSchedule {
+            to: receiver,
+            schedule,
+        };
+        make_and_sign_transaction(
+            signer,
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add(cost::scheduled_transfer(num_releases)),
+            &payload,
+        )
+    }
+
+    /// Register the sender account as a baker.
+    /// TODO: Make a function for constructing the keys payload, with correct
+    /// proofs and context.
+    pub fn add_baker(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        baking_stake: Amount,
+        restake_earnings: bool,
+        keys: BakerKeysPayload,
+    ) -> AccountTransaction<EncodedPayload> {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let payload = Payload::AddBaker {
+            payload: Box::new(AddBakerPayload {
+                keys,
+                baking_stake,
+                restake_earnings,
+            }),
+        };
+        make_and_sign_transaction(
+            signer,
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add(cost::ADD_BAKER),
+            &payload,
+        )
+    }
+
+    /// Update keys of the baker associated with the sender account.
+    /// TODO: Make a function for constructing the keys payload, with correct
+    /// proofs and context.
+    pub fn update_baker_keys(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        keys: BakerKeysPayload,
+    ) -> AccountTransaction<EncodedPayload> {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let payload = Payload::UpdateBakerKeys {
+            payload: Box::new(keys),
+        };
+        make_and_sign_transaction(
+            signer,
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add(cost::UPDATE_BAKER_KEYS),
+            &payload,
+        )
+    }
+
+    /// Deregister the account as a baker.
+    pub fn remove_baker(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+    ) -> AccountTransaction<EncodedPayload> {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let payload = Payload::RemoveBaker;
+        make_and_sign_transaction(
+            signer,
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add(cost::REMOVE_BAKER),
+            &payload,
+        )
+    }
+
+    /// Update the amount the account stakes for being a baker.
+    pub fn update_baker_stake(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        new_stake: Amount,
+    ) -> AccountTransaction<EncodedPayload> {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let payload = Payload::UpdateBakerStake { stake: new_stake };
+        make_and_sign_transaction(
+            signer,
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add(cost::UPDATE_BAKER_STAKE),
+            &payload,
+        )
+    }
+
+    pub fn update_baker_restake_earnings(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        restake_earnings: bool,
+    ) -> AccountTransaction<EncodedPayload> {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let payload = Payload::UpdateBakerRestakeEarnings { restake_earnings };
+        make_and_sign_transaction(
+            signer,
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add(cost::UPDATE_BAKER_RESTAKE),
+            &payload,
+        )
+    }
+
+    /// Construct a transction to register the given piece of data.
+    pub fn register_data(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        data: RegisteredData,
+    ) -> AccountTransaction<EncodedPayload> {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let payload = Payload::RegisterData { data };
+        make_and_sign_transaction(
+            signer,
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add(cost::REGISTER_DATA),
+            &payload,
+        )
+    }
+
+    /// Deploy the given Wasm module. The module is given as a binary source,
+    /// and no processing is done to the module.
+    pub fn deploy_module(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        source: smart_contracts::ModuleSource,
+    ) -> AccountTransaction<EncodedPayload> {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let module_size = source.size();
+        let payload = Payload::DeployModule {
+            module: smart_contracts::WasmModule { version: 0, source },
+        };
+        make_and_sign_transaction(
+            signer,
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add(cost::deploy_module(module_size)),
+            &payload,
+        )
+    }
+
+    pub enum GivenEnergy {
+        /// Use this exact amount of energy.
+        Absolute(Energy),
+        /// Add the given amount of energy to the base amount.
+        /// The base amount covers transaction size and signature checking.
+        Add(Energy),
+    }
+
+    /// A convenience wrapper around `sign_transaction` that construct the
+    /// transaction and signs it. Compared to transaction-type-specific wrappers
+    /// above this allows selecting the amount of energy
+    pub fn make_and_sign_transaction(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        energy: GivenEnergy,
+        payload: &Payload,
+    ) -> AccountTransaction<EncodedPayload> {
+        let builder = TransactionBuilder::new(sender, nonce, expiry, payload);
+        let cost = |size| match energy {
+            GivenEnergy::Absolute(energy) => energy,
+            GivenEnergy::Add(energy) => {
+                let num_keys = signer.num_keys();
+                cost::base_cost(size, num_keys) + energy
+            }
+        };
+        builder.finalize(signer, cost)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::types::hashes::TransactionSignHash;
@@ -820,7 +1340,7 @@ mod tests {
             }
         }
         let hash = TransactionSignHash::new(rng.gen());
-        let sig = sign_transaction_hash(&keys, &hash);
+        let sig = keys.sign_transaction_hash(&hash);
         let threshold =
             AccountThreshold::try_from(rng.gen_range(1, (keys.len() + 1) as u8)).unwrap();
         let pub_keys = keys

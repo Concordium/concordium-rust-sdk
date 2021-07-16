@@ -5,7 +5,11 @@ use crate::{
         GetTransactionStatusInBlockRequest, JsonResponse, PeerConnectRequest, PeerElement,
         PeersRequest, SendTransactionRequest, TransactionHash,
     },
-    types::{self, network, queries, transactions, BakerId},
+    types::{
+        self, network, queries,
+        transactions::{self, PayloadLike},
+        BakerId,
+    },
 };
 use anyhow::anyhow;
 use crypto_common::Versioned;
@@ -665,13 +669,12 @@ impl Client {
         Ok(nn)
     }
 
-    pub async fn send_transaction<PayloadType>(
+    /// Send the given block item on the given network.
+    pub async fn send_transaction<PayloadType: PayloadLike>(
         &mut self,
         network_id: network::NetworkId,
         bi: &transactions::BlockItem<PayloadType>,
-    ) -> RPCResult<bool>
-    where
-        transactions::BlockItem<PayloadType>: crypto_common::Serial, {
+    ) -> RPCResult<bool> {
         let request = self.construct_request(SendTransactionRequest {
             network_id: u32::from(u16::from(network_id)),
             payload:    crypto_common::to_bytes(&crypto_common::Versioned::new(
