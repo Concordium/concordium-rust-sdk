@@ -95,38 +95,34 @@ where
     let connection_handle = tokio::spawn(connection);
 
     let query_account_statement_asc = {
-        let statement = "SELECT summaries.id, summaries.block, summaries.timestamp, \
-                         summaries.summary
+        let statement = "SELECT ati.id, summaries.block, summaries.timestamp, summaries.summary
  FROM ati JOIN summaries ON ati.summary = summaries.id
- WHERE ati.account = $1 AND ati.summary >= $2
- ORDER BY summaries.id ASC LIMIT $3";
+ WHERE ati.account = $1 AND ati.id >= $2
+ ORDER BY ati.id ASC LIMIT $3";
         database_client.prepare(statement).await?
     };
 
     let query_contract_statement_asc = {
-        let statement = "SELECT summaries.id, summaries.block, summaries.timestamp, \
-                         summaries.summary
+        let statement = "SELECT cti.id, summaries.block, summaries.timestamp, summaries.summary
  FROM cti JOIN summaries ON cti.summary = summaries.id
- WHERE cti.index = $1 AND cti.subindex = $2 AND cti.summary >= $3
- ORDER BY summaries.id ASC LIMIT $4";
+ WHERE cti.index = $1 AND cti.subindex = $2 AND cti.id >= $3
+ ORDER BY cti.id ASC LIMIT $4";
         database_client.prepare(statement).await?
     };
 
     let query_account_statement_desc = {
-        let statement = "SELECT summaries.id, summaries.block, summaries.timestamp, \
-                         summaries.summary
+        let statement = "SELECT ati.id, summaries.block, summaries.timestamp, summaries.summary
  FROM ati JOIN summaries ON ati.summary = summaries.id
- WHERE ati.account = $1 AND ati.summary <= $2
- ORDER BY summaries.id DESC LIMIT $3";
+ WHERE ati.account = $1 AND ati.id <= $2
+ ORDER BY ati.id DESC LIMIT $3";
         database_client.prepare(statement).await?
     };
 
     let query_contract_statement_desc = {
-        let statement = "SELECT summaries.id, summaries.block, summaries.timestamp, \
-                         summaries.summary
+        let statement = "SELECT cti.id, summaries.block, summaries.timestamp, summaries.summary
  FROM cti JOIN summaries ON cti.summary = summaries.id
- WHERE cti.index = $1 AND cti.subindex = $2 AND cti.summary <= $3
- ORDER BY summaries.id DESC LIMIT $4";
+ WHERE cti.index = $1 AND cti.subindex = $2 AND cti.id <= $3
+ ORDER BY cti.id DESC LIMIT $4";
         database_client.prepare(statement).await?
     };
 
