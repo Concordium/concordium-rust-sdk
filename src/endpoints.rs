@@ -40,8 +40,8 @@ impl From<serde_json::Error> for RPCError {
     fn from(x: serde_json::Error) -> Self { Self::ParseError(x.into()) }
 }
 
-impl From<semver::SemVerError> for RPCError {
-    fn from(x: semver::SemVerError) -> Self { Self::ParseError(x.into()) }
+impl From<semver::Error> for RPCError {
+    fn from(x: semver::Error) -> Self { Self::ParseError(x.into()) }
 }
 
 #[derive(Error, Debug)]

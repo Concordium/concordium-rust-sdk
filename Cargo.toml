@@ -8,8 +8,8 @@ license-file = "LICENSE"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tonic = "0.4.2"
-prost = "0.7.0"
+tonic = "0.5"
+prost = "0.8"
 tokio = { version = "1.5.0", features = ["full"] }
 futures = "0.3"
 serde_json = "1.0.60"
@@ -18,7 +18,7 @@ chrono = {version = "0.4", features = ["serde"] }
 thiserror = "1"
 hex = "0.4.3"
 derive_more = "0.99"
-semver = "0.11"
+semver = "1"
 anyhow = "1.0"
 # See https://github.com/serde-rs/json/issues/505 for how to be careful.
 rust_decimal = { version = "1.14", features = ["serde-float", "serde-arbitrary-precision"]}
@@ -44,4 +44,4 @@ clap = "2.33.3"
 rand = "0.7"
 
 [build-dependencies]
-tonic-build = "0.4.2"
+tonic-build = "0.5"
