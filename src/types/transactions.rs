@@ -1348,10 +1348,10 @@ mod tests {
             .map(|(&ci, keys)| {
                 let threshold = SignatureThreshold(rng.gen_range(1, keys.len() + 1) as u8);
                 let keys = keys
-                    .into_iter()
+                    .iter()
                     .map(|(&ki, kp)| (ki, VerifyKey::from(kp)))
                     .collect();
-                (ci, CredentialPublicKeys { threshold, keys })
+                (ci, CredentialPublicKeys { keys, threshold })
             })
             .collect::<BTreeMap<_, _>>();
         let mut access_structure = AccountAccessStructure {

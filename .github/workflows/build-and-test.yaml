@@ -1,0 +1,81 @@
+name: Build and test
+
+# This job runs
+# - rustfmt and clippy linting,
+# - cargo check
+# - cargo test
+
+on:
+  push:
+    branches: main
+
+  pull_request:
+    branches: main
+
+  workflow_dispatch: # allows manual trigger
+
+env:
+  RUST_FMT: nightly-2021-06-09-x86_64-unknown-linux-gnu
+  RUST_VERSION: 1.53
+
+jobs:
+  "lint_fmt":
+    name: lint:fmt
+    # Don't run on draft pull requests
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUST_FMT }}
+          override: true
+          components: rustfmt
+      - name: Format
+        run: |
+          cargo fmt -- --color=always --check
+
+  "lint_clippy":
+    name: lint:clippy
+    # Don't run on draft pull requests
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
+          components: rustfmt, clippy
+      - name: Clippy
+        run: |
+          cargo clippy --color=always --tests --benches --examples -- -Dclippy::all
+
+  "cargo_test":
+    name: cargo:test
+    runs-on: ubuntu-latest
+    needs:
+      - lint_clippy
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
+          components: rustfmt
+      - name: Test
+        run: cargo test
+
