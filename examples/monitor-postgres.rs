@@ -46,7 +46,7 @@ async fn main() -> anyhow::Result<()> {
     // get the ID where new events will start at.
     let start_id = {
         let rows = db
-            .query_account(&addr, 1, QueryOrder::Descending { start: i64::MAX })
+            .query_account(&addr, 1, QueryOrder::Descending { start: None })
             .await?;
         rows.fold(0, |_, row| async move { row.id + 1 }).await
     };
@@ -61,7 +61,7 @@ async fn main() -> anyhow::Result<()> {
         loop {
             let rows = db
                 .query_account(&addr, 100, QueryOrder::Ascending {
-                    start: next_start_id,
+                    start: Some(next_start_id),
                 })
                 .await?;
             // in the fold closure below we only need a reference to the channel

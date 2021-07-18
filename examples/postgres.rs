@@ -12,6 +12,13 @@ use tokio_postgres::NoTls;
 struct App {
     #[structopt(long = "account")]
     account: AccountAddress,
+    #[structopt(
+        long = "db",
+        default_value = "host=localhost dbname=transaction-outcome user=postgres \
+                         password=password port=5432",
+        help = "Database connection string."
+    )]
+    config:  tokio_postgres::Config,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -24,14 +31,12 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
-    let config = "host=localhost dbname=transaction-outcome user=postgres password=password \
-                  port=5432"
-        .parse()?;
+    let config = app.config;
 
     let db = create_client(config, NoTls).await?;
     let addr: AccountAddress = app.account;
     let rows = db
-        .query_account(&addr, 50, QueryOrder::Ascending { start: 0 })
+        .query_account(&addr, 50, QueryOrder::Ascending { start: None })
         .await?;
     rows.for_each(|entry| async move {
         println!("{:?}", entry.id);
@@ -42,7 +47,7 @@ async fn main() -> anyhow::Result<()> {
         .query_contract(
             ContractAddress::new(0.into(), 0.into()),
             20,
-            QueryOrder::Ascending { start: 0 },
+            QueryOrder::Ascending { start: None },
         )
         .await?;
     rows.for_each(|entry| async move {
@@ -51,7 +56,7 @@ async fn main() -> anyhow::Result<()> {
     .await;
 
     let rows = db
-        .query_account(&addr, 20, QueryOrder::Descending { start: 0 })
+        .query_account(&addr, 20, QueryOrder::Descending { start: None })
         .await?;
     rows.for_each(|entry| async move {
         println!("{:?}", entry);
@@ -62,7 +67,7 @@ async fn main() -> anyhow::Result<()> {
         .query_contract(
             ContractAddress::new(0.into(), 0.into()),
             20,
-            QueryOrder::Descending { start: 0 },
+            QueryOrder::Descending { start: None },
         )
         .await?;
     rows.for_each(|entry| async move {

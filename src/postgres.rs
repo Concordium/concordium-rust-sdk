@@ -140,11 +140,13 @@ where
 pub enum QueryOrder {
     Ascending {
         /// Return results where the row ID is `start` or higher.
-        start: i64,
+        /// If `start` is not given assume starting from the beginning.
+        start: Option<i64>,
     },
     Descending {
         /// Return results where the row ID is `start` or lower.
-        start: i64,
+        /// If `start` is not given assume starting from the end.
+        start: Option<i64>,
     },
 }
 
@@ -160,8 +162,13 @@ impl DatabaseClient {
         order: QueryOrder,
     ) -> Result<impl futures::stream::Stream<Item = DatabaseRow>, tokio_postgres::Error> {
         let (statement, start) = match order {
-            QueryOrder::Ascending { start } => (&self.query_account_statement_asc, start),
-            QueryOrder::Descending { start } => (&self.query_account_statement_desc, start),
+            QueryOrder::Ascending { start } => {
+                (&self.query_account_statement_asc, start.unwrap_or(i64::MIN))
+            }
+            QueryOrder::Descending { start } => (
+                &self.query_account_statement_desc,
+                start.unwrap_or(i64::MAX),
+            ),
         };
 
         // This type, and the trait implementation below, are necessary
@@ -223,8 +230,14 @@ impl DatabaseClient {
         order: QueryOrder,
     ) -> Result<impl futures::stream::Stream<Item = DatabaseRow>, tokio_postgres::Error> {
         let (statement, start) = match order {
-            QueryOrder::Ascending { start } => (&self.query_contract_statement_asc, start),
-            QueryOrder::Descending { start } => (&self.query_contract_statement_desc, start),
+            QueryOrder::Ascending { start } => (
+                &self.query_contract_statement_asc,
+                start.unwrap_or(i64::MIN),
+            ),
+            QueryOrder::Descending { start } => (
+                &self.query_contract_statement_desc,
+                start.unwrap_or(i64::MAX),
+            ),
         };
 
         let params: [i64; 4] = [
@@ -245,10 +258,8 @@ impl DatabaseClient {
         acc: &AccountAddress,
         start: Option<i64>,
     ) -> Result<impl futures::stream::Stream<Item = DatabaseRow>, tokio_postgres::Error> {
-        self.query_account(acc, i64::MAX, QueryOrder::Ascending {
-            start: start.unwrap_or(0),
-        })
-        .await
+        self.query_account(acc, i64::MAX, QueryOrder::Ascending { start })
+            .await
     }
 
     /// Return all transactions affecting the contract, starting with the given
@@ -258,10 +269,8 @@ impl DatabaseClient {
         addr: ContractAddress,
         start: Option<i64>,
     ) -> Result<impl futures::stream::Stream<Item = DatabaseRow>, tokio_postgres::Error> {
-        self.query_contract(addr, i64::MAX, QueryOrder::Ascending {
-            start: start.unwrap_or(0),
-        })
-        .await
+        self.query_contract(addr, i64::MAX, QueryOrder::Ascending { start })
+            .await
     }
 }
 
