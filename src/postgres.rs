@@ -1,11 +1,10 @@
-use std::convert::TryInto;
-
 use crate::types::{
     hashes::BlockHash, BlockItemSummary, ContractAddress, SpecialTransactionOutcome,
 };
 use crypto_common::{types::Timestamp, SerdeDeserialize, SerdeSerialize};
 use futures::StreamExt;
 use id::types::AccountAddress;
+use std::convert::TryInto;
 use tokio::task::{JoinError, JoinHandle};
 use tokio_postgres::types::ToSql;
 
@@ -154,9 +153,9 @@ impl DatabaseClient {
     /// The return value is a stream of rows that have been parsed.
     ///
     /// The `limit` value limits the number of rows that will be returned.
-    pub async fn query_account(
-        &self,
-        acc: &AccountAddress,
+    pub async fn query_account<'a>(
+        &'a self,
+        acc: &'a AccountAddress,
         limit: i64,
         order: QueryOrder,
     ) -> Result<impl futures::stream::Stream<Item = DatabaseRow>, tokio_postgres::Error> {
@@ -165,9 +164,51 @@ impl DatabaseClient {
             QueryOrder::Descending { start } => (&self.query_account_statement_desc, start),
         };
 
-        let params: [&(dyn ToSql); 3] = [&&acc.as_ref()[..], &start, &limit];
+        // This type, and the trait implementation below, are necessary
+        // because tokio_postgres API is not flexible enough to allow supplying
+        // tuples of values of different type as parameters.
+        //
+        // In principle this could be solvable by supplying an array of [&dyn ToSql]
+        // values, but that causes problems when, for example, the Future (that
+        // is the result of this function) is shipped off to a background task.
+        // The information that the type that is in that array is Sync is lost.
+        // Ideally we'd like to have [&dyn ToSql + Sync] but this does
+        // not work either due to obscure reasons.
+        //
+        // Hence we have this private type.
+        #[derive(Debug)]
+        enum Helper<'a> {
+            Array(&'a AccountAddress),
+            Int(i64),
+        }
 
-        let rows = self.as_ref().query_raw(statement, params).await?;
+        impl<'a> ToSql for Helper<'a> {
+            tokio_postgres::types::to_sql_checked!();
+
+            fn to_sql(
+                &self,
+                ty: &tokio_postgres::types::Type,
+                out: &mut prost::bytes::BytesMut,
+            ) -> Result<tokio_postgres::types::IsNull, Box<dyn std::error::Error + Sync + Send>>
+            where
+                Self: Sized, {
+                match self {
+                    Helper::Array(acc) => acc.as_ref().as_ref().to_sql(ty, out),
+                    Helper::Int(start) => start.to_sql(ty, out),
+                }
+            }
+
+            fn accepts(ty: &tokio_postgres::types::Type) -> bool
+            where
+                Self: Sized, {
+                ty == &tokio_postgres::types::Type::BYTEA
+                    || ty == &tokio_postgres::types::Type::INT8
+            }
+        }
+
+        let params = [Helper::Array(acc), Helper::Int(start), Helper::Int(limit)];
+
+        let rows = self.as_ref().query_raw(statement, &params).await?;
         Ok(rows.filter_map(|row_or_err| async move { construct_row(row_or_err) }))
     }
 
