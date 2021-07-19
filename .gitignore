@@ -20,4 +20,3 @@ pkg
 *.state
 
 Cargo.lock
-
