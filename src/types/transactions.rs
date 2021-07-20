@@ -750,6 +750,26 @@ pub enum BlockItem<PayloadType> {
     // FIXME: Add update instructions
 }
 
+impl<PayloadType> From<AccountTransaction<PayloadType>> for BlockItem<PayloadType> {
+    fn from(at: AccountTransaction<PayloadType>) -> Self { Self::AccountTransaction(at) }
+}
+
+impl<PayloadType>
+    From<
+        AccountCredential<id::constants::IpPairing, id::constants::ArCurve, id::ffi::AttributeKind>,
+    > for BlockItem<PayloadType>
+{
+    fn from(
+        at: AccountCredential<
+            id::constants::IpPairing,
+            id::constants::ArCurve,
+            id::ffi::AttributeKind,
+        >,
+    ) -> Self {
+        Self::CredentialDeployment(Box::new(at))
+    }
+}
+
 impl<PayloadType> BlockItem<PayloadType> {
     /// Compute the hash of the block item that identifies the block item on the
     /// chain.

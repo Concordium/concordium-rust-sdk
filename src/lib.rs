@@ -10,3 +10,9 @@ mod internal;
 pub mod postgres;
 /// Type definitions used throughout the rest of the SDK.
 pub mod types;
+
+/// Re-export of the identity library.
+pub use id;
+
+/// Re-export of common helper functionality.
+pub use crypto_common as common;

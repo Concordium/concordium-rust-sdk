@@ -19,9 +19,10 @@ use id::{
 };
 use std::{borrow::Borrow, convert::TryInto, net::IpAddr, sync::Arc, time::UNIX_EPOCH};
 use thiserror::Error;
+pub use tonic::transport::Endpoint;
 use tonic::{
     metadata::{errors::InvalidMetadataValue, MetadataValue},
-    transport::{Channel, Endpoint},
+    transport::Channel,
     Response,
 };
 

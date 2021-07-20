@@ -134,14 +134,20 @@ pub struct Energy {
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
+#[derive(
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into, Default,
+)]
+/// Contract index. The default implementation produces contract index 0.
 pub struct ContractIndex {
     pub index: u64,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
+#[derive(
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into, Default,
+)]
+/// Contract subindex. The default implementation produces contract index 0.
 pub struct ContractSubIndex {
     pub sub_index: u64,
 }

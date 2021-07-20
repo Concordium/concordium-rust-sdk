@@ -91,8 +91,8 @@ impl Deserial for InitName {
     }
 }
 
-/// FIXME: Move to Wasm.
-#[derive(SerdeSerialize, SerdeDeserialize, derive::Serial, Debug, Clone, AsRef, Into)]
+/// FIXME: Move to Wasm, and check size also in JSON deserialization
+#[derive(SerdeSerialize, SerdeDeserialize, derive::Serial, Debug, Clone, AsRef, Into, From)]
 #[serde(transparent)]
 pub struct Parameter {
     #[serde(with = "crate::internal::byte_array_hex")]
