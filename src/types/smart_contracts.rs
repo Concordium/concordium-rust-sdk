@@ -39,6 +39,10 @@ impl From<ReceiveName> for String {
     fn from(n: ReceiveName) -> Self { n.name }
 }
 
+impl<'a> From<&'a ReceiveName> for &'a str {
+    fn from(n: &'a ReceiveName) -> Self { n.name.as_str() }
+}
+
 impl TryFrom<String> for ReceiveName {
     type Error = concordium_contracts_common::NewReceiveNameError;
 
@@ -70,6 +74,10 @@ pub struct InitName {
 
 impl From<InitName> for String {
     fn from(n: InitName) -> Self { n.name }
+}
+
+impl<'a> From<&'a InitName> for &'a str {
+    fn from(n: &'a InitName) -> Self { n.name.as_str() }
 }
 
 impl TryFrom<String> for InitName {

@@ -7,7 +7,7 @@ use id::types::AccountAddress;
 use std::convert::TryInto;
 use tokio::task::{JoinError, JoinHandle};
 use tokio_postgres::types::ToSql;
-pub use tokio_postgres::{Config, NoTls};
+pub use tokio_postgres::{Config, Error, NoTls};
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 pub enum DatabaseSummaryEntry {
