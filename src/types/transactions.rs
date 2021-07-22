@@ -9,8 +9,7 @@ use super::{
 use crate::constants::*;
 use crypto_common::{
     derive::{Serial, Serialize},
-    serde_impls::KeyPairDef,
-    types::{Amount, KeyIndex, Timestamp, TransactionSignature, TransactionTime},
+    types::{Amount, KeyIndex, KeyPair, Timestamp, TransactionSignature, TransactionTime},
     Buffer, Deserial, Get, ParseResult, Put, ReadBytesExt, SerdeDeserialize, SerdeSerialize,
     Serial,
 };
@@ -312,7 +311,7 @@ pub enum Payload {
             CredentialDeploymentInfo<
                 id::constants::IpPairing,
                 id::constants::ArCurve,
-                id::ffi::AttributeKind,
+                id::constants::AttributeKind,
             >,
         >,
         /// Ids of credentials to remove.
@@ -618,7 +617,7 @@ impl ExactSizeTransactionSigner for AccountKeys {
     }
 }
 
-impl TransactionSigner for BTreeMap<CredentialIndex, BTreeMap<KeyIndex, KeyPairDef>> {
+impl TransactionSigner for BTreeMap<CredentialIndex, BTreeMap<KeyIndex, KeyPair>> {
     fn sign_transaction_hash(
         &self,
         hash_to_sign: &hashes::TransactionSignHash,
@@ -635,7 +634,7 @@ impl TransactionSigner for BTreeMap<CredentialIndex, BTreeMap<KeyIndex, KeyPairD
     }
 }
 
-impl ExactSizeTransactionSigner for BTreeMap<CredentialIndex, BTreeMap<KeyIndex, KeyPairDef>> {
+impl ExactSizeTransactionSigner for BTreeMap<CredentialIndex, BTreeMap<KeyIndex, KeyPair>> {
     fn num_keys(&self) -> u32 { self.values().map(|v| v.len() as u32).sum::<u32>() }
 }
 
@@ -743,7 +742,7 @@ pub enum BlockItem<PayloadType> {
             AccountCredential<
                 id::constants::IpPairing,
                 id::constants::ArCurve,
-                id::ffi::AttributeKind,
+                id::constants::AttributeKind,
             >,
         >,
     ),
@@ -756,14 +755,18 @@ impl<PayloadType> From<AccountTransaction<PayloadType>> for BlockItem<PayloadTyp
 
 impl<PayloadType>
     From<
-        AccountCredential<id::constants::IpPairing, id::constants::ArCurve, id::ffi::AttributeKind>,
+        AccountCredential<
+            id::constants::IpPairing,
+            id::constants::ArCurve,
+            id::constants::AttributeKind,
+        >,
     > for BlockItem<PayloadType>
 {
     fn from(
         at: AccountCredential<
             id::constants::IpPairing,
             id::constants::ArCurve,
-            id::ffi::AttributeKind,
+            id::constants::AttributeKind,
         >,
     ) -> Self {
         Self::CredentialDeployment(Box::new(at))
@@ -1345,7 +1348,7 @@ mod tests {
     #[test]
     fn test_transaction_signature_check() {
         let mut rng = rand::thread_rng();
-        let mut keys = BTreeMap::<CredentialIndex, BTreeMap<KeyIndex, KeyPairDef>>::new();
+        let mut keys = BTreeMap::<CredentialIndex, BTreeMap<KeyIndex, KeyPair>>::new();
         let bound: usize = rng.gen_range(1, 20);
         for _ in 0..bound {
             let c_idx = CredentialIndex::from(rng.gen::<u8>());
@@ -1354,7 +1357,7 @@ mod tests {
                 let mut cred_keys = BTreeMap::new();
                 for _ in 0..inner_bound {
                     let k_idx = KeyIndex::from(rng.gen::<u8>());
-                    cred_keys.insert(k_idx, KeyPairDef::generate(&mut rng));
+                    cred_keys.insert(k_idx, KeyPair::generate(&mut rng));
                 }
                 keys.insert(c_idx, cred_keys);
             }

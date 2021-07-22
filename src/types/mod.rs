@@ -14,8 +14,7 @@ use crypto_common::{
     Buffer, Deserial, Get, ParseResult, SerdeDeserialize, SerdeSerialize, Serial, Versioned,
 };
 use id::{
-    constants::ArCurve,
-    ffi::AttributeKind,
+    constants::{ArCurve, AttributeKind},
     types::{AccountAddress, AccountCredentialWithoutProofs},
 };
 use std::{

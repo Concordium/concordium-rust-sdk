@@ -6,9 +6,11 @@
 //! of postgres notifications to avoid queries which will mostly return nothing.
 
 use clap::AppSettings;
-use concordium_rust_sdk::postgres::{create_client, QueryOrder};
+use concordium_rust_sdk::{
+    id::types::AccountAddress,
+    postgres::{create_client, QueryOrder},
+};
 use futures::StreamExt;
-use id::types::AccountAddress;
 use structopt::StructOpt;
 use tokio_postgres::NoTls;
 

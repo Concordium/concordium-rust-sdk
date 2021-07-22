@@ -16,3 +16,23 @@ pub use id;
 
 /// Re-export of common helper functionality.
 pub use crypto_common as common;
+
+/// Re-export of functionality for constructing and verifying encrypted
+/// transfers.
+pub use encrypted_transfers;
+
+/// Re-export of functionality for constructing and verifying aggregate
+/// signatures. This is useful for constructing baker transactions.
+pub use aggregate_sig;
+
+/// Re-export of Elgamal encryption.
+pub use elgamal;
+
+/// Re-export of Elgamal encryption.
+pub use eddsa_ed25519;
+
+/// Re-export of Elgamal encryption.
+pub use ecvrf;
+
+/// Re-export of Pedersen commitments functionality.
+pub use pedersen_scheme as pedersen_commitment;

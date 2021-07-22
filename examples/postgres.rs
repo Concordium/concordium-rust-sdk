@@ -1,10 +1,10 @@
 use clap::AppSettings;
 use concordium_rust_sdk::{
+    id::types::AccountAddress,
     postgres::{create_client, QueryOrder},
     types::ContractAddress,
 };
 use futures::StreamExt;
-use id::types::AccountAddress;
 use structopt::StructOpt;
 use tokio_postgres::NoTls;
 
