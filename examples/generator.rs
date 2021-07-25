@@ -12,7 +12,11 @@ use structopt::StructOpt;
 
 #[derive(StructOpt)]
 struct App {
-    #[structopt(long = "grpc")]
+    #[structopt(
+        long = "node",
+        help = "GRPC interface of the node.",
+        default_value = "http://localhost:10000"
+    )]
     endpoint:  tonic::transport::Endpoint,
     #[structopt(long = "sender")]
     account:   PathBuf,
