@@ -5,7 +5,10 @@ use concordium_rust_sdk::{
     constants::DEFAULT_NETWORK_ID,
     endpoints,
     id::types::{AccountAddress, AccountKeys},
-    types::transactions::{send, BlockItem},
+    types::{
+        self,
+        transactions::{send, BlockItem},
+    },
 };
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -58,7 +61,7 @@ async fn main() -> anyhow::Result<()> {
     let consensus_info = client.get_consensus_status().await?;
 
     // Get the initial nonce.
-    let acc_info = client
+    let acc_info: types::AccountInfo = client
         .get_account_info(&keys.address, &consensus_info.last_finalized_block)
         .await?;
 

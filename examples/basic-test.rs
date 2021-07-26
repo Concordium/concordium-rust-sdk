@@ -1,15 +1,10 @@
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize},
-    constants::DEFAULT_NETWORK_ID,
+    common::{SerdeDeserialize, SerdeSerialize},
     endpoints,
     id::types::{AccountAddress, AccountKeys},
-    types::{
-        self,
-        transactions::{send, BlockItem},
-    },
+    types,
 };
-use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -22,8 +17,6 @@ struct App {
     endpoint:    tonic::transport::Endpoint,
     #[structopt(long = "block")]
     start_block: Option<types::hashes::BlockHash>,
-    #[structopt(long = "keys")]
-    account:     PathBuf,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize)]
@@ -43,8 +36,6 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
-    let keys: AccountData = serde_json::from_str(&std::fs::read_to_string(app.account)?)?;
-
     let mut client = endpoints::Client::connect(app.endpoint, "rpcadmin".to_string()).await?;
 
     let version = client.version().await?;
@@ -57,46 +48,6 @@ async fn main() -> anyhow::Result<()> {
 
     let consensus_info = client.get_consensus_status().await?;
     println!("{}", serde_json::to_string_pretty(&consensus_info).unwrap());
-
-    // send transaction
-    let acc_info = client
-        .get_account_info(&keys.address, &consensus_info.last_finalized_block)
-        .await?;
-    println!("{:?}", acc_info);
-    let expiry: TransactionTime =
-        TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
-    let tx = send::transfer(
-        &keys.account_keys,
-        keys.address,
-        acc_info.account_nonce,
-        expiry,
-        keys.address,
-        1.into(),
-    );
-    let item = BlockItem::AccountTransaction(tx);
-    let transaction_hash = item.hash();
-    let res = client.send_transaction(DEFAULT_NETWORK_ID, &item).await?;
-    anyhow::ensure!(res, "Transaction not accepted.");
-    println!("Transaction {} submitted.", transaction_hash);
-    loop {
-        let status = client.get_transaction_status(&transaction_hash).await?;
-        match status {
-            types::TransactionStatus::Received => {
-                println!("Transaction received.");
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            }
-            types::TransactionStatus::Finalized(outcome) => {
-                println!("Transaction finalized.");
-                println!("{:?}", outcome);
-                break;
-            }
-            types::TransactionStatus::Committed(outcomes) => {
-                println!("Transaction committed.");
-                println!("{:?}", outcomes);
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            }
-        }
-    }
 
     let gb = consensus_info.genesis_block;
     let mut cb = app.start_block.unwrap_or(consensus_info.best_block);

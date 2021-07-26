@@ -451,6 +451,23 @@ impl Client {
         addr: impl Borrow<id::types::AccountAddress>,
         bh: &types::hashes::BlockHash,
     ) -> QueryResult<types::AccountInfo> {
+        let res = self.get_account_info_raw(addr, bh).await?;
+        Ok(serde_json::from_value(res)?)
+    }
+
+    /// Get the information for the given account in the given block. If either
+    /// the block or the account does not exist [QueryError::NotFound] is
+    /// returned. In contrast to [Client::get_account_info] this function does
+    /// not fully parse the result. Since parsing account responses can be
+    /// relatively expensive this provides an option to delay parsing, or to
+    /// only take out individual values. The return
+    /// [Value](serde_json::Value) will always be parseable as a
+    /// [AccountInfo](types::AccountInfo)
+    pub async fn get_account_info_raw(
+        &mut self,
+        addr: impl Borrow<id::types::AccountAddress>,
+        bh: &types::hashes::BlockHash,
+    ) -> QueryResult<serde_json::Value> {
         let request = self.construct_request(GetAddressInfoRequest {
             address:    addr.borrow().to_string(),
             block_hash: bh.to_string(),
@@ -471,6 +488,25 @@ impl Client {
         addr: impl Borrow<crate::types::CredentialRegistrationID>,
         bh: &types::hashes::BlockHash,
     ) -> QueryResult<types::AccountInfo> {
+        let res = self.get_account_info_by_cred_id_raw(addr, bh).await?;
+        Ok(serde_json::from_value(res)?)
+    }
+
+    /// Get the information for the given account in the given block by
+    /// credential registration id. This returns an account that is either
+    /// currently, or was in the past, associated with a credential with the
+    /// specified registration id.
+    ///
+    /// If either the block or the credential registration id does no not exist
+    /// then [QueryError::NotFound] is returned.
+    ///
+    /// Compares to [Client::get_account_info_by_cred_id] analogously to how
+    /// [Client::get_account_info] compares to [Client::get_account_info_raw]
+    pub async fn get_account_info_by_cred_id_raw(
+        &mut self,
+        addr: impl Borrow<crate::types::CredentialRegistrationID>,
+        bh: &types::hashes::BlockHash,
+    ) -> QueryResult<serde_json::Value> {
         let request = self.construct_request(GetAddressInfoRequest {
             address:    addr.borrow().to_string(),
             block_hash: bh.to_string(),
@@ -697,5 +733,10 @@ fn parse_json_response<A: serde::de::DeserializeOwned>(
     // We go through the intermediate Value to handle arbitrary precision floats
     // limitation of Serde.
     let val = serde_json::from_str::<serde_json::Value>(inner.value.as_str())?;
-    serde_json::from_value::<Option<A>>(val)?.ok_or(QueryError::NotFound)
+    if val.is_null() {
+        Err(QueryError::NotFound)
+    } else {
+        let res = serde_json::from_value::<A>(val)?;
+        Ok(res)
+    }
 }
