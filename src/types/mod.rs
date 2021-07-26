@@ -168,7 +168,7 @@ pub struct BirkBaker {
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
-#[serde(tag = "pendingChange")]
+#[serde(tag = "change")]
 /// Pending change in the baker's stake.
 pub enum BakerPendingChange {
     #[serde(rename = "ReduceStake")]
@@ -176,7 +176,7 @@ pub enum BakerPendingChange {
     /// The stake is being reduced. The new stake will take affect in the given
     /// epoch.
     ReduceStake { new_stake: Amount, epoch: Epoch },
-    #[serde(rename = "ReduceStake")]
+    #[serde(rename = "RemoveBaker")]
     #[serde(rename_all = "camelCase")]
     /// The baker will be removed at the end of the given epoch.
     RemoveBaker { epoch: Epoch },
