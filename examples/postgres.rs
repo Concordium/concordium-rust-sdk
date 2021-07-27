@@ -1,7 +1,7 @@
 use clap::AppSettings;
 use concordium_rust_sdk::{
     id::types::AccountAddress,
-    postgres::{create_client, QueryOrder},
+    postgres::{DatabaseClient, QueryOrder},
     types::ContractAddress,
 };
 use futures::StreamExt;
@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
 
     let config = app.config;
 
-    let db = create_client(config, NoTls).await?;
+    let db = DatabaseClient::create(config, NoTls).await?;
     let addr: AccountAddress = app.account;
     let rows = db
         .query_account(&addr, 50, QueryOrder::Ascending { start: None })

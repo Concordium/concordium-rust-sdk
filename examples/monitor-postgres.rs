@@ -8,7 +8,7 @@
 use clap::AppSettings;
 use concordium_rust_sdk::{
     id::types::AccountAddress,
-    postgres::{create_client, QueryOrder},
+    postgres::{DatabaseClient, QueryOrder},
 };
 use futures::StreamExt;
 use structopt::StructOpt;
@@ -43,7 +43,7 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
-    let db = create_client(app.config, NoTls).await?;
+    let db = DatabaseClient::create(app.config, NoTls).await?;
     let addr: AccountAddress = app.account;
     // get the ID where new events will start at.
     let start_id = {
