@@ -94,11 +94,17 @@ where
     let (database_client, connection) = config.connect(tls).await?;
     let connection_handle = tokio::spawn(connection);
 
+    // NB before changing the queries.
+    // In these queries we add a semantically unnecessary ORDER BY
+    // summaries.id. This is added to increase performance of the queries.
+    // Otherwise queries with small limits take a lot more time (<0.5s vs 7s). The
+    // reason for this appears to be the postgresql query planner which chooses
+    // a wrong approach for small limits for the database we have.
     let query_account_statement_asc = {
         let statement = "SELECT ati.id, summaries.block, summaries.timestamp, summaries.summary
  FROM ati JOIN summaries ON ati.summary = summaries.id
  WHERE ati.account = $1 AND ati.id >= $2
- ORDER BY ati.id ASC LIMIT $3";
+ ORDER BY ati.id ASC, summaries.id ASC LIMIT $3";
         database_client.prepare(statement).await?
     };
 
@@ -106,7 +112,7 @@ where
         let statement = "SELECT cti.id, summaries.block, summaries.timestamp, summaries.summary
  FROM cti JOIN summaries ON cti.summary = summaries.id
  WHERE cti.index = $1 AND cti.subindex = $2 AND cti.id >= $3
- ORDER BY cti.id ASC LIMIT $4";
+ ORDER BY cti.id ASC, summaries.id ASC LIMIT $4";
         database_client.prepare(statement).await?
     };
 
@@ -114,7 +120,7 @@ where
         let statement = "SELECT ati.id, summaries.block, summaries.timestamp, summaries.summary
  FROM ati JOIN summaries ON ati.summary = summaries.id
  WHERE ati.account = $1 AND ati.id <= $2
- ORDER BY ati.id DESC LIMIT $3";
+ ORDER BY ati.id DESC, summaries.id DESC LIMIT $3";
         database_client.prepare(statement).await?
     };
 
@@ -122,7 +128,7 @@ where
         let statement = "SELECT cti.id, summaries.block, summaries.timestamp, summaries.summary
  FROM cti JOIN summaries ON cti.summary = summaries.id
  WHERE cti.index = $1 AND cti.subindex = $2 AND cti.id <= $3
- ORDER BY cti.id DESC LIMIT $4";
+ ORDER BY cti.id DESC, summaries.id DESC LIMIT $4";
         database_client.prepare(statement).await?
     };
 
