@@ -3,6 +3,7 @@ pub mod hashes;
 pub mod network;
 pub mod queries;
 pub mod smart_contracts;
+mod summary_helper;
 pub mod transactions;
 
 use crate::constants::*;
@@ -202,42 +203,6 @@ pub struct RewardsOverview {
 #[serde(rename_all = "camelCase")]
 // Since all variants are fieldless, the default JSON serialization will convert
 // all the variants to simple strings.
-/// Enumeration of the types of updates that are possible.
-pub enum UpdateType {
-    /// Update the chain protocol
-    UpdateProtocol,
-    /// Update the election difficulty
-    UpdateElectionDifficulty,
-    /// Update the euro per energy exchange rate
-    UpdateEuroPerEnergy,
-    /// Update the microGTU per euro exchange rate
-    UpdateMicroGTUPerEuro,
-    /// Update the address of the foundation account
-    UpdateFoundationAccount,
-    /// Update the distribution of newly minted GTU
-    UpdateMintDistribution,
-    /// Update the distribution of transaction fees
-    UpdateTransactionFeeDistribution,
-    /// Update the GAS rewards
-    UpdateGASRewards,
-    /// Minimum amount to register as a baker
-    UpdateBakerStakeThreshold,
-    /// Add new anonymity revoker
-    UpdateAddAnonymityRevoker,
-    /// Add new identity provider
-    UpdateAddIdentityProvider,
-    /// Update the root keys
-    UpdateRootKeys,
-    /// Update the level 1 keys
-    UpdateLevel1Keys,
-    /// Update the level 2 keys
-    UpdateLevel2Keys,
-}
-
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
-#[serde(rename_all = "camelCase")]
-// Since all variants are fieldless, the default JSON serialization will convert
-// all the variants to simple strings.
 /// Enumeration of the types of credentials.
 pub enum CredentialType {
     /// Initial credential is a credential that is submitted by the identity
@@ -288,25 +253,6 @@ pub enum TransactionType {
     UpdateCredentials,
     /// Register some data on the chain.
     RegisterData,
-}
-
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(tag = "type", content = "contents", rename_all = "camelCase")]
-/// The type of the block item.
-pub enum BlockItemType {
-    #[serde(rename = "accountTransaction")]
-    /// Account transactions are transactions that are signed by an account.
-    /// Most transactions are account transactions.
-    AccountTransaction(#[serde(default)] Option<TransactionType>),
-    #[serde(rename = "credentialDeploymentTransaction")]
-    /// Credential deployments that create accounts are special kinds of
-    /// transactions. They are not signed by the account in the usual way,
-    /// and they are not paid for directly by the sender.
-    CredentialDeploymentTransaction(CredentialType),
-    #[serde(rename = "updateTransaction")]
-    /// Chain updates are signed by the governance keys. They affect the core
-    /// parameters of the chain.
-    UpdateTransaction(UpdateType),
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
@@ -409,48 +355,227 @@ pub enum SpecialTransactionOutcome {
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
 #[serde(rename_all = "camelCase")]
+/// Summary of transactions, protocol generated transfers, and chain parameters
+/// in a given block.
 pub struct BlockSummary {
     transaction_summaries: Vec<BlockItemSummary>,
     special_events:        Vec<SpecialTransactionOutcome>,
     updates:               Updates, // FIXME: Add the finalization data.
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-/// Summary of the outcome of a block item.
+#[derive(SerdeDeserialize, SerdeSerialize, Debug, Clone)]
+#[serde(
+    try_from = "summary_helper::BlockItemSummary",
+    into = "summary_helper::BlockItemSummary"
+)]
+/// Summary of the outcome of a block item in structured form.
+/// The summary determines which transaction type it was.
 pub struct BlockItemSummary {
-    #[serde(default)]
-    /// Sender, if available. The sender is always available for account
-    /// transactions.
-    // FIXME: Restructure this type to make the impossible states unrepresentable.
-    pub sender:       Option<AccountAddress>,
-    /// Hash of the transaction.
-    pub hash:         hashes::TransactionHash,
-    /// The amount of GTU the transaction was charged to the sender.
-    pub cost:         Amount,
-    /// The amount of NRG the transaction cost.
-    pub energy_cost:  Energy,
-    #[serde(rename = "type")]
-    /// Which type of block item this is.
-    pub summary_type: BlockItemType,
-    /// What is the outcome of this particular block item.
-    pub result:       BlockItemResult,
     /// Index of the transaction in the block where it is included.
-    pub index:        TransactionIndex,
+    pub index:       TransactionIndex,
+    /// The amount of NRG the transaction cost.
+    pub energy_cost: Energy,
+    /// Hash of the transaction.
+    pub hash:        hashes::TransactionHash,
+    /// Details that are specific to different transaction types.
+    /// For successful transactions there is a one to one mapping of transaction
+    /// types and variants (together with subvariants) of this type.
+    pub details:     BlockItemSummaryDetails,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(tag = "outcome", rename_all = "camelCase")]
-/// Outcome of a block item execution.
-pub enum BlockItemResult {
-    /// The intended action was completed. The sender was charged, if
-    /// applicable. Some events were generated describing the changes that
-    /// happened on the chain.
-    Success { events: Vec<Event> },
-    #[serde(rename_all = "camelCase")]
-    /// The intended action was not completed due to an error. The sender was
-    /// charged, but no other effect is seen on the chain.
-    Reject { reject_reason: Box<RejectReason> },
+impl BlockItemSummary {
+    pub fn sender_account(&self) -> Option<AccountAddress> {
+        match &self.details {
+            BlockItemSummaryDetails::AccountTransaction(at) => Some(at.sender),
+            BlockItemSummaryDetails::AccountCreation(_) => None,
+            BlockItemSummaryDetails::Update(_) => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+/// Details of a block item summary, split by the kind of block item it is for.
+pub enum BlockItemSummaryDetails {
+    /// The summary is of an account transaction with the given details.
+    AccountTransaction(AccountTransactionDetails),
+    /// The summary is of an account creation, and the outcome is as specified
+    /// by the payload.
+    AccountCreation(AccountCreationDetails),
+    /// The summary is of a chain update, and the outcome is as specified by the
+    /// payload.
+    Update(UpdateDetails),
+}
+
+#[derive(Debug, Clone)]
+/// Details of an account transaction. This always has a sender and is paid for,
+/// and it might have some other effects on the state of the chain.
+pub struct AccountTransactionDetails {
+    /// The amount of GTU the sender paid for including this transaction in
+    /// the block.
+    pub cost:    Amount,
+    /// Sender of the transaction.
+    pub sender:  AccountAddress,
+    /// Effects of the account transaction, if any.
+    pub effects: AccountTransactionEffects,
+}
+
+#[derive(Debug, Clone)]
+/// A successful contract invocation produces a sequence of effects on smart
+/// contracts and possibly accounts (if any contract transfers GTU to an
+/// account).
+pub enum ContractTraceElement {
+    /// A contract instance was updated.
+    Updated { data: InstanceUpdatedEvent },
+    /// A contract transferred am amount to the account,
+    Transferred {
+        /// Sender contract.
+        from:   ContractAddress,
+        /// Amount transferred.
+        amount: Amount,
+        /// Receiver account.
+        to:     AccountAddress,
+    },
+}
+
+#[derive(Debug, Clone)]
+/// Effects of an account transactions. All variants apart from
+/// [AccountTransactionEffects::None] correspond to a unique transaction that
+/// was successful.
+pub enum AccountTransactionEffects {
+    /// No effects other than payment from this transaction.
+    /// The rejection reason indicates why the transaction failed.
+    None {
+        /// Transaction type of a failed transaction, if known.
+        /// In case of serialization failure this will be None.
+        transaction_type: Option<TransactionType>,
+        /// Reason for rejection of the transaction
+        reject_reason:    RejectReason,
+    },
+    /// A module was deployed. This corresponds to
+    /// [DeployModule](transactions::Payload::DeployModule) transaction
+    /// type.
+    ModuleDeployed {
+        module_ref: smart_contracts::ModuleRef,
+    },
+    /// A contract was initialized was deployed. This corresponds to
+    /// [InitContract](transactions::Payload::InitContract) transaction type.
+    ContractInitialized { data: ContractInitializedEvent },
+    /// A contract update transaction was issued and produced the given trace.
+    /// This is the result of [Update](transactions::Payload::Update)
+    /// transaction.
+    ContractUpdateIssued { effects: Vec<ContractTraceElement> },
+    /// A simple account to account transfer occurred. This is the result of a
+    /// successful [Transfer](transactions::Payload::Transfer) transaction.
+    AccountTransfer {
+        /// Amount that was transferred.
+        amount: Amount,
+        /// Receiver account.
+        to:     AccountAddress,
+    },
+    /// An account was registered as a baker. This is the result of a successful
+    /// [AddBaker](transactions::Payload::AddBaker) transaction.
+    BakerAdded { data: Box<BakerAddedEvent> },
+    /// An account was deregistered as a baker. This is the result of a
+    /// successful [RemoveBaker](transactions::Payload::RemoveBaker)
+    /// transaction.
+    BakerRemoved { baker_id: BakerId },
+    /// An account was deregistered as a baker. This is the result of a
+    /// successful [UpdateBakerStake](transactions::Payload::UpdateBakerStake)
+    /// transaction.
+    BakerStakeUpdated {
+        baker_id:  BakerId,
+        new_stake: Amount,
+        increased: bool,
+    },
+    /// An account changed its preference for restaking earnings. This is the
+    /// result of a successful
+    /// [UpdateBakerRestakeEarnings](
+    ///    transactions::Payload::UpdateBakerRestakeEarnings) transaction.
+    BakerRestakeEarningsUpdated {
+        baker_id:         BakerId,
+        /// The new value of the flag.
+        restake_earnings: bool,
+    },
+    /// The baker's keys were updated. This is the result of a successful
+    /// [UpdateBakerKeys](transactions::Payload::UpdateBakerKeys) transaction.
+    BakerKeysUpdated { data: Box<BakerKeysEvent> },
+    /// An encrypted amount was transferred. This is the result of a successful
+    /// [EncryptedAmountTransfer](
+    ///   transactions::Payload::EncryptedAmountTransfer) transaction.
+    EncryptedAmountTransferred {
+        // FIXME: It would be better to only have one pointer
+        removed: Box<EncryptedAmountRemovedEvent>,
+        added:   Box<NewEncryptedAmountEvent>,
+    },
+    /// An account transferred part of its public balance to its encrypted
+    /// balance. This is the result of a successful
+    /// [TransferToEncrypted](transactions::Payload::TransferToEncrypted)
+    /// transaction.
+    TransferredToEncrypted {
+        data: Box<EncryptedSelfAmountAddedEvent>,
+    },
+    /// An account transferred part of its encrypted balance to its public
+    /// balance. This is the result of a successful
+    /// [TransferToPublic](transactions::Payload::TransferToPublic) transaction.
+    TransferredToPublic {
+        removed: Box<EncryptedAmountRemovedEvent>,
+        amount:  Amount,
+    },
+    /// A transfer with schedule was performed. This is the result of a
+    /// successful
+    /// [TransferWithSchedule](transactions::Payload::TransferWithSchedule)
+    /// transaction.
+    TransferredWithSchedule {
+        /// Receiver account.
+        to:     AccountAddress,
+        /// The list of releases. Ordered by increasing timestamp.
+        amount: Vec<(Timestamp, Amount)>,
+    },
+    /// Keys of a specific credential were updated. This is the result of a
+    /// successful
+    /// [UpdateCredentialKeys](transactions::Payload::UpdateCredentialKeys)
+    /// transaction.
+    CredentialKeysUpdated {
+        /// ID of the credential whose keys were updated.
+        cred_id: CredentialRegistrationID,
+    },
+    /// Account's credentials were updated. This is the result of a
+    /// successful [UpdateCredentials](transactions::Payload::UpdateCredentials)
+    /// transaction.
+    CredentialsUpdated {
+        /// The credential ids that were added.
+        new_cred_ids:     Vec<CredentialRegistrationID>,
+        /// The credentials that were removed.
+        removed_cred_ids: Vec<CredentialRegistrationID>,
+        /// The (possibly) updated account threshold.
+        new_threshold:    AccountThreshold,
+    },
+    /// Some data was registered on the chain. This is the result of a
+    /// successful [RegisterData](transactions::Payload::RegisterData)
+    /// transaction.
+    DataRegistered { data: RegisteredData },
+}
+
+#[derive(Debug, Clone)]
+/// Details of an account creation. These transactions are free, and we only
+/// ever get a response for them if the account is created, hence no failure
+/// cases.
+pub struct AccountCreationDetails {
+    /// Whether this is an initial or normal account.
+    pub credential_type: CredentialType,
+    /// Address of the newly created account.
+    pub address:         AccountAddress,
+    /// Credential registration ID of the first credential.
+    pub reg_id:          CredentialRegistrationID,
+}
+
+#[derive(Debug, Clone)]
+/// Details of an update instruction. These are free, and we only ever get a
+/// response for them if the update is successfully enqueued, hence no failure
+/// cases.
+pub struct UpdateDetails {
+    pub effective_time: TransactionTime,
+    pub payload:        UpdatePayload,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -458,11 +583,12 @@ pub enum BlockItemResult {
 /// Event generated when an account receives a new encrypted amount.
 pub struct NewEncryptedAmountEvent {
     /// The account onto which the amount was added.
-    account:          AccountAddress,
+    #[serde(rename = "account")]
+    pub receiver:         AccountAddress,
     /// The index the amount was assigned.
-    new_index:        encrypted_transfers::types::EncryptedAmountIndex,
+    pub new_index:        encrypted_transfers::types::EncryptedAmountIndex,
     /// The encrypted amount that was added.
-    encrypted_amount: encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
+    pub encrypted_amount: encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -471,13 +597,13 @@ pub struct NewEncryptedAmountEvent {
 /// account.
 pub struct EncryptedAmountRemovedEvent {
     /// The affected account.
-    account:      AccountAddress,
+    pub account:      AccountAddress,
     /// The new self encrypted amount on the affected account.
-    new_amount:   encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
+    pub new_amount:   encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
     /// The input encrypted amount that was removed.
-    input_amount: encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
+    pub input_amount: encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
     /// The index indicating which amounts were used.
-    up_to_index:  encrypted_transfers::types::EncryptedAmountAggIndex,
+    pub up_to_index:  encrypted_transfers::types::EncryptedAmountAggIndex,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -485,202 +611,80 @@ pub struct EncryptedAmountRemovedEvent {
 pub struct BakerAddedEvent {
     #[serde(flatten)]
     /// The keys with which the baker registered.
-    keys_event:       BakerKeysEvent,
+    pub keys_event:       BakerKeysEvent,
     /// The amount the account staked to become a baker. This amount is
     /// locked.
-    stake:            Amount,
+    pub stake:            Amount,
     /// Whether the baker will automatically add earnings to their stake or
     /// not.
-    restake_earnings: bool,
+    pub restake_earnings: bool,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+/// Result of a successful change of baker keys.
 pub struct BakerKeysEvent {
-    baker_id:        BakerId,
-    account:         AccountAddress,
-    sign_key:        BakerSignVerifyKey,
-    election_key:    BakerElectionVerifyKey,
-    aggregation_key: BakerAggregationVerifyKey,
+    /// ID of the baker whose keys were changed.
+    pub baker_id:        BakerId,
+    /// Account address of the baker.
+    pub account:         AccountAddress,
+    /// The new public key for verifying block signatures.
+    pub sign_key:        BakerSignVerifyKey,
+    /// The new public key for verifying whether the baker won the block
+    /// lottery.
+    pub election_key:    BakerElectionVerifyKey,
+    /// The new public key for verifying finalization records.
+    pub aggregation_key: BakerAggregationVerifyKey,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct EncryptedSelfAmountAddedEvent {
     /// The affected account.
-    account:    AccountAddress,
+    pub account:    AccountAddress,
     /// The new self encrypted amount of the account.
-    new_amount: encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
+    pub new_amount: encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
     /// The amount that was transferred from public to encrypted balance.
-    amount:     Amount,
+    pub amount:     Amount,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(tag = "tag")]
-/// An event describing the changes that occurred to the state of the chain.
-pub enum Event {
-    /// A smart contract module was successfully deployed.
-    ModuleDeployed {
-        #[serde(rename = "contents")]
-        module_ref: smart_contracts::ModuleRef,
-    },
-    /// A new smart contract instance was created.
-    #[serde(rename_all = "camelCase")]
-    ContractInitialized {
-        #[serde(rename = "ref")]
-        /// Module with the source code of the contract.
-        origin_ref: smart_contracts::ModuleRef,
-        /// The newly assigned address of the contract.
-        address:    ContractAddress,
-        /// The amount the instance was initialized with.
-        amount:     Amount,
-        /// The name of the contract.
-        init_name:  smart_contracts::InitName,
-        /// Any contract events that might have been generated by the contract
-        /// initialization.
-        events:     Vec<smart_contracts::ContractEvent>,
-    },
-    #[serde(rename_all = "camelCase")]
-    /// A smart contract instance was updated.
-    Updated {
-        address:      ContractAddress,
-        /// The origin of the message to the smart contract. This can be either
-        /// an account or a smart contract.
-        instigator:   Address,
-        /// The amount the method was invoked with.
-        amount:       Amount,
-        /// The message passed to method.
-        message:      smart_contracts::Parameter,
-        /// The name of the method that was executed.
-        receive_name: smart_contracts::ReceiveName,
-        /// Any contract events that might have been generated by the contract
-        /// execution.
-        events:       Vec<smart_contracts::ContractEvent>,
-    },
-    #[serde(rename_all = "camelCase")]
-    /// An amount of GTU was transferred.
-    Transferred {
-        /// Sender, either smart contract instance or account.
-        from:   Address,
-        /// Amount that was transferred.
-        amount: Amount,
-        /// Receiver. This will currently always be an account. Transferring to
-        /// a smart contract is always an update.
-        to:     Address,
-    },
-    /// An account with the given address was created.
-    AccountCreated { contents: AccountAddress },
-    #[serde(rename_all = "camelCase")]
-    /// A new credential with the given ID was deployed onto an account.
-    /// This is used only when a new account is created. See
-    /// [Event::CredentialsUpdated] for when an existing account's
-    /// credentials are updated.
-    CredentialDeployed {
-        reg_id:  CredentialRegistrationID,
-        account: AccountAddress,
-    },
-    /// A new baker was registered, with the given ID and keys.
-    BakerAdded {
-        #[serde(flatten)]
-        data: Box<BakerAddedEvent>,
-    },
-    #[serde(rename_all = "camelCase")]
-    /// A baker was scheduled to be removed.
-    BakerRemoved {
-        baker_id: BakerId,
-        account:  AccountAddress,
-    },
-    #[serde(rename_all = "camelCase")]
-    /// A baker's stake was increased. This has effect immediately.
-    BakerStakeIncreased {
-        baker_id:  BakerId,
-        account:   AccountAddress,
-        new_stake: Amount,
-    },
-    #[serde(rename_all = "camelCase")]
-    /// A baker's stake was scheduled to be decreased. This will have an effect
-    /// on the stake after a number of epochs, controlled by the baker
-    /// cooldown period.
-    BakerStakeDecreased {
-        baker_id:  BakerId,
-        account:   AccountAddress,
-        new_stake: Amount,
-    },
-    #[serde(rename_all = "camelCase")]
-    /// The setting for whether rewards are added to stake immediately or not
-    /// was changed to the given value.
-    BakerSetRestakeEarnings {
-        baker_id:         BakerId,
-        account:          AccountAddress,
-        /// The new value of the flag.
-        restake_earnings: bool,
-    },
-    /// The baker keys were updated. The new keys are listed.
-    BakerKeysUpdated {
-        #[serde(flatten)]
-        data: Box<BakerKeysEvent>,
-    },
-    #[serde(rename_all = "camelCase")]
-    /// Keys of the given credential were updated.
-    CredentialKeysUpdated { cred_id: CredentialRegistrationID },
-    #[serde(rename_all = "camelCase")]
-    /// A new encrypted amount was added to the account.
-    NewEncryptedAmount {
-        #[serde(flatten)]
-        data: Box<NewEncryptedAmountEvent>,
-    },
-    #[serde(rename_all = "camelCase")]
-    /// One or more encrypted amounts were removed from an account as part of a
-    /// transfer or decryption.
-    EncryptedAmountsRemoved {
-        #[serde(flatten)]
-        data: Box<EncryptedAmountRemovedEvent>,
-    },
-    #[serde(rename_all = "camelCase")]
-    /// The public balance of the account was increased via a transfer from
-    /// encrypted to public balance.
-    AmountAddedByDecryption {
-        account: AccountAddress,
-        amount:  Amount,
-    },
-    /// The encrypted balance of the account was updated due to transfer from
-    /// public to encrypted balance of the account.
-    EncryptedSelfAmountAdded {
-        #[serde(flatten)]
-        data: Box<EncryptedSelfAmountAddedEvent>,
-    },
-    #[serde(rename_all = "camelCase")]
-    /// An update was enqueued for the given time.
-    UpdateEnqueued {
-        effective_time: TransactionTime,
-        payload:        UpdatePayload,
-    },
-    #[serde(rename_all = "camelCase")]
-    /// A transfer with schedule was enqueued.
-    TransferredWithSchedule {
-        /// Sender account.
-        from:   AccountAddress,
-        /// Receiver account.
-        to:     AccountAddress,
-        /// The list of releases. Ordered by increasing timestamp.
-        amount: Vec<(Timestamp, Amount)>,
-    },
-    #[serde(rename_all = "camelCase")]
-    /// The credentials of the account were updated. Either added, removed, or
-    /// both.
-    CredentialsUpdated {
-        /// The affected account.
-        account:          AccountAddress,
-        /// The credential ids that were added.
-        new_cred_ids:     Vec<CredentialRegistrationID>,
-        /// The credentials that were removed.
-        removed_cred_ids: Vec<CredentialRegistrationID>,
-        /// The (possibly) updated account threshold.
-        new_threshold:    AccountThreshold,
-    },
-    #[serde(rename_all = "camelCase")]
-    /// Data was registered.
-    DataRegistered { data: RegisteredData },
+#[serde(rename_all = "camelCase")]
+pub struct ContractInitializedEvent {
+    #[serde(rename = "ref")]
+    /// Module with the source code of the contract.
+    pub origin_ref: smart_contracts::ModuleRef,
+    /// The newly assigned address of the contract.
+    pub address:    ContractAddress,
+    /// The amount the instance was initialized with.
+    pub amount:     Amount,
+    /// The name of the contract.
+    pub init_name:  smart_contracts::InitName,
+    /// Any contract events that might have been generated by the contract
+    /// initialization.
+    pub events:     Vec<smart_contracts::ContractEvent>,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+/// Data generated as part of updating a single contract instance.
+/// In general a single [Update](transactions::Payload::Update) transaction will
+/// generate one or more of these events, together with possibly some transfers.
+pub struct InstanceUpdatedEvent {
+    /// Address of the affected instance.
+    pub address:      ContractAddress,
+    /// The origin of the message to the smart contract. This can be either
+    /// an account or a smart contract.
+    pub instigator:   Address,
+    /// The amount the method was invoked with.
+    pub amount:       Amount,
+    /// The message passed to method.
+    pub message:      smart_contracts::Parameter,
+    /// The name of the method that was executed.
+    pub receive_name: smart_contracts::ReceiveName,
+    /// Any contract events that might have been generated by the contract
+    /// execution.
+    pub events:       Vec<smart_contracts::ContractEvent>,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -722,12 +726,12 @@ pub enum UpdatePayload {
 /// way, and bakers will need to update their node software to support the
 /// update.
 pub struct ProtocolUpdate {
-    message: String,
+    pub message: String,
     #[serde(rename = "specificationURL")]
-    specification_url: String,
-    specification_hash: hashes::Hash,
+    pub specification_url: String,
+    pub specification_hash: hashes::Hash,
     #[serde(with = "crate::internal::byte_array_hex")]
-    specification_auxiliary_data: Vec<u8>,
+    pub specification_auxiliary_data: Vec<u8>,
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
@@ -736,10 +740,10 @@ pub struct ProtocolUpdate {
 /// Update the transaction fee distribution to the specified value.
 pub struct TransactionFeeDistribution {
     /// The fraction that goes to the baker of the block.
-    baker:       RewardFraction,
+    pub baker:       RewardFraction,
     /// The fraction that goes to the gas account. The remaining fraction will
     /// go to the foundation.
-    gas_account: RewardFraction,
+    pub gas_account: RewardFraction,
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
@@ -749,16 +753,16 @@ pub struct TransactionFeeDistribution {
 pub struct GASRewards {
     /// `BakerPrevTransFrac`: fraction of the previous gas account paid to the
     /// baker.
-    baker:              RewardFraction,
+    pub baker:              RewardFraction,
     /// `FeeAddFinalisationProof`: fraction paid for including a finalization
     /// proof in a block.
-    finalization_proof: RewardFraction,
+    pub finalization_proof: RewardFraction,
     /// `FeeAccountCreation`: fraction paid for including each account creation
     /// transaction in a block.
-    account_creation:   RewardFraction,
+    pub account_creation:   RewardFraction,
     /// `FeeUpdate`: fraction paid for including an update transaction in a
     /// block.
-    chain_update:       RewardFraction,
+    pub chain_update:       RewardFraction,
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]

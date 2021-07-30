@@ -47,7 +47,7 @@ impl DatabaseSummaryEntry {
     /// - chain updates and special outcomes
     pub fn sender_account(&self) -> Option<AccountAddress> {
         match self {
-            DatabaseSummaryEntry::BlockItem(bi) => bi.sender,
+            DatabaseSummaryEntry::BlockItem(bi) => bi.sender_account(),
             DatabaseSummaryEntry::ProtocolEvent(_) => None,
         }
     }

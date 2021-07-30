@@ -69,6 +69,8 @@ impl Nonce {
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
+/// Equivalent of a transaction nonce but for update instructions. Update
+/// sequence numbers are per update type.
 pub struct UpdateSequenceNumber {
     pub number: u64,
 }
@@ -76,6 +78,8 @@ pub struct UpdateSequenceNumber {
 #[derive(SerdeSerialize, SerdeDeserialize)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Into, Serial)]
+/// The minimum number of credentials that need to sign any transaction coming
+/// from an associated account.
 pub struct AccountThreshold {
     #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
     threshold: u8,
@@ -120,6 +124,8 @@ pub struct BlockHeight {
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
+/// Index of the account in the account table. These are assigned sequentially
+/// in the order of creation of accounts. The first account has index 0.
 pub struct AccountIndex {
     pub index: u64,
 }
