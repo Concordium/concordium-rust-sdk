@@ -77,14 +77,23 @@ async fn main() -> anyhow::Result<()> {
     let total_accounts = accounts.len();
     let mut num_bakers = 0;
     let mut num_initial = 0;
+    let mut staked_amount: Amount = 0.into();
+    let mut total_amount: Amount = 0.into();
 
     let mut acc_balances = Vec::with_capacity(accounts.len());
     for acc in accounts {
         let info = client.get_account_info(&acc, &block).await?;
-        let is_baker = info.account_baker.is_some();
-        if is_baker {
+        let is_baker = if let Some(baker) = info.account_baker {
             num_bakers += 1;
-        }
+            staked_amount = (staked_amount + baker.staked_amount)
+                .context("Total staked amount exceeds u64. This should not happen.")?;
+            true
+        } else {
+            false
+        };
+
+        total_amount = (total_amount + info.account_amount)
+            .context("Total amount exceeds u64. This should not happen.")?;
 
         let acc_type =
             info.account_credentials
@@ -123,6 +132,13 @@ async fn main() -> anyhow::Result<()> {
     println!(
         "{} of these accounts are bakers, and {} are initial accounts.",
         num_bakers, num_initial
+    );
+
+    println!("Total amount of GTU is {}.", total_amount);
+    println!(
+        "Total amount of staked GTU is {}, which amounts to {:.2}%.",
+        staked_amount,
+        (u64::from(staked_amount) as f64 / u64::from(total_amount) as f64) * 100f64
     );
 
     Ok(())
