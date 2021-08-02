@@ -41,6 +41,7 @@ concordium-contracts-common = { version = "*", path = "./concordium-contracts-co
 rand = "0.7"
 structopt = "0.3"
 clap = "2.33.3"
+csv = "1.1"
 
 [build-dependencies]
 tonic-build = "0.5"
