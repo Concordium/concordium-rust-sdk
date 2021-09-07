@@ -2,6 +2,7 @@
 
 use super::hashes;
 use crate::constants::*;
+pub use concordium_contracts_common;
 use crypto_common::{
     derive,
     derive::{Serial, Serialize},
