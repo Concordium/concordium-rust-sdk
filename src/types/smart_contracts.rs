@@ -2,6 +2,9 @@
 
 use super::hashes;
 use crate::constants::*;
+/// Re-export of common helper functionality for smart contract, such as types
+/// and serialization specific for smart contracts.
+pub use concordium_contracts_common;
 use crypto_common::{
     derive,
     derive::{Serial, Serialize},

@@ -35,7 +35,7 @@ aggregate_sig = { version = "*", path = "./concordium-base/rust-src/aggregate_si
 encrypted_transfers = { version = "*", path = "./concordium-base/rust-src/encrypted_transfers" }
 eddsa_ed25519 = { version = "*", path = "./concordium-base/rust-src/eddsa_ed25519/" }
 pedersen_scheme = { version = "*", path = "./concordium-base/rust-src/pedersen_scheme/" }
-concordium-contracts-common = { version = "*", path = "./concordium-contracts-common/"}
+concordium-contracts-common = { version = "*", path = "./concordium-contracts-common/", features = ["derive-serde"]}
 
 [dev-dependencies]
 rand = "0.7"
