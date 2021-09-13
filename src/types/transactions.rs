@@ -396,7 +396,7 @@ impl Serial for Payload {
                 out.put(amount);
             }
             Payload::TransferToPublic { data } => {
-                out.put(&18);
+                out.put(&18u8);
                 out.put(data);
             }
             Payload::TransferWithSchedule { to, schedule } => {
