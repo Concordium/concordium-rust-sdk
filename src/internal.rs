@@ -48,16 +48,43 @@ pub(crate) mod byte_array_hex {
 /// Serialize amounts as u64
 pub(crate) mod amounts_as_u64 {
     use crypto_common::types::Amount;
-    use serde::Deserialize;
-    /// Serialize an Amount as the amount of microGTU expressed as a u64.
+    use serde::Serialize;
+    /// Serialize an Amount as usual. See deserialize below for why we include
+    /// this at all.
+    #[inline(always)]
     pub fn serialize<S: serde::Serializer>(amnt: &Amount, ser: S) -> Result<S::Ok, S::Error> {
-        ser.serialize_u64(amnt.microgtu)
+        amnt.serialize(ser)
     }
 
-    /// Deserialize an Amount as the amount of microGTU expressed as a u64.
+    /// Deserialize an Amount either from an integer in microGTU expressed as a
+    /// u64 or from its own parser (from string)
     pub fn deserialize<'de, D: serde::Deserializer<'de>>(des: D) -> Result<Amount, D::Error> {
-        let microgtu = u64::deserialize(des)?;
-        Ok(Amount { microgtu })
+        struct AmountVisitor;
+        impl<'de> serde::de::Visitor<'de> for AmountVisitor {
+            type Value = Amount;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(
+                    formatter,
+                    "A non-negative integer or a string containing an integer."
+                )
+            }
+
+            fn visit_u64<E: serde::de::Error>(self, microgtu: u64) -> Result<Self::Value, E> {
+                Ok(Amount { microgtu })
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                let microgtu = v.parse::<u64>().map_err(|_| {
+                    E::custom(
+                        "Invalid amount value. Expecting a string containing a non-negative \
+                         integer < 2^64.",
+                    )
+                })?;
+                Ok(Amount { microgtu })
+            }
+        }
+        des.deserialize_any(AmountVisitor)
     }
 }
 
