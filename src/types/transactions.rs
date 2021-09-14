@@ -211,6 +211,35 @@ pub struct AddBakerPayload {
 
 #[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize)]
 #[serde(rename_all = "camelCase")]
+/// Data needed to initialize a smart contract.
+pub struct InitContractPayload {
+    /// Deposit this amount of GTU.
+    pub amount:    Amount,
+    /// Reference to the module from which to initialize the instance.
+    pub mod_ref:   smart_contracts::ModuleRef,
+    /// Name of the contract in the module.
+    pub init_name: smart_contracts::InitName,
+    /// Message to invoke the initialization method with.
+    pub param:     smart_contracts::Parameter,
+}
+
+#[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize)]
+#[serde(rename_all = "camelCase")]
+/// Data needed to update a smart contract instance.
+pub struct UpdateContractPayload {
+    /// Send the given amount of GTU together with the message to the
+    /// contract instance.
+    amount:       Amount,
+    /// Address of the contract instance to invoke.
+    address:      ContractAddress,
+    /// Name of the method to invoke on the contract.
+    receive_name: smart_contracts::ReceiveName,
+    /// Message to send to the contract instance.
+    message:      smart_contracts::Parameter,
+}
+
+#[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize)]
+#[serde(rename_all = "camelCase")]
 /// Payload of an account transaction.
 pub enum Payload {
     /// Deploy a Wasm module with the given source.
@@ -220,26 +249,13 @@ pub enum Payload {
     },
     /// Initialize a new smart contract instance.
     InitContract {
-        /// Deposit this amount of GTU.
-        amount:    Amount,
-        /// Reference to the module from which to initialize the instance.
-        mod_ref:   smart_contracts::ModuleRef,
-        /// Name of the contract in the module.
-        init_name: smart_contracts::InitName,
-        /// Message to invoke the initialization method with.
-        param:     smart_contracts::Parameter,
+        #[serde(flatten)]
+        payload: InitContractPayload,
     },
     /// Update a smart contract instance by invoking a specific function.
     Update {
-        /// Send the given amount of GTU together with the message to the
-        /// contract instance.
-        amount:       Amount,
-        /// Address of the contract instance to invoke.
-        address:      ContractAddress,
-        /// Name of the method to invoke on the contract.
-        receive_name: smart_contracts::ReceiveName,
-        /// Message to send to the contract instance.
-        message:      smart_contracts::Parameter,
+        #[serde(flatten)]
+        payload: UpdateContractPayload,
     },
     /// Transfer GTU to an account.
     Transfer {
@@ -361,29 +377,13 @@ impl Serial for Payload {
                 out.put(&0u8);
                 out.put(module);
             }
-            Payload::InitContract {
-                amount,
-                mod_ref,
-                init_name,
-                param,
-            } => {
+            Payload::InitContract { payload } => {
                 out.put(&1u8);
-                out.put(amount);
-                out.put(mod_ref);
-                out.put(init_name);
-                out.put(param);
+                out.put(payload)
             }
-            Payload::Update {
-                amount,
-                address,
-                receive_name,
-                message,
-            } => {
+            Payload::Update { payload } => {
                 out.put(&2u8);
-                out.put(amount);
-                out.put(address);
-                out.put(receive_name);
-                out.put(message);
+                out.put(payload)
             }
             Payload::Transfer { to_address, amount } => {
                 out.put(&3u8);
@@ -485,28 +485,12 @@ impl Deserial for Payload {
                 Ok(Payload::DeployModule { module })
             }
             1 => {
-                let amount = source.get()?;
-                let mod_ref = source.get()?;
-                let init_name = source.get()?;
-                let param = source.get()?;
-                Ok(Payload::InitContract {
-                    amount,
-                    mod_ref,
-                    init_name,
-                    param,
-                })
+                let payload = source.get()?;
+                Ok(Payload::InitContract { payload })
             }
             2 => {
-                let amount = source.get()?;
-                let address = source.get()?;
-                let receive_name = source.get()?;
-                let message = source.get()?;
-                Ok(Payload::Update {
-                    amount,
-                    address,
-                    receive_name,
-                    message,
-                })
+                let payload = source.get()?;
+                Ok(Payload::Update { payload })
             }
             3 => {
                 let to_address = source.get()?;
@@ -906,6 +890,54 @@ impl Deserial for AddBakerPayload {
             keys,
             baking_stake,
             restake_earnings,
+        })
+    }
+}
+
+impl Serial for InitContractPayload {
+    fn serial<B: Buffer>(&self, out: &mut B) {
+        out.put(&self.amount);
+        out.put(&self.mod_ref);
+        out.put(&self.init_name);
+        out.put(&self.param);
+    }
+}
+
+impl Deserial for InitContractPayload {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let amount = source.get()?;
+        let mod_ref = source.get()?;
+        let init_name = source.get()?;
+        let param = source.get()?;
+        Ok(InitContractPayload {
+            amount,
+            mod_ref,
+            init_name,
+            param,
+        })
+    }
+}
+
+impl Serial for UpdateContractPayload {
+    fn serial<B: Buffer>(&self, out: &mut B) {
+        out.put(&self.amount);
+        out.put(&self.address);
+        out.put(&self.receive_name);
+        out.put(&self.message);
+    }
+}
+
+impl Deserial for UpdateContractPayload {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let amount = source.get()?;
+        let address = source.get()?;
+        let receive_name = source.get()?;
+        let message = source.get()?;
+        Ok(UpdateContractPayload {
+            amount,
+            address,
+            receive_name,
+            message,
         })
     }
 }
@@ -1456,6 +1488,54 @@ pub mod send {
             nonce,
             expiry,
             GivenEnergy::Add(cost::deploy_module(module_size)),
+            &payload,
+        )
+    }
+
+    /// Initialize a smart contract, giving it the given amount of energy for
+    /// execution. The unique parameters are
+    /// - `energy` -- the amount of energy that can be used for contract
+    ///   execution. The base energy amount for transaction verification will be
+    ///   added to this cost.
+    pub fn init_contract(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        payload: InitContractPayload,
+        energy: Energy,
+    ) -> AccountTransaction<EncodedPayload> {
+        let payload = Payload::InitContract { payload };
+        make_and_sign_transaction(
+            signer,
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add(energy),
+            &payload,
+        )
+    }
+
+    /// Update a smart contract intance, giving it the given amount of energy
+    /// for execution. The unique parameters are
+    /// - `energy` -- the amount of energy that can be used for contract
+    ///   execution. The base energy amount for transaction verification will be
+    ///   added to this cost.
+    pub fn update_contract(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        payload: UpdateContractPayload,
+        energy: Energy,
+    ) -> AccountTransaction<EncodedPayload> {
+        let payload = Payload::Update { payload };
+        make_and_sign_transaction(
+            signer,
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add(energy),
             &payload,
         )
     }
