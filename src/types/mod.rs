@@ -366,8 +366,8 @@ pub enum SpecialTransactionOutcome {
 /// in a given block.
 pub struct BlockSummary {
     pub transaction_summaries: Vec<BlockItemSummary>,
-    special_events:            Vec<SpecialTransactionOutcome>,
-    updates:                   Updates, // FIXME: Add the finalization data.
+    pub special_events:        Vec<SpecialTransactionOutcome>,
+    pub updates:               Updates, // FIXME: Add the finalization data.
 }
 
 #[derive(SerdeDeserialize, SerdeSerialize, Debug, Clone)]
@@ -427,7 +427,12 @@ pub struct AccountTransactionDetails {
 }
 
 impl AccountTransactionEffects {
-    pub fn tx_type(&self) -> Option<TransactionType> {
+    /// Get the transaction type corresponding to the effects.
+    /// Returns `None` for the
+    /// [AccountTransactionEffects::None](AccountTransactionEffects::None)
+    /// variant in case the transaction failed with serialization failure
+    /// reason.
+    pub fn transaction_type(&self) -> Option<TransactionType> {
         use TransactionType::*;
         match self {
             AccountTransactionEffects::None {
