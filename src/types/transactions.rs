@@ -4,7 +4,7 @@
 use super::{
     hashes, smart_contracts, AccountInfo, AccountThreshold, AggregateSigPairing,
     BakerAggregationVerifyKey, BakerElectionVerifyKey, BakerSignVerifyKey, ContractAddress,
-    CredentialIndex, CredentialRegistrationID, Energy, Nonce, RegisteredData,
+    CredentialIndex, CredentialRegistrationID, Energy, Memo, Nonce, RegisteredData,
 };
 use crate::constants::*;
 use crypto_common::{
@@ -324,6 +324,34 @@ pub enum Payload {
         /// The data to register.
         data: RegisteredData,
     },
+    /// Transfer GTU to an account with an additional memo.
+    TransferWithMemo {
+        /// Address to send to.
+        to_address: AccountAddress,
+        /// Memo to include in the transfer.
+        memo:       Memo,
+        /// Amount to send.
+        amount:     Amount,
+    },
+    /// Transfer an encrypted amount.
+    EncryptedAmountTransferWithMemo {
+        /// The recepient's address.
+        to:   AccountAddress,
+        /// Memo to include in the transfer.
+        memo: Memo,
+        /// The (encrypted) amount to transfer and proof of correctness of
+        /// accounting.
+        data: Box<EncryptedAmountTransferData<EncryptedAmountsCurve>>,
+    },
+    /// Transfer an amount with schedule.
+    TransferWithScheduleAndMemo {
+        /// The recepient.
+        to:       AccountAddress,
+        /// Memo to include in the transfer.
+        memo:     Memo,
+        /// The release schedule. This can be at most 255 elements.
+        schedule: Vec<(Timestamp, Amount)>,
+    },
 }
 
 impl Serial for Payload {
@@ -420,6 +448,29 @@ impl Serial for Payload {
             Payload::RegisterData { data } => {
                 out.put(&21u8);
                 out.put(data);
+            }
+            Payload::TransferWithMemo {
+                to_address,
+                memo,
+                amount,
+            } => {
+                out.put(&22u8);
+                out.put(to_address);
+                out.put(memo);
+                out.put(amount);
+            }
+            Payload::EncryptedAmountTransferWithMemo { to, memo, data } => {
+                out.put(&23u8);
+                out.put(to);
+                out.put(memo);
+                out.put(data);
+            }
+            Payload::TransferWithScheduleAndMemo { to, memo, schedule } => {
+                out.put(&24u8);
+                out.put(to);
+                out.put(memo);
+                out.put(&(schedule.len() as u8));
+                crypto_common::serial_vector_no_length(schedule, out);
             }
         }
     }
@@ -526,6 +577,29 @@ impl Deserial for Payload {
             21 => {
                 let data = source.get()?;
                 Ok(Payload::RegisterData { data })
+            }
+            22 => {
+                let to_address = source.get()?;
+                let memo = source.get()?;
+                let amount = source.get()?;
+                Ok(Payload::TransferWithMemo {
+                    to_address,
+                    memo,
+                    amount,
+                })
+            }
+            23 => {
+                let to = source.get()?;
+                let memo = source.get()?;
+                let data = source.get()?;
+                Ok(Payload::EncryptedAmountTransferWithMemo { to, memo, data })
+            }
+            24 => {
+                let to = source.get()?;
+                let memo = source.get()?;
+                let len: u8 = source.get()?;
+                let schedule = crypto_common::deserial_vector_no_length(source, len.into())?;
+                Ok(Payload::TransferWithScheduleAndMemo { to, memo, schedule })
             }
             _ => {
                 anyhow::bail!("Unsupported transaction payload tag {}", tag)
@@ -1055,6 +1129,32 @@ pub mod send {
         )
     }
 
+    /// Construct a transfer transaction with a memo.
+    pub fn transfer_with_memo(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        receiver: AccountAddress,
+        amount: Amount,
+        memo: Memo,
+    ) -> AccountTransaction<EncodedPayload> {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let payload = Payload::TransferWithMemo {
+            to_address: receiver,
+            memo,
+            amount,
+        };
+        make_and_sign_transaction(
+            signer,
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add(cost::SIMPLE_TRANSFER),
+            &payload,
+        )
+    }
+
     /// Make an encrypted transfer. The payload can be constructed using
     /// [encrypted_transfers::make_transfer_data].
     pub fn encrypted_transfer(
@@ -1068,6 +1168,33 @@ pub mod send {
         // FIXME: This payload could be returned as well since it is only borrowed.
         let payload = Payload::EncryptedAmountTransfer {
             to:   receiver,
+            data: Box::new(data),
+        };
+        make_and_sign_transaction(
+            signer,
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add(cost::ENCRYPTED_TRANSFER),
+            &payload,
+        )
+    }
+
+    /// Make an encrypted transfer with a memo. The payload can be constructed
+    /// using [encrypted_transfers::make_transfer_data].
+    pub fn encrypted_transfer_with_memo(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        receiver: AccountAddress,
+        data: EncryptedAmountTransferData<EncryptedAmountsCurve>,
+        memo: Memo,
+    ) -> AccountTransaction<EncodedPayload> {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let payload = Payload::EncryptedAmountTransferWithMemo {
+            to: receiver,
+            memo,
             data: Box::new(data),
         };
         make_and_sign_transaction(
@@ -1138,6 +1265,33 @@ pub mod send {
         let num_releases = schedule.len() as u16;
         let payload = Payload::TransferWithSchedule {
             to: receiver,
+            schedule,
+        };
+        make_and_sign_transaction(
+            signer,
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add(cost::scheduled_transfer(num_releases)),
+            &payload,
+        )
+    }
+
+    /// Construct a transfer with schedule and memo transaction, sending to the
+    /// given account.
+    pub fn transfer_with_schedule_and_memo(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        receiver: AccountAddress,
+        schedule: Vec<(Timestamp, Amount)>,
+        memo: Memo,
+    ) -> AccountTransaction<EncodedPayload> {
+        let num_releases = schedule.len() as u16;
+        let payload = Payload::TransferWithScheduleAndMemo {
+            to: receiver,
+            memo,
             schedule,
         };
         make_and_sign_transaction(

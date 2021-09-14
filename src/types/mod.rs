@@ -14,6 +14,7 @@ use crypto_common::{
     types::{Amount, CredentialIndex, Timestamp, TransactionTime},
     Buffer, Deserial, Get, ParseResult, SerdeDeserialize, SerdeSerialize, Serial, Versioned,
 };
+use derive_more::*;
 use id::{
     constants::{ArCurve, AttributeKind},
     types::{AccountAddress, AccountCredentialWithoutProofs},
@@ -253,6 +254,12 @@ pub enum TransactionType {
     UpdateCredentials,
     /// Register some data on the chain.
     RegisterData,
+    /// Same as transfer but with a memo field.
+    TransferWithMemo,
+    /// Same as encrypted transfer, but with a memo.
+    EncryptedAmountTransferWithMemo,
+    /// Same as transfer with schedule, but with an added memo.
+    TransferWithScheduleAndMemo,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
@@ -358,9 +365,9 @@ pub enum SpecialTransactionOutcome {
 /// Summary of transactions, protocol generated transfers, and chain parameters
 /// in a given block.
 pub struct BlockSummary {
-    transaction_summaries: Vec<BlockItemSummary>,
-    special_events:        Vec<SpecialTransactionOutcome>,
-    updates:               Updates, // FIXME: Add the finalization data.
+    pub transaction_summaries: Vec<BlockItemSummary>,
+    special_events:            Vec<SpecialTransactionOutcome>,
+    updates:                   Updates, // FIXME: Add the finalization data.
 }
 
 #[derive(SerdeDeserialize, SerdeSerialize, Debug, Clone)]
@@ -419,6 +426,44 @@ pub struct AccountTransactionDetails {
     pub effects: AccountTransactionEffects,
 }
 
+impl AccountTransactionEffects {
+    pub fn tx_type(&self) -> Option<TransactionType> {
+        use TransactionType::*;
+        match self {
+            AccountTransactionEffects::None {
+                transaction_type, ..
+            } => *transaction_type,
+            AccountTransactionEffects::ModuleDeployed { .. } => Some(DeployModule),
+            AccountTransactionEffects::ContractInitialized { .. } => Some(InitContract),
+            AccountTransactionEffects::ContractUpdateIssued { .. } => Some(Update),
+            AccountTransactionEffects::AccountTransfer { .. } => Some(Transfer),
+            AccountTransactionEffects::AccountTransferWithMemo { .. } => Some(TransferWithMemo),
+            AccountTransactionEffects::BakerAdded { .. } => Some(AddBaker),
+            AccountTransactionEffects::BakerRemoved { .. } => Some(RemoveBaker),
+            AccountTransactionEffects::BakerStakeUpdated { .. } => Some(UpdateBakerStake),
+            AccountTransactionEffects::BakerRestakeEarningsUpdated { .. } => {
+                Some(UpdateBakerRestakeEarnings)
+            }
+            AccountTransactionEffects::BakerKeysUpdated { .. } => Some(UpdateBakerKeys),
+            AccountTransactionEffects::EncryptedAmountTransferred { .. } => {
+                Some(EncryptedAmountTransfer)
+            }
+            AccountTransactionEffects::EncryptedAmountTransferredWithMemo { .. } => {
+                Some(EncryptedAmountTransferWithMemo)
+            }
+            AccountTransactionEffects::TransferredToEncrypted { .. } => Some(TransferToEncrypted),
+            AccountTransactionEffects::TransferredToPublic { .. } => Some(TransferToPublic),
+            AccountTransactionEffects::TransferredWithSchedule { .. } => Some(TransferWithSchedule),
+            AccountTransactionEffects::TransferredWithScheduleAndMemo { .. } => {
+                Some(TransferWithScheduleAndMemo)
+            }
+            AccountTransactionEffects::CredentialKeysUpdated { .. } => Some(UpdateCredentialKeys),
+            AccountTransactionEffects::CredentialsUpdated { .. } => Some(UpdateCredentials),
+            AccountTransactionEffects::DataRegistered { .. } => Some(RegisterData),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 /// A successful contract invocation produces a sequence of effects on smart
 /// contracts and possibly accounts (if any contract transfers GTU to an
@@ -472,6 +517,17 @@ pub enum AccountTransactionEffects {
         /// Receiver account.
         to:     AccountAddress,
     },
+    /// A simple account to account transfer occurred with a memo. This is the
+    /// result of a successful
+    /// [TransferWithMemo](transactions::Payload::TransferWithMemo) transaction.
+    AccountTransferWithMemo {
+        /// Amount that was transferred.
+        amount: Amount,
+        /// Receiver account.
+        to:     AccountAddress,
+        /// Included memo.
+        memo:   Memo,
+    },
     /// An account was registered as a baker. This is the result of a successful
     /// [AddBaker](transactions::Payload::AddBaker) transaction.
     BakerAdded { data: Box<BakerAddedEvent> },
@@ -507,6 +563,15 @@ pub enum AccountTransactionEffects {
         removed: Box<EncryptedAmountRemovedEvent>,
         added:   Box<NewEncryptedAmountEvent>,
     },
+    /// An encrypted amount was transferred with an included memo. This is the
+    /// result of a successful [EncryptedAmountTransferWithMemo](
+    ///   transactions::Payload::EncryptedAmountTransferWithMemo) transaction.
+    EncryptedAmountTransferredWithMemo {
+        // FIXME: It would be better to only have one pointer
+        removed: Box<EncryptedAmountRemovedEvent>,
+        added:   Box<NewEncryptedAmountEvent>,
+        memo:    Memo,
+    },
     /// An account transferred part of its public balance to its encrypted
     /// balance. This is the result of a successful
     /// [TransferToEncrypted](transactions::Payload::TransferToEncrypted)
@@ -530,6 +595,17 @@ pub enum AccountTransactionEffects {
         to:     AccountAddress,
         /// The list of releases. Ordered by increasing timestamp.
         amount: Vec<(Timestamp, Amount)>,
+    },
+    /// A transfer with schedule was performed with an added memo. This is the
+    /// result of a successful
+    /// [TransferWithScheduleAndMemo](transactions::Payload::
+    /// TransferWithScheduleAndMemo) transaction.
+    TransferredWithScheduleAndMemo {
+        /// Receiver account.
+        to:     AccountAddress,
+        /// The list of releases. Ordered by increasing timestamp.
+        amount: Vec<(Timestamp, Amount)>,
+        memo:   Memo,
     },
     /// Keys of a specific credential were updated. This is the result of a
     /// successful
@@ -877,6 +953,40 @@ impl Deserial for RegisteredData {
         );
         let bytes = crypto_common::deserial_bytes(source, len.into())?;
         Ok(RegisteredData { bytes })
+    }
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, AsRef, Into)]
+#[serde(transparent)]
+/// A data that was registered on the chain.
+pub struct Memo {
+    #[serde(with = "crate::internal::byte_array_hex")]
+    #[size_length = 2]
+    bytes: Vec<u8>,
+}
+
+/// An error used to signal that an object was too big to be converted.
+#[derive(Display, Error, Debug)]
+pub struct TooBig;
+
+impl TryFrom<Vec<u8>> for Memo {
+    type Error = TooBig;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        if value.len() <= MAX_MEMO_SIZE {
+            Ok(Self { bytes: value })
+        } else {
+            Err(TooBig)
+        }
+    }
+}
+
+impl Deserial for Memo {
+    fn deserial<R: crypto_common::ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let len: u16 = source.get()?;
+        anyhow::ensure!(usize::from(len) <= MAX_MEMO_SIZE, "Memo too big..");
+        let bytes = crypto_common::deserial_bytes(source, len.into())?;
+        Ok(Memo { bytes })
     }
 }
 

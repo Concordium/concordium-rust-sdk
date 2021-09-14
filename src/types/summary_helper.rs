@@ -245,12 +245,15 @@ enum Event {
     #[serde(rename_all = "camelCase")]
     /// Data was registered.
     DataRegistered { data: RegisteredData },
+    #[serde(rename_all = "camelCase")]
+    /// Memo
+    TransferMemo { memo: Memo },
 }
 
 use super::{
     hashes, smart_contracts, AccountThreshold, BakerAddedEvent, BakerId, BakerKeysEvent,
     ContractInitializedEvent, CredentialRegistrationID, CredentialType,
-    EncryptedAmountRemovedEvent, EncryptedSelfAmountAddedEvent, Energy, InstanceUpdatedEvent,
+    EncryptedAmountRemovedEvent, EncryptedSelfAmountAddedEvent, Energy, InstanceUpdatedEvent, Memo,
     NewEncryptedAmountEvent, RegisteredData, RejectReason, TransactionIndex, TransactionType,
     UpdatePayload,
 };
@@ -298,6 +301,11 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                         events: vec![ev1, ev2],
                     })
                 };
+                let mk_success_3 = |ty, ev1, ev2, ev3| {
+                    (Some(ty), BlockItemResult::Success {
+                        events: vec![ev1, ev2, ev3],
+                    })
+                };
                 let (transaction_type, result) = match effects {
                     super::AccountTransactionEffects::None {
                         transaction_type,
@@ -342,6 +350,19 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                             to: Address::Account(to),
                         })
                     }
+                    super::AccountTransactionEffects::AccountTransferWithMemo {
+                        amount,
+                        to,
+                        memo,
+                    } => mk_success_2(
+                        TransactionType::Transfer,
+                        Event::Transferred {
+                            from: Address::Account(sender),
+                            amount,
+                            to: Address::Account(to),
+                        },
+                        Event::TransferMemo { memo },
+                    ),
                     super::AccountTransactionEffects::BakerAdded { data } => {
                         mk_success_1(TransactionType::AddBaker, Event::BakerAdded { data })
                     }
@@ -395,6 +416,16 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                         Event::EncryptedAmountsRemoved { data: removed },
                         Event::NewEncryptedAmount { data: added },
                     ),
+                    super::AccountTransactionEffects::EncryptedAmountTransferredWithMemo {
+                        removed,
+                        added,
+                        memo,
+                    } => mk_success_3(
+                        TransactionType::EncryptedAmountTransfer,
+                        Event::EncryptedAmountsRemoved { data: removed },
+                        Event::NewEncryptedAmount { data: added },
+                        Event::TransferMemo { memo },
+                    ),
                     super::AccountTransactionEffects::TransferredToEncrypted { data } => {
                         mk_success_1(
                             TransactionType::TransferToEncrypted,
@@ -421,6 +452,19 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                             },
                         )
                     }
+                    super::AccountTransactionEffects::TransferredWithScheduleAndMemo {
+                        to,
+                        amount,
+                        memo,
+                    } => mk_success_2(
+                        TransactionType::TransferWithSchedule,
+                        Event::TransferredWithSchedule {
+                            from: sender,
+                            to,
+                            amount,
+                        },
+                        Event::TransferMemo { memo },
+                    ),
                     super::AccountTransactionEffects::CredentialKeysUpdated { cred_id } => {
                         mk_success_1(
                             TransactionType::UpdateCredentialKeys,
@@ -602,6 +646,25 @@ fn convert_account_transaction(
             })?;
             mk_success(effects)
         }
+        TransactionType::TransferWithMemo => {
+            let events_arr: [_; 2] = events
+                .try_into()
+                .map_err(|_| ConversionError::InvalidTransactionResult)?;
+            match events_arr {
+                [Event::Transferred {
+                    from: _,
+                    amount,
+                    to: Address::Account(to),
+                }, Event::TransferMemo { memo }] => {
+                    mk_success(super::AccountTransactionEffects::AccountTransferWithMemo {
+                        amount,
+                        to,
+                        memo,
+                    })
+                }
+                _ => Err(ConversionError::InvalidTransactionResult),
+            }
+        }
         TransactionType::AddBaker => {
             let effects = with_singleton(events, |e| match e {
                 Event::BakerAdded { data } => {
@@ -695,6 +758,23 @@ fn convert_account_transaction(
                 _ => Err(ConversionError::InvalidTransactionResult),
             }
         }
+        TransactionType::EncryptedAmountTransferWithMemo => {
+            let events_arr: [_; 3] = events
+                .try_into()
+                .map_err(|_| ConversionError::InvalidTransactionResult)?;
+            match events_arr {
+                [Event::EncryptedAmountsRemoved { data: removed }, Event::NewEncryptedAmount { data: added }, Event::TransferMemo { memo }] => {
+                    mk_success(
+                        super::AccountTransactionEffects::EncryptedAmountTransferredWithMemo {
+                            removed,
+                            added,
+                            memo,
+                        },
+                    )
+                }
+                _ => Err(ConversionError::InvalidTransactionResult),
+            }
+        }
         TransactionType::TransferToEncrypted => {
             let effects = with_singleton(events, |e| match e {
                 Event::EncryptedSelfAmountAdded { data } => {
@@ -726,6 +806,23 @@ fn convert_account_transaction(
                 _ => None,
             })?;
             mk_success(effects)
+        }
+        TransactionType::TransferWithScheduleAndMemo => {
+            let events_arr: [_; 2] = events
+                .try_into()
+                .map_err(|_| ConversionError::InvalidTransactionResult)?;
+            match events_arr {
+                [Event::TransferredWithSchedule { to, amount, .. }, Event::TransferMemo { memo }] => {
+                    mk_success(
+                        super::AccountTransactionEffects::TransferredWithScheduleAndMemo {
+                            to,
+                            amount,
+                            memo,
+                        },
+                    )
+                }
+                _ => Err(ConversionError::InvalidTransactionResult),
+            }
         }
         TransactionType::UpdateCredentials => {
             let effects = with_singleton(events, |e| match e {
