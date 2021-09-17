@@ -229,13 +229,13 @@ pub struct InitContractPayload {
 pub struct UpdateContractPayload {
     /// Send the given amount of GTU together with the message to the
     /// contract instance.
-    amount:       Amount,
+    pub amount:       Amount,
     /// Address of the contract instance to invoke.
-    address:      ContractAddress,
+    pub address:      ContractAddress,
     /// Name of the method to invoke on the contract.
-    receive_name: smart_contracts::ReceiveName,
+    pub receive_name: smart_contracts::ReceiveName,
     /// Message to send to the contract instance.
-    message:      smart_contracts::Parameter,
+    pub message:      smart_contracts::Parameter,
 }
 
 #[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize)]
