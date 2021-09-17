@@ -13,6 +13,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use crypto_common::Versioned;
+use derive_more::From;
 use id::{
     constants::{ArCurve, IpPairing},
     types::{ArInfo, GlobalContext, IpInfo},
@@ -76,6 +77,26 @@ pub type RPCResult<A> = Result<A, RPCError>;
 /// Result a GRPC query where the item lookup might fail.
 /// This is a simple alias for [std::Result](https://doc.rust-lang.org/std/result/enum.Result.html) that fixes the error type to be [QueryResult].
 pub type QueryResult<A> = Result<A, QueryError>;
+
+/// Input to the [Client::get_blocks_at_height] query.
+#[derive(Clone, Copy, Debug, From)]
+pub enum BlocksAtHeightInput {
+    Absolute {
+        /// Height from the beginning of the chain.
+        height: types::AbsoluteBlockHeight,
+    },
+    /// Query relative to an explicit genesis index.
+    Relative {
+        /// Genesis index to start from.
+        genesis_index: types::GenesisIndex,
+        /// Height starting from the genesis block at the genesis index.
+        height:        types::BlockHeight,
+        /// Whether to return results only from the specified genesis index
+        /// (`true`), or allow results from more recent genesis indices
+        /// as well (`false`).
+        restrict:      bool,
+    },
+}
 
 #[derive(Clone)]
 /// Client that can perform queries.
@@ -361,11 +382,24 @@ impl Client {
     /// at the given height an empty list is returned.
     pub async fn get_blocks_at_height(
         &mut self,
-        bh: types::BlockHeight,
+        bh: BlocksAtHeightInput,
     ) -> RPCResult<Vec<types::hashes::BlockHash>> {
-        let request = self.construct_request(BlockHeight {
-            block_height: bh.into(),
-        })?;
+        let request = match bh {
+            BlocksAtHeightInput::Absolute { height } => self.construct_request(BlockHeight {
+                block_height:              height.into(),
+                from_genesis_index:        0,
+                restrict_to_genesis_index: false,
+            })?,
+            BlocksAtHeightInput::Relative {
+                genesis_index,
+                height,
+                restrict,
+            } => self.construct_request(BlockHeight {
+                block_height:              height.into(),
+                from_genesis_index:        genesis_index.into(),
+                restrict_to_genesis_index: restrict,
+            })?,
+        };
         let response = self.client.get_blocks_at_height(request).await?;
         let blocks = serde_json::from_str::<Vec<_>>(response.into_inner().value.as_str())?;
         Ok(blocks)

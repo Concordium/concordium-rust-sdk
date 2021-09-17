@@ -1,9 +1,11 @@
 use crypto_common::{
     derive::{SerdeBase16Serialize, Serial, Serialize},
-    Buffer, Deserial, Get, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
+    Buffer, Deserial, Get, ParseResult, Put, ReadBytesExt, SerdeDeserialize, SerdeSerialize,
+    Serial,
 };
 use derive_more::{Add, Display, From, FromStr, Into};
 use std::{convert::TryFrom, fmt};
+use thiserror::Error;
 
 /// Duration of a slot in milliseconds.
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
@@ -112,12 +114,88 @@ pub struct CredentialsPerBlockLimit {
     pub limit: u16,
 }
 
-/// Height of a block. Genesis block is at height 0, a child of a block at
-/// height n is at height n+1.
+/// Height of a block. Last genesis block is at height 0, a child of a block at
+/// height n is at height n+1. This height counts from the last protocol update.
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
 pub struct BlockHeight {
+    pub height: u64,
+}
+
+/// Type indicating the index of a (re)genesis block.
+/// The initial genesis block has index `0` and each subsequent regenesis
+/// has an incrementally higher index.
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
+#[serde(transparent)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
+pub struct GenesisIndex {
+    pub height: u32,
+}
+
+/// An enumeration of the supported versions of the consensus protocol.
+/// Binary and JSON serializations are as Word64 corresponding to the protocol
+/// number.
+#[derive(
+    SerdeSerialize, SerdeDeserialize, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Display,
+)]
+#[serde(into = "u64", try_from = "u64")]
+pub enum ProtocolVersion {
+    #[display(fmt = "P1")]
+    P1,
+    #[display(fmt = "P2")]
+    P2,
+}
+
+#[derive(Debug, Error, Display)]
+/// A structure to represent conversion errors when converting integers to
+/// protocol versions.
+pub struct UnknownProtocolVersion {
+    /// The version that was attempted to be converted, but is not supported.
+    version: u64,
+}
+
+impl TryFrom<u64> for ProtocolVersion {
+    type Error = UnknownProtocolVersion;
+
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(ProtocolVersion::P1),
+            2 => Ok(ProtocolVersion::P2),
+            version => Err(UnknownProtocolVersion { version }),
+        }
+    }
+}
+
+impl From<ProtocolVersion> for u64 {
+    fn from(pv: ProtocolVersion) -> Self {
+        match pv {
+            ProtocolVersion::P1 => 1,
+            ProtocolVersion::P2 => 2,
+        }
+    }
+}
+
+impl Serial for ProtocolVersion {
+    fn serial<B: Buffer>(&self, out: &mut B) {
+        let n: u64 = (*self).into();
+        out.put(&n);
+    }
+}
+
+impl Deserial for ProtocolVersion {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let n: u64 = source.get()?;
+        let pv = ProtocolVersion::try_from(n)?;
+        Ok(pv)
+    }
+}
+
+/// Height of a block since chain genesis.
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
+#[serde(transparent)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
+pub struct AbsoluteBlockHeight {
     pub height: u64,
 }
 
