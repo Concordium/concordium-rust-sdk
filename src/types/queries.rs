@@ -39,8 +39,14 @@ pub struct BlockInfo {
     /// [BlockInfo::block_arrive_time] this is an objective value, all nodes
     /// agree on it.
     pub block_slot_time:         chrono::DateTime<chrono::Utc>,
-    /// Height of the block.
-    pub block_height:            BlockHeight,
+    /// Height of the block from genesis.
+    pub block_height:            AbsoluteBlockHeight,
+    /// The height of this block relative to the (re)genesis block of its era.
+    pub era_block_height:        BlockHeight,
+    /// The genesis index for this block. This counts the number of protocol
+    /// updates that have preceded this block, and defines the era of the
+    /// block.
+    pub genesis_index:           GenesisIndex,
     /// Identity of the baker of the block. For non-genesis blocks the value is
     /// going to always be `Some`.
     pub block_baker:             Option<BakerId>,
@@ -51,7 +57,7 @@ pub struct BlockInfo {
 /// Summary of the current state of consensus.
 pub struct ConsensusInfo {
     /// Height of the last finalized block. Genesis block has height 0.
-    pub last_finalized_block_height:    BlockHeight,
+    pub last_finalized_block_height:    AbsoluteBlockHeight,
     /// The exponential moving average standard deviation of the time between a
     /// block's nominal slot time, and the time at which it is verified.
     pub block_arrive_latency_e_m_s_d:   f64,
@@ -76,7 +82,7 @@ pub struct ConsensusInfo {
     /// `None` if there are no finalizations yet since the node start.
     pub finalization_period_e_m_a:      Option<f64>,
     /// Height of the best block. See [ConsensusInfo::best_block].
-    pub best_block_height:              BlockHeight,
+    pub best_block_height:              AbsoluteBlockHeight,
     /// Time at which a block last became finalized. Note that this is the local
     /// time of the node at the time the block was finalized.
     pub last_finalized_time:            Option<chrono::DateTime<chrono::Utc>>,
@@ -126,6 +132,19 @@ pub struct ConsensusInfo {
     pub genesis_block:                  BlockHash,
     /// The time (local time of the node) that a block was last received.
     pub block_last_received_time:       Option<chrono::DateTime<chrono::Utc>>,
+    /// Currently active protocol version.
+    pub protocol_version:               ProtocolVersion,
+    /// The number of chain restarts via a protocol update. An effected
+    /// protocol update instruction might not change the protocol version
+    /// specified in the previous field, but it always increments the genesis
+    /// index.
+    pub genesis_index:                  GenesisIndex,
+    /// Block hash of the genesis block of current era, i.e., since the last
+    /// protocol update. Initially this is equal to
+    /// [ConsensusInfo::genesis_hash]'.
+    pub current_era_genesis_block:      BlockHash,
+    /// Time when the current era started.
+    pub current_era_genesis_time:       chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize)]
