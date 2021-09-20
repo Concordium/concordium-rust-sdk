@@ -24,6 +24,7 @@ anyhow = "1.0"
 rust_decimal = { version = "1.14", features = ["serde-float", "serde-arbitrary-precision"]}
 ed25519-dalek = "1"
 sha2 = "0.9"
+rand = "0.7"
 
 tokio-postgres = { version = "0.7", features = ["with-serde_json-1"] }
 
@@ -36,9 +37,9 @@ encrypted_transfers = { version = "*", path = "./concordium-base/rust-src/encryp
 eddsa_ed25519 = { version = "*", path = "./concordium-base/rust-src/eddsa_ed25519/" }
 pedersen_scheme = { version = "*", path = "./concordium-base/rust-src/pedersen_scheme/" }
 concordium-contracts-common = { version = "*", path = "./concordium-contracts-common/", features = ["derive-serde"]}
+random_oracle = { version = "*", path = "./concordium-base/rust-src/random_oracle/" }
 
 [dev-dependencies]
-rand = "0.7"
 structopt = "0.3"
 clap = "2.33.3"
 csv = "1.1"

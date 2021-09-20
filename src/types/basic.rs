@@ -4,6 +4,8 @@ use crypto_common::{
     Serial,
 };
 use derive_more::{Add, Display, From, FromStr, Into};
+use rand::{CryptoRng, RngCore};
+use random_oracle::RandomOracle;
 use std::{convert::TryFrom, fmt};
 use thiserror::Error;
 
@@ -271,21 +273,146 @@ pub struct TransactionIndex {
 pub type AggregateSigPairing = id::constants::IpPairing;
 
 /// FIXME: Move higher up in the dependency
+#[derive(SerdeBase16Serialize, Serialize, Debug)]
+pub struct BakerAggregationSignKey {
+    pub sign_key: aggregate_sig::SecretKey<AggregateSigPairing>,
+}
+
+impl BakerAggregationSignKey {
+    pub fn generate<T: CryptoRng + RngCore>(csprng: &mut T) -> Self {
+        Self {
+            sign_key: aggregate_sig::SecretKey::generate(csprng),
+        }
+    }
+
+    pub fn prove<T: CryptoRng + RngCore>(
+        &self,
+        csprng: &mut T,
+        random_oracle: &mut RandomOracle,
+    ) -> aggregate_sig::Proof<AggregateSigPairing> {
+        self.sign_key.prove(csprng, random_oracle)
+    }
+}
+
+/// FIXME: Move higher up in the dependency
 #[derive(SerdeBase16Serialize, Serialize, Clone, Debug)]
 pub struct BakerAggregationVerifyKey {
     pub verify_key: aggregate_sig::PublicKey<AggregateSigPairing>,
 }
 
+impl BakerAggregationVerifyKey {
+    pub fn from_sign_key(secret: &BakerAggregationSignKey) -> Self {
+        Self {
+            verify_key: aggregate_sig::PublicKey::from_secret(&secret.sign_key),
+        }
+    }
+}
+
+/// FIXME: Move higher up in the dependency
+#[derive(SerdeBase16Serialize, Serialize, Debug)]
+pub struct BakerSignatureSignKey {
+    pub sign_key: ed25519_dalek::SecretKey,
+}
+
+impl BakerSignatureSignKey {
+    pub fn generate<T: CryptoRng + RngCore>(csprng: &mut T) -> Self {
+        Self {
+            sign_key: ed25519_dalek::SecretKey::generate(csprng),
+        }
+    }
+}
+
 /// FIXME: Move higher up in the dependency
 #[derive(SerdeBase16Serialize, Serialize, Clone, Debug)]
-pub struct BakerSignVerifyKey {
+pub struct BakerSignatureVerifyKey {
     pub verify_key: ed25519_dalek::PublicKey,
+}
+
+impl BakerSignatureVerifyKey {
+    pub fn from_sign_key(secret: &BakerSignatureSignKey) -> Self {
+        Self {
+            verify_key: ed25519_dalek::PublicKey::from(&secret.sign_key),
+        }
+    }
+}
+
+/// FIXME: Move higher up in the dependency
+#[derive(SerdeBase16Serialize, Serialize, Debug)]
+pub struct BakerElectionSignKey {
+    pub sign_key: ecvrf::SecretKey,
+}
+
+impl BakerElectionSignKey {
+    pub fn generate<T: CryptoRng + RngCore>(csprng: &mut T) -> Self {
+        Self {
+            sign_key: ecvrf::SecretKey::generate(csprng),
+        }
+    }
 }
 
 /// FIXME: Move higher up in the dependency
 #[derive(SerdeBase16Serialize, Serialize, Clone, Debug)]
 pub struct BakerElectionVerifyKey {
-    verify_key: ecvrf::PublicKey,
+    pub verify_key: ecvrf::PublicKey,
+}
+
+impl BakerElectionVerifyKey {
+    pub fn from_sign_key(secret: &BakerElectionSignKey) -> Self {
+        Self {
+            verify_key: ecvrf::PublicKey::from(&secret.sign_key),
+        }
+    }
+}
+
+/// Baker key pairs
+#[derive(SerdeSerialize, Serialize, Debug)]
+pub struct BakerKeyPairs {
+    #[serde(rename = "signatureSignKey")]
+    pub signature_sign:     BakerSignatureSignKey,
+    #[serde(rename = "signatureVerifyKey")]
+    pub signature_verify:   BakerSignatureVerifyKey,
+    #[serde(rename = "electionPrivateKey")]
+    pub election_sign:      BakerElectionSignKey,
+    #[serde(rename = "electionVerifyKey")]
+    pub election_verify:    BakerElectionVerifyKey,
+    #[serde(rename = "aggregationSignKey")]
+    pub aggregation_sign:   BakerAggregationSignKey,
+    #[serde(rename = "aggregationVerifyKey")]
+    pub aggregation_verify: BakerAggregationVerifyKey,
+}
+
+impl BakerKeyPairs {
+    /// Generate key pairs needed for becoming a baker.
+    pub fn generate<T: CryptoRng + RngCore>(csprng: &mut T) -> Self {
+        let signature_sign = BakerSignatureSignKey::generate(csprng);
+        let signature_verify = BakerSignatureVerifyKey::from_sign_key(&signature_sign);
+        let election_sign = BakerElectionSignKey::generate(csprng);
+        let election_verify = BakerElectionVerifyKey::from_sign_key(&election_sign);
+        let aggregation_sign = BakerAggregationSignKey::generate(csprng);
+        let aggregation_verify = BakerAggregationVerifyKey::from_sign_key(&aggregation_sign);
+        BakerKeyPairs {
+            signature_sign,
+            signature_verify,
+            election_sign,
+            election_verify,
+            aggregation_sign,
+            aggregation_verify,
+        }
+    }
+}
+
+#[derive(SerdeSerialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct BakerCredentials {
+    baker_id: BakerId,
+    #[serde(flatten)]
+    keys:     BakerKeyPairs,
+}
+
+impl BakerCredentials {
+    pub fn new(baker_id: BakerId, keys: BakerKeyPairs) -> Self {
+        BakerCredentials { baker_id, keys }
+    }
 }
 
 /// FIXME: Move to somewhere else in the dependency. This belongs to rust-src.

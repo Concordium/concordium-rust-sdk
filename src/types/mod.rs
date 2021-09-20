@@ -133,7 +133,7 @@ pub struct AccountBaker {
     pub baker_election_verify_key:    BakerElectionVerifyKey,
     /// Baker's public key used to check that they are indeed the ones who
     /// produced the block.
-    pub baker_signature_verify_key:   BakerSignVerifyKey,
+    pub baker_signature_verify_key:   BakerSignatureVerifyKey,
     /// Baker's public key used to check signatures on finalization records.
     /// This is only used if the baker has sufficient stake to participate in
     /// finalization.
@@ -710,7 +710,7 @@ pub struct BakerKeysEvent {
     /// Account address of the baker.
     pub account:         AccountAddress,
     /// The new public key for verifying block signatures.
-    pub sign_key:        BakerSignVerifyKey,
+    pub sign_key:        BakerSignatureVerifyKey,
     /// The new public key for verifying whether the baker won the block
     /// lottery.
     pub election_key:    BakerElectionVerifyKey,

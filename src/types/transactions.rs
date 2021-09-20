@@ -3,8 +3,9 @@
 
 use super::{
     hashes, smart_contracts, AccountInfo, AccountThreshold, AggregateSigPairing,
-    BakerAggregationVerifyKey, BakerElectionVerifyKey, BakerSignVerifyKey, ContractAddress,
-    CredentialIndex, CredentialRegistrationID, Energy, Memo, Nonce, RegisteredData,
+    BakerAggregationVerifyKey, BakerElectionVerifyKey, BakerKeyPairs, BakerSignatureVerifyKey,
+    ContractAddress, CredentialIndex, CredentialRegistrationID, Energy, Memo, Nonce,
+    RegisteredData,
 };
 use crate::constants::*;
 use crypto_common::{
@@ -18,8 +19,10 @@ use encrypted_transfers::types::{EncryptedAmountTransferData, SecToPubAmountTran
 use id::types::{
     AccountAddress, AccountCredential, AccountKeys, CredentialDeploymentInfo, CredentialPublicKeys,
 };
+use rand::{CryptoRng, RngCore};
+use random_oracle::RandomOracle;
 use sha2::Digest;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, marker::PhantomData};
 
 #[derive(
     Debug, Copy, Clone, Serial, SerdeSerialize, SerdeDeserialize, Into, Display, Eq, PartialEq,
@@ -171,17 +174,23 @@ impl<P: PayloadLike> AccountTransaction<P> {
         verify_signature_transaction_sign_hash(keys, &hash, &self.signature)
     }
 }
+#[derive(Debug, Copy, Clone)]
+pub struct AddBakerKeysMarker;
+#[derive(Debug, Copy, Clone)]
+pub struct UpdateBakerKeysMarker;
 
 #[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize)]
 #[serde(rename_all = "camelCase")]
 /// Auxiliary type that contains public keys and proof of ownership of those
 /// keys. This is used in the `AddBaker` and `UpdateBakerKeys` transaction
 /// types.
-pub struct BakerKeysPayload {
+pub struct BakerKeysPayload<V> {
+    #[serde(skip)] // use default when deserializing
+    phantom:                    PhantomData<V>,
     /// New public key for participating in the election lottery.
     pub election_verify_key:    BakerElectionVerifyKey,
     /// New public key for verifying this baker's signatures.
-    pub signature_verify_key:   BakerSignVerifyKey,
+    pub signature_verify_key:   BakerSignatureVerifyKey,
     /// New public key for verifying this baker's signature on finalization
     /// records.
     pub aggregation_verify_key: BakerAggregationVerifyKey,
@@ -195,6 +204,69 @@ pub struct BakerKeysPayload {
     pub proof_aggregation:      aggregate_sig::Proof<AggregateSigPairing>,
 }
 
+impl<T> BakerKeysPayload<T> {
+    /// Construct a BakerKeysPayload taking a prefix for the challenge.
+    fn new<R: CryptoRng + RngCore>(
+        csprng: &mut R,
+        baker_keys: &BakerKeyPairs,
+        sender: AccountAddress,
+        challenge_prefix: &[u8],
+    ) -> Self {
+        let mut challenge = challenge_prefix.to_vec();
+
+        sender.serial(&mut challenge);
+        baker_keys.election_verify.serial(&mut challenge);
+        baker_keys.signature_verify.serial(&mut challenge);
+        baker_keys.aggregation_verify.serial(&mut challenge);
+
+        let proof_election = eddsa_ed25519::prove_dlog_ed25519(
+            &mut RandomOracle::domain(&challenge),
+            &baker_keys.election_verify.verify_key,
+            &baker_keys.election_sign.sign_key,
+        );
+        let proof_sig = eddsa_ed25519::prove_dlog_ed25519(
+            &mut RandomOracle::domain(&challenge),
+            &baker_keys.signature_verify.verify_key,
+            &baker_keys.signature_sign.sign_key,
+        );
+        let proof_aggregation = baker_keys
+            .aggregation_sign
+            .prove(csprng, &mut RandomOracle::domain(&challenge));
+
+        BakerKeysPayload {
+            phantom: PhantomData::default(),
+            election_verify_key: baker_keys.election_verify.clone(),
+            signature_verify_key: baker_keys.signature_verify.clone(),
+            aggregation_verify_key: baker_keys.aggregation_verify.clone(),
+            proof_sig,
+            proof_election,
+            proof_aggregation,
+        }
+    }
+}
+
+impl BakerKeysPayload<AddBakerKeysMarker> {
+    /// Construct a BakerKeysPayload with proofs for adding a baker.
+    pub fn new_add_payload<T: CryptoRng + RngCore>(
+        csprng: &mut T,
+        baker_keys: &BakerKeyPairs,
+        sender: AccountAddress,
+    ) -> Self {
+        BakerKeysPayload::new(csprng, baker_keys, sender, b"addBaker")
+    }
+}
+
+impl BakerKeysPayload<UpdateBakerKeysMarker> {
+    /// Construct a BakerKeysPayload with proofs for updating baker keys.
+    pub fn new_update_payload<T: CryptoRng + RngCore>(
+        csprng: &mut T,
+        baker_keys: &BakerKeyPairs,
+        sender: AccountAddress,
+    ) -> Self {
+        BakerKeysPayload::new(csprng, baker_keys, sender, b"updateBakerKeys")
+    }
+}
+
 #[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize)]
 #[serde(rename_all = "camelCase")]
 /// Payload of the `AddBaker` transaction. This transaction registers the
@@ -202,7 +274,7 @@ pub struct BakerKeysPayload {
 pub struct AddBakerPayload {
     /// The keys with which the baker registered.
     #[serde(flatten)]
-    pub keys:             BakerKeysPayload,
+    pub keys:             BakerKeysPayload<AddBakerKeysMarker>,
     /// Initial baking stake.
     pub baking_stake:     Amount,
     /// Whether to add earnings to the stake automatically or not.
@@ -284,7 +356,7 @@ pub enum Payload {
     /// Update the baker's keys.
     UpdateBakerKeys {
         #[serde(flatten)]
-        payload: Box<BakerKeysPayload>,
+        payload: Box<BakerKeysPayload<UpdateBakerKeysMarker>>,
     },
     /// Update signing keys of a specific credential.
     UpdateCredentialKeys {
@@ -843,7 +915,7 @@ impl<PayloadType> BlockItem<PayloadType> {
     }
 }
 
-impl Serial for BakerKeysPayload {
+impl<V> Serial for BakerKeysPayload<V> {
     fn serial<B: Buffer>(&self, out: &mut B) {
         out.put(&self.election_verify_key);
         out.put(&self.signature_verify_key);
@@ -854,7 +926,7 @@ impl Serial for BakerKeysPayload {
     }
 }
 
-impl Deserial for BakerKeysPayload {
+impl<V> Deserial for BakerKeysPayload<V> {
     fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
         let election_verify_key = source.get()?;
         let signature_verify_key = source.get()?;
@@ -863,6 +935,7 @@ impl Deserial for BakerKeysPayload {
         let proof_election = source.get()?;
         let proof_aggregation = source.get()?;
         Ok(Self {
+            phantom: PhantomData::default(),
             election_verify_key,
             signature_verify_key,
             aggregation_verify_key,
@@ -1346,7 +1419,7 @@ pub mod send {
         expiry: TransactionTime,
         baking_stake: Amount,
         restake_earnings: bool,
-        keys: BakerKeysPayload,
+        keys: BakerKeysPayload<AddBakerKeysMarker>,
     ) -> AccountTransaction<EncodedPayload> {
         // FIXME: This payload could be returned as well since it is only borrowed.
         let payload = Payload::AddBaker {
@@ -1374,7 +1447,7 @@ pub mod send {
         sender: AccountAddress,
         nonce: Nonce,
         expiry: TransactionTime,
-        keys: BakerKeysPayload,
+        keys: BakerKeysPayload<UpdateBakerKeysMarker>,
     ) -> AccountTransaction<EncodedPayload> {
         // FIXME: This payload could be returned as well since it is only borrowed.
         let payload = Payload::UpdateBakerKeys {
