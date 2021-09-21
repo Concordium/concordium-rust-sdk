@@ -4,7 +4,7 @@ use crypto_common::{
     Serial,
 };
 use derive_more::{Add, Display, From, FromStr, Into};
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 use random_oracle::RandomOracle;
 use std::{convert::TryFrom, fmt};
 use thiserror::Error;
@@ -273,19 +273,19 @@ pub struct TransactionIndex {
 pub type AggregateSigPairing = id::constants::IpPairing;
 
 /// FIXME: Move higher up in the dependency
-#[derive(SerdeBase16Serialize, Serialize, Debug)]
+#[derive(SerdeBase16Serialize, Serialize)]
 pub struct BakerAggregationSignKey {
-    pub sign_key: aggregate_sig::SecretKey<AggregateSigPairing>,
+    pub(crate) sign_key: aggregate_sig::SecretKey<AggregateSigPairing>,
 }
 
 impl BakerAggregationSignKey {
-    pub fn generate<T: CryptoRng + RngCore>(csprng: &mut T) -> Self {
+    pub fn generate<T: Rng>(csprng: &mut T) -> Self {
         Self {
             sign_key: aggregate_sig::SecretKey::generate(csprng),
         }
     }
 
-    pub fn prove<T: CryptoRng + RngCore>(
+    pub fn prove<T: Rng>(
         &self,
         csprng: &mut T,
         random_oracle: &mut RandomOracle,
@@ -297,11 +297,11 @@ impl BakerAggregationSignKey {
 /// FIXME: Move higher up in the dependency
 #[derive(SerdeBase16Serialize, Serialize, Clone, Debug)]
 pub struct BakerAggregationVerifyKey {
-    pub verify_key: aggregate_sig::PublicKey<AggregateSigPairing>,
+    pub(crate) verify_key: aggregate_sig::PublicKey<AggregateSigPairing>,
 }
 
-impl BakerAggregationVerifyKey {
-    pub fn from_sign_key(secret: &BakerAggregationSignKey) -> Self {
+impl From<&BakerAggregationSignKey> for BakerAggregationVerifyKey {
+    fn from(secret: &BakerAggregationSignKey) -> Self {
         Self {
             verify_key: aggregate_sig::PublicKey::from_secret(&secret.sign_key),
         }
@@ -309,13 +309,13 @@ impl BakerAggregationVerifyKey {
 }
 
 /// FIXME: Move higher up in the dependency
-#[derive(SerdeBase16Serialize, Serialize, Debug)]
+#[derive(SerdeBase16Serialize, Serialize)]
 pub struct BakerSignatureSignKey {
-    pub sign_key: ed25519_dalek::SecretKey,
+    pub(crate) sign_key: ed25519_dalek::SecretKey,
 }
 
 impl BakerSignatureSignKey {
-    pub fn generate<T: CryptoRng + RngCore>(csprng: &mut T) -> Self {
+    pub fn generate<T: CryptoRng + Rng>(csprng: &mut T) -> Self {
         Self {
             sign_key: ed25519_dalek::SecretKey::generate(csprng),
         }
@@ -325,11 +325,11 @@ impl BakerSignatureSignKey {
 /// FIXME: Move higher up in the dependency
 #[derive(SerdeBase16Serialize, Serialize, Clone, Debug)]
 pub struct BakerSignatureVerifyKey {
-    pub verify_key: ed25519_dalek::PublicKey,
+    pub(crate) verify_key: ed25519_dalek::PublicKey,
 }
 
-impl BakerSignatureVerifyKey {
-    pub fn from_sign_key(secret: &BakerSignatureSignKey) -> Self {
+impl From<&BakerSignatureSignKey> for BakerSignatureVerifyKey {
+    fn from(secret: &BakerSignatureSignKey) -> Self {
         Self {
             verify_key: ed25519_dalek::PublicKey::from(&secret.sign_key),
         }
@@ -337,13 +337,13 @@ impl BakerSignatureVerifyKey {
 }
 
 /// FIXME: Move higher up in the dependency
-#[derive(SerdeBase16Serialize, Serialize, Debug)]
+#[derive(SerdeBase16Serialize, Serialize)]
 pub struct BakerElectionSignKey {
-    pub sign_key: ecvrf::SecretKey,
+    pub(crate) sign_key: ecvrf::SecretKey,
 }
 
 impl BakerElectionSignKey {
-    pub fn generate<T: CryptoRng + RngCore>(csprng: &mut T) -> Self {
+    pub fn generate<T: CryptoRng + Rng>(csprng: &mut T) -> Self {
         Self {
             sign_key: ecvrf::SecretKey::generate(csprng),
         }
@@ -353,19 +353,25 @@ impl BakerElectionSignKey {
 /// FIXME: Move higher up in the dependency
 #[derive(SerdeBase16Serialize, Serialize, Clone, Debug)]
 pub struct BakerElectionVerifyKey {
-    pub verify_key: ecvrf::PublicKey,
+    pub(crate) verify_key: ecvrf::PublicKey,
 }
 
-impl BakerElectionVerifyKey {
-    pub fn from_sign_key(secret: &BakerElectionSignKey) -> Self {
+impl From<&BakerElectionSignKey> for BakerElectionVerifyKey {
+    fn from(secret: &BakerElectionSignKey) -> Self {
         Self {
             verify_key: ecvrf::PublicKey::from(&secret.sign_key),
         }
     }
 }
 
-/// Baker key pairs
-#[derive(SerdeSerialize, Serialize, Debug)]
+/// Baker keys containing both public and secret keys.
+/// This is used to construct `BakerKeysPayload` for adding and updating baker
+/// keys. It is also used to build the `BakerCredentials` required to have a
+/// concordium node running as a baker.
+///
+/// Note: This type contains unencrypted secret keys and should be treated
+/// carefully.
+#[derive(SerdeSerialize, Serialize)]
 pub struct BakerKeyPairs {
     #[serde(rename = "signatureSignKey")]
     pub signature_sign:     BakerSignatureSignKey,
@@ -383,13 +389,13 @@ pub struct BakerKeyPairs {
 
 impl BakerKeyPairs {
     /// Generate key pairs needed for becoming a baker.
-    pub fn generate<T: CryptoRng + RngCore>(csprng: &mut T) -> Self {
+    pub fn generate<T: Rng + CryptoRng>(csprng: &mut T) -> Self {
         let signature_sign = BakerSignatureSignKey::generate(csprng);
-        let signature_verify = BakerSignatureVerifyKey::from_sign_key(&signature_sign);
+        let signature_verify = BakerSignatureVerifyKey::from(&signature_sign);
         let election_sign = BakerElectionSignKey::generate(csprng);
-        let election_verify = BakerElectionVerifyKey::from_sign_key(&election_sign);
+        let election_verify = BakerElectionVerifyKey::from(&election_sign);
         let aggregation_sign = BakerAggregationSignKey::generate(csprng);
-        let aggregation_verify = BakerAggregationVerifyKey::from_sign_key(&aggregation_sign);
+        let aggregation_verify = BakerAggregationVerifyKey::from(&aggregation_sign);
         BakerKeyPairs {
             signature_sign,
             signature_verify,
@@ -401,7 +407,12 @@ impl BakerKeyPairs {
     }
 }
 
-#[derive(SerdeSerialize, Debug)]
+/// Baker credentials type, which can be serialized to JSON and used by a
+/// concordium-node for baking.
+///
+/// Note: This type contains unencrypted secret keys and should be treated
+/// carefully.
+#[derive(SerdeSerialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BakerCredentials {
     baker_id: BakerId,

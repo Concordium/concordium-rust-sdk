@@ -19,7 +19,7 @@ use encrypted_transfers::types::{EncryptedAmountTransferData, SecToPubAmountTran
 use id::types::{
     AccountAddress, AccountCredential, AccountKeys, CredentialDeploymentInfo, CredentialPublicKeys,
 };
-use rand::{CryptoRng, RngCore};
+use rand::Rng;
 use random_oracle::RandomOracle;
 use sha2::Digest;
 use std::{collections::BTreeMap, marker::PhantomData};
@@ -174,16 +174,25 @@ impl<P: PayloadLike> AccountTransaction<P> {
         verify_signature_transaction_sign_hash(keys, &hash, &self.signature)
     }
 }
-#[derive(Debug, Copy, Clone)]
-pub struct AddBakerKeysMarker;
-#[derive(Debug, Copy, Clone)]
-pub struct UpdateBakerKeysMarker;
+
+/// Marker for `BakerKeysPayload` indicating the proofs contained in
+/// `BakerKeysPayload` have been generated for an `AddBaker` transaction.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AddBakerKeysMarker {}
+
+/// Marker for `BakerKeysPayload` indicating the proofs contained in
+/// `BakerKeysPayload` have been generated for an `UpdateBakerKeys` transaction.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum UpdateBakerKeysMarker {}
 
 #[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize)]
 #[serde(rename_all = "camelCase")]
 /// Auxiliary type that contains public keys and proof of ownership of those
 /// keys. This is used in the `AddBaker` and `UpdateBakerKeys` transaction
 /// types.
+/// The proofs are either constructed for `AddBaker` or `UpdateBakerKeys` and
+/// the generic `V` is used as a marker to distinguish this in the type. See the
+/// markers: `AddBakerKeysMarker` and `UpdateBakerKeysMarker`.
 pub struct BakerKeysPayload<V> {
     #[serde(skip)] // use default when deserializing
     phantom:                    PhantomData<V>,
@@ -204,13 +213,19 @@ pub struct BakerKeysPayload<V> {
     pub proof_aggregation:      aggregate_sig::Proof<AggregateSigPairing>,
 }
 
+/// Baker keys payload containing proofs construct for a `AddBaker` transaction.
+pub type BakerAddKeysPayload = BakerKeysPayload<AddBakerKeysMarker>;
+/// Baker keys payload containing proofs construct for a `UpdateBakerKeys`
+/// transaction.
+pub type BakerUpdateKeysPayload = BakerKeysPayload<UpdateBakerKeysMarker>;
+
 impl<T> BakerKeysPayload<T> {
     /// Construct a BakerKeysPayload taking a prefix for the challenge.
-    fn new<R: CryptoRng + RngCore>(
-        csprng: &mut R,
+    fn new_payload<R: Rng>(
         baker_keys: &BakerKeyPairs,
         sender: AccountAddress,
         challenge_prefix: &[u8],
+        csprng: &mut R,
     ) -> Self {
         let mut challenge = challenge_prefix.to_vec();
 
@@ -245,25 +260,17 @@ impl<T> BakerKeysPayload<T> {
     }
 }
 
-impl BakerKeysPayload<AddBakerKeysMarker> {
+impl BakerAddKeysPayload {
     /// Construct a BakerKeysPayload with proofs for adding a baker.
-    pub fn new_add_payload<T: CryptoRng + RngCore>(
-        csprng: &mut T,
-        baker_keys: &BakerKeyPairs,
-        sender: AccountAddress,
-    ) -> Self {
-        BakerKeysPayload::new(csprng, baker_keys, sender, b"addBaker")
+    pub fn new<T: Rng>(baker_keys: &BakerKeyPairs, sender: AccountAddress, csprng: &mut T) -> Self {
+        BakerKeysPayload::new_payload(baker_keys, sender, b"addBaker", csprng)
     }
 }
 
-impl BakerKeysPayload<UpdateBakerKeysMarker> {
+impl BakerUpdateKeysPayload {
     /// Construct a BakerKeysPayload with proofs for updating baker keys.
-    pub fn new_update_payload<T: CryptoRng + RngCore>(
-        csprng: &mut T,
-        baker_keys: &BakerKeyPairs,
-        sender: AccountAddress,
-    ) -> Self {
-        BakerKeysPayload::new(csprng, baker_keys, sender, b"updateBakerKeys")
+    pub fn new<T: Rng>(baker_keys: &BakerKeyPairs, sender: AccountAddress, csprng: &mut T) -> Self {
+        BakerKeysPayload::new_payload(baker_keys, sender, b"updateBakerKeys", csprng)
     }
 }
 
@@ -274,7 +281,7 @@ impl BakerKeysPayload<UpdateBakerKeysMarker> {
 pub struct AddBakerPayload {
     /// The keys with which the baker registered.
     #[serde(flatten)]
-    pub keys:             BakerKeysPayload<AddBakerKeysMarker>,
+    pub keys:             BakerAddKeysPayload,
     /// Initial baking stake.
     pub baking_stake:     Amount,
     /// Whether to add earnings to the stake automatically or not.
@@ -356,7 +363,7 @@ pub enum Payload {
     /// Update the baker's keys.
     UpdateBakerKeys {
         #[serde(flatten)]
-        payload: Box<BakerKeysPayload<UpdateBakerKeysMarker>>,
+        payload: Box<BakerUpdateKeysPayload>,
     },
     /// Update signing keys of a specific credential.
     UpdateCredentialKeys {
@@ -1419,7 +1426,7 @@ pub mod send {
         expiry: TransactionTime,
         baking_stake: Amount,
         restake_earnings: bool,
-        keys: BakerKeysPayload<AddBakerKeysMarker>,
+        keys: BakerAddKeysPayload,
     ) -> AccountTransaction<EncodedPayload> {
         // FIXME: This payload could be returned as well since it is only borrowed.
         let payload = Payload::AddBaker {
@@ -1447,7 +1454,7 @@ pub mod send {
         sender: AccountAddress,
         nonce: Nonce,
         expiry: TransactionTime,
-        keys: BakerKeysPayload<UpdateBakerKeysMarker>,
+        keys: BakerUpdateKeysPayload,
     ) -> AccountTransaction<EncodedPayload> {
         // FIXME: This payload could be returned as well since it is only borrowed.
         let payload = Payload::UpdateBakerKeys {
