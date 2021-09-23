@@ -285,6 +285,8 @@ impl BakerAggregationSignKey {
         }
     }
 
+    /// Prove knowledge of the baker aggregation signing key with respect to the
+    /// challenge given via the random oracle.
     pub fn prove<T: Rng>(
         &self,
         csprng: &mut T,
