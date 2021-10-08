@@ -17,7 +17,8 @@ use crypto_common::{
 use derive_more::*;
 use encrypted_transfers::types::{EncryptedAmountTransferData, SecToPubAmountTransferData};
 use id::types::{
-    AccountAddress, AccountCredential, AccountKeys, CredentialDeploymentInfo, CredentialPublicKeys,
+    AccountAddress, AccountCredentialMessage, AccountKeys, CredentialDeploymentInfo,
+    CredentialPublicKeys,
 };
 use rand::Rng;
 use random_oracle::RandomOracle;
@@ -876,7 +877,7 @@ pub enum BlockItem<PayloadType> {
     /// including them.
     CredentialDeployment(
         Box<
-            AccountCredential<
+            AccountCredentialMessage<
                 id::constants::IpPairing,
                 id::constants::ArCurve,
                 id::constants::AttributeKind,
@@ -892,7 +893,7 @@ impl<PayloadType> From<AccountTransaction<PayloadType>> for BlockItem<PayloadTyp
 
 impl<PayloadType>
     From<
-        AccountCredential<
+        AccountCredentialMessage<
             id::constants::IpPairing,
             id::constants::ArCurve,
             id::constants::AttributeKind,
@@ -900,7 +901,7 @@ impl<PayloadType>
     > for BlockItem<PayloadType>
 {
     fn from(
-        at: AccountCredential<
+        at: AccountCredentialMessage<
             id::constants::IpPairing,
             id::constants::ArCurve,
             id::constants::AttributeKind,

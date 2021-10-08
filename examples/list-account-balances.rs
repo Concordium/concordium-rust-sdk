@@ -30,7 +30,7 @@ struct App {
     token:    String,
     #[structopt(
         long = "out",
-        help = "File to output the listof accounts with their balances to."
+        help = "File to output the list of accounts with their balances to."
     )]
     out:      PathBuf,
 }

@@ -155,7 +155,7 @@ pub struct Branch {
     /// Root of the tree.
     pub block_hash: BlockHash,
     /// And children.
-    pub branches:   Vec<Branch>,
+    pub children:   Vec<Branch>,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
