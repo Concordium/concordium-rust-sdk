@@ -18,6 +18,7 @@ use derive_more::*;
 use id::{
     constants::{ArCurve, AttributeKind},
     types::{AccountAddress, AccountCredentialWithoutProofs},
+    elgamal
 };
 use std::{
     collections::{BTreeMap, BTreeSet},

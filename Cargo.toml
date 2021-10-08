@@ -30,7 +30,6 @@ tokio-postgres = { version = "0.7", features = ["with-serde_json-1"] }
 
 crypto_common = { version = "*", path = "./concordium-base/rust-src/crypto_common", features = ["encryption"] }
 id = { version = "*", path = "./concordium-base/rust-src/id", default-features=false }
-elgamal = { version = "*", path = "./concordium-base/rust-src/elgamal" }
 ecvrf = { version = "*", path = "./concordium-base/rust-src/ecvrf" }
 aggregate_sig = { version = "*", path = "./concordium-base/rust-src/aggregate_sig" }
 encrypted_transfers = { version = "*", path = "./concordium-base/rust-src/encrypted_transfers" }
@@ -38,6 +37,7 @@ eddsa_ed25519 = { version = "*", path = "./concordium-base/rust-src/eddsa_ed2551
 pedersen_scheme = { version = "*", path = "./concordium-base/rust-src/pedersen_scheme/" }
 concordium-contracts-common = { version = "*", path = "./concordium-contracts-common/", features = ["derive-serde"]}
 random_oracle = { version = "*", path = "./concordium-base/rust-src/random_oracle/" }
+
 
 [dev-dependencies]
 structopt = "0.3"

@@ -25,8 +25,6 @@ pub use encrypted_transfers;
 /// signatures. This is useful for constructing baker transactions.
 pub use aggregate_sig;
 
-/// Re-export of Elgamal encryption.
-pub use elgamal;
 
 /// Re-export of Elgamal encryption.
 pub use eddsa_ed25519;
@@ -34,5 +32,3 @@ pub use eddsa_ed25519;
 /// Re-export of Elgamal encryption.
 pub use ecvrf;
 
-/// Re-export of Pedersen commitments functionality.
-pub use pedersen_scheme as pedersen_commitment;
