@@ -50,7 +50,7 @@ impl TryFrom<String> for ReceiveName {
     type Error = concordium_contracts_common::NewReceiveNameError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        concordium_contracts_common::is_valid_receive_name(value.as_str())?;
+        concordium_contracts_common::ReceiveName::is_valid_receive_name(value.as_str())?;
         Ok(ReceiveName { name: value })
     }
 }
@@ -59,7 +59,7 @@ impl Deserial for ReceiveName {
     fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
         let len: u16 = source.get()?;
         let name = crypto_common::deserial_string(source, len.into())?;
-        concordium_contracts_common::is_valid_receive_name(name.as_str())
+        concordium_contracts_common::ReceiveName::is_valid_receive_name(name.as_str())
             .map_err(|x| anyhow::anyhow!(x))?;
         Ok(ReceiveName { name })
     }
@@ -87,7 +87,7 @@ impl TryFrom<String> for InitName {
     type Error = concordium_contracts_common::NewContractNameError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        concordium_contracts_common::is_valid_contract_name(value.as_str())?;
+        concordium_contracts_common::ContractName::is_valid_contract_name(value.as_str())?;
         Ok(InitName { name: value })
     }
 }
@@ -96,7 +96,7 @@ impl Deserial for InitName {
     fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
         let len: u16 = source.get()?;
         let name = crypto_common::deserial_string(source, len.into())?;
-        concordium_contracts_common::is_valid_contract_name(name.as_str())
+        concordium_contracts_common::ContractName::is_valid_contract_name(name.as_str())
             .map_err(|x| anyhow::anyhow!(x))?;
         Ok(InitName { name })
     }
