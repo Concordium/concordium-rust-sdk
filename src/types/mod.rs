@@ -21,7 +21,7 @@ use id::{
     types::{AccountAddress, AccountCredentialWithoutProofs},
 };
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
     convert::TryFrom,
     marker::PhantomData,
 };
@@ -95,7 +95,8 @@ pub struct AccountInfo {
     pub account_release_schedule: AccountReleaseSchedule,
     /// Map of all currently active credentials on the account.
     /// This includes public keys that can sign for the given credentials, as
-    /// well as any revealed attributes.
+    /// well as any revealed attributes. This map always contains a credential
+    /// with index 0.
     pub account_credentials: std::collections::BTreeMap<
         CredentialIndex,
         Versioned<AccountCredentialWithoutProofs<ArCurve, AttributeKind>>,
@@ -117,6 +118,21 @@ pub struct AccountInfo {
     /// `Some` if and only if the account is a baker. In that case it is the
     /// information about the baker.
     pub account_baker:            Option<AccountBaker>,
+    /// Canonical address of the account.
+    pub account_address:          Option<AccountAddress>,
+}
+
+impl AccountInfo {
+    /// Get the account address of the account.
+    pub fn account_address(&self) -> AccountAddress {
+        match self.account_address {
+            Some(addr) => addr,
+            None => match self.account_credentials.get(&CredentialIndex::from(0u8)) {
+                Some(v) => AccountAddress::new(v.value.cred_id()),
+                None => unreachable!("Account info always has a credential at index 0."),
+            },
+        }
+    }
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
@@ -361,6 +377,34 @@ pub enum SpecialTransactionOutcome {
     },
 }
 
+impl SpecialTransactionOutcome {
+    pub fn affected_addresses(&self) -> Vec<AccountAddress> {
+        match self {
+            SpecialTransactionOutcome::BakingRewards { baker_rewards, .. } => {
+                baker_rewards.keys().copied().collect()
+            }
+            SpecialTransactionOutcome::Mint {
+                foundation_account, ..
+            } => vec![*foundation_account],
+            SpecialTransactionOutcome::FinalizationRewards {
+                finalization_rewards,
+                ..
+            } => finalization_rewards.keys().copied().collect(),
+            SpecialTransactionOutcome::BlockReward {
+                baker,
+                foundation_account,
+                ..
+            } => {
+                if baker == foundation_account {
+                    vec![*baker]
+                } else {
+                    vec![*baker, *foundation_account]
+                }
+            }
+        }
+    }
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 /// Summary of transactions, protocol generated transfers, and chain parameters
@@ -368,7 +412,33 @@ pub enum SpecialTransactionOutcome {
 pub struct BlockSummary {
     pub transaction_summaries: Vec<BlockItemSummary>,
     pub special_events:        Vec<SpecialTransactionOutcome>,
-    pub updates:               Updates, // FIXME: Add the finalization data.
+    pub updates:               Updates,
+    pub finalization_data:     Option<FinalizationSummary>,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+/// Summary of the finalization record in a block, if any.
+pub struct FinalizationSummary {
+    #[serde(rename = "finalizationBlockPointer")]
+    pub block_pointer: hashes::BlockHash,
+    #[serde(rename = "finalizationIndex")]
+    pub index:         FinalizationIndex,
+    #[serde(rename = "finalizationDelay")]
+    pub delay:         BlockHeight,
+    #[serde(rename = "finalizers")]
+    pub finalizers:    Vec<FinalizationSummaryParty>,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+/// Details of a party in a finalization.
+pub struct FinalizationSummaryParty {
+    /// The identity of the baker.
+    pub baker_id: BakerId,
+    /// The party's relative weight in the committee
+    pub weight:   u64,
+    /// Whether the party's signature is present
+    pub signed:   bool,
 }
 
 #[derive(SerdeDeserialize, SerdeSerialize, Debug, Clone)]
@@ -397,6 +467,95 @@ impl BlockItemSummary {
             BlockItemSummaryDetails::AccountTransaction(at) => Some(at.sender),
             BlockItemSummaryDetails::AccountCreation(_) => None,
             BlockItemSummaryDetails::Update(_) => None,
+        }
+    }
+
+    pub fn affected_contracts(&self) -> Vec<ContractAddress> {
+        if let BlockItemSummaryDetails::AccountTransaction(at) = &self.details {
+            match &at.effects {
+                AccountTransactionEffects::ContractInitialized { data } => vec![data.address],
+                AccountTransactionEffects::ContractUpdateIssued { effects } => {
+                    let mut addresses = HashSet::new();
+                    for effect in effects {
+                        match effect {
+                            ContractTraceElement::Updated { data } => {
+                                addresses.insert(data.address);
+                            }
+                            ContractTraceElement::Transferred { .. } => (),
+                        }
+                    }
+                    addresses.into_iter().collect()
+                }
+                _ => Vec::new(),
+            }
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Return the list of addresses affected by the block summary.
+    pub fn affected_addresses(&self) -> Vec<AccountAddress> {
+        if let BlockItemSummaryDetails::AccountTransaction(at) = &self.details {
+            match &at.effects {
+                AccountTransactionEffects::None { .. } => vec![at.sender],
+                AccountTransactionEffects::ModuleDeployed { .. } => vec![at.sender],
+                AccountTransactionEffects::ContractInitialized { .. } => vec![at.sender],
+                AccountTransactionEffects::ContractUpdateIssued { effects } => {
+                    let mut addresses = HashSet::new();
+                    addresses.insert(at.sender);
+                    for effect in effects {
+                        match effect {
+                            ContractTraceElement::Updated { .. } => (),
+                            ContractTraceElement::Transferred { to, .. } => {
+                                addresses.insert(*to);
+                            }
+                        }
+                    }
+                    addresses.into_iter().collect()
+                }
+                AccountTransactionEffects::AccountTransfer { to, .. } => {
+                    if *to == at.sender {
+                        vec![at.sender]
+                    } else {
+                        vec![at.sender, *to]
+                    }
+                }
+                AccountTransactionEffects::AccountTransferWithMemo { to, .. } => {
+                    if *to == at.sender {
+                        vec![at.sender]
+                    } else {
+                        vec![at.sender, *to]
+                    }
+                }
+                AccountTransactionEffects::BakerAdded { .. } => vec![at.sender],
+                AccountTransactionEffects::BakerRemoved { .. } => vec![at.sender],
+                AccountTransactionEffects::BakerStakeUpdated { .. } => vec![at.sender],
+                AccountTransactionEffects::BakerRestakeEarningsUpdated { .. } => vec![at.sender],
+                AccountTransactionEffects::BakerKeysUpdated { .. } => vec![at.sender],
+                AccountTransactionEffects::EncryptedAmountTransferred { removed, added } => {
+                    vec![removed.account, added.receiver]
+                }
+                AccountTransactionEffects::EncryptedAmountTransferredWithMemo {
+                    removed,
+                    added,
+                    ..
+                } => vec![removed.account, added.receiver],
+                AccountTransactionEffects::TransferredToEncrypted { data } => vec![data.account],
+                AccountTransactionEffects::TransferredToPublic { removed, .. } => {
+                    vec![removed.account]
+                }
+                AccountTransactionEffects::TransferredWithSchedule { to, .. } => {
+                    vec![at.sender, *to]
+                }
+                AccountTransactionEffects::TransferredWithScheduleAndMemo { to, .. } => {
+                    vec![at.sender, *to]
+                }
+                AccountTransactionEffects::CredentialKeysUpdated { .. } => vec![at.sender],
+                AccountTransactionEffects::CredentialsUpdated { .. } => vec![at.sender],
+                AccountTransactionEffects::DataRegistered { .. } => vec![at.sender],
+            }
+        } else {
+            Vec::new()
         }
     }
 }

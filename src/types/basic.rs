@@ -147,6 +147,8 @@ pub enum ProtocolVersion {
     P1,
     #[display(fmt = "P2")]
     P2,
+    #[display(fmt = "P3")]
+    P3,
 }
 
 #[derive(Debug, Error, Display)]
@@ -164,6 +166,7 @@ impl TryFrom<u64> for ProtocolVersion {
         match value {
             1 => Ok(ProtocolVersion::P1),
             2 => Ok(ProtocolVersion::P2),
+            3 => Ok(ProtocolVersion::P3),
             version => Err(UnknownProtocolVersion { version }),
         }
     }
@@ -174,6 +177,7 @@ impl From<ProtocolVersion> for u64 {
         match pv {
             ProtocolVersion::P1 => 1,
             ProtocolVersion::P2 => 2,
+            ProtocolVersion::P3 => 3,
         }
     }
 }
@@ -221,7 +225,7 @@ pub struct Energy {
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
 #[derive(
-    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into, Default,
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into, Default, Hash,
 )]
 /// Contract index. The default implementation produces contract index 0.
 pub struct ContractIndex {
@@ -231,7 +235,7 @@ pub struct ContractIndex {
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
 #[derive(
-    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into, Default,
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into, Default, Hash,
 )]
 /// Contract subindex. The default implementation produces contract index 0.
 pub struct ContractSubIndex {
@@ -240,7 +244,7 @@ pub struct ContractSubIndex {
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct ContractAddress {
     pub index:    ContractIndex,
     pub subindex: ContractSubIndex,
@@ -504,6 +508,17 @@ pub struct MintRate {
 #[serde(transparent)]
 pub struct RewardFraction {
     parts_per_hundred_thousands: PartsPerHundredThousands,
+}
+
+/// Sequential index of finalization.
+
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
+#[serde(transparent)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
+/// Index of the account in the account table. These are assigned sequentially
+/// in the order of creation of accounts. The first account has index 0.
+pub struct FinalizationIndex {
+    pub index: u64,
 }
 
 /// Add two parts, checking that the result is still less than 100_000.

@@ -355,7 +355,7 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                         to,
                         memo,
                     } => mk_success_2(
-                        TransactionType::Transfer,
+                        TransactionType::TransferWithMemo,
                         Event::Transferred {
                             from: Address::Account(sender),
                             amount,
@@ -421,7 +421,7 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                         added,
                         memo,
                     } => mk_success_3(
-                        TransactionType::EncryptedAmountTransfer,
+                        TransactionType::EncryptedAmountTransferWithMemo,
                         Event::EncryptedAmountsRemoved { data: removed },
                         Event::NewEncryptedAmount { data: added },
                         Event::TransferMemo { memo },
@@ -457,7 +457,7 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                         amount,
                         memo,
                     } => mk_success_2(
-                        TransactionType::TransferWithSchedule,
+                        TransactionType::TransferWithScheduleAndMemo,
                         Event::TransferredWithSchedule {
                             from: sender,
                             to,

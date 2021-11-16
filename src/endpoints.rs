@@ -719,6 +719,21 @@ impl Client {
         &mut self,
         bh: &types::hashes::BlockHash,
     ) -> QueryResult<types::BlockSummary> {
+        let summary = self.get_block_summary_raw(bh).await?;
+        Ok(serde_json::from_value(summary)?)
+    }
+
+    /// Get the summary of a block. This lists all transactions and special
+    /// outcomes occurring in a given block, as well as the value of chain
+    /// parameters at the given block. If the block is not in the node's tree
+    /// [QueryError::NotFound] is returned. In contrast to
+    /// [Client::get_block_summary] this function does not fully parse the
+    /// result since that can be expensive and some applications might not need
+    /// it.
+    pub async fn get_block_summary_raw(
+        &mut self,
+        bh: &types::hashes::BlockHash,
+    ) -> QueryResult<serde_json::Value> {
         let request = self.construct_request(BlockHash {
             block_hash: bh.to_string(),
         })?;
