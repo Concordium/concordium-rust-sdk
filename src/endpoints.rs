@@ -58,6 +58,11 @@ pub enum QueryError {
     NotFound,
 }
 
+impl QueryError {
+    /// Whether this error is the NotFound variant.
+    pub fn is_not_found(&self) -> bool { matches!(self, Self::NotFound) }
+}
+
 impl From<tonic::Status> for QueryError {
     fn from(s: tonic::Status) -> Self { Self::RPCError(s.into()) }
 }

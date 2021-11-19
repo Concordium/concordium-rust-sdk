@@ -1,5 +1,6 @@
 use crate::types::{
-    hashes::BlockHash, BlockItemSummary, ContractAddress, SpecialTransactionOutcome,
+    hashes::BlockHash, AbsoluteBlockHeight, BlockItemSummary, ContractAddress,
+    SpecialTransactionOutcome,
 };
 use crypto_common::{types::Timestamp, SerdeDeserialize, SerdeSerialize};
 use futures::StreamExt;
@@ -30,14 +31,16 @@ pub enum DatabaseSummaryEntry {
 pub struct DatabaseRow {
     /// Internal id of the row. This can be used in repeated queries to get more
     /// pages of results.
-    pub id:         i64,
+    pub id:           i64,
     /// Hash of the block the row applies to.
-    pub block_hash: BlockHash,
+    pub block_hash:   BlockHash,
     /// Slot time of the block the row applies to.
-    pub block_time: Timestamp,
+    pub block_time:   Timestamp,
+    /// Block height stored in the database.
+    pub block_height: AbsoluteBlockHeight,
     /// Summary of the item. Either a user-generated transaction, or a protocol
     /// event that affected the account or contract.
-    pub summary:    DatabaseSummaryEntry,
+    pub summary:      DatabaseSummaryEntry,
 }
 
 impl DatabaseSummaryEntry {
@@ -97,6 +100,12 @@ impl AsRef<tokio_postgres::Client> for DatabaseClient {
     fn as_ref(&self) -> &tokio_postgres::Client { &self.database_client }
 }
 
+/// This implementation enables direct queries on the underlying database
+/// client.
+impl AsMut<tokio_postgres::Client> for DatabaseClient {
+    fn as_mut(&mut self) -> &mut tokio_postgres::Client { &mut self.database_client }
+}
+
 impl DatabaseClient {
     pub async fn create<T: tokio_postgres::tls::MakeTlsConnect<tokio_postgres::Socket>>(
         config: tokio_postgres::Config,
@@ -115,7 +124,7 @@ impl DatabaseClient {
         // a wrong approach for small limits for the database we have.
         let query_account_statement_asc = {
             let statement = "SELECT ati.id, summaries.block, summaries.timestamp, \
-                             summaries.summary
+                             summaries.height, summaries.summary
  FROM ati JOIN summaries ON ati.summary = summaries.id
  WHERE ati.account = $1 AND ati.id >= $2
  ORDER BY ati.id ASC, summaries.id ASC LIMIT $3";
@@ -124,7 +133,7 @@ impl DatabaseClient {
 
         let query_contract_statement_asc = {
             let statement = "SELECT cti.id, summaries.block, summaries.timestamp, \
-                             summaries.summary
+                             summaries.height, summaries.summary
  FROM cti JOIN summaries ON cti.summary = summaries.id
  WHERE cti.index = $1 AND cti.subindex = $2 AND cti.id >= $3
  ORDER BY cti.id ASC, summaries.id ASC LIMIT $4";
@@ -133,7 +142,7 @@ impl DatabaseClient {
 
         let query_account_statement_desc = {
             let statement = "SELECT ati.id, summaries.block, summaries.timestamp, \
-                             summaries.summary
+                             summaries.height, summaries.summary
  FROM ati JOIN summaries ON ati.summary = summaries.id
  WHERE ati.account = $1 AND ati.id <= $2
  ORDER BY ati.id DESC, summaries.id DESC LIMIT $3";
@@ -142,7 +151,7 @@ impl DatabaseClient {
 
         let query_contract_statement_desc = {
             let statement = "SELECT cti.id, summaries.block, summaries.timestamp, \
-                             summaries.summary
+                             summaries.height, summaries.summary
  FROM cti JOIN summaries ON cti.summary = summaries.id
  WHERE cti.index = $1 AND cti.subindex = $2 AND cti.id <= $3
  ORDER BY cti.id DESC, summaries.id DESC LIMIT $4";
@@ -272,11 +281,13 @@ fn construct_row(
     let hash_bytes: &[u8] = row.get(1);
     let block_hash = BlockHash::new(hash_bytes.try_into().ok()?);
     let block_time = Timestamp::from(row.get::<_, i64>(2) as u64);
-    let summary = serde_json::from_value::<DatabaseSummaryEntry>(row.get(3)).ok()?;
+    let block_height = AbsoluteBlockHeight::from(row.get::<_, i64>(3) as u64);
+    let summary = serde_json::from_value::<DatabaseSummaryEntry>(row.get(4)).ok()?;
     Some(DatabaseRow {
         id,
         block_hash,
         block_time,
+        block_height,
         summary,
     })
 }

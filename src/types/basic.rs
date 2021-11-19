@@ -205,6 +205,15 @@ pub struct AbsoluteBlockHeight {
     pub height: u64,
 }
 
+impl AbsoluteBlockHeight {
+    /// Get the next height.
+    pub fn next(self) -> Self {
+        AbsoluteBlockHeight {
+            height: 1 + self.height,
+        }
+    }
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
