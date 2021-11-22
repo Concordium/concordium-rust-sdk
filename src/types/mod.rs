@@ -475,16 +475,19 @@ impl BlockItemSummary {
             match &at.effects {
                 AccountTransactionEffects::ContractInitialized { data } => vec![data.address],
                 AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                    let mut addresses = HashSet::new();
+                    let mut seen = HashSet::new();
+                    let mut addresses = Vec::new();
                     for effect in effects {
                         match effect {
                             ContractTraceElement::Updated { data } => {
-                                addresses.insert(data.address);
+                                if !seen.insert(data.address) {
+                                    addresses.push(data.address);
+                                }
                             }
                             ContractTraceElement::Transferred { .. } => (),
                         }
                     }
-                    addresses.into_iter().collect()
+                    addresses
                 }
                 _ => Vec::new(),
             }
@@ -501,17 +504,20 @@ impl BlockItemSummary {
                 AccountTransactionEffects::ModuleDeployed { .. } => vec![at.sender],
                 AccountTransactionEffects::ContractInitialized { .. } => vec![at.sender],
                 AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                    let mut addresses = HashSet::new();
-                    addresses.insert(at.sender);
+                    let mut seen = BTreeSet::new();
+                    seen.insert(at.sender);
+                    let mut addresses = vec![at.sender];
                     for effect in effects {
                         match effect {
                             ContractTraceElement::Updated { .. } => (),
                             ContractTraceElement::Transferred { to, .. } => {
-                                addresses.insert(*to);
+                                if !seen.insert(*to) {
+                                    addresses.push(*to);
+                                }
                             }
                         }
                     }
-                    addresses.into_iter().collect()
+                    addresses
                 }
                 AccountTransactionEffects::AccountTransfer { to, .. } => {
                     if *to == at.sender {
@@ -584,6 +590,15 @@ pub struct AccountTransactionDetails {
     pub sender:  AccountAddress,
     /// Effects of the account transaction, if any.
     pub effects: AccountTransactionEffects,
+}
+
+impl AccountTransactionDetails {
+    /// Get the transaction type corresponding to the details.
+    /// Returns `None` for the
+    /// [AccountTransactionEffects::None](AccountTransactionEffects::None)
+    /// variant in case the transaction failed with serialization failure
+    /// reason.
+    pub fn transaction_type(&self) -> Option<TransactionType> { self.effects.transaction_type() }
 }
 
 impl AccountTransactionEffects {
