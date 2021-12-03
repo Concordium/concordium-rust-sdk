@@ -56,7 +56,7 @@ pub(crate) mod amounts_as_u64 {
         amnt.serialize(ser)
     }
 
-    /// Deserialize an Amount either from an integer in microGTU expressed as a
+    /// Deserialize an Amount either from an integer in microCCD expressed as a
     /// u64 or from its own parser (from string)
     pub fn deserialize<'de, D: serde::Deserializer<'de>>(des: D) -> Result<Amount, D::Error> {
         struct AmountVisitor;
@@ -70,18 +70,18 @@ pub(crate) mod amounts_as_u64 {
                 )
             }
 
-            fn visit_u64<E: serde::de::Error>(self, microgtu: u64) -> Result<Self::Value, E> {
-                Ok(Amount { microgtu })
+            fn visit_u64<E: serde::de::Error>(self, microccd: u64) -> Result<Self::Value, E> {
+                Ok(Amount { microgtu: microccd })
             }
 
             fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
-                let microgtu = v.parse::<u64>().map_err(|_| {
+                let microccd = v.parse::<u64>().map_err(|_| {
                     E::custom(
                         "Invalid amount value. Expecting a string containing a non-negative \
                          integer < 2^64.",
                     )
                 })?;
-                Ok(Amount { microgtu })
+                Ok(Amount { microgtu: microccd })
             }
         }
         des.deserialize_any(AmountVisitor)

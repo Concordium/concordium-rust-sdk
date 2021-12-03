@@ -569,7 +569,7 @@ impl Client {
         parse_json_response(response)
     }
 
-    /// Get the information about total amount of GTU and the state of various
+    /// Get the information about total amount of CCD and the state of various
     /// administrative accounts.
     pub async fn get_reward_status(
         &mut self,

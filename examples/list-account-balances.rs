@@ -1,4 +1,4 @@
-//! List accounts and their balances ordered by decreasing GTU amount in a CSV
+//! List accounts and their balances ordered by decreasing CCD amount in a CSV
 //! file.
 use anyhow::Context;
 use clap::AppSettings;
@@ -39,7 +39,7 @@ struct App {
 struct Row {
     #[serde(rename = "Account address")]
     address:  AccountAddress,
-    #[serde(rename = "Account balance in GTU", serialize_with = "to_string")]
+    #[serde(rename = "Account balance in CCD", serialize_with = "to_string")]
     balance:  Amount,
     #[serde(rename = "isBaker")]
     is_baker: bool,
@@ -134,9 +134,9 @@ async fn main() -> anyhow::Result<()> {
         num_bakers, num_initial
     );
 
-    println!("Total amount of GTU is {}.", total_amount);
+    println!("Total amount of CCD is {}.", total_amount);
     println!(
-        "Total amount of staked GTU is {}, which amounts to {:.2}%.",
+        "Total amount of staked CCD is {}, which amounts to {:.2}%.",
         staked_amount,
         (u64::from(staked_amount) as f64 / u64::from(total_amount) as f64) * 100f64
     );
