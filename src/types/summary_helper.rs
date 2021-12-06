@@ -19,7 +19,7 @@ pub(crate) struct BlockItemSummary {
     sender:       Option<AccountAddress>,
     /// Hash of the transaction.
     hash:         hashes::TransactionHash,
-    /// The amount of GTU the transaction was charged to the sender.
+    /// The amount of CCD the transaction was charged to the sender.
     cost:         Amount,
     /// The amount of NRG the transaction cost.
     energy_cost:  Energy,
@@ -63,11 +63,11 @@ pub enum UpdateType {
     UpdateElectionDifficulty,
     /// Update the euro per energy exchange rate
     UpdateEuroPerEnergy,
-    /// Update the microGTU per euro exchange rate
+    /// Update the microCCD per euro exchange rate
     UpdateMicroGTUPerEuro,
     /// Update the address of the foundation account
     UpdateFoundationAccount,
-    /// Update the distribution of newly minted GTU
+    /// Update the distribution of newly minted CCD
     UpdateMintDistribution,
     /// Update the distribution of transaction fees
     UpdateTransactionFeeDistribution,
@@ -122,7 +122,7 @@ enum Event {
         data: InstanceUpdatedEvent,
     },
     #[serde(rename_all = "camelCase")]
-    /// An amount of GTU was transferred.
+    /// An amount of CCD was transferred.
     Transferred {
         /// Sender, either smart contract instance or account.
         from:   Address,

@@ -293,7 +293,7 @@ pub struct AddBakerPayload {
 #[serde(rename_all = "camelCase")]
 /// Data needed to initialize a smart contract.
 pub struct InitContractPayload {
-    /// Deposit this amount of GTU.
+    /// Deposit this amount of CCD.
     pub amount:    Amount,
     /// Reference to the module from which to initialize the instance.
     pub mod_ref:   smart_contracts::ModuleRef,
@@ -307,7 +307,7 @@ pub struct InitContractPayload {
 #[serde(rename_all = "camelCase")]
 /// Data needed to update a smart contract instance.
 pub struct UpdateContractPayload {
-    /// Send the given amount of GTU together with the message to the
+    /// Send the given amount of CCD together with the message to the
     /// contract instance.
     pub amount:       Amount,
     /// Address of the contract instance to invoke.
@@ -337,7 +337,7 @@ pub enum Payload {
         #[serde(flatten)]
         payload: UpdateContractPayload,
     },
-    /// Transfer GTU to an account.
+    /// Transfer CCD to an account.
     Transfer {
         /// Address to send to.
         to_address: AccountAddress,
@@ -420,7 +420,7 @@ pub enum Payload {
         /// The data to register.
         data: RegisteredData,
     },
-    /// Transfer GTU to an account with an additional memo.
+    /// Transfer CCD to an account with an additional memo.
     TransferWithMemo {
         /// Address to send to.
         to_address: AccountAddress,
