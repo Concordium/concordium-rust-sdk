@@ -25,6 +25,7 @@ use std::{
     convert::TryFrom,
     marker::PhantomData,
 };
+use thiserror::Error;
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -1115,13 +1116,49 @@ pub struct Authorizations {
     pub add_identity_provider: AccessStructure,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, AsRef, Into, AsMut)]
 #[serde(transparent)]
 /// A data that was registered on the chain.
 pub struct RegisteredData {
     #[serde(with = "crate::internal::byte_array_hex")]
     #[size_length = 2]
     bytes: Vec<u8>,
+}
+
+/// Registered data is too large.
+#[derive(Debug, Error, Copy, Clone)]
+#[error("Data is too large to be registered ({actual_size}).")]
+pub struct TooLargeError {
+    actual_size: usize,
+}
+
+impl TryFrom<Vec<u8>> for RegisteredData {
+    type Error = TooLargeError;
+
+    fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
+        let actual_size = bytes.len();
+        if actual_size <= MAX_REGISTERED_DATA_SIZE {
+            Ok(RegisteredData { bytes })
+        } else {
+            Err(TooLargeError { actual_size })
+        }
+    }
+}
+
+impl From<[u8; 32]> for RegisteredData {
+    fn from(data: [u8; 32]) -> Self {
+        Self {
+            bytes: data.to_vec(),
+        }
+    }
+}
+
+impl<M> From<hashes::HashBytes<M>> for RegisteredData {
+    fn from(data: hashes::HashBytes<M>) -> Self {
+        Self {
+            bytes: data.as_ref().to_vec(),
+        }
+    }
 }
 
 impl Deserial for RegisteredData {
