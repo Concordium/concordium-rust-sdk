@@ -12,7 +12,7 @@ pub struct BlockInfo {
     pub transactions_size:       u64,
     /// Parent block pointer.
     pub block_parent:            BlockHash,
-    /// Hashe of the block.
+    /// Hash of the block.
     pub block_hash:              BlockHash,
     /// Whether the block is finalized or not.
     pub finalized:               bool,

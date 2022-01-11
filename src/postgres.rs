@@ -7,7 +7,10 @@ use futures::StreamExt;
 use id::types::AccountAddress;
 use std::convert::TryInto;
 use tokio::task::{JoinError, JoinHandle};
-use tokio_postgres::types::ToSql;
+use tokio_postgres::{
+    types::{BorrowToSql, ToSql},
+    RowStream,
+};
 pub use tokio_postgres::{Config, Error, NoTls};
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -56,6 +59,102 @@ impl DatabaseSummaryEntry {
     }
 }
 
+/// A helper to enable support both for prepared and raw statements.
+/// Prepared statements can be more efficient, but they require the database
+/// tables to already exist when establishing the database connection.
+enum QueryStatement {
+    Raw(&'static str),
+    Prepared(tokio_postgres::Statement),
+}
+
+struct QueryStatements {
+    /// Prepared statement that is used to query accounts in ascending order.
+    /// It has 3 placeholders, for account address, `id` start and limit.
+    query_account_statement_asc:   QueryStatement,
+    /// Prepared statement that is used to query contracts in ascending order.
+    /// It has 4 placeholders, for contract index and subindex, `id` start and
+    /// limit.
+    query_contract_statement_asc:  QueryStatement,
+    /// Prepared statement that is used to query contracts in descending order.
+    /// It has 3 placeholders, for account address, `id` start and limit.
+    query_account_statement_desc:  QueryStatement,
+    /// Prepared statement that is used to query contracts in descending order.
+    /// It has 4 placeholders, for contract index and subindex, `id` start and
+    /// limit.
+    query_contract_statement_desc: QueryStatement,
+}
+
+impl QueryStatements {
+    pub async fn create(
+        client: &tokio_postgres::Client,
+        prepared: bool,
+    ) -> Result<Self, tokio_postgres::Error> {
+        // NB before changing the queries.
+        // In these queries we add a semantically unnecessary ORDER BY
+        // summaries.id. This is added to increase performance of the queries.
+        // Otherwise queries with small limits take a lot more time (<0.5s vs 7s). The
+        // reason for this appears to be the postgresql query planner which chooses
+        // a wrong approach for small limits for the database we have.
+        let query_account_statement_asc = {
+            let statement = "SELECT ati.id, summaries.block, summaries.timestamp, \
+                             summaries.height, summaries.summary
+ FROM ati JOIN summaries ON ati.summary = summaries.id
+ WHERE ati.account = $1 AND ati.id >= $2
+ ORDER BY ati.id ASC, summaries.id ASC LIMIT $3";
+            if prepared {
+                QueryStatement::Prepared(client.prepare(statement).await?)
+            } else {
+                QueryStatement::Raw(statement)
+            }
+        };
+
+        let query_contract_statement_asc = {
+            let statement = "SELECT cti.id, summaries.block, summaries.timestamp, \
+                             summaries.height, summaries.summary
+ FROM cti JOIN summaries ON cti.summary = summaries.id
+ WHERE cti.index = $1 AND cti.subindex = $2 AND cti.id >= $3
+ ORDER BY cti.id ASC, summaries.id ASC LIMIT $4";
+            if prepared {
+                QueryStatement::Prepared(client.prepare(statement).await?)
+            } else {
+                QueryStatement::Raw(statement)
+            }
+        };
+
+        let query_account_statement_desc = {
+            let statement = "SELECT ati.id, summaries.block, summaries.timestamp, \
+                             summaries.height, summaries.summary
+ FROM ati JOIN summaries ON ati.summary = summaries.id
+ WHERE ati.account = $1 AND ati.id <= $2
+ ORDER BY ati.id DESC, summaries.id DESC LIMIT $3";
+            if prepared {
+                QueryStatement::Prepared(client.prepare(statement).await?)
+            } else {
+                QueryStatement::Raw(statement)
+            }
+        };
+
+        let query_contract_statement_desc = {
+            let statement = "SELECT cti.id, summaries.block, summaries.timestamp, \
+                             summaries.height, summaries.summary
+ FROM cti JOIN summaries ON cti.summary = summaries.id
+ WHERE cti.index = $1 AND cti.subindex = $2 AND cti.id <= $3
+ ORDER BY cti.id DESC, summaries.id DESC LIMIT $4";
+            if prepared {
+                QueryStatement::Prepared(client.prepare(statement).await?)
+            } else {
+                QueryStatement::Raw(statement)
+            }
+        };
+        Ok(Self {
+            query_account_statement_asc,
+            query_contract_statement_asc,
+            query_account_statement_desc,
+            query_contract_statement_desc,
+        })
+    }
+}
+
 /// The database client for interfacing with the Postgres database.
 /// Some common queries are provided as methods on this struct. If these do not
 /// provide enough flexibility then the `AsRef<tokio_postgres::Client>` trait
@@ -68,22 +167,9 @@ impl DatabaseSummaryEntry {
 pub struct DatabaseClient {
     /// Connection handle that can be used to drop the connection.
     /// The connection is spawned in a background tokio task.
-    connection_handle:             JoinHandle<Result<(), tokio_postgres::Error>>,
-    database_client:               tokio_postgres::Client,
-    /// Prepared statement that is used to query accounts in ascending order.
-    /// It has 3 placeholders, for account address, `id` start and limit.
-    query_account_statement_asc:   tokio_postgres::Statement,
-    /// Prepared statement that is used to query contracts in ascending order.
-    /// It has 4 placeholders, for contract index and subindex, `id` start and
-    /// limit.
-    query_contract_statement_asc:  tokio_postgres::Statement,
-    /// Prepared statement that is used to query contracts in descending order.
-    /// It has 3 placeholders, for account address, `id` start and limit.
-    query_account_statement_desc:  tokio_postgres::Statement,
-    /// Prepared statement that is used to query contracts in descending order.
-    /// It has 4 placeholders, for contract index and subindex, `id` start and
-    /// limit.
-    query_contract_statement_desc: tokio_postgres::Statement,
+    connection_handle: JoinHandle<Result<(), tokio_postgres::Error>>,
+    database_client:   tokio_postgres::Client,
+    statements:        QueryStatements,
 }
 
 impl DatabaseClient {
@@ -101,12 +187,17 @@ impl AsRef<tokio_postgres::Client> for DatabaseClient {
 }
 
 /// This implementation enables direct queries on the underlying database
-/// client.
+/// client such as [Client::transaction](https://docs.rs/tokio-postgres/*/tokio_postgres/struct.Client.html#method.transaction)
+/// that require mutable access to the underlying client
 impl AsMut<tokio_postgres::Client> for DatabaseClient {
     fn as_mut(&mut self) -> &mut tokio_postgres::Client { &mut self.database_client }
 }
 
 impl DatabaseClient {
+    /// Create a connection to the database. This does not create any prepared
+    /// statements. If the database and its tables already exist prefer
+    /// [DatabaseClient::create_prepared], however if the database tables do not
+    /// yet exist then use this method to build it.
     pub async fn create<T: tokio_postgres::tls::MakeTlsConnect<tokio_postgres::Socket>>(
         config: tokio_postgres::Config,
         tls: T,
@@ -115,56 +206,30 @@ impl DatabaseClient {
         T::Stream: Send + 'static, {
         let (database_client, connection) = config.connect(tls).await?;
         let connection_handle = tokio::spawn(connection);
-
-        // NB before changing the queries.
-        // In these queries we add a semantically unnecessary ORDER BY
-        // summaries.id. This is added to increase performance of the queries.
-        // Otherwise queries with small limits take a lot more time (<0.5s vs 7s). The
-        // reason for this appears to be the postgresql query planner which chooses
-        // a wrong approach for small limits for the database we have.
-        let query_account_statement_asc = {
-            let statement = "SELECT ati.id, summaries.block, summaries.timestamp, \
-                             summaries.height, summaries.summary
- FROM ati JOIN summaries ON ati.summary = summaries.id
- WHERE ati.account = $1 AND ati.id >= $2
- ORDER BY ati.id ASC, summaries.id ASC LIMIT $3";
-            database_client.prepare(statement).await?
-        };
-
-        let query_contract_statement_asc = {
-            let statement = "SELECT cti.id, summaries.block, summaries.timestamp, \
-                             summaries.height, summaries.summary
- FROM cti JOIN summaries ON cti.summary = summaries.id
- WHERE cti.index = $1 AND cti.subindex = $2 AND cti.id >= $3
- ORDER BY cti.id ASC, summaries.id ASC LIMIT $4";
-            database_client.prepare(statement).await?
-        };
-
-        let query_account_statement_desc = {
-            let statement = "SELECT ati.id, summaries.block, summaries.timestamp, \
-                             summaries.height, summaries.summary
- FROM ati JOIN summaries ON ati.summary = summaries.id
- WHERE ati.account = $1 AND ati.id <= $2
- ORDER BY ati.id DESC, summaries.id DESC LIMIT $3";
-            database_client.prepare(statement).await?
-        };
-
-        let query_contract_statement_desc = {
-            let statement = "SELECT cti.id, summaries.block, summaries.timestamp, \
-                             summaries.height, summaries.summary
- FROM cti JOIN summaries ON cti.summary = summaries.id
- WHERE cti.index = $1 AND cti.subindex = $2 AND cti.id <= $3
- ORDER BY cti.id DESC, summaries.id DESC LIMIT $4";
-            database_client.prepare(statement).await?
-        };
-
+        let statements = QueryStatements::create(&database_client, false).await?;
         Ok(DatabaseClient {
             connection_handle,
             database_client,
-            query_account_statement_asc,
-            query_contract_statement_asc,
-            query_account_statement_desc,
-            query_contract_statement_desc,
+            statements,
+        })
+    }
+
+    /// Like [DatabaseClient::create] but creates prepared statements and thus
+    /// requires all the necessary database tables to already exist. Use this
+    /// when using the database in read-only mode.
+    pub async fn create_prepared<T: tokio_postgres::tls::MakeTlsConnect<tokio_postgres::Socket>>(
+        config: tokio_postgres::Config,
+        tls: T,
+    ) -> Result<DatabaseClient, tokio_postgres::Error>
+    where
+        T::Stream: Send + 'static, {
+        let (database_client, connection) = config.connect(tls).await?;
+        let connection_handle = tokio::spawn(connection);
+        let statements = QueryStatements::create(&database_client, true).await?;
+        Ok(DatabaseClient {
+            connection_handle,
+            database_client,
+            statements,
         })
     }
 }
@@ -185,6 +250,17 @@ pub enum QueryOrder {
 }
 
 impl DatabaseClient {
+    async fn query<P, I>(&self, st: &QueryStatement, params: I) -> Result<RowStream, Error>
+    where
+        P: BorrowToSql,
+        I: IntoIterator<Item = P>,
+        I::IntoIter: ExactSizeIterator, {
+        match st {
+            QueryStatement::Raw(r) => self.as_ref().query_raw(*r, params).await,
+            QueryStatement::Prepared(p) => self.as_ref().query_raw(p, params).await,
+        }
+    }
+
     /// Get the list of transactions affecting the given account.
     /// The return value is a stream of rows that have been parsed.
     ///
@@ -196,11 +272,12 @@ impl DatabaseClient {
         order: QueryOrder,
     ) -> Result<impl futures::stream::Stream<Item = DatabaseRow>, tokio_postgres::Error> {
         let (statement, start) = match order {
-            QueryOrder::Ascending { start } => {
-                (&self.query_account_statement_asc, start.unwrap_or(i64::MIN))
-            }
+            QueryOrder::Ascending { start } => (
+                &self.statements.query_account_statement_asc,
+                start.unwrap_or(i64::MIN),
+            ),
             QueryOrder::Descending { start } => (
-                &self.query_account_statement_desc,
+                &self.statements.query_account_statement_desc,
                 start.unwrap_or(i64::MAX),
             ),
         };
@@ -211,7 +288,7 @@ impl DatabaseClient {
             &limit as &(dyn ToSql + Sync),
         ];
 
-        let rows = self.as_ref().query_raw(statement, params).await?;
+        let rows = self.query(statement, params).await?;
         Ok(rows.filter_map(|row_or_err| async move { construct_row(row_or_err) }))
     }
 
@@ -227,11 +304,11 @@ impl DatabaseClient {
     ) -> Result<impl futures::stream::Stream<Item = DatabaseRow>, tokio_postgres::Error> {
         let (statement, start) = match order {
             QueryOrder::Ascending { start } => (
-                &self.query_contract_statement_asc,
+                &self.statements.query_contract_statement_asc,
                 start.unwrap_or(i64::MIN),
             ),
             QueryOrder::Descending { start } => (
-                &self.query_contract_statement_desc,
+                &self.statements.query_contract_statement_desc,
                 start.unwrap_or(i64::MAX),
             ),
         };
@@ -243,7 +320,7 @@ impl DatabaseClient {
             limit,
         ];
 
-        let rows = self.as_ref().query_raw(statement, &params).await?;
+        let rows = self.query(statement, &params).await?;
         Ok(rows.filter_map(|row_or_err| async move { construct_row(row_or_err) }))
     }
 

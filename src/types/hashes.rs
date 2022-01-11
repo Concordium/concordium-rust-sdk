@@ -154,6 +154,19 @@ impl<Purpose> TryFrom<&str> for HashBytes<Purpose> {
     fn try_from(value: &str) -> Result<Self, Self::Error> { Self::from_str(value) }
 }
 
+#[derive(Error, Debug)]
+#[error("Slice has incompatible length with a hash.")]
+pub struct IncorrectLength;
+
+impl<Purpose> TryFrom<&[u8]> for HashBytes<Purpose> {
+    type Error = IncorrectLength;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        let bytes: [u8; SHA256 as usize] = value.try_into().map_err(|_| IncorrectLength)?;
+        Ok(bytes.into())
+    }
+}
+
 // NB: Using try_from = &str does not work correctly for HashBytes
 // SerdeDeserialize instance due to ownership issues for the JSON format. Hence
 // we implement this manually. The issue is that a &'a str cannot be

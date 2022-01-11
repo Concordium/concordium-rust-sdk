@@ -25,6 +25,7 @@ use std::{
     convert::TryFrom,
     marker::PhantomData,
 };
+use thiserror::Error;
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -245,7 +246,7 @@ pub enum TransactionType {
     InitContract,
     /// Update a smart contract instance.
     Update,
-    /// Transfer GTU from an account to another.
+    /// Transfer CCD from an account to another.
     Transfer,
     /// Register an account as a baker.
     AddBaker,
@@ -265,7 +266,7 @@ pub enum TransactionType {
     TransferToEncrypted,
     /// Transfer from encrypted to public balance of the same account.
     TransferToPublic,
-    /// Transfer a GTU with a release schedule.
+    /// Transfer a CCD with a release schedule.
     TransferWithSchedule,
     /// Update the account's credentials.
     UpdateCredentials,
@@ -331,16 +332,16 @@ pub enum SpecialTransactionOutcome {
         remainder:     Amount,
     },
     #[serde(rename_all = "camelCase")]
-    /// Distribution of newly minted GTU.
+    /// Distribution of newly minted CCD.
     Mint {
-        /// The portion of the newly minted GTU that goes to the baking reward
+        /// The portion of the newly minted CCD that goes to the baking reward
         /// account.
         mint_baking_reward:               Amount,
         /// The portion that goes to the finalization reward account.
         mint_finalization_reward:         Amount,
         /// The portion that goes to the foundation, as foundation tax.
         mint_platform_development_charge: Amount,
-        /// The address of the foundation account that the newly minted GTU goes
+        /// The address of the foundation account that the newly minted CCD goes
         /// to.
         foundation_account:               AccountAddress,
     },
@@ -366,9 +367,9 @@ pub enum SpecialTransactionOutcome {
         #[serde(rename = "newGASAccount")]
         /// New balance of the GAS account.
         new_gas_account:    Amount,
-        /// The amount of GTU that goes to the baker.
+        /// The amount of CCD that goes to the baker.
         baker_reward:       Amount,
-        /// The amount of GTU that goes to the foundation.
+        /// The amount of CCD that goes to the foundation.
         foundation_charge:  Amount,
         /// The account address where the baker receives the reward.
         baker:              AccountAddress,
@@ -583,7 +584,7 @@ pub enum BlockItemSummaryDetails {
 /// Details of an account transaction. This always has a sender and is paid for,
 /// and it might have some other effects on the state of the chain.
 pub struct AccountTransactionDetails {
-    /// The amount of GTU the sender paid for including this transaction in
+    /// The amount of CCD the sender paid for including this transaction in
     /// the block.
     pub cost:    Amount,
     /// Sender of the transaction.
@@ -646,7 +647,7 @@ impl AccountTransactionEffects {
 
 #[derive(Debug, Clone)]
 /// A successful contract invocation produces a sequence of effects on smart
-/// contracts and possibly accounts (if any contract transfers GTU to an
+/// contracts and possibly accounts (if any contract transfers CCD to an
 /// account).
 pub enum ContractTraceElement {
     /// A contract instance was updated.
@@ -1096,7 +1097,7 @@ pub struct Authorizations {
     /// Access structure for updating the euro to energy exchange rate.
     pub euro_per_energy: AccessStructure,
     #[serde(rename = "microGTUPerEuro")]
-    /// Access structure for updating the microgtu per euro exchange rate.
+    /// Access structure for updating the microccd per euro exchange rate.
     pub micro_gtu_per_euro: AccessStructure,
     /// Access structure for updating the foundation account address.
     pub foundation_account: AccessStructure,
@@ -1115,13 +1116,49 @@ pub struct Authorizations {
     pub add_identity_provider: AccessStructure,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, AsRef, Into, AsMut)]
 #[serde(transparent)]
 /// A data that was registered on the chain.
 pub struct RegisteredData {
     #[serde(with = "crate::internal::byte_array_hex")]
     #[size_length = 2]
     bytes: Vec<u8>,
+}
+
+/// Registered data is too large.
+#[derive(Debug, Error, Copy, Clone)]
+#[error("Data is too large to be registered ({actual_size}).")]
+pub struct TooLargeError {
+    actual_size: usize,
+}
+
+impl TryFrom<Vec<u8>> for RegisteredData {
+    type Error = TooLargeError;
+
+    fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
+        let actual_size = bytes.len();
+        if actual_size <= MAX_REGISTERED_DATA_SIZE {
+            Ok(RegisteredData { bytes })
+        } else {
+            Err(TooLargeError { actual_size })
+        }
+    }
+}
+
+impl From<[u8; 32]> for RegisteredData {
+    fn from(data: [u8; 32]) -> Self {
+        Self {
+            bytes: data.to_vec(),
+        }
+    }
+}
+
+impl<M> From<hashes::HashBytes<M>> for RegisteredData {
+    fn from(data: hashes::HashBytes<M>) -> Self {
+        Self {
+            bytes: data.as_ref().to_vec(),
+        }
+    }
 }
 
 impl Deserial for RegisteredData {
@@ -1190,7 +1227,7 @@ pub struct ChainParameters {
     /// Euro per energy exchange rate.
     pub euro_per_energy:              ExchangeRate,
     #[serde(rename = "microGTUPerEuro")]
-    /// Micro gtu per euro exchange rate.
+    /// Micro ccd per euro exchange rate.
     pub micro_gtu_per_euro:           ExchangeRate,
     /// Extra number of epochs before reduction in stake, or baker
     /// deregistration is completed.
