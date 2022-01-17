@@ -68,6 +68,11 @@ pub enum TransactionMarker {}
 pub enum TransactionSignMarker {}
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+/// Used as a phantom type to indicate a hash is an update sign hash, i.e.,
+/// the hash that is signed to make an update instruction.
+pub enum UpdateSignMarker {}
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 /// Used as a phantom type to indicate a hash is a block state hash.
 pub enum StateMarker {}
 
@@ -92,6 +97,9 @@ pub type TransactionHash = HashBytes<TransactionMarker>;
 /// Hash that is signed by the account holder's keys to make a transaction
 /// signature.
 pub type TransactionSignHash = HashBytes<TransactionSignMarker>;
+/// Hash that is signed by the governance keys to make an update instruction
+/// signature.
+pub type UpdateSignHash = HashBytes<UpdateSignMarker>;
 /// Hash of the block state that is included in a block.
 pub type StateHash = HashBytes<StateMarker>;
 

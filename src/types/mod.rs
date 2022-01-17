@@ -10,9 +10,11 @@ use crate::constants::*;
 pub use crate::generated_types::PeerStatsResponse;
 pub use basic::*;
 use crypto_common::{
-    derive::Serial,
+    derive::{Serial, Serialize},
+    deserial_bytes, deserial_set_no_length, deserial_string, deserial_vector_no_length,
     types::{Amount, CredentialIndex, Timestamp, TransactionTime},
-    Buffer, Deserial, Get, ParseResult, SerdeDeserialize, SerdeSerialize, Serial, Versioned,
+    Buffer, Deserial, Get, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
+    Versioned,
 };
 use derive_more::*;
 use id::{
@@ -23,6 +25,7 @@ use id::{
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     convert::TryFrom,
+    io::Read,
     marker::PhantomData,
 };
 use thiserror::Error;
@@ -991,7 +994,64 @@ pub struct ProtocolUpdate {
     pub specification_auxiliary_data: Vec<u8>,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
+impl Serial for ProtocolUpdate {
+    fn serial<B: Buffer>(&self, out: &mut B) {
+        let data_len = self.message.as_bytes().len()
+            + 8
+            + self.specification_url.as_bytes().len()
+            + 8
+            + 32
+            + self.specification_auxiliary_data.len();
+        (data_len as u64).serial(out);
+        (self.message.as_bytes().len() as u64).serial(out);
+        out.write_all(self.message.as_bytes())
+            .expect("Serialization to a buffer always succeeds.");
+        (self.specification_url.as_bytes().len() as u64).serial(out);
+        out.write_all(self.specification_url.as_bytes())
+            .expect("Serialization to a buffer always succeeds.");
+        self.specification_hash.serial(out);
+        out.write_all(&self.specification_auxiliary_data)
+            .expect("Serialization to a buffer always succeeds.")
+    }
+}
+
+impl Deserial for ProtocolUpdate {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let data_len = u64::deserial(source)?;
+        let mut limited = source.take(data_len);
+        let message_len = u64::deserial(&mut limited)?;
+        let message = if message_len <= 4096 {
+            // protect against DOS by memory exhaustion
+            deserial_string(&mut limited, message_len as usize)?
+        } else {
+            String::from_utf8(deserial_vector_no_length(
+                &mut limited,
+                message_len as usize,
+            )?)?
+        };
+        let url_len = u64::deserial(&mut limited)?;
+        let specification_url = if message_len <= 4096 {
+            deserial_string(&mut limited, url_len as usize)?
+        } else {
+            String::from_utf8(deserial_vector_no_length(&mut limited, url_len as usize)?)?
+        };
+        let specification_hash = limited.get()?;
+        let remaining = limited.limit();
+        let specification_auxiliary_data = if remaining <= 4096 {
+            deserial_bytes(&mut limited, remaining as usize)?
+        } else {
+            deserial_vector_no_length(&mut limited, remaining as usize)?
+        };
+        Ok(Self {
+            message,
+            specification_url,
+            specification_hash,
+            specification_auxiliary_data,
+        })
+    }
+}
+
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Serial, Clone)]
 #[serde(rename_all = "camelCase")]
 #[serde(try_from = "transaction_fee_distribution::TransactionFeeDistributionUnchecked")]
 /// Update the transaction fee distribution to the specified value.
@@ -1003,7 +1063,19 @@ pub struct TransactionFeeDistribution {
     pub gas_account: RewardFraction,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
+impl Deserial for TransactionFeeDistribution {
+    fn deserial<R: crypto_common::ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let baker: RewardFraction = source.get()?;
+        let gas_account: RewardFraction = source.get()?;
+        anyhow::ensure!(
+            (baker + gas_account).is_some(),
+            "Reward fractions exceed 100%."
+        );
+        Ok(Self { baker, gas_account })
+    }
+}
+
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 /// The reward fractions related to the gas account and inclusion of special
 /// transactions.
@@ -1033,6 +1105,36 @@ pub enum RootUpdate {
     Level2KeysUpdate(Box<Authorizations>),
 }
 
+impl Serial for RootUpdate {
+    fn serial<B: Buffer>(&self, out: &mut B) {
+        match self {
+            RootUpdate::RootKeysUpdate(ruk) => {
+                0u8.serial(out);
+                ruk.serial(out)
+            }
+            RootUpdate::Level1KeysUpdate(l1k) => {
+                1u8.serial(out);
+                l1k.serial(out)
+            }
+            RootUpdate::Level2KeysUpdate(l2k) => {
+                2u8.serial(out);
+                l2k.serial(out)
+            }
+        }
+    }
+}
+
+impl Deserial for RootUpdate {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        match u8::deserial(source)? {
+            0u8 => Ok(RootUpdate::RootKeysUpdate(source.get()?)),
+            1u8 => Ok(RootUpdate::Level1KeysUpdate(source.get()?)),
+            2u8 => Ok(RootUpdate::Level2KeysUpdate(source.get()?)),
+            tag => anyhow::bail!("Unknown RootUpdate tag {}", tag),
+        }
+    }
+}
+
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(tag = "typeOfUpdate", content = "updatePayload")]
 #[serde(rename_all = "camelCase")]
@@ -1041,6 +1143,31 @@ pub enum RootUpdate {
 pub enum Level1Update {
     Level1KeysUpdate(HigherLevelAccessStructure<Level1KeysKind>),
     Level2KeysUpdate(Box<Authorizations>),
+}
+
+impl Serial for Level1Update {
+    fn serial<B: Buffer>(&self, out: &mut B) {
+        match self {
+            Level1Update::Level1KeysUpdate(l1k) => {
+                0u8.serial(out);
+                l1k.serial(out)
+            }
+            Level1Update::Level2KeysUpdate(l2k) => {
+                1u8.serial(out);
+                l2k.serial(out)
+            }
+        }
+    }
+}
+
+impl Deserial for Level1Update {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        match u8::deserial(source)? {
+            0u8 => Ok(Level1Update::Level1KeysUpdate(source.get()?)),
+            1u8 => Ok(Level1Update::Level2KeysUpdate(source.get()?)),
+            tag => anyhow::bail!("Unknown Level1Update tag {}", tag),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -1057,7 +1184,7 @@ pub enum RootKeysKind {}
 /// type-level marker.
 pub enum Level1KeysKind {}
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Serial, Clone)]
 #[serde(rename_all = "camelCase")]
 #[serde(bound = "Kind: Sized")]
 /// Either root, level1, or level 2 access structure. They all have the same
@@ -1065,27 +1192,60 @@ pub enum Level1KeysKind {}
 /// added type safety to distinguish different access structures in different
 /// contexts.
 pub struct HigherLevelAccessStructure<Kind> {
+    #[size_length = 2]
     pub keys:      Vec<UpdatePublicKey>,
     pub threshold: UpdateKeysThreshold,
     #[serde(skip)] // use default when deserializing
     pub _phantom:  PhantomData<Kind>,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
+impl<Kind> Deserial for HigherLevelAccessStructure<Kind> {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let keys_len: u16 = source.get()?;
+        let keys = deserial_vector_no_length(source, keys_len as usize)?;
+        let threshold: UpdateKeysThreshold = source.get()?;
+        anyhow::ensure!(threshold.threshold <= keys_len, "Threshold too large.");
+        Ok(Self {
+            keys,
+            threshold,
+            _phantom: Default::default(),
+        })
+    }
+}
+
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Serial, Clone)]
 #[serde(rename_all = "camelCase")]
 /// And access structure for performing chain updates. The access structure is
 /// only meaningful in the context of a list of update keys to which the indices
 /// refer to.
 pub struct AccessStructure {
+    #[set_size_length = 2]
     pub authorized_keys: BTreeSet<UpdateKeysIndex>,
     pub threshold:       UpdateKeysThreshold,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
+impl Deserial for AccessStructure {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let authorized_keys_len: u16 = source.get()?;
+        let authorized_keys = deserial_set_no_length(source, authorized_keys_len as usize)?;
+        let threshold: UpdateKeysThreshold = source.get()?;
+        anyhow::ensure!(
+            threshold.threshold <= authorized_keys_len,
+            "Threshold too large."
+        );
+        Ok(Self {
+            authorized_keys,
+            threshold,
+        })
+    }
+}
+
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 /// Access structures for each of the different possible chain updates, togehter
 /// with the context giving all the possible keys.
 pub struct Authorizations {
+    #[size_length = 2]
     /// The list of all keys that are currently authorized to perform updates.
     pub keys: Vec<UpdatePublicKey>,
     /// Access structure for emergency updates.
@@ -1211,11 +1371,11 @@ impl Deserial for Memo {
 #[serde(rename_all = "camelCase")]
 /// The current collection of keys allowd to do updates.
 pub struct UpdateKeysCollection {
-    root_keys:    HigherLevelAccessStructure<RootKeysKind>,
+    pub root_keys:    HigherLevelAccessStructure<RootKeysKind>,
     #[serde(rename = "level1Keys")]
-    level_1_keys: HigherLevelAccessStructure<Level1KeysKind>,
+    pub level_1_keys: HigherLevelAccessStructure<Level1KeysKind>,
     #[serde(rename = "level2Keys")]
-    level_2_keys: Authorizations,
+    pub level_2_keys: Authorizations,
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize)]

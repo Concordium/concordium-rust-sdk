@@ -5,12 +5,15 @@ use super::{
     hashes, smart_contracts, AccountInfo, AccountThreshold, AggregateSigPairing,
     BakerAggregationVerifyKey, BakerElectionVerifyKey, BakerKeyPairs, BakerSignatureVerifyKey,
     ContractAddress, CredentialIndex, CredentialRegistrationID, Energy, Memo, Nonce,
-    RegisteredData,
+    RegisteredData, UpdateKeysIndex, UpdatePayload, UpdateSequenceNumber,
 };
 use crate::constants::*;
 use crypto_common::{
     derive::{Serial, Serialize},
-    types::{Amount, KeyIndex, KeyPair, Timestamp, TransactionSignature, TransactionTime},
+    deserial_map_no_length,
+    types::{
+        Amount, KeyIndex, KeyPair, Signature, Timestamp, TransactionSignature, TransactionTime,
+    },
     Buffer, Deserial, Get, ParseResult, Put, ReadBytesExt, SerdeDeserialize, SerdeSerialize,
     Serial,
 };
@@ -864,6 +867,113 @@ pub fn verify_signature_transaction_sign_hash(
     true
 }
 
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct UpdateHeader {
+    pub seq_number:     UpdateSequenceNumber,
+    pub effective_time: TransactionTime,
+    pub timeout:        TransactionTime,
+    pub payload_size:   PayloadSize,
+}
+
+#[derive(Debug, Clone, Serial, Into)]
+pub struct UpdateInstructionSignature {
+    #[map_size_length = 2]
+    signatures: BTreeMap<UpdateKeysIndex, Signature>,
+}
+
+impl Deserial for UpdateInstructionSignature {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let len = u16::deserial(source)?;
+        anyhow::ensure!(len != 0, "There must be at least one signature.");
+        let signatures = deserial_map_no_length(source, len as usize)?;
+        Ok(Self { signatures })
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UpdateInstruction {
+    pub header:     UpdateHeader,
+    pub payload:    UpdatePayload,
+    pub signatures: UpdateInstructionSignature,
+}
+
+pub trait UpdateSigner {
+    /// Sign the specified transaction hash, allocating and returning the
+    /// signatures.
+    fn sign_update_hash(&self, hash_to_sign: &hashes::UpdateSignHash)
+        -> UpdateInstructionSignature;
+}
+
+impl UpdateSigner for BTreeMap<UpdateKeysIndex, KeyPair> {
+    fn sign_update_hash(
+        &self,
+        hash_to_sign: &hashes::UpdateSignHash,
+    ) -> UpdateInstructionSignature {
+        let signatures = self
+            .iter()
+            .map(|(ki, kp)| (*ki, kp.sign(hash_to_sign.as_ref())))
+            .collect::<BTreeMap<_, _>>();
+        UpdateInstructionSignature { signatures }
+    }
+}
+
+impl UpdateSigner for &[(UpdateKeysIndex, KeyPair)] {
+    fn sign_update_hash(
+        &self,
+        hash_to_sign: &hashes::UpdateSignHash,
+    ) -> UpdateInstructionSignature {
+        let signatures = self
+            .iter()
+            .map(|(ki, kp)| (*ki, kp.sign(hash_to_sign.as_ref())))
+            .collect::<BTreeMap<_, _>>();
+        UpdateInstructionSignature { signatures }
+    }
+}
+
+pub mod update {
+    use std::io::Write;
+
+    use crypto_common::to_bytes;
+
+    use super::*;
+    fn compute_sign_hash(
+        header: &UpdateHeader,
+        payload: &[u8], // serialized payload
+    ) -> hashes::UpdateSignHash {
+        let mut hasher = sha2::Sha256::new();
+        header.serial(&mut hasher);
+        hasher
+            .write_all(payload)
+            .expect("Writing to hasher does not fail.");
+        <[u8; 32]>::from(hasher.finalize()).into()
+    }
+
+    /// Construct an update instruction and sign it.
+    pub fn update(
+        signer: impl UpdateSigner,
+        seq_number: UpdateSequenceNumber,
+        effective_time: TransactionTime,
+        timeout: TransactionTime,
+        payload: UpdatePayload,
+    ) -> UpdateInstruction {
+        let serialized_payload = to_bytes(&payload);
+        let header = UpdateHeader {
+            seq_number,
+            effective_time,
+            timeout,
+            payload_size: PayloadSize {
+                size: serialized_payload.len() as u32,
+            },
+        };
+        let signatures = signer.sign_update_hash(&compute_sign_hash(&header, &serialized_payload));
+        UpdateInstruction {
+            header,
+            payload,
+            signatures,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 /// A block item are data items that are transmitted on the network either as
 /// separate messages, or as part of blocks. They are the only user-generated
@@ -884,7 +994,7 @@ pub enum BlockItem<PayloadType> {
             >,
         >,
     ),
-    // FIXME: Add update instructions
+    UpdateInstruction(UpdateInstruction),
 }
 
 impl<PayloadType> From<AccountTransaction<PayloadType>> for BlockItem<PayloadType> {
@@ -909,6 +1019,10 @@ impl<PayloadType>
     ) -> Self {
         Self::CredentialDeployment(Box::new(at))
     }
+}
+
+impl<PayloadType> From<UpdateInstruction> for BlockItem<PayloadType> {
+    fn from(ui: UpdateInstruction) -> Self { Self::UpdateInstruction(ui) }
 }
 
 impl<PayloadType> BlockItem<PayloadType> {
@@ -1034,6 +1148,10 @@ impl<P: PayloadLike> Serial for BlockItem<P> {
                 out.put(&1u8);
                 out.put(acdi);
             }
+            BlockItem::UpdateInstruction(ui) => {
+                out.put(&2u8);
+                out.put(ui);
+            }
         }
     }
 }
@@ -1050,8 +1168,91 @@ impl Deserial for BlockItem<EncodedPayload> {
                 let acdi = source.get()?;
                 Ok(BlockItem::CredentialDeployment(acdi))
             }
-            2 => todo!("Update instruction"),
+            2 => {
+                let ui = source.get()?;
+                Ok(BlockItem::UpdateInstruction(ui))
+            }
             _ => anyhow::bail!("Unsupported block item type: {}.", tag),
+        }
+    }
+}
+
+impl Serial for UpdatePayload {
+    fn serial<B: Buffer>(&self, out: &mut B) {
+        match self {
+            UpdatePayload::Protocol(pu) => {
+                1u8.serial(out);
+                pu.serial(out)
+            }
+            UpdatePayload::ElectionDifficulty(ed) => {
+                2u8.serial(out);
+                ed.serial(out);
+            }
+            UpdatePayload::EuroPerEnergy(ee) => {
+                3u8.serial(out);
+                ee.serial(out);
+            }
+            UpdatePayload::MicroGTUPerEuro(me) => {
+                4u8.serial(out);
+                me.serial(out);
+            }
+            UpdatePayload::FoundationAccount(fa) => {
+                5u8.serial(out);
+                fa.serial(out);
+            }
+            UpdatePayload::MintDistribution(md) => {
+                6u8.serial(out);
+                md.serial(out);
+            }
+            UpdatePayload::TransactionFeeDistribution(tf) => {
+                7u8.serial(out);
+                tf.serial(out);
+            }
+            UpdatePayload::GASRewards(gr) => {
+                8u8.serial(out);
+                gr.serial(out);
+            }
+            UpdatePayload::BakerStakeThreshold(bs) => {
+                9u8.serial(out);
+                bs.serial(out)
+            }
+            UpdatePayload::Root(ru) => {
+                10u8.serial(out);
+                ru.serial(out)
+            }
+            UpdatePayload::Level1(l1) => {
+                11u8.serial(out);
+                l1.serial(out)
+            }
+            UpdatePayload::AddAnonymityRevoker(add_ar) => {
+                12u8.serial(out);
+                add_ar.serial(out)
+            }
+            UpdatePayload::AddIdentityProvider(add_ip) => {
+                13u8.serial(out);
+                add_ip.serial(out)
+            }
+        }
+    }
+}
+
+impl Deserial for UpdatePayload {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        match u8::deserial(source)? {
+            1u8 => Ok(UpdatePayload::Protocol(source.get()?)),
+            2u8 => Ok(UpdatePayload::ElectionDifficulty(source.get()?)),
+            3u8 => Ok(UpdatePayload::EuroPerEnergy(source.get()?)),
+            4u8 => Ok(UpdatePayload::MicroGTUPerEuro(source.get()?)),
+            5u8 => Ok(UpdatePayload::FoundationAccount(source.get()?)),
+            6u8 => Ok(UpdatePayload::MintDistribution(source.get()?)),
+            7u8 => Ok(UpdatePayload::TransactionFeeDistribution(source.get()?)),
+            8u8 => Ok(UpdatePayload::GASRewards(source.get()?)),
+            9u8 => Ok(UpdatePayload::BakerStakeThreshold(source.get()?)),
+            10u8 => Ok(UpdatePayload::Root(source.get()?)),
+            11u8 => Ok(UpdatePayload::Level1(source.get()?)),
+            12u8 => Ok(UpdatePayload::AddAnonymityRevoker(source.get()?)),
+            13u8 => Ok(UpdatePayload::AddIdentityProvider(source.get()?)),
+            tag => anyhow::bail!("Unknown update payload tag {}", tag),
         }
     }
 }

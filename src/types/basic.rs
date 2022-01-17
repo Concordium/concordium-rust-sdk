@@ -452,27 +452,37 @@ impl fmt::Display for CredentialRegistrationID {
     }
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Serialize, Clone, Into, From)]
 #[serde(transparent)]
 /// A single public key that can sign updates.
 pub struct UpdatePublicKey {
-    public: id::types::VerifyKey,
+    pub public: id::types::VerifyKey,
 }
 
-#[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serial, Into)]
 #[serde(transparent)]
 pub struct UpdateKeysThreshold {
     #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
-    threshold: u16,
+    pub(crate) threshold: u16,
 }
 
-#[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, PartialEq, Eq, PartialOrd, Ord)]
+impl Deserial for UpdateKeysThreshold {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let threshold = source.get()?;
+        anyhow::ensure!(threshold != 0, "Threshold cannot be 0.");
+        Ok(Self { threshold })
+    }
+}
+
+#[derive(
+    Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize, PartialEq, Eq, PartialOrd, Ord,
+)]
 #[serde(transparent)]
 pub struct UpdateKeysIndex {
     pub index: u16,
 }
 
-#[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
 pub struct ElectionDifficulty {
     parts_per_hundred_thousands: PartsPerHundredThousands,
@@ -480,7 +490,22 @@ pub struct ElectionDifficulty {
 
 #[derive(Debug, Clone, Copy)]
 pub struct PartsPerHundredThousands {
-    parts: u32,
+    pub(crate) parts: u32,
+}
+
+impl Serial for PartsPerHundredThousands {
+    fn serial<B: Buffer>(&self, out: &mut B) { self.parts.serial(out) }
+}
+
+impl Deserial for PartsPerHundredThousands {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let parts: u32 = source.get()?;
+        anyhow::ensure!(
+            parts <= 100_000,
+            "No more than 100_000 parts per hundred thousand."
+        );
+        Ok(Self { parts })
+    }
 }
 
 /// Display the value as a fraction.
@@ -491,7 +516,7 @@ impl fmt::Display for PartsPerHundredThousands {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, Copy)]
 pub struct ExchangeRate {
     #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
     pub numerator:   u64,
@@ -499,7 +524,22 @@ pub struct ExchangeRate {
     pub denominator: u64,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+impl Deserial for ExchangeRate {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let numerator = source.get()?;
+        let denominator = source.get()?;
+        anyhow::ensure!(
+            numerator != 0 && denominator != 0 && num::integer::gcd(numerator, denominator) == 1,
+            "Invalid exchange rate."
+        );
+        Ok(Self {
+            numerator,
+            denominator,
+        })
+    }
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct MintDistribution {
     mint_per_slot:       MintRate,
@@ -507,16 +547,33 @@ pub struct MintDistribution {
     finalization_reward: RewardFraction,
 }
 
-#[derive(Debug, Clone, Copy)]
+impl Deserial for MintDistribution {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let mint_per_slot = source.get()?;
+        let baking_reward: RewardFraction = source.get()?;
+        let finalization_reward: RewardFraction = source.get()?;
+        anyhow::ensure!(
+            (baking_reward + finalization_reward).is_some(),
+            "Reward fractions exceed 100%."
+        );
+        Ok(Self {
+            mint_per_slot,
+            baking_reward,
+            finalization_reward,
+        })
+    }
+}
+
+#[derive(Debug, Serialize, Clone, Copy)]
 pub struct MintRate {
     pub mantissa: u32,
     pub exponent: u8,
 }
 
-#[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
 pub struct RewardFraction {
-    parts_per_hundred_thousands: PartsPerHundredThousands,
+    pub(crate) parts_per_hundred_thousands: PartsPerHundredThousands,
 }
 
 /// Sequential index of finalization.
