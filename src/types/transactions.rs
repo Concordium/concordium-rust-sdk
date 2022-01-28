@@ -29,7 +29,7 @@ use sha2::Digest;
 use std::{collections::BTreeMap, marker::PhantomData};
 
 #[derive(
-    Debug, Copy, Clone, Serial, SerdeSerialize, SerdeDeserialize, Into, Display, Eq, PartialEq,
+    Debug, Copy, Clone, Serial, SerdeSerialize, SerdeDeserialize, Into, From, Display, Eq, PartialEq,
 )]
 #[serde(transparent)]
 /// Type safe wrapper to record the size of the transaction payload.
@@ -73,6 +73,21 @@ pub struct TransactionHeader {
 pub struct EncodedPayload {
     #[serde(with = "crate::internal::byte_array_hex")]
     pub(crate) payload: Vec<u8>,
+}
+
+impl EncodedPayload {
+    pub fn decode(&self) -> ParseResult<Payload> {
+        let mut source = std::io::Cursor::new(&self.payload);
+        let payload = source.get()?;
+        // ensure payload length matches the stated size.
+        let consumed = source.position();
+        anyhow::ensure!(
+            consumed == self.payload.len() as u64,
+            "Payload length information is inaccurate: {} bytes of input remaining.",
+            self.payload.len() as u64 - consumed
+        );
+        Ok(payload)
+    }
 }
 
 /// This serial instance does not have an inverse. It needs a context with the
@@ -1362,8 +1377,61 @@ pub mod cost {
 /// High level wrappers for making transactions with minimal user input.
 /// These wrappers handle encoding, setting energy costs when those are fixed
 /// for transaction.
-pub mod send {
+/// See also the [send] module above which combines construction with signing.
+pub mod construct {
     use super::*;
+
+    /// A transaction that is prepared to be signed.
+    /// The serde instance serializes the structured payload and skips
+    /// serializing the encoded one.
+    #[derive(Debug, Clone, SerdeSerialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct PreAccountTransaction {
+        pub header:       TransactionHeader,
+        /// The payload.
+        pub payload:      Payload,
+        /// The encoded payload. This is already serialized payload that is
+        /// constructed during construction of the prepared transaction
+        /// since we need it to compute the cost.
+        #[serde(skip_serializing)]
+        pub encoded:      EncodedPayload,
+        /// Hash of the transaction to sign.
+        pub hash_to_sign: hashes::TransactionSignHash,
+    }
+
+    impl PreAccountTransaction {
+        /// Sign the transaction with the provided signer. Note that this signer
+        /// must match the account address and the number of keys that
+        /// were used in construction, otherwise the transaction will be
+        /// invalid.
+        pub fn sign(self, signer: &impl TransactionSigner) -> AccountTransaction<EncodedPayload> {
+            sign_transaction(signer, self.header, self.encoded)
+        }
+    }
+
+    /// Serialize only the header and payload, so that this can be deserialized
+    /// as a transaction body.
+    impl Serial for PreAccountTransaction {
+        fn serial<B: Buffer>(&self, out: &mut B) {
+            self.header.serial(out);
+            self.encoded.serial(out);
+        }
+    }
+
+    impl Deserial for PreAccountTransaction {
+        fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+            let header: TransactionHeader = source.get()?;
+            let encoded = get_encoded_payload(source, header.payload_size)?;
+            let payload = encoded.decode()?;
+            let hash_to_sign = compute_transaction_sign_hash(&header, &encoded);
+            Ok(Self {
+                header,
+                payload,
+                encoded,
+                hash_to_sign,
+            })
+        }
+    }
 
     /// Helper structure to store the intermediate state of a transaction.
     /// The problem this helps solve is that to compute the exact energy
@@ -1374,22 +1442,25 @@ pub mod send {
     /// in the [TransactionBuilder::finalize] method we compute the correct
     /// energy amount and overwrite it in the transaction, before signing
     /// it.
+    /// This is deliberately made private so that the inconsistent internal
+    /// state does not leak.
     struct TransactionBuilder {
         header:  TransactionHeader,
+        payload: Payload,
         encoded: EncodedPayload,
     }
 
     /// Size of a transaction header. This is currently always 60 bytes.
     /// Future chain updates might revise this, but this is a big change so this
     /// is expected to change seldomly.
-    const TRANSACTION_HEADER_SIZE: u64 = 32 + 8 + 8 + 4 + 8;
+    pub const TRANSACTION_HEADER_SIZE: u64 = 32 + 8 + 8 + 4 + 8;
 
     impl TransactionBuilder {
         pub fn new(
             sender: AccountAddress,
             nonce: Nonce,
             expiry: TransactionTime,
-            payload: &Payload,
+            payload: Payload,
         ) -> Self {
             let encoded = payload.encode();
             let header = TransactionHeader {
@@ -1399,7 +1470,11 @@ pub mod send {
                 payload_size: encoded.size(),
                 expiry,
             };
-            Self { header, encoded }
+            Self {
+                header,
+                payload,
+                encoded,
+            }
         }
 
         #[inline]
@@ -1408,16 +1483,475 @@ pub mod send {
         }
 
         #[inline]
-        pub fn finalize(
-            mut self,
-            signer: &impl TransactionSigner,
-            f: impl FnOnce(u64) -> Energy,
-        ) -> AccountTransaction<EncodedPayload> {
+        pub fn construct(mut self, f: impl FnOnce(u64) -> Energy) -> PreAccountTransaction {
             let size = self.size();
             self.header.energy_amount = f(size);
-            sign_transaction(signer, self.header, self.encoded)
+            let hash_to_sign = compute_transaction_sign_hash(&self.header, &self.encoded);
+            PreAccountTransaction {
+                header: self.header,
+                payload: self.payload,
+                encoded: self.encoded,
+                hash_to_sign,
+            }
         }
     }
+
+    /// Construct a transfer transaction.
+    pub fn transfer(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        receiver: AccountAddress,
+        amount: Amount,
+    ) -> PreAccountTransaction {
+        let payload = Payload::Transfer {
+            to_address: receiver,
+            amount,
+        };
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add {
+                num_sigs,
+                energy: cost::SIMPLE_TRANSFER,
+            },
+            payload,
+        )
+    }
+
+    /// Construct a transfer transaction with a memo.
+    pub fn transfer_with_memo(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        receiver: AccountAddress,
+        amount: Amount,
+        memo: Memo,
+    ) -> PreAccountTransaction {
+        let payload = Payload::TransferWithMemo {
+            to_address: receiver,
+            memo,
+            amount,
+        };
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add {
+                num_sigs,
+                energy: cost::SIMPLE_TRANSFER,
+            },
+            payload,
+        )
+    }
+
+    /// Make an encrypted transfer. The payload can be constructed using
+    /// [encrypted_transfers::make_transfer_data].
+    pub fn encrypted_transfer(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        receiver: AccountAddress,
+        data: EncryptedAmountTransferData<EncryptedAmountsCurve>,
+    ) -> PreAccountTransaction {
+        let payload = Payload::EncryptedAmountTransfer {
+            to:   receiver,
+            data: Box::new(data),
+        };
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add {
+                num_sigs,
+                energy: cost::ENCRYPTED_TRANSFER,
+            },
+            payload,
+        )
+    }
+
+    /// Make an encrypted transfer with a memo. The payload can be constructed
+    /// using [encrypted_transfers::make_transfer_data].
+    pub fn encrypted_transfer_with_memo(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        receiver: AccountAddress,
+        data: EncryptedAmountTransferData<EncryptedAmountsCurve>,
+        memo: Memo,
+    ) -> PreAccountTransaction {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let payload = Payload::EncryptedAmountTransferWithMemo {
+            to: receiver,
+            memo,
+            data: Box::new(data),
+        };
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add {
+                num_sigs,
+                energy: cost::ENCRYPTED_TRANSFER,
+            },
+            payload,
+        )
+    }
+
+    /// Transfer the given amount from public to encrypted balance of the given
+    /// account.
+    pub fn transfer_to_encrypted(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        amount: Amount,
+    ) -> PreAccountTransaction {
+        let payload = Payload::TransferToEncrypted { amount };
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add {
+                num_sigs,
+                energy: cost::TRANSFER_TO_ENCRYPTED,
+            },
+            payload,
+        )
+    }
+
+    /// Transfer the given amount from encrypted to public balance of the given
+    /// account. The payload may be constructed using
+    /// [encrypted_transfers::make_sec_to_pub_transfer_data]
+    pub fn transfer_to_public(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        data: SecToPubAmountTransferData<EncryptedAmountsCurve>,
+    ) -> PreAccountTransaction {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let payload = Payload::TransferToPublic {
+            data: Box::new(data),
+        };
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add {
+                num_sigs,
+                energy: cost::TRANSFER_TO_PUBLIC,
+            },
+            payload,
+        )
+    }
+
+    /// Construct a transfer with schedule transaction, sending to the given
+    /// account.
+    pub fn transfer_with_schedule(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        receiver: AccountAddress,
+        schedule: Vec<(Timestamp, Amount)>,
+    ) -> PreAccountTransaction {
+        let num_releases = schedule.len() as u16;
+        let payload = Payload::TransferWithSchedule {
+            to: receiver,
+            schedule,
+        };
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add {
+                num_sigs,
+                energy: cost::scheduled_transfer(num_releases),
+            },
+            payload,
+        )
+    }
+
+    /// Construct a transfer with schedule and memo transaction, sending to the
+    /// given account.
+    pub fn transfer_with_schedule_and_memo(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        receiver: AccountAddress,
+        schedule: Vec<(Timestamp, Amount)>,
+        memo: Memo,
+    ) -> PreAccountTransaction {
+        let num_releases = schedule.len() as u16;
+        let payload = Payload::TransferWithScheduleAndMemo {
+            to: receiver,
+            memo,
+            schedule,
+        };
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add {
+                num_sigs,
+                energy: cost::scheduled_transfer(num_releases),
+            },
+            payload,
+        )
+    }
+
+    /// Register the sender account as a baker.
+    /// TODO: Make a function for constructing the keys payload, with correct
+    /// proofs and context.
+    pub fn add_baker(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        baking_stake: Amount,
+        restake_earnings: bool,
+        keys: BakerAddKeysPayload,
+    ) -> PreAccountTransaction {
+        let payload = Payload::AddBaker {
+            payload: Box::new(AddBakerPayload {
+                keys,
+                baking_stake,
+                restake_earnings,
+            }),
+        };
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add {
+                num_sigs,
+                energy: cost::ADD_BAKER,
+            },
+            payload,
+        )
+    }
+
+    /// Update keys of the baker associated with the sender account.
+    /// TODO: Make a function for constructing the keys payload, with correct
+    /// proofs and context.
+    pub fn update_baker_keys(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        keys: BakerUpdateKeysPayload,
+    ) -> PreAccountTransaction {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let payload = Payload::UpdateBakerKeys {
+            payload: Box::new(keys),
+        };
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add {
+                num_sigs,
+                energy: cost::UPDATE_BAKER_KEYS,
+            },
+            payload,
+        )
+    }
+
+    /// Deregister the account as a baker.
+    pub fn remove_baker(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+    ) -> PreAccountTransaction {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let payload = Payload::RemoveBaker;
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add {
+                num_sigs,
+                energy: cost::REMOVE_BAKER,
+            },
+            payload,
+        )
+    }
+
+    /// Update the amount the account stakes for being a baker.
+    pub fn update_baker_stake(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        new_stake: Amount,
+    ) -> PreAccountTransaction {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let payload = Payload::UpdateBakerStake { stake: new_stake };
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add {
+                num_sigs,
+                energy: cost::UPDATE_BAKER_STAKE,
+            },
+            payload,
+        )
+    }
+
+    pub fn update_baker_restake_earnings(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        restake_earnings: bool,
+    ) -> PreAccountTransaction {
+        // FIXME: This payload could be returned as well since it is only borrowed.
+        let payload = Payload::UpdateBakerRestakeEarnings { restake_earnings };
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add {
+                num_sigs,
+                energy: cost::UPDATE_BAKER_RESTAKE,
+            },
+            payload,
+        )
+    }
+
+    /// Construct a transction to register the given piece of data.
+    pub fn register_data(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        data: RegisteredData,
+    ) -> PreAccountTransaction {
+        let payload = Payload::RegisterData { data };
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add {
+                num_sigs,
+                energy: cost::REGISTER_DATA,
+            },
+            payload,
+        )
+    }
+
+    /// Deploy the given Wasm module. The module is given as a binary source,
+    /// and no processing is done to the module.
+    pub fn deploy_module(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        source: smart_contracts::ModuleSource,
+    ) -> PreAccountTransaction {
+        let module_size = source.size();
+        let payload = Payload::DeployModule {
+            module: smart_contracts::WasmModule { version: 0, source },
+        };
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add {
+                num_sigs,
+                energy: cost::deploy_module(module_size),
+            },
+            payload,
+        )
+    }
+
+    /// Initialize a smart contract, giving it the given amount of energy for
+    /// execution. The unique parameters are
+    /// - `energy` -- the amount of energy that can be used for contract
+    ///   execution. The base energy amount for transaction verification will be
+    ///   added to this cost.
+    pub fn init_contract(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        payload: InitContractPayload,
+        energy: Energy,
+    ) -> PreAccountTransaction {
+        let payload = Payload::InitContract { payload };
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add { num_sigs, energy },
+            payload,
+        )
+    }
+
+    /// Update a smart contract intance, giving it the given amount of energy
+    /// for execution. The unique parameters are
+    /// - `energy` -- the amount of energy that can be used for contract
+    ///   execution. The base energy amount for transaction verification will be
+    ///   added to this cost.
+    pub fn update_contract(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        payload: UpdateContractPayload,
+        energy: Energy,
+    ) -> PreAccountTransaction {
+        let payload = Payload::Update { payload };
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add { num_sigs, energy },
+            payload,
+        )
+    }
+
+    pub enum GivenEnergy {
+        /// Use this exact amount of energy.
+        Absolute(Energy),
+        /// Add the given amount of energy to the base amount.
+        /// The base amount covers transaction size and signature checking.
+        Add { energy: Energy, num_sigs: u32 },
+    }
+
+    /// A convenience wrapper around `sign_transaction` that construct the
+    /// transaction and signs it. Compared to transaction-type-specific wrappers
+    /// above this allows selecting the amount of energy
+    pub fn make_transaction(
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        energy: GivenEnergy,
+        payload: Payload,
+    ) -> PreAccountTransaction {
+        let builder = TransactionBuilder::new(sender, nonce, expiry, payload);
+        let cost = |size| match energy {
+            GivenEnergy::Absolute(energy) => energy,
+            GivenEnergy::Add { num_sigs, energy } => cost::base_cost(size, num_sigs) + energy,
+        };
+        builder.construct(cost)
+    }
+}
+
+/// High level wrappers for making transactions with minimal user input.
+/// These wrappers handle encoding, setting energy costs when those are fixed
+/// for transaction.
+pub mod send {
+    use super::*;
 
     /// Construct a transfer transaction.
     pub fn transfer(
@@ -1428,19 +1962,7 @@ pub mod send {
         receiver: AccountAddress,
         amount: Amount,
     ) -> AccountTransaction<EncodedPayload> {
-        // FIXME: This payload could be returned as well since it is only borrowed.
-        let payload = Payload::Transfer {
-            to_address: receiver,
-            amount,
-        };
-        make_and_sign_transaction(
-            signer,
-            sender,
-            nonce,
-            expiry,
-            GivenEnergy::Add(cost::SIMPLE_TRANSFER),
-            &payload,
-        )
+        construct::transfer(signer.num_keys(), sender, nonce, expiry, receiver, amount).sign(signer)
     }
 
     /// Construct a transfer transaction with a memo.
@@ -1453,20 +1975,16 @@ pub mod send {
         amount: Amount,
         memo: Memo,
     ) -> AccountTransaction<EncodedPayload> {
-        // FIXME: This payload could be returned as well since it is only borrowed.
-        let payload = Payload::TransferWithMemo {
-            to_address: receiver,
-            memo,
-            amount,
-        };
-        make_and_sign_transaction(
-            signer,
+        construct::transfer_with_memo(
+            signer.num_keys(),
             sender,
             nonce,
             expiry,
-            GivenEnergy::Add(cost::SIMPLE_TRANSFER),
-            &payload,
+            receiver,
+            amount,
+            memo,
         )
+        .sign(signer)
     }
 
     /// Make an encrypted transfer. The payload can be constructed using
@@ -1479,19 +1997,8 @@ pub mod send {
         receiver: AccountAddress,
         data: EncryptedAmountTransferData<EncryptedAmountsCurve>,
     ) -> AccountTransaction<EncodedPayload> {
-        // FIXME: This payload could be returned as well since it is only borrowed.
-        let payload = Payload::EncryptedAmountTransfer {
-            to:   receiver,
-            data: Box::new(data),
-        };
-        make_and_sign_transaction(
-            signer,
-            sender,
-            nonce,
-            expiry,
-            GivenEnergy::Add(cost::ENCRYPTED_TRANSFER),
-            &payload,
-        )
+        construct::encrypted_transfer(signer.num_keys(), sender, nonce, expiry, receiver, data)
+            .sign(signer)
     }
 
     /// Make an encrypted transfer with a memo. The payload can be constructed
@@ -1505,20 +2012,16 @@ pub mod send {
         data: EncryptedAmountTransferData<EncryptedAmountsCurve>,
         memo: Memo,
     ) -> AccountTransaction<EncodedPayload> {
-        // FIXME: This payload could be returned as well since it is only borrowed.
-        let payload = Payload::EncryptedAmountTransferWithMemo {
-            to: receiver,
-            memo,
-            data: Box::new(data),
-        };
-        make_and_sign_transaction(
-            signer,
+        construct::encrypted_transfer_with_memo(
+            signer.num_keys(),
             sender,
             nonce,
             expiry,
-            GivenEnergy::Add(cost::ENCRYPTED_TRANSFER),
-            &payload,
+            receiver,
+            data,
+            memo,
         )
+        .sign(signer)
     }
 
     /// Transfer the given amount from public to encrypted balance of the given
@@ -1530,16 +2033,8 @@ pub mod send {
         expiry: TransactionTime,
         amount: Amount,
     ) -> AccountTransaction<EncodedPayload> {
-        // FIXME: This payload could be returned as well since it is only borrowed.
-        let payload = Payload::TransferToEncrypted { amount };
-        make_and_sign_transaction(
-            signer,
-            sender,
-            nonce,
-            expiry,
-            GivenEnergy::Add(cost::TRANSFER_TO_ENCRYPTED),
-            &payload,
-        )
+        construct::transfer_to_encrypted(signer.num_keys(), sender, nonce, expiry, amount)
+            .sign(signer)
     }
 
     /// Transfer the given amount from encrypted to public balance of the given
@@ -1552,18 +2047,7 @@ pub mod send {
         expiry: TransactionTime,
         data: SecToPubAmountTransferData<EncryptedAmountsCurve>,
     ) -> AccountTransaction<EncodedPayload> {
-        // FIXME: This payload could be returned as well since it is only borrowed.
-        let payload = Payload::TransferToPublic {
-            data: Box::new(data),
-        };
-        make_and_sign_transaction(
-            signer,
-            sender,
-            nonce,
-            expiry,
-            GivenEnergy::Add(cost::TRANSFER_TO_PUBLIC),
-            &payload,
-        )
+        construct::transfer_to_public(signer.num_keys(), sender, nonce, expiry, data).sign(signer)
     }
 
     /// Construct a transfer with schedule transaction, sending to the given
@@ -1576,19 +2060,15 @@ pub mod send {
         receiver: AccountAddress,
         schedule: Vec<(Timestamp, Amount)>,
     ) -> AccountTransaction<EncodedPayload> {
-        let num_releases = schedule.len() as u16;
-        let payload = Payload::TransferWithSchedule {
-            to: receiver,
-            schedule,
-        };
-        make_and_sign_transaction(
-            signer,
+        construct::transfer_with_schedule(
+            signer.num_keys(),
             sender,
             nonce,
             expiry,
-            GivenEnergy::Add(cost::scheduled_transfer(num_releases)),
-            &payload,
+            receiver,
+            schedule,
         )
+        .sign(signer)
     }
 
     /// Construct a transfer with schedule and memo transaction, sending to the
@@ -1602,25 +2082,19 @@ pub mod send {
         schedule: Vec<(Timestamp, Amount)>,
         memo: Memo,
     ) -> AccountTransaction<EncodedPayload> {
-        let num_releases = schedule.len() as u16;
-        let payload = Payload::TransferWithScheduleAndMemo {
-            to: receiver,
-            memo,
-            schedule,
-        };
-        make_and_sign_transaction(
-            signer,
+        construct::transfer_with_schedule_and_memo(
+            signer.num_keys(),
             sender,
             nonce,
             expiry,
-            GivenEnergy::Add(cost::scheduled_transfer(num_releases)),
-            &payload,
+            receiver,
+            schedule,
+            memo,
         )
+        .sign(signer)
     }
 
     /// Register the sender account as a baker.
-    /// TODO: Make a function for constructing the keys payload, with correct
-    /// proofs and context.
     pub fn add_baker(
         signer: &impl ExactSizeTransactionSigner,
         sender: AccountAddress,
@@ -1630,27 +2104,19 @@ pub mod send {
         restake_earnings: bool,
         keys: BakerAddKeysPayload,
     ) -> AccountTransaction<EncodedPayload> {
-        // FIXME: This payload could be returned as well since it is only borrowed.
-        let payload = Payload::AddBaker {
-            payload: Box::new(AddBakerPayload {
-                keys,
-                baking_stake,
-                restake_earnings,
-            }),
-        };
-        make_and_sign_transaction(
-            signer,
+        construct::add_baker(
+            signer.num_keys(),
             sender,
             nonce,
             expiry,
-            GivenEnergy::Add(cost::ADD_BAKER),
-            &payload,
+            baking_stake,
+            restake_earnings,
+            keys,
         )
+        .sign(signer)
     }
 
     /// Update keys of the baker associated with the sender account.
-    /// TODO: Make a function for constructing the keys payload, with correct
-    /// proofs and context.
     pub fn update_baker_keys(
         signer: &impl ExactSizeTransactionSigner,
         sender: AccountAddress,
@@ -1658,18 +2124,7 @@ pub mod send {
         expiry: TransactionTime,
         keys: BakerUpdateKeysPayload,
     ) -> AccountTransaction<EncodedPayload> {
-        // FIXME: This payload could be returned as well since it is only borrowed.
-        let payload = Payload::UpdateBakerKeys {
-            payload: Box::new(keys),
-        };
-        make_and_sign_transaction(
-            signer,
-            sender,
-            nonce,
-            expiry,
-            GivenEnergy::Add(cost::UPDATE_BAKER_KEYS),
-            &payload,
-        )
+        construct::update_baker_keys(signer.num_keys(), sender, nonce, expiry, keys).sign(signer)
     }
 
     /// Deregister the account as a baker.
@@ -1679,16 +2134,7 @@ pub mod send {
         nonce: Nonce,
         expiry: TransactionTime,
     ) -> AccountTransaction<EncodedPayload> {
-        // FIXME: This payload could be returned as well since it is only borrowed.
-        let payload = Payload::RemoveBaker;
-        make_and_sign_transaction(
-            signer,
-            sender,
-            nonce,
-            expiry,
-            GivenEnergy::Add(cost::REMOVE_BAKER),
-            &payload,
-        )
+        construct::remove_baker(signer.num_keys(), sender, nonce, expiry).sign(signer)
     }
 
     /// Update the amount the account stakes for being a baker.
@@ -1699,16 +2145,8 @@ pub mod send {
         expiry: TransactionTime,
         new_stake: Amount,
     ) -> AccountTransaction<EncodedPayload> {
-        // FIXME: This payload could be returned as well since it is only borrowed.
-        let payload = Payload::UpdateBakerStake { stake: new_stake };
-        make_and_sign_transaction(
-            signer,
-            sender,
-            nonce,
-            expiry,
-            GivenEnergy::Add(cost::UPDATE_BAKER_STAKE),
-            &payload,
-        )
+        construct::update_baker_stake(signer.num_keys(), sender, nonce, expiry, new_stake)
+            .sign(signer)
     }
 
     pub fn update_baker_restake_earnings(
@@ -1718,16 +2156,14 @@ pub mod send {
         expiry: TransactionTime,
         restake_earnings: bool,
     ) -> AccountTransaction<EncodedPayload> {
-        // FIXME: This payload could be returned as well since it is only borrowed.
-        let payload = Payload::UpdateBakerRestakeEarnings { restake_earnings };
-        make_and_sign_transaction(
-            signer,
+        construct::update_baker_restake_earnings(
+            signer.num_keys(),
             sender,
             nonce,
             expiry,
-            GivenEnergy::Add(cost::UPDATE_BAKER_RESTAKE),
-            &payload,
+            restake_earnings,
         )
+        .sign(signer)
     }
 
     /// Construct a transction to register the given piece of data.
@@ -1738,16 +2174,7 @@ pub mod send {
         expiry: TransactionTime,
         data: RegisteredData,
     ) -> AccountTransaction<EncodedPayload> {
-        // FIXME: This payload could be returned as well since it is only borrowed.
-        let payload = Payload::RegisterData { data };
-        make_and_sign_transaction(
-            signer,
-            sender,
-            nonce,
-            expiry,
-            GivenEnergy::Add(cost::REGISTER_DATA),
-            &payload,
-        )
+        construct::register_data(signer.num_keys(), sender, nonce, expiry, data).sign(signer)
     }
 
     /// Deploy the given Wasm module. The module is given as a binary source,
@@ -1759,19 +2186,7 @@ pub mod send {
         expiry: TransactionTime,
         source: smart_contracts::ModuleSource,
     ) -> AccountTransaction<EncodedPayload> {
-        // FIXME: This payload could be returned as well since it is only borrowed.
-        let module_size = source.size();
-        let payload = Payload::DeployModule {
-            module: smart_contracts::WasmModule { version: 0, source },
-        };
-        make_and_sign_transaction(
-            signer,
-            sender,
-            nonce,
-            expiry,
-            GivenEnergy::Add(cost::deploy_module(module_size)),
-            &payload,
-        )
+        construct::deploy_module(signer.num_keys(), sender, nonce, expiry, source).sign(signer)
     }
 
     /// Initialize a smart contract, giving it the given amount of energy for
@@ -1787,15 +2202,8 @@ pub mod send {
         payload: InitContractPayload,
         energy: Energy,
     ) -> AccountTransaction<EncodedPayload> {
-        let payload = Payload::InitContract { payload };
-        make_and_sign_transaction(
-            signer,
-            sender,
-            nonce,
-            expiry,
-            GivenEnergy::Add(energy),
-            &payload,
-        )
+        construct::init_contract(signer.num_keys(), sender, nonce, expiry, payload, energy)
+            .sign(signer)
     }
 
     /// Update a smart contract intance, giving it the given amount of energy
@@ -1811,15 +2219,8 @@ pub mod send {
         payload: UpdateContractPayload,
         energy: Energy,
     ) -> AccountTransaction<EncodedPayload> {
-        let payload = Payload::Update { payload };
-        make_and_sign_transaction(
-            signer,
-            sender,
-            nonce,
-            expiry,
-            GivenEnergy::Add(energy),
-            &payload,
-        )
+        construct::update_contract(signer.num_keys(), sender, nonce, expiry, payload, energy)
+            .sign(signer)
     }
 
     pub enum GivenEnergy {
@@ -1839,17 +2240,29 @@ pub mod send {
         nonce: Nonce,
         expiry: TransactionTime,
         energy: GivenEnergy,
-        payload: &Payload,
+        payload: Payload,
     ) -> AccountTransaction<EncodedPayload> {
-        let builder = TransactionBuilder::new(sender, nonce, expiry, payload);
-        let cost = |size| match energy {
-            GivenEnergy::Absolute(energy) => energy,
-            GivenEnergy::Add(energy) => {
-                let num_keys = signer.num_keys();
-                cost::base_cost(size, num_keys) + energy
-            }
-        };
-        builder.finalize(signer, cost)
+        match energy {
+            GivenEnergy::Absolute(energy) => construct::make_transaction(
+                sender,
+                nonce,
+                expiry,
+                construct::GivenEnergy::Absolute(energy),
+                payload,
+            )
+            .sign(signer),
+            GivenEnergy::Add(energy) => construct::make_transaction(
+                sender,
+                nonce,
+                expiry,
+                construct::GivenEnergy::Add {
+                    energy,
+                    num_sigs: signer.num_keys(),
+                },
+                payload,
+            )
+            .sign(signer),
+        }
     }
 }
 

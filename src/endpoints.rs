@@ -12,12 +12,13 @@ use crate::{
     },
 };
 use anyhow::anyhow;
-use crypto_common::Versioned;
+use crypto_common::{types::TransactionSignature, Serial, Versioned};
 use derive_more::From;
 use id::{
     constants::{ArCurve, IpPairing},
     types::{ArInfo, GlobalContext, IpInfo},
 };
+use sha2::Digest;
 use std::{borrow::Borrow, convert::TryInto, net::IpAddr, sync::Arc, time::UNIX_EPOCH};
 use thiserror::Error;
 pub use tonic::transport::Endpoint;
@@ -775,6 +776,41 @@ impl Client {
         })?;
         let response = self.client.send_transaction(request).await?;
         Ok(response.into_inner().value)
+    }
+
+    /// Send the given account transaction item on the given network.
+    /// This is a low-level function that can be useful in case a transaction is
+    /// constructed by a third party. It avoids deserializing and converting
+    /// data.
+    /// If the transaciton is accepted by the node then the transaction hash
+    /// that can be used to query the status is returned.
+    pub async fn send_raw_account_transaction(
+        &mut self,
+        network_id: network::NetworkId,
+        signatures: &TransactionSignature, // signatures for the transaction.
+        body: &[u8],                       // body of the transaction (header + payload)
+    ) -> RPCResult<types::hashes::TransactionHash> {
+        let mut data = Vec::with_capacity(
+            body.len() + transactions::construct::TRANSACTION_HEADER_SIZE as usize,
+        );
+        crypto_common::VERSION_0.serial(&mut data); // outer version number
+        0u8.serial(&mut data); // tag for account transaction
+        signatures.serial(&mut data); // signatures
+        data.extend_from_slice(body); // header + payload
+                                      // compute the hash of the transaction
+        let hash = types::hashes::HashBytes::new(sha2::Sha256::digest(&data).into());
+        let request = self.construct_request(SendTransactionRequest {
+            network_id: u32::from(u16::from(network_id)),
+            payload:    data,
+        })?;
+        let response = self.client.send_transaction(request).await?;
+        if response.into_inner().value {
+            Ok(hash)
+        } else {
+            Err(RPCError::CallError(tonic::Status::invalid_argument(
+                "Transaction was invalid and thus not accepted by the node.",
+            )))
+        }
     }
 }
 
