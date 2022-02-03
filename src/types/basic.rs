@@ -79,6 +79,20 @@ pub struct UpdateSequenceNumber {
     pub number: u64,
 }
 
+impl UpdateSequenceNumber {
+    /// Get the next sequence number. This is marked as must_use to prevent
+    /// mistakes in combination with next_mut.
+    #[must_use]
+    pub fn next(self) -> Self {
+        Self {
+            number: self.number + 1,
+        }
+    }
+
+    /// Increase the sequence number.
+    pub fn next_mut(&mut self) { self.number += 1; }
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Into, Serial)]
