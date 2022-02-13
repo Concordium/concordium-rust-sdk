@@ -372,26 +372,31 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                             account: sender,
                         })
                     }
-                    super::AccountTransactionEffects::BakerStakeUpdated {
-                        baker_id,
-                        new_stake,
-                        increased,
-                    } => mk_success_1(
-                        TransactionType::UpdateBakerStake,
-                        if increased {
-                            Event::BakerStakeIncreased {
-                                baker_id,
-                                account: sender,
-                                new_stake,
-                            }
+                    super::AccountTransactionEffects::BakerStakeUpdated { data } => {
+                        if let Some(data) = data {
+                            mk_success_1(
+                                TransactionType::UpdateBakerStake,
+                                if data.increased {
+                                    Event::BakerStakeIncreased {
+                                        baker_id:  data.baker_id,
+                                        account:   sender,
+                                        new_stake: data.new_stake,
+                                    }
+                                } else {
+                                    Event::BakerStakeDecreased {
+                                        baker_id:  data.baker_id,
+                                        account:   sender,
+                                        new_stake: data.new_stake,
+                                    }
+                                },
+                            )
                         } else {
-                            Event::BakerStakeDecreased {
-                                baker_id,
-                                account: sender,
-                                new_stake,
-                            }
-                        },
-                    ),
+                            (
+                                Some(TransactionType::UpdateBakerStake),
+                                BlockItemResult::Success { events: Vec::new() },
+                            )
+                        }
+                    }
                     super::AccountTransactionEffects::BakerRestakeEarningsUpdated {
                         baker_id,
                         restake_earnings,
@@ -685,27 +690,35 @@ fn convert_account_transaction(
             mk_success(effects)
         }
         TransactionType::UpdateBakerStake => {
-            let effects = with_singleton(events, |e| match e {
-                Event::BakerStakeDecreased {
-                    baker_id,
-                    account: _,
-                    new_stake,
-                } => Some(super::AccountTransactionEffects::BakerStakeUpdated {
-                    baker_id,
-                    new_stake,
-                    increased: false,
-                }),
-                Event::BakerStakeIncreased {
-                    baker_id,
-                    account: _,
-                    new_stake,
-                } => Some(super::AccountTransactionEffects::BakerStakeUpdated {
-                    baker_id,
-                    new_stake,
-                    increased: true,
-                }),
-                _ => None,
-            })?;
+            let effects = if events.is_empty() {
+                super::AccountTransactionEffects::BakerStakeUpdated { data: None }
+            } else {
+                with_singleton(events, |e| match e {
+                    Event::BakerStakeDecreased {
+                        baker_id,
+                        account: _,
+                        new_stake,
+                    } => Some(super::AccountTransactionEffects::BakerStakeUpdated {
+                        data: Some(super::BakerStakeUpdatedData {
+                            baker_id,
+                            new_stake,
+                            increased: false,
+                        }),
+                    }),
+                    Event::BakerStakeIncreased {
+                        baker_id,
+                        account: _,
+                        new_stake,
+                    } => Some(super::AccountTransactionEffects::BakerStakeUpdated {
+                        data: Some(super::BakerStakeUpdatedData {
+                            baker_id,
+                            new_stake,
+                            increased: true,
+                        }),
+                    }),
+                    _ => None,
+                })?
+            };
             mk_success(effects)
         }
         TransactionType::UpdateBakerRestakeEarnings => {

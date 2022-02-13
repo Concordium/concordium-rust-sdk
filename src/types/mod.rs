@@ -666,6 +666,19 @@ pub enum ContractTraceElement {
     },
 }
 
+#[derive(Debug, Clone, Copy)]
+/// Data contained in the transaction response in case a baker stake was updated
+/// (either increased or decreased.)
+pub struct BakerStakeUpdatedData {
+    /// Affected baker.
+    pub baker_id:  BakerId,
+    /// New stake.
+    pub new_stake: Amount,
+    /// A boolean which indicates whether it increased
+    /// (`true`) or decreased (`false`).
+    pub increased: bool,
+}
+
 #[derive(Debug, Clone)]
 /// Effects of an account transactions. All variants apart from
 /// [AccountTransactionEffects::None] correspond to a unique transaction that
@@ -723,9 +736,9 @@ pub enum AccountTransactionEffects {
     /// successful [UpdateBakerStake](transactions::Payload::UpdateBakerStake)
     /// transaction.
     BakerStakeUpdated {
-        baker_id:  BakerId,
-        new_stake: Amount,
-        increased: bool,
+        /// If the stake was updated (that is, it changed and did not stay the
+        /// same) then this is [Some], otherwise [None].
+        data: Option<BakerStakeUpdatedData>,
     },
     /// An account changed its preference for restaking earnings. This is the
     /// result of a successful
