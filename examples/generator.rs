@@ -24,7 +24,7 @@ struct App {
     #[structopt(long = "sender")]
     account:   PathBuf,
     #[structopt(long = "receivers")]
-    receivers: PathBuf,
+    receivers: Option<PathBuf>,
     #[structopt(long = "tps")]
     tps:       u16,
 }
@@ -46,19 +46,25 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
-    let keys: AccountData = serde_json::from_str(
-        &std::fs::read_to_string(app.account).context("Could not read the keys file.")?,
-    )
-    .context("Could not parse the accounts file.")?;
-    let accounts: Vec<AccountAddress> = serde_json::from_str(
-        &std::fs::read_to_string(app.receivers).context("Could not read the receivers file.")?,
-    )
-    .context("Could not parse the receivers file.")?;
-    anyhow::ensure!(!accounts.is_empty(), "List of receivers must not be empty.");
-
     let mut client = endpoints::Client::connect(app.endpoint, "rpcadmin".to_string()).await?;
 
     let consensus_info = client.get_consensus_status().await?;
+
+    let keys: AccountData = serde_json::from_str(
+        &std::fs::read_to_string(app.account).context("Could not read the keys file.")?,
+    )
+    .context("Could not parse the keys file.")?;
+    let accounts: Vec<AccountAddress> = match app.receivers {
+        None => client
+            .get_account_list(&consensus_info.last_finalized_block)
+            .await
+            .context("Could not obtain a list of accounts.")?,
+        Some(receivers) => serde_json::from_str(
+            &std::fs::read_to_string(receivers).context("Could not read the receivers file.")?,
+        )
+        .context("Could not parse the receivers file.")?,
+    };
+    anyhow::ensure!(!accounts.is_empty(), "List of receivers must not be empty.");
 
     // Get the initial nonce.
     let acc_info: types::AccountInfo = client
