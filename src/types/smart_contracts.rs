@@ -13,7 +13,7 @@ use crypto_common::{
 };
 use derive_more::*;
 use id::types::AccountAddress;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Copy, Clone, Display)]
 #[serde(try_from = "u8", into = "u8")]
@@ -43,6 +43,19 @@ impl TryFrom<u8> for WasmVersion {
             1 => Ok(Self::V1),
             _ => anyhow::bail!("Only versions 0 and 1 of smart contracts are supported."),
         }
+    }
+}
+
+impl Serial for WasmVersion {
+    #[inline(always)]
+    fn serial<B: Buffer>(&self, out: &mut B) { u32::from(u8::from(*self)).serial(out) }
+}
+
+impl Deserial for WasmVersion {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let x = u32::deserial(source)?;
+        let tag = u8::try_from(x)?;
+        tag.try_into()
     }
 }
 
@@ -297,6 +310,6 @@ impl Deserial for ModuleSource {
 /// Unparsed module with a version indicating what operations are allowed.
 /// FIXME: Make this structured based on what we have in wasm-chain-integration.
 pub struct WasmModule {
-    pub version: u32,
+    pub version: WasmVersion,
     pub source:  ModuleSource,
 }

@@ -1889,12 +1889,10 @@ pub mod construct {
         sender: AccountAddress,
         nonce: Nonce,
         expiry: TransactionTime,
-        source: smart_contracts::ModuleSource,
+        module: smart_contracts::WasmModule,
     ) -> PreAccountTransaction {
-        let module_size = source.size();
-        let payload = Payload::DeployModule {
-            module: smart_contracts::WasmModule { version: 0, source },
-        };
+        let module_size = module.source.size();
+        let payload = Payload::DeployModule { module };
         make_transaction(
             sender,
             nonce,
@@ -2217,9 +2215,9 @@ pub mod send {
         sender: AccountAddress,
         nonce: Nonce,
         expiry: TransactionTime,
-        source: smart_contracts::ModuleSource,
+        module: smart_contracts::WasmModule,
     ) -> AccountTransaction<EncodedPayload> {
-        construct::deploy_module(signer.num_keys(), sender, nonce, expiry, source).sign(signer)
+        construct::deploy_module(signer.num_keys(), sender, nonce, expiry, module).sign(signer)
     }
 
     /// Initialize a smart contract, giving it the given amount of energy for
