@@ -484,7 +484,7 @@ impl BlockItemSummary {
                     for effect in effects {
                         match effect {
                             ContractTraceElement::Updated { data } => {
-                                if !seen.insert(data.address) {
+                                if seen.insert(data.address) {
                                     addresses.push(data.address);
                                 }
                             }
@@ -515,7 +515,7 @@ impl BlockItemSummary {
                         match effect {
                             ContractTraceElement::Updated { .. } => (),
                             ContractTraceElement::Transferred { to, .. } => {
-                                if !seen.insert(*to) {
+                                if seen.insert(*to) {
                                     addresses.push(*to);
                                 }
                             }
