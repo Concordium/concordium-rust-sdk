@@ -13,6 +13,7 @@ use crypto_common::{
 };
 use derive_more::*;
 use id::types::AccountAddress;
+use sha2::Digest;
 use std::convert::{TryFrom, TryInto};
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Copy, Clone, Display)]
@@ -312,4 +313,15 @@ impl Deserial for ModuleSource {
 pub struct WasmModule {
     pub version: WasmVersion,
     pub source:  ModuleSource,
+}
+
+impl WasmModule {
+    /// Get the identifier of the module. This identifier is used to refer to
+    /// the module on the chain, e.g., when initializing a new contract
+    /// instance.
+    pub fn get_module_ref(&self) -> ModuleRef {
+        let mut hasher = sha2::Sha256::new();
+        self.serial(&mut hasher);
+        ModuleRef::from(<[u8; 32]>::from(hasher.finalize()))
+    }
 }

@@ -248,6 +248,22 @@ enum Event {
     #[serde(rename_all = "camelCase")]
     /// Memo
     TransferMemo { memo: Memo },
+    #[serde(rename_all = "camelCase")]
+    /// A V1 contract was interrupted.
+    Interrupted {
+        /// Address of the contract that was interrupted.
+        address: super::ContractAddress,
+        /// Events generated up to the interrupt.
+        events:  Vec<smart_contracts::ContractEvent>,
+    },
+    #[serde(rename_all = "camelCase")]
+    /// A V1 contract resumed execution.
+    Resumed {
+        /// Address of the contract that is resuming.
+        address: super::ContractAddress,
+        /// Whether the interrupt succeeded or not.
+        success: bool,
+    },
 }
 
 use super::{
@@ -337,6 +353,14 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                                         to: Address::Account(to),
                                     }
                                 }
+                                crate::types::ContractTraceElement::Interrupted {
+                                    address,
+                                    events,
+                                } => Event::Interrupted { address, events },
+                                crate::types::ContractTraceElement::Resumed {
+                                    address,
+                                    success,
+                                } => Event::Resumed { address, success },
                             })
                             .collect::<Vec<_>>();
                         (Some(TransactionType::Update), BlockItemResult::Success {
@@ -635,6 +659,12 @@ fn convert_account_transaction(
                         amount,
                         to: Address::Account(to),
                     } => Ok(super::ContractTraceElement::Transferred { from, amount, to }),
+                    Event::Interrupted { address, events } => {
+                        Ok(super::ContractTraceElement::Interrupted { address, events })
+                    }
+                    Event::Resumed { address, success } => {
+                        Ok(super::ContractTraceElement::Resumed { address, success })
+                    }
                     _ => Err(ConversionError::InvalidTransactionResult),
                 })
                 .collect::<Result<_, _>>()?;
