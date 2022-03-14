@@ -33,6 +33,12 @@ struct App {
         help = "File to output the list of accounts with their balances to."
     )]
     out:      PathBuf,
+    #[structopt(
+        long = "num",
+        help = "How many queries to make in parallel.",
+        default_value = "8"
+    )]
+    num:      usize,
 }
 
 #[derive(SerdeSerialize)]
@@ -81,41 +87,52 @@ async fn main() -> anyhow::Result<()> {
     let mut total_amount: Amount = 0.into();
 
     let mut acc_balances = Vec::with_capacity(accounts.len());
-    for acc in accounts {
-        let info = client.get_account_info(&acc, &block).await?;
-        let is_baker = if let Some(baker) = info.account_baker {
-            num_bakers += 1;
-            staked_amount = (staked_amount + baker.staked_amount)
-                .context("Total staked amount exceeds u64. This should not happen.")?;
-            true
-        } else {
-            false
-        };
+    for accs in accounts.chunks(app.num).map(Vec::from) {
+        let mut handles = Vec::with_capacity(app.num);
+        for acc in accs {
+            let mut client = client.clone();
+            handles.push(tokio::spawn(async move {
+                let info = client.get_account_info(&acc, &block).await?;
+                Ok::<_, anyhow::Error>((acc, info))
+            }));
+        }
 
-        total_amount = (total_amount + info.account_amount)
-            .context("Total amount exceeds u64. This should not happen.")?;
+        for res in futures::future::join_all(handles).await {
+            let (acc, info) = res??;
+            let is_baker = if let Some(baker) = info.account_baker {
+                num_bakers += 1;
+                staked_amount = (staked_amount + baker.staked_amount)
+                    .context("Total staked amount exceeds u64. This should not happen.")?;
+                true
+            } else {
+                false
+            };
 
-        let acc_type =
-            info.account_credentials
-                .get(&0.into())
-                .map_or(CredentialType::Normal, |cdi| match cdi.value {
-                    id::types::AccountCredentialWithoutProofs::Initial { .. } => {
-                        num_initial += 1;
-                        CredentialType::Initial
-                    }
-                    id::types::AccountCredentialWithoutProofs::Normal { .. } => {
-                        CredentialType::Normal
-                    }
-                });
+            total_amount = (total_amount + info.account_amount)
+                .context("Total amount exceeds u64. This should not happen.")?;
 
-        let row = Row {
-            address: acc,
-            balance: info.account_amount,
-            is_baker,
-            acc_type,
-        };
-        if row.is_baker {}
-        acc_balances.push(row);
+            let acc_type =
+                info.account_credentials
+                    .get(&0.into())
+                    .map_or(CredentialType::Normal, |cdi| match cdi.value {
+                        id::types::AccountCredentialWithoutProofs::Initial { .. } => {
+                            num_initial += 1;
+                            CredentialType::Initial
+                        }
+                        id::types::AccountCredentialWithoutProofs::Normal { .. } => {
+                            CredentialType::Normal
+                        }
+                    });
+
+            let row = Row {
+                address: acc,
+                balance: info.account_amount,
+                is_baker,
+                acc_type,
+            };
+            if row.is_baker {}
+            acc_balances.push(row);
+        }
     }
 
     // Sort decreasing by amount
