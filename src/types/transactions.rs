@@ -1444,10 +1444,10 @@ pub mod construct {
     /// it.
     /// This is deliberately made private so that the inconsistent internal
     /// state does not leak.
-    struct TransactionBuilder {
-        header:  TransactionHeader,
-        payload: Payload,
-        encoded: EncodedPayload,
+    pub struct TransactionBuilder {
+        pub header:  TransactionHeader,
+        pub payload: Payload,
+        pub encoded: EncodedPayload,
     }
 
     /// Size of a transaction header. This is currently always 60 bytes.
@@ -1478,7 +1478,7 @@ pub mod construct {
         }
 
         #[inline]
-        fn size(&self) -> u64 {
+        pub fn size(&self) -> u64 {
             TRANSACTION_HEADER_SIZE + u64::from(u32::from(self.header.payload_size))
         }
 
