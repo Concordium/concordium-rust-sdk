@@ -284,6 +284,7 @@ pub enum TransactionType {
 }
 
 impl TransactionType {
+    /// Resolve the TransactionType corresponding to the variant of the provided Payload.
     pub fn from_payload(p: &transactions::Payload) -> TransactionType {
         match p {
             transactions::Payload::DeployModule { .. } => TransactionType::DeployModule,
