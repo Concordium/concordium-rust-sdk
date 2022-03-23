@@ -283,48 +283,6 @@ pub enum TransactionType {
     TransferWithScheduleAndMemo,
 }
 
-impl TransactionType {
-    /// Resolve the TransactionType corresponding to the variant of the provided
-    /// Payload.
-    pub fn from_payload(p: &transactions::Payload) -> TransactionType {
-        match p {
-            transactions::Payload::DeployModule { .. } => TransactionType::DeployModule,
-            transactions::Payload::InitContract { .. } => TransactionType::InitContract,
-            transactions::Payload::Update { .. } => TransactionType::Update,
-            transactions::Payload::Transfer { .. } => TransactionType::Transfer,
-            transactions::Payload::AddBaker { .. } => TransactionType::AddBaker,
-            transactions::Payload::RemoveBaker { .. } => TransactionType::RemoveBaker,
-            transactions::Payload::UpdateBakerStake { .. } => TransactionType::UpdateBakerStake,
-            transactions::Payload::UpdateBakerRestakeEarnings { .. } => {
-                TransactionType::UpdateBakerRestakeEarnings
-            }
-            transactions::Payload::UpdateBakerKeys { .. } => TransactionType::UpdateBakerKeys,
-            transactions::Payload::UpdateCredentialKeys { .. } => {
-                TransactionType::UpdateCredentialKeys
-            }
-            transactions::Payload::EncryptedAmountTransfer { .. } => {
-                TransactionType::EncryptedAmountTransfer
-            }
-            transactions::Payload::TransferToEncrypted { .. } => {
-                TransactionType::TransferToEncrypted
-            }
-            transactions::Payload::TransferToPublic { .. } => TransactionType::TransferToPublic,
-            transactions::Payload::TransferWithSchedule { .. } => {
-                TransactionType::TransferWithSchedule
-            }
-            transactions::Payload::UpdateCredentials { .. } => TransactionType::UpdateCredentials,
-            transactions::Payload::RegisterData { .. } => TransactionType::RegisterData,
-            transactions::Payload::TransferWithMemo { .. } => TransactionType::TransferWithMemo,
-            transactions::Payload::EncryptedAmountTransferWithMemo { .. } => {
-                TransactionType::EncryptedAmountTransferWithMemo
-            }
-            transactions::Payload::TransferWithScheduleAndMemo { .. } => {
-                TransactionType::TransferWithScheduleAndMemo
-            }
-        }
-    }
-}
-
 #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
 #[serde(tag = "status", content = "result", rename_all = "camelCase")]
 /// Status of a transaction in a given block.
