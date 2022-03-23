@@ -284,7 +284,8 @@ pub enum TransactionType {
 }
 
 impl TransactionType {
-    /// Resolve the TransactionType corresponding to the variant of the provided Payload.
+    /// Resolve the TransactionType corresponding to the variant of the provided
+    /// Payload.
     pub fn from_payload(p: &transactions::Payload) -> TransactionType {
         match p {
             transactions::Payload::DeployModule { .. } => TransactionType::DeployModule,
@@ -294,18 +295,32 @@ impl TransactionType {
             transactions::Payload::AddBaker { .. } => TransactionType::AddBaker,
             transactions::Payload::RemoveBaker { .. } => TransactionType::RemoveBaker,
             transactions::Payload::UpdateBakerStake { .. } => TransactionType::UpdateBakerStake,
-            transactions::Payload::UpdateBakerRestakeEarnings { .. } => TransactionType::UpdateBakerRestakeEarnings,
+            transactions::Payload::UpdateBakerRestakeEarnings { .. } => {
+                TransactionType::UpdateBakerRestakeEarnings
+            }
             transactions::Payload::UpdateBakerKeys { .. } => TransactionType::UpdateBakerKeys,
-            transactions::Payload::UpdateCredentialKeys { .. } => TransactionType::UpdateCredentialKeys,
-            transactions::Payload::EncryptedAmountTransfer { .. } => TransactionType::EncryptedAmountTransfer,
-            transactions::Payload::TransferToEncrypted { .. } => TransactionType::TransferToEncrypted,
+            transactions::Payload::UpdateCredentialKeys { .. } => {
+                TransactionType::UpdateCredentialKeys
+            }
+            transactions::Payload::EncryptedAmountTransfer { .. } => {
+                TransactionType::EncryptedAmountTransfer
+            }
+            transactions::Payload::TransferToEncrypted { .. } => {
+                TransactionType::TransferToEncrypted
+            }
             transactions::Payload::TransferToPublic { .. } => TransactionType::TransferToPublic,
-            transactions::Payload::TransferWithSchedule { .. } => TransactionType::TransferWithSchedule,
+            transactions::Payload::TransferWithSchedule { .. } => {
+                TransactionType::TransferWithSchedule
+            }
             transactions::Payload::UpdateCredentials { .. } => TransactionType::UpdateCredentials,
             transactions::Payload::RegisterData { .. } => TransactionType::RegisterData,
             transactions::Payload::TransferWithMemo { .. } => TransactionType::TransferWithMemo,
-            transactions::Payload::EncryptedAmountTransferWithMemo { .. } => TransactionType::EncryptedAmountTransferWithMemo,
-            transactions::Payload::TransferWithScheduleAndMemo { .. } => TransactionType::TransferWithScheduleAndMemo,
+            transactions::Payload::EncryptedAmountTransferWithMemo { .. } => {
+                TransactionType::EncryptedAmountTransferWithMemo
+            }
+            transactions::Payload::TransferWithScheduleAndMemo { .. } => {
+                TransactionType::TransferWithScheduleAndMemo
+            }
         }
     }
 }
