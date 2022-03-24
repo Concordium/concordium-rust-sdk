@@ -7,7 +7,7 @@ use super::{
     ContractAddress, CredentialIndex, CredentialRegistrationID, Energy, Memo, Nonce,
     RegisteredData, UpdateKeysIndex, UpdatePayload, UpdateSequenceNumber,
 };
-use crate::constants::*;
+use crate::{constants::*, types::TransactionType};
 use crypto_common::{
     derive::{Serial, Serialize},
     deserial_map_no_length,
@@ -466,6 +466,39 @@ pub enum Payload {
         /// The release schedule. This can be at most 255 elements.
         schedule: Vec<(Timestamp, Amount)>,
     },
+}
+
+impl Payload {
+    /// Resolve the [TransactionType] corresponding to the variant of the Payload.
+    pub fn transaction_type(&self) -> TransactionType {
+        match self {
+            Payload::DeployModule { .. } => TransactionType::DeployModule,
+            Payload::InitContract { .. } => TransactionType::InitContract,
+            Payload::Update { .. } => TransactionType::Update,
+            Payload::Transfer { .. } => TransactionType::Transfer,
+            Payload::AddBaker { .. } => TransactionType::AddBaker,
+            Payload::RemoveBaker { .. } => TransactionType::RemoveBaker,
+            Payload::UpdateBakerStake { .. } => TransactionType::UpdateBakerStake,
+            Payload::UpdateBakerRestakeEarnings { .. } => {
+                TransactionType::UpdateBakerRestakeEarnings
+            }
+            Payload::UpdateBakerKeys { .. } => TransactionType::UpdateBakerKeys,
+            Payload::UpdateCredentialKeys { .. } => TransactionType::UpdateCredentialKeys,
+            Payload::EncryptedAmountTransfer { .. } => TransactionType::EncryptedAmountTransfer,
+            Payload::TransferToEncrypted { .. } => TransactionType::TransferToEncrypted,
+            Payload::TransferToPublic { .. } => TransactionType::TransferToPublic,
+            Payload::TransferWithSchedule { .. } => TransactionType::TransferWithSchedule,
+            Payload::UpdateCredentials { .. } => TransactionType::UpdateCredentials,
+            Payload::RegisterData { .. } => TransactionType::RegisterData,
+            Payload::TransferWithMemo { .. } => TransactionType::TransferWithMemo,
+            Payload::EncryptedAmountTransferWithMemo { .. } => {
+                TransactionType::EncryptedAmountTransferWithMemo
+            }
+            Payload::TransferWithScheduleAndMemo { .. } => {
+                TransactionType::TransferWithScheduleAndMemo
+            }
+        }
+    }
 }
 
 impl Serial for Payload {
