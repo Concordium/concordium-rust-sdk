@@ -1,5 +1,7 @@
 use crypto_common::{
     derive::{SerdeBase16Serialize, Serial, Serialize},
+    deserial_string,
+    types::Amount,
     Buffer, Deserial, Get, ParseResult, Put, ReadBytesExt, SerdeDeserialize, SerdeSerialize,
     Serial,
 };
@@ -27,12 +29,175 @@ impl From<SlotDuration> for chrono::Duration {
     }
 }
 
+/// Duration in seconds.
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
+#[serde(transparent)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
+pub struct DurationSeconds {
+    pub seconds: u64,
+}
+
+impl From<DurationSeconds> for chrono::Duration {
+    fn from(s: DurationSeconds) -> Self {
+        // this is technically iffy in cases
+        // where duration would exceed
+        // i64::MAX. But that will not
+        // happen.
+        Self::seconds(s.seconds as i64)
+    }
+}
+
 /// Internal short id of the baker.
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
 pub struct BakerId {
-    pub id: u64,
+    pub id: AccountIndex,
+}
+
+/// Internal short id of the delegator.
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
+#[serde(transparent)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
+pub struct DelegatorId {
+    pub id: AccountIndex,
+}
+
+/// A unicode representation of a Url.
+/// The Utf8 encoding of the Url must be at most
+/// [`MAX_URL_TEXT_LENGTH`](crate::constants::MAX_URL_TEXT_LENGTH) bytes.
+#[derive(
+    SerdeSerialize,
+    SerdeDeserialize,
+    Serial,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Debug,
+    Display,
+    Into,
+)]
+#[serde(try_from = "String", into = "String")]
+pub struct UrlText {
+    #[string_size_length = 2]
+    url: String,
+}
+
+impl Deserial for UrlText {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let len: u16 = source.get()?;
+        anyhow::ensure!(
+            usize::from(len) <= crate::constants::MAX_URL_TEXT_LENGTH,
+            "URL length exceeds maximum allowed."
+        );
+        let url = deserial_string(source, len.into())?;
+        Ok(Self { url })
+    }
+}
+
+impl TryFrom<String> for UrlText {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        anyhow::ensure!(
+            value.as_bytes().len() <= crate::constants::MAX_URL_TEXT_LENGTH,
+            "URL length exceeds maximum allowed."
+        );
+        Ok(Self { url: value })
+    }
+}
+
+/// The status of whether a baking pool allows delegators to join.
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+#[repr(u8)]
+pub enum OpenStatus {
+    /// New delegators may join the pool.
+    OpenForAll   = 0,
+    /// New delegators may not join, but existing delegators are kept.
+    ClosedForNew = 1,
+    /// No delegators are allowed.
+    ClosedForAll = 2,
+}
+
+impl Serial for OpenStatus {
+    fn serial<B: Buffer>(&self, out: &mut B) { (*self as u8).serial(out) }
+}
+
+impl Deserial for OpenStatus {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let tag: u8 = source.get()?;
+        match tag {
+            0 => Ok(Self::OpenForAll),
+            1 => Ok(Self::ClosedForNew),
+            2 => Ok(Self::ClosedForAll),
+            _ => anyhow::bail!("Unrecognized OpenStatus tag {}", tag),
+        }
+    }
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase", tag = "delegateType")]
+pub enum DelegationTarget {
+    #[serde(rename = "L-Pool")]
+    /// Delegate to the lock-up pool.
+    LPool,
+    #[serde(rename = "Baker")]
+    /// Delegate to a specific baker.
+    Baker {
+        #[serde(rename = "bakerId")]
+        baker_id: BakerId,
+    },
+}
+
+impl Serial for DelegationTarget {
+    fn serial<B: Buffer>(&self, out: &mut B) {
+        match self {
+            DelegationTarget::LPool => 0u8.serial(out),
+            DelegationTarget::Baker { baker_id } => {
+                1u8.serial(out);
+                baker_id.serial(out)
+            }
+        }
+    }
+}
+
+impl Deserial for DelegationTarget {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let tag: u8 = source.get()?;
+        match tag {
+            0 => Ok(Self::LPool),
+            1 => {
+                let baker_id = source.get()?;
+                Ok(Self::Baker { baker_id })
+            }
+            _ => anyhow::bail!("Unrecognized delegation target tag: {}", tag),
+        }
+    }
+}
+
+/// Additional information about a baking pool.
+/// This information is added with the introduction of delegation.
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BakerPoolInfo {
+    /// Whether the pool allows delegators.
+    open_status:      OpenStatus,
+    /// The URL that links to the metadata about the pool.
+    metadata_url:     UrlText,
+    /// The commission rates charged by the pool owner.
+    commission_rates: CommissionRates,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+/// Information about the delegated stake of the account.
+pub struct AccountStakingDelegationInfo {
+    staked_amount:     Amount,
+    restake_earnings:  bool,
+    delegation_target: BakerId,
 }
 
 /// Slot number
@@ -214,6 +379,9 @@ impl Deserial for ProtocolVersion {
         Ok(pv)
     }
 }
+
+pub struct ChainParameterVersion0;
+pub struct ChainParameterVersion1;
 
 /// Height of a block since chain genesis.
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
@@ -506,7 +674,7 @@ pub struct ElectionDifficulty {
     parts_per_hundred_thousands: PartsPerHundredThousands,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub struct PartsPerHundredThousands {
     pub(crate) parts: u32,
 }
@@ -535,6 +703,43 @@ impl fmt::Display for PartsPerHundredThousands {
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, Copy)]
+pub struct CommissionRates {
+    /// Fraction of finalization rewards charged by the pool owner.
+    #[serde(rename = "finalizationCommission")]
+    finalization: AmountFraction,
+    /// Fraction of baking rewards charged by the pool owner.
+    #[serde(rename = "bakingCommission")]
+    baking:       AmountFraction,
+    /// Fraction of transaction rewards charged by the pool owner.
+    #[serde(rename = "transactionCommission")]
+    transaction:  AmountFraction,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+/// Ranges of allowed commission values that pools may choose from.
+pub struct CommissionRanges {
+    /// The range of allowed finalization commissions.
+    #[serde(rename = "finalizationCommissionRange")]
+    finalization: InclusiveRange<AmountFraction>,
+    /// The range of allowed baker commissions.
+    #[serde(rename = "bakingCommissionRange")]
+    baking:       InclusiveRange<AmountFraction>,
+    /// The range of allowed transaction commissions.
+    #[serde(rename = "transactionCommissionRange")]
+    transaction:  InclusiveRange<AmountFraction>,
+}
+
+#[derive(Debug, Copy, Clone, SerdeSerialize, SerdeDeserialize)]
+pub struct InclusiveRange<T> {
+    min: T,
+    max: T,
+}
+
+impl<T: Ord> InclusiveRange<T> {
+    pub fn contains(&self, x: &T) -> bool { &self.min <= x && x <= &self.max }
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, Copy)]
 pub struct ExchangeRate {
     #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
     pub numerator:   u64,
@@ -557,19 +762,79 @@ impl Deserial for ExchangeRate {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct MintDistribution {
-    mint_per_slot:       MintRate,
-    baking_reward:       RewardFraction,
-    finalization_reward: RewardFraction,
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, Copy)]
+#[serde(try_from = "leverage_factor_json::LeverageFactorRaw")]
+pub struct LeverageFactor {
+    #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
+    pub numerator:   u64,
+    #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
+    pub denominator: u64,
 }
 
-impl Deserial for MintDistribution {
+mod leverage_factor_json {
+    #[derive(super::SerdeDeserialize)]
+    pub struct LeverageFactorRaw {
+        pub numerator:   u64,
+        pub denominator: u64,
+    }
+
+    impl std::convert::TryFrom<LeverageFactorRaw> for super::LeverageFactor {
+        type Error = anyhow::Error;
+
+        fn try_from(value: LeverageFactorRaw) -> Result<Self, Self::Error> {
+            let numerator = value.numerator;
+            let denominator = value.denominator;
+            anyhow::ensure!(
+                numerator >= denominator
+                    && denominator != 0
+                    && num::integer::gcd(numerator, denominator) == 1,
+                "Invalid leverage factor."
+            );
+            Ok(super::LeverageFactor {
+                numerator,
+                denominator,
+            })
+        }
+    }
+}
+
+impl Deserial for LeverageFactor {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let numerator = source.get()?;
+        let denominator = source.get()?;
+        anyhow::ensure!(
+            numerator >= denominator
+                && denominator != 0
+                && num::integer::gcd(numerator, denominator) == 1,
+            "Invalid leverage factor."
+        );
+        Ok(Self {
+            numerator,
+            denominator,
+        })
+    }
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct MintDistributionV0 {
+    mint_per_slot:       MintRate,
+    baking_reward:       AmountFraction,
+    finalization_reward: AmountFraction,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct MintDistributionV1 {
+    baking_reward:       AmountFraction,
+    finalization_reward: AmountFraction,
+}
+
+impl Deserial for MintDistributionV0 {
     fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
         let mint_per_slot = source.get()?;
-        let baking_reward: RewardFraction = source.get()?;
-        let finalization_reward: RewardFraction = source.get()?;
+        let baking_reward: AmountFraction = source.get()?;
+        let finalization_reward: AmountFraction = source.get()?;
         anyhow::ensure!(
             (baking_reward + finalization_reward).is_some(),
             "Reward fractions exceed 100%."
@@ -582,25 +847,63 @@ impl Deserial for MintDistribution {
     }
 }
 
+impl Deserial for MintDistributionV1 {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let baking_reward: AmountFraction = source.get()?;
+        let finalization_reward: AmountFraction = source.get()?;
+        anyhow::ensure!(
+            (baking_reward + finalization_reward).is_some(),
+            "Reward fractions exceed 100%."
+        );
+        Ok(Self {
+            baking_reward,
+            finalization_reward,
+        })
+    }
+}
+
+pub trait MintDistributionFamily {
+    type Output;
+}
+
+impl MintDistributionFamily for ChainParameterVersion0 {
+    type Output = MintDistributionV0;
+}
+
+impl MintDistributionFamily for ChainParameterVersion1 {
+    type Output = MintDistributionV1;
+}
+
+pub type MintDistribution<CPV> = <CPV as MintDistributionFamily>::Output;
+
 #[derive(Debug, Serialize, Clone, Copy)]
 pub struct MintRate {
     pub mantissa: u32,
     pub exponent: u8,
 }
 
-#[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize)]
+#[derive(
+    Default, Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize, PartialEq, Eq,
+)]
 #[serde(transparent)]
-pub struct RewardFraction {
+pub struct AmountFraction {
     pub(crate) parts_per_hundred_thousands: PartsPerHundredThousands,
 }
 
-/// Sequential index of finalization.
+#[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize)]
+#[serde(transparent)]
+#[repr(transparent)]
+/// A bound on the relative share of the total staked capital that a baker can
+/// have as its stake. This is required to be greater than 0.
+pub struct CapitalBound {
+    #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
+    pub bound: AmountFraction,
+}
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
-/// Index of the account in the account table. These are assigned sequentially
-/// in the order of creation of accounts. The first account has index 0.
+/// Sequential index of finalization.
 pub struct FinalizationIndex {
     pub index: u64,
 }
@@ -620,13 +923,13 @@ impl std::ops::Add for PartsPerHundredThousands {
 }
 
 /// Add two reward fractions checking that they sum up to no more than 1.
-impl std::ops::Add for RewardFraction {
+impl std::ops::Add for AmountFraction {
     type Output = Option<Self>;
 
     fn add(self, rhs: Self) -> Self::Output {
         let parts_per_hundred_thousands =
             (self.parts_per_hundred_thousands + rhs.parts_per_hundred_thousands)?;
-        Some(RewardFraction {
+        Some(AmountFraction {
             parts_per_hundred_thousands,
         })
     }

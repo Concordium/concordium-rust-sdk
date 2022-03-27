@@ -85,6 +85,47 @@ pub struct Release {
     pub transactions: Vec<hashes::TransactionHash>,
 }
 
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+/// Information about a baker.
+pub struct BakerInfo {
+    /// Identity of the baker. This is actually the account index of
+    /// the account controlling the baker.
+    pub baker_id:                     BakerId,
+    /// Baker's public key used to check whether they won the lottery or not.
+    pub baker_election_verify_key:    BakerElectionVerifyKey,
+    /// Baker's public key used to check that they are indeed the ones who
+    /// produced the block.
+    pub baker_signature_verify_key:   BakerSignatureVerifyKey,
+    /// Baker's public key used to check signatures on finalization records.
+    /// This is only used if the baker has sufficient stake to participate in
+    /// finalization.
+    pub baker_aggregation_verify_key: BakerAggregationVerifyKey,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum AccountStakingInfo {
+    #[serde(rename_all = "camelCase")]
+    /// The account is a baker.
+    Baker {
+        staked_amount:    Amount,
+        restake_earnings: bool,
+        #[serde(flatten)]
+        baker_info:       BakerInfo,
+        pending_change:   Option<StakePendingChange>,
+        pool_info:        Option<BakerPoolInfo>,
+    },
+    /// The account is delegating stake to a baker.
+    #[serde(rename_all = "camelCase")]
+    Delegated {
+        staked_amount:             Amount,
+        restake_earnings:          bool,
+        delegation_target:         DelegationTarget,
+        delegation_pending_change: Option<StakePendingChange>,
+    },
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 /// Account information exposed via the node's API. This is always the state of
@@ -119,50 +160,14 @@ pub struct AccountInfo {
     /// account is a baker. Hence it is exposed here as well.
     pub account_index:            AccountIndex,
     #[serde(default)]
-    /// `Some` if and only if the account is a baker. In that case it is the
-    /// information about the baker.
-    pub account_baker:            Option<AccountBaker>,
+    /// `Some` if and only if the account is a baker or delegator. In that case
+    /// it is the information about the baker or delegator.
+    // this is a bit of a hacky way of JSON parsing, and **relies** on
+    // the account staking info serde instance being "untagged"
+    #[serde(rename = "accountBaker", alias = "accountDelegation")]
+    pub account_stake:            Option<AccountStakingInfo>,
     /// Canonical address of the account.
-    pub account_address:          Option<AccountAddress>,
-}
-
-impl AccountInfo {
-    /// Get the account address of the account.
-    pub fn account_address(&self) -> AccountAddress {
-        match self.account_address {
-            Some(addr) => addr,
-            None => match self.account_credentials.get(&CredentialIndex::from(0u8)) {
-                Some(v) => AccountAddress::new(v.value.cred_id()),
-                None => unreachable!("Account info always has a credential at index 0."),
-            },
-        }
-    }
-}
-
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-/// Information about a baker.
-pub struct AccountBaker {
-    /// The baker's stake.
-    pub staked_amount:                Amount,
-    /// Whether the earnings from block, baker, and finalization rewards are
-    /// automatically added to the baker's stake.
-    pub restake_earnings:             bool,
-    /// ID of the baker. This is the same as the index of the account.
-    pub baker_id:                     BakerId,
-    /// Baker's public key used to check whether they won the lottery or not.
-    pub baker_election_verify_key:    BakerElectionVerifyKey,
-    /// Baker's public key used to check that they are indeed the ones who
-    /// produced the block.
-    pub baker_signature_verify_key:   BakerSignatureVerifyKey,
-    /// Baker's public key used to check signatures on finalization records.
-    /// This is only used if the baker has sufficient stake to participate in
-    /// finalization.
-    pub baker_aggregation_verify_key: BakerAggregationVerifyKey,
-    #[serde(default)]
-    /// Any currently scheduled change in the baker. This is only present if
-    /// the baker is being removed, or its stake is being lowered.
-    pub pending_change:               Option<BakerPendingChange>,
+    pub account_address:          AccountAddress,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
@@ -190,22 +195,27 @@ pub struct BirkBaker {
     pub baker_account:       AccountAddress,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
 #[serde(tag = "change")]
 /// Pending change in the baker's stake.
-pub enum BakerPendingChange {
+pub enum StakePendingChange {
     #[serde(rename = "ReduceStake")]
     #[serde(rename_all = "camelCase")]
     /// The stake is being reduced. The new stake will take affect in the given
     /// epoch.
-    ReduceStake { new_stake: Amount, epoch: Epoch },
-    #[serde(rename = "RemoveBaker")]
+    ReduceStake {
+        new_stake:      Amount,
+        effective_time: chrono::DateTime<chrono::Utc>,
+    },
+    #[serde(rename = "RemoveStake")]
     #[serde(rename_all = "camelCase")]
     /// The baker will be removed at the end of the given epoch.
-    RemoveBaker { epoch: Epoch },
+    RemoveStake {
+        effective_time: chrono::DateTime<chrono::Utc>,
+    },
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 /// Current balance statistics.
 pub struct RewardsOverview {
@@ -219,6 +229,101 @@ pub struct RewardsOverview {
     pub finalization_reward_account: Amount,
     #[serde(with = "crate::internal::amounts_as_u64")]
     pub gas_account:                 Amount,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
+#[serde(tag = "pendingChangeType")]
+pub enum PoolPendingChange {
+    NoChange,
+    #[serde(rename_all = "camelCase")]
+    ReduceBakerCapital {
+        /// New baker equity capital.
+        baker_equity_capital: Amount,
+        /// Effective time of the change.
+        effective_time:       chrono::DateTime<chrono::Utc>,
+    },
+    #[serde(rename_all = "camelCase")]
+    RemovePool {
+        /// Effective time of the change.
+        effective_time: chrono::DateTime<chrono::Utc>,
+    },
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CurrentPaydayBakerPoolStatus {
+    /// The number of blocks baked in the current reward period.
+    pub blocks_baked:            u64,
+    /// Whether the baker has contributed a finalization proof in the current
+    /// reward period.
+    pub finalization_live:       bool,
+    /// The transaction fees accruing to the pool in the current reward period.
+    pub transaction_fees_earned: Amount,
+    /// The effective stake of the baker in the current reward period.
+    pub effective_stake:         Amount,
+    /// The lottery power of the baker in the current reward period.
+    #[serde(deserialize_with = "lottery_power_parser::deserialize")]
+    pub lottery_power:           f64,
+    /// The effective equity capital of the baker for the current reward period.
+    pub baker_equity_capital:    Amount,
+    /// The effective delegated capital to the pool for the current reward
+    /// period.
+    pub delegated_capital:       Amount,
+}
+
+// hack due to a bug in Serde that is caused by the comtination of
+// the tag attribute, and the arbitrary_precision feature.
+mod lottery_power_parser {
+    use super::SerdeDeserialize;
+    /// Deserialize (via Serde) chrono::Duration in milliseconds as an i64.
+    pub fn deserialize<'de, D: serde::Deserializer<'de>>(des: D) -> Result<f64, D::Error> {
+        let v = serde_json::Value::deserialize(des)?;
+        if let Some(n) = v.as_f64() {
+            Ok(n)
+        } else {
+            Err(serde::de::Error::custom("Expected a number."))
+        }
+    }
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[serde(tag = "poolType")]
+pub enum PoolStatus {
+    #[serde(rename_all = "camelCase")]
+    BakerPool {
+        /// The 'BakerId' of the pool owner.
+        baker_id:                   BakerId,
+        /// The account address of the pool owner.
+        baker_address:              AccountAddress,
+        /// The equity capital provided by the pool owner.
+        baker_equity_capital:       Amount,
+        /// The capital delegated to the pool by other accounts.
+        delegated_capital:          Amount,
+        /// The maximum amount that may be delegated to the pool, accounting for
+        /// leverage and stake limits.
+        delegated_capital_cap:      Amount,
+        /// The pool info associated with the pool: open status, metadata URL
+        /// and commission rates.
+        pool_info:                  BakerPoolInfo,
+        /// Any pending change to the baker's stake.
+        baker_stake_pending_change: PoolPendingChange,
+        /// Status of the pool in the current reward period. This will be [None]
+        /// if the pool is not a
+        current_payday_status:      Option<CurrentPaydayBakerPoolStatus>,
+    },
+    #[serde(rename_all = "camelCase")]
+    LPool {
+        /// The total capital delegated to the L-pool.
+        delegated_capital: Amount,
+        /// The L-pool commission rates.
+        commission_rates: CommissionRates,
+        /// The transaction fees accruing to the L-pool in the current reward
+        /// period.
+        current_payday_transaction_fees_earned: Amount,
+        /// The effective delegated capital to the L-pool for the current reward
+        /// period.
+        current_payday_delegated_capital: Amount,
+    },
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
@@ -281,6 +386,10 @@ pub enum TransactionType {
     EncryptedAmountTransferWithMemo,
     /// Same as transfer with schedule, but with an added memo.
     TransferWithScheduleAndMemo,
+    ///  Configure an account's baker.
+    ConfigureBaker,
+    ///  Configure an account's stake delegation.
+    ConfigureDelegation,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
@@ -379,6 +488,58 @@ pub enum SpecialTransactionOutcome {
         /// The account address where the foundation receives the tax.
         foundation_account: AccountAddress,
     },
+    #[serde(rename_all = "camelCase")]
+    /// Payment for the foundation.
+    PaydayFoundationReward {
+        /// Address of the foundation account.
+        foundation_account: AccountAddress,
+        /// Amount rewarded.
+        development_charge: Amount,
+    },
+    /// Payment for a particular account.
+    #[serde(rename_all = "camelCase")]
+    PaydayAccountReward {
+        /// The account that got rewarded.
+        account:             AccountAddress,
+        /// The transaction fee reward at payday to the account.
+        transaction_fees:    Amount,
+        /// The baking reward at payday to the account.
+        baker_reward:        Amount,
+        /// The finalization reward at payday to the account.
+        finalization_reward: Amount,
+    },
+    /// Amounts accrued to accounts for each baked block.
+    #[serde(rename_all = "camelCase")]
+    BlockAccrueReward {
+        /// The total fees paid for transactions in the block.
+        transaction_fees:  Amount,
+        /// The old balance of the GAS account.
+        #[serde(rename = "oldGASAccount")]
+        old_gas_account:   Amount,
+        /// The new balance of the GAS account.
+        #[serde(rename = "newGASAccount")]
+        new_gas_account:   Amount,
+        /// The amount awarded to the baker.
+        baker_reward:      Amount,
+        /// The amount awarded to the L-Pool.
+        l_pool_reward:     Amount,
+        /// The amount awarded to the foundation.
+        foundation_charge: Amount,
+        /// The baker of the block, who will receive the award.
+        baker_id:          BakerId,
+    },
+    /// Payment distributed to a pool or L-Pool.
+    #[serde(rename_all = "camelCase")]
+    PaydayPoolReward {
+        /// The pool owner (L-Pool when 'None').
+        pool_owner:          Option<BakerId>,
+        /// Accrued transaction fees for pool.
+        transaction_fees:    Amount,
+        /// Accrued baking rewards for pool.
+        baker_reward:        Amount,
+        /// Accrued finalization rewards for pool.
+        finalization_reward: Amount,
+    },
 }
 
 impl SpecialTransactionOutcome {
@@ -405,22 +566,146 @@ impl SpecialTransactionOutcome {
                     vec![*baker, *foundation_account]
                 }
             }
+            SpecialTransactionOutcome::PaydayFoundationReward {
+                foundation_account, ..
+            } => vec![*foundation_account],
+            SpecialTransactionOutcome::PaydayAccountReward { account, .. } => vec![*account],
+            SpecialTransactionOutcome::BlockAccrueReward { .. } => Vec::new(),
+            SpecialTransactionOutcome::PaydayPoolReward { .. } => Vec::new(),
         }
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-/// Summary of transactions, protocol generated transfers, and chain parameters
-/// in a given block.
-pub struct BlockSummary {
+pub struct BlockSummaryData<Upd> {
+    /// Outcomes of transactions in this block, ordered as in the block.
     pub transaction_summaries: Vec<BlockItemSummary>,
+    /// Any special events generated as part of this block. Special events
+    /// are protocol defined transfers, e.g., rewards, minting.
     pub special_events:        Vec<SpecialTransactionOutcome>,
-    pub updates:               Updates,
+    /// Chain parameters, and any scheduled updates to chain parameters or
+    /// the protocol.
+    pub updates:               Upd,
+    /// If the block contains a finalization record this contains its
+    /// summary. Otherwise [None].
     pub finalization_data:     Option<FinalizationSummary>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize)]
+// serialize as untagged, deserialization is custom, looking at the protocol version.
+#[serde(untagged, try_from = "block_summary_parser::BlockSummaryRaw")]
+/// Summary of transactions, protocol generated transfers, and chain parameters
+/// in a given block.
+pub enum BlockSummary {
+    #[serde(rename_all = "camelCase")]
+    V0 {
+        /// Protocol version at which this block was baked. This is no more than
+        /// [ProtocolVersion::P3]
+        protocol_version: ProtocolVersion,
+        #[serde(flatten)]
+        data:             BlockSummaryData<Updates<ChainParameterVersion0>>,
+    },
+    #[serde(rename_all = "camelCase")]
+    V1 {
+        /// Protocol version at which this block was baked. This is at least
+        /// [ProtocolVersion::P4]
+        protocol_version: ProtocolVersion,
+        #[serde(flatten)]
+        data:             BlockSummaryData<Updates<ChainParameterVersion1>>,
+    },
+}
+
+mod block_summary_parser {
+    #[derive(super::SerdeDeserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct BlockSummaryRaw {
+        protocol_version: super::ProtocolVersion,
+        #[serde(flatten)]
+        // parse first into a value
+        data:             super::BlockSummaryData<serde_json::Value>,
+    }
+
+    impl std::convert::TryFrom<BlockSummaryRaw> for super::BlockSummary {
+        type Error = anyhow::Error;
+
+        fn try_from(value: BlockSummaryRaw) -> Result<Self, Self::Error> {
+            use super::ProtocolVersion::*;
+            match value.protocol_version {
+                P1 | P2 | P3 => {
+                    let updates: super::Updates<super::ChainParameterVersion0> =
+                        serde_json::from_value(value.data.updates)?;
+                    let data = super::BlockSummaryData {
+                        updates,
+                        transaction_summaries: value.data.transaction_summaries,
+                        special_events: value.data.special_events,
+                        finalization_data: value.data.finalization_data,
+                    };
+                    Ok(Self::V0 {
+                        protocol_version: value.protocol_version,
+                        data,
+                    })
+                }
+                P4 => {
+                    let updates: super::Updates<super::ChainParameterVersion1> =
+                        serde_json::from_value(value.data.updates)?;
+                    let data = super::BlockSummaryData {
+                        updates,
+                        transaction_summaries: value.data.transaction_summaries,
+                        special_events: value.data.special_events,
+                        finalization_data: value.data.finalization_data,
+                    };
+                    Ok(Self::V1 {
+                        protocol_version: value.protocol_version,
+                        data,
+                    })
+                }
+            }
+        }
+    }
+}
+
+impl BlockSummary {
+    /// Protocol version of the block.
+    pub fn protocol_version(&self) -> ProtocolVersion {
+        match self {
+            BlockSummary::V0 {
+                protocol_version, ..
+            } => *protocol_version,
+            BlockSummary::V1 {
+                protocol_version, ..
+            } => *protocol_version,
+        }
+    }
+
+    /// Outcomes of transactions in this block, ordered as in the block.
+    pub fn transaction_summaries(&self) -> &[BlockItemSummary] {
+        match self {
+            BlockSummary::V0 { data, .. } => &data.transaction_summaries,
+            BlockSummary::V1 { data, .. } => &data.transaction_summaries,
+        }
+    }
+
+    /// Any special events generated as part of this block. Special events
+    /// are protocol defined transfers, e.g., rewards, minting.
+    pub fn special_events(&self) -> &[SpecialTransactionOutcome] {
+        match self {
+            BlockSummary::V0 { data, .. } => &data.special_events,
+            BlockSummary::V1 { data, .. } => &data.special_events,
+        }
+    }
+
+    /// If the block contains a finalization record this contains its
+    /// summary. Otherwise [None].
+    pub fn finalization_data(&self) -> Option<&FinalizationSummary> {
+        match self {
+            BlockSummary::V0 { data, .. } => data.finalization_data.as_ref(),
+            BlockSummary::V1 { data, .. } => data.finalization_data.as_ref(),
+        }
+    }
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 /// Summary of the finalization record in a block, if any.
 pub struct FinalizationSummary {
     #[serde(rename = "finalizationBlockPointer")]
@@ -433,7 +718,7 @@ pub struct FinalizationSummary {
     pub finalizers:    Vec<FinalizationSummaryParty>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 /// Details of a party in a finalization.
 pub struct FinalizationSummaryParty {
@@ -567,6 +852,8 @@ impl BlockItemSummary {
                 AccountTransactionEffects::CredentialKeysUpdated { .. } => vec![at.sender],
                 AccountTransactionEffects::CredentialsUpdated { .. } => vec![at.sender],
                 AccountTransactionEffects::DataRegistered { .. } => vec![at.sender],
+                AccountTransactionEffects::BakerConfigured { .. } => vec![at.sender],
+                AccountTransactionEffects::DelegationConfigured { .. } => vec![at.sender],
             }
         } else {
             Vec::new()
@@ -648,6 +935,8 @@ impl AccountTransactionEffects {
             AccountTransactionEffects::CredentialKeysUpdated { .. } => Some(UpdateCredentialKeys),
             AccountTransactionEffects::CredentialsUpdated { .. } => Some(UpdateCredentials),
             AccountTransactionEffects::DataRegistered { .. } => Some(RegisterData),
+            AccountTransactionEffects::BakerConfigured { .. } => Some(ConfigureBaker),
+            AccountTransactionEffects::DelegationConfigured { .. } => Some(ConfigureDelegation),
         }
     }
 }
@@ -839,6 +1128,114 @@ pub enum AccountTransactionEffects {
     /// successful [RegisterData](transactions::Payload::RegisterData)
     /// transaction.
     DataRegistered { data: RegisteredData },
+    /// A baker was configured. The details of what happened are contained in
+    /// the list of [baker events](BakerEvent).
+    BakerConfigured { data: Vec<BakerEvent> },
+    /// An account configured delegation. The details of what happened are
+    /// contained in the list of [delegation events](DelegationEvent).
+    DelegationConfigured { data: Vec<DelegationEvent> },
+}
+
+/// Events that may happen as a result of the
+/// [TransactionType::ConfigureDelegation] transaction.
+#[derive(Debug, Clone)]
+pub enum DelegationEvent {
+    DelegationStakeIncreased {
+        /// Delegator's id
+        delegator_id: DelegatorId,
+        /// New stake
+        new_stake:    Amount,
+    },
+    DelegationStakeDecreased {
+        /// Delegator's id
+        delegator_id: DelegatorId,
+        /// New stake
+        new_stake:    Amount,
+    },
+    DelegationSetRestakeEarnings {
+        /// Delegator's id
+        delegator_id:     DelegatorId,
+        /// Whether earnings will be restaked
+        restake_earnings: bool,
+    },
+    DelegationSetDelegationTarget {
+        /// Delegator's id
+        delegator_id:      DelegatorId,
+        /// New delegation target
+        delegation_target: DelegationTarget,
+    },
+    DelegationAdded {
+        /// Delegator's id
+        delegator_id: DelegatorId,
+    },
+    DelegationRemoved {
+        /// Delegator's id
+        delegator_id: DelegatorId,
+    },
+}
+
+/// Events that may result from the [TransactionType::ConfigureBaker]
+/// transaction.
+#[derive(Debug, Clone)]
+pub enum BakerEvent {
+    BakerAdded {
+        data: Box<BakerAddedEvent>,
+    },
+    BakerRemoved {
+        baker_id: BakerId,
+    },
+    BakerStakeIncreased {
+        baker_id:  BakerId,
+        new_stake: Amount,
+    },
+    BakerStakeDecreased {
+        baker_id:  BakerId,
+        new_stake: Amount,
+    },
+    BakerRestakeEarningsUpdated {
+        baker_id:         BakerId,
+        /// The new value of the flag.
+        restake_earnings: bool,
+    },
+    /// The baker's keys were updated.
+    BakerKeysUpdated {
+        data: Box<BakerKeysEvent>,
+    },
+    /// Updated open status for a baker pool
+    BakerSetOpenStatus {
+        /// Baker's id
+        baker_id:    BakerId,
+        /// The open status.
+        open_status: OpenStatus,
+    },
+    /// Updated metadata url for baker pool
+    BakerSetMetadataURL {
+        /// Baker's id
+        baker_id:     BakerId,
+        /// The URL.
+        metadata_url: UrlText,
+    },
+    /// Updated transaction fee commission for baker pool
+    BakerSetTransactionFeeCommission {
+        /// Baker's id
+        baker_id:                   BakerId,
+        /// The transaction fee commission.
+        transaction_fee_commission: AmountFraction,
+    },
+    /// Updated baking reward commission for baker pool
+    BakerSetBakingRewardCommission {
+        /// Baker's id
+        baker_id:                 BakerId,
+        /// The baking reward commission
+        baking_reward_commission: AmountFraction,
+    },
+    /// Updated finalization reward commission for baker pool
+    BakerSetFinalizationRewardCommission {
+        /// Baker's id
+        baker_id: BakerId,
+        /// The finalization reward commission
+        finalization_reward_commission: AmountFraction,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -991,7 +1388,7 @@ pub enum UpdatePayload {
     #[serde(rename = "foundationAccount")]
     FoundationAccount(AccountAddress),
     #[serde(rename = "mintDistribution")]
-    MintDistribution(MintDistribution),
+    MintDistribution(MintDistribution<ChainParameterVersion0>),
     #[serde(rename = "transactionFeeDistribution")]
     TransactionFeeDistribution(TransactionFeeDistribution),
     #[serde(rename = "gASRewards")]
@@ -1086,16 +1483,16 @@ impl Deserial for ProtocolUpdate {
 /// Update the transaction fee distribution to the specified value.
 pub struct TransactionFeeDistribution {
     /// The fraction that goes to the baker of the block.
-    pub baker:       RewardFraction,
+    pub baker:       AmountFraction,
     /// The fraction that goes to the gas account. The remaining fraction will
     /// go to the foundation.
-    pub gas_account: RewardFraction,
+    pub gas_account: AmountFraction,
 }
 
 impl Deserial for TransactionFeeDistribution {
     fn deserial<R: crypto_common::ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
-        let baker: RewardFraction = source.get()?;
-        let gas_account: RewardFraction = source.get()?;
+        let baker: AmountFraction = source.get()?;
+        let gas_account: AmountFraction = source.get()?;
         anyhow::ensure!(
             (baker + gas_account).is_some(),
             "Reward fractions exceed 100%."
@@ -1111,16 +1508,16 @@ impl Deserial for TransactionFeeDistribution {
 pub struct GASRewards {
     /// `BakerPrevTransFrac`: fraction of the previous gas account paid to the
     /// baker.
-    pub baker:              RewardFraction,
+    pub baker:              AmountFraction,
     /// `FeeAddFinalisationProof`: fraction paid for including a finalization
     /// proof in a block.
-    pub finalization_proof: RewardFraction,
+    pub finalization_proof: AmountFraction,
     /// `FeeAccountCreation`: fraction paid for including each account creation
     /// transaction in a block.
-    pub account_creation:   RewardFraction,
+    pub account_creation:   AmountFraction,
     /// `FeeUpdate`: fraction paid for including an update transaction in a
     /// block.
-    pub chain_update:       RewardFraction,
+    pub chain_update:       AmountFraction,
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
@@ -1131,7 +1528,7 @@ pub struct GASRewards {
 pub enum RootUpdate {
     RootKeysUpdate(HigherLevelAccessStructure<RootKeysKind>),
     Level1KeysUpdate(HigherLevelAccessStructure<Level1KeysKind>),
-    Level2KeysUpdate(Box<Authorizations>),
+    Level2KeysUpdate(Box<Authorizations<ChainParameterVersion0>>),
 }
 
 impl Serial for RootUpdate {
@@ -1171,7 +1568,7 @@ impl Deserial for RootUpdate {
 /// updates must be a separate transaction.
 pub enum Level1Update {
     Level1KeysUpdate(HigherLevelAccessStructure<Level1KeysKind>),
-    Level2KeysUpdate(Box<Authorizations>),
+    Level2KeysUpdate(Box<Authorizations<ChainParameterVersion0>>),
 }
 
 impl Serial for Level1Update {
@@ -1273,7 +1670,7 @@ impl Deserial for AccessStructure {
 #[serde(rename_all = "camelCase")]
 /// Access structures for each of the different possible chain updates, togehter
 /// with the context giving all the possible keys.
-pub struct Authorizations {
+pub struct AuthorizationsV0 {
     #[size_length = 2]
     /// The list of all keys that are currently authorized to perform updates.
     pub keys: Vec<UpdatePublicKey>,
@@ -1304,6 +1701,33 @@ pub struct Authorizations {
     /// Access structure for adding new identity providers.
     pub add_identity_provider: AccessStructure,
 }
+
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+/// Access structures for each of the different possible chain updates, togehter
+/// with the context giving all the possible keys.
+pub struct AuthorizationsV1 {
+    #[serde(flatten)]
+    pub v0:                  AuthorizationsV0,
+    /// Keys for changing cooldown periods related to baking and delegating.
+    pub cooldown_parameters: AccessStructure,
+    /// Keys for changing the lenghts of the reward period.
+    pub time_parameters:     AccessStructure,
+}
+
+pub trait AuthorizationsFamily {
+    type Output: std::fmt::Debug;
+}
+
+impl AuthorizationsFamily for ChainParameterVersion0 {
+    type Output = AuthorizationsV0;
+}
+
+impl AuthorizationsFamily for ChainParameterVersion1 {
+    type Output = AuthorizationsV1;
+}
+
+pub type Authorizations<CPV> = <CPV as AuthorizationsFamily>::Output;
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, AsRef, Into, AsMut)]
 #[serde(transparent)]
@@ -1396,21 +1820,24 @@ impl Deserial for Memo {
     }
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-/// The current collection of keys allowd to do updates.
-pub struct UpdateKeysCollection {
+/// The current collection of keys allowed to do updates.
+/// Parametrized by the chain parameter version.
+pub struct UpdateKeysCollectionSkeleton<Auths> {
     pub root_keys:    HigherLevelAccessStructure<RootKeysKind>,
     #[serde(rename = "level1Keys")]
     pub level_1_keys: HigherLevelAccessStructure<Level1KeysKind>,
     #[serde(rename = "level2Keys")]
-    pub level_2_keys: Authorizations,
+    pub level_2_keys: Auths,
 }
+
+pub type UpdateKeysCollection<CPV> = UpdateKeysCollectionSkeleton<Authorizations<CPV>>;
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize)]
 #[serde(rename_all = "camelCase")]
 /// Values of chain parameters that can be updated via chain updates.
-pub struct ChainParameters {
+pub struct ChainParametersV0 {
     /// Election difficulty for consensus lottery.
     pub election_difficulty:          ElectionDifficulty,
     /// Euro per energy exchange rate.
@@ -1424,22 +1851,127 @@ pub struct ChainParameters {
     /// The limit for the number of account creations in a block.
     pub account_creation_limit:       CredentialsPerBlockLimit,
     /// Current reward parameters.
-    pub reward_parameters:            RewardParameters,
+    pub reward_parameters:            RewardParameters<ChainParameterVersion0>,
     /// Index of the foundation account.
     pub foundation_account_index:     AccountIndex,
     /// Minimum threshold for becoming a baker.
     pub minimum_threshold_for_baking: Amount,
 }
 
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Copy, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CooldownParameters {
+    /// Number of seconds that pool owners must cooldown
+    /// when reducing their equity capital or closing the pool.
+    pool_owner_cooldown: DurationSeconds,
+    /// Number of seconds that a delegator must cooldown
+    /// when reducing their delegated stake.
+    delegator_cooldown:  DurationSeconds,
+}
+
+/// Length of a reward period in epochs.
+/// Must always be a strictly positive integer.
+#[derive(
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Debug,
+    FromStr,
+    Display,
+    From,
+    Into,
+    SerdeSerialize,
+    SerdeDeserialize,
+)]
+#[serde(transparent)]
+struct RewardPeriodLength {
+    reward_period_epochs: Epoch,
+}
+
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Copy, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TimeParameters {
+    reward_period_length: RewardPeriodLength,
+    mint_per_payday:      MintRate,
+}
+
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+/// Parameters related to staking pools.
+pub struct PoolParameters {
+    /// Fraction of finalization rewards charged by the L-Pool.
+    finalization_commission_l_pool: AmountFraction,
+    /// Fraction of baking rewards charged by the L-Pool.
+    baking_commission_l_pool:       AmountFraction,
+    /// Fraction of transaction rewards charged by the L-pool.
+    transaction_commission_l_pool:  AmountFraction,
+    /// Bounds on the commission rates that may be charged by bakers.
+    #[serde(flatten)]
+    pub commission_bounds:          CommissionRanges,
+    /// Minimum equity capital required for a new baker.
+    pub minimum_equity_capital:     Amount,
+    /// Maximum fraction of the total staked capital of that a new baker can
+    /// have.
+    pub capital_bound:              CapitalBound,
+    /// The maximum leverage that a baker can have as a ratio of total stake
+    /// to equity capital.
+    pub leverage_bound:             LeverageFactor,
+}
+
+#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[serde(rename_all = "camelCase")]
+/// Values of chain parameters that can be updated via chain updates.
+pub struct ChainParametersV1 {
+    /// Election difficulty for consensus lottery.
+    pub election_difficulty:      ElectionDifficulty,
+    /// Euro per energy exchange rate.
+    pub euro_per_energy:          ExchangeRate,
+    #[serde(rename = "microGTUPerEuro")]
+    /// Micro ccd per euro exchange rate.
+    pub micro_gtu_per_euro:       ExchangeRate,
+    #[serde(flatten)]
+    pub cooldown_parameters:      CooldownParameters,
+    #[serde(flatten)]
+    pub time_parameters:          TimeParameters,
+    /// The limit for the number of account creations in a block.
+    pub account_creation_limit:   CredentialsPerBlockLimit,
+    /// Current reward parameters.
+    pub reward_parameters:        RewardParameters<ChainParameterVersion1>,
+    /// Index of the foundation account.
+    pub foundation_account_index: AccountIndex,
+    #[serde(flatten)]
+    /// Parameters for baker pools.
+    pub pool_parameters:          PoolParameters,
+}
+
+pub trait ChainParametersFamily {
+    type Output: std::fmt::Debug;
+}
+
+impl ChainParametersFamily for ChainParameterVersion0 {
+    type Output = ChainParametersV0;
+}
+
+impl ChainParametersFamily for ChainParameterVersion1 {
+    type Output = ChainParametersV1;
+}
+
+pub type ChainParameters<CPV> = <CPV as ChainParametersFamily>::Output;
+
 #[derive(Debug, SerdeSerialize, SerdeDeserialize)]
 #[serde(rename_all = "camelCase")]
 /// Values of reward parameters.
-pub struct RewardParameters {
-    pub mint_distribution:            MintDistribution,
+pub struct RewardParametersSkeleton<MD> {
+    pub mint_distribution:            MD,
     pub transaction_fee_distribution: TransactionFeeDistribution,
     #[serde(rename = "gASRewards")]
     pub gas_rewards:                  GASRewards,
 }
+
+pub type RewardParameters<CPV> = RewardParametersSkeleton<MintDistribution<CPV>>;
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
@@ -1461,17 +1993,17 @@ pub struct UpdateQueue<T> {
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct PendingUpdates {
+pub struct PendingUpdatesV0 {
     pub root_keys:                    UpdateQueue<HigherLevelAccessStructure<RootKeysKind>>,
     pub level_1_keys:                 UpdateQueue<HigherLevelAccessStructure<Level1KeysKind>>,
-    pub level_2_keys:                 UpdateQueue<Authorizations>,
+    pub level_2_keys:                 UpdateQueue<Authorizations<ChainParameterVersion0>>,
     pub protocol:                     UpdateQueue<ProtocolUpdate>,
     pub election_difficulty:          UpdateQueue<ElectionDifficulty>,
     pub euro_per_energy:              UpdateQueue<ExchangeRate>,
     #[serde(rename = "microGTUPerEuro")]
     pub micro_gtu_per_euro:           UpdateQueue<ExchangeRate>,
     pub foundation_account:           UpdateQueue<AccountIndex>,
-    pub mint_distribution:            UpdateQueue<MintDistribution>,
+    pub mint_distribution:            UpdateQueue<MintDistribution<ChainParameterVersion0>>,
     pub transaction_fee_distribution: UpdateQueue<TransactionFeeDistribution>,
     pub gas_rewards:                  UpdateQueue<GASRewards>,
     pub baker_stake_threshold:        UpdateQueue<Amount>,
@@ -1479,21 +2011,62 @@ pub struct PendingUpdates {
     pub add_identity_provider:        UpdateQueue<id::types::IpInfo<id::constants::IpPairing>>,
 }
 
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingUpdatesV1 {
+    pub root_keys:                    UpdateQueue<HigherLevelAccessStructure<RootKeysKind>>,
+    pub level_1_keys:                 UpdateQueue<HigherLevelAccessStructure<Level1KeysKind>>,
+    pub level_2_keys:                 UpdateQueue<Authorizations<ChainParameterVersion1>>,
+    pub protocol:                     UpdateQueue<ProtocolUpdate>,
+    pub election_difficulty:          UpdateQueue<ElectionDifficulty>,
+    pub euro_per_energy:              UpdateQueue<ExchangeRate>,
+    #[serde(rename = "microGTUPerEuro")]
+    pub micro_gtu_per_euro:           UpdateQueue<ExchangeRate>,
+    pub foundation_account:           UpdateQueue<AccountIndex>,
+    pub mint_distribution:            UpdateQueue<MintDistribution<ChainParameterVersion1>>,
+    pub transaction_fee_distribution: UpdateQueue<TransactionFeeDistribution>,
+    pub gas_rewards:                  UpdateQueue<GASRewards>,
+    pub pool_parameters:              UpdateQueue<PoolParameters>,
+    pub add_anonymity_revoker:        UpdateQueue<id::types::ArInfo<id::constants::ArCurve>>,
+    pub add_identity_provider:        UpdateQueue<id::types::IpInfo<id::constants::IpPairing>>,
+    pub cooldown_parameters:          UpdateQueue<CooldownParameters>,
+    pub time_parameters:              UpdateQueue<TimeParameters>,
+}
+
+pub trait PendingUpdatesFamily {
+    type Output: std::fmt::Debug;
+}
+
+impl PendingUpdatesFamily for ChainParameterVersion0 {
+    type Output = PendingUpdatesV0;
+}
+
+impl PendingUpdatesFamily for ChainParameterVersion1 {
+    type Output = PendingUpdatesV1;
+}
+
+pub type PendingUpdates<CPV> = <CPV as PendingUpdatesFamily>::Output;
+
 #[derive(Debug, SerdeSerialize, SerdeDeserialize)]
 #[serde(rename_all = "camelCase")]
 /// State of updates. This includes current values of parameters as well as any
 /// scheduled updates.
-pub struct Updates {
+pub struct UpdatesSkeleton<UKC, CP, PU> {
     /// Keys allowed to perform updates.
-    pub keys:             UpdateKeysCollection,
+    pub keys:             UKC,
     #[serde(default)]
     /// Possibly pending protocol update.
     pub protocol_update:  Option<ProtocolUpdate>,
     /// Values of chain parameters.
-    pub chain_parameters: ChainParameters,
+    pub chain_parameters: CP,
     /// Any scheduled updates.
-    pub update_queues:    PendingUpdates,
+    pub update_queues:    PU,
 }
+
+/// State of updates. This includes current values of parameters as well as any
+/// scheduled updates.
+pub type Updates<CPV> =
+    UpdatesSkeleton<UpdateKeysCollection<CPV>, ChainParameters<CPV>, PendingUpdates<CPV>>;
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(tag = "tag")]
@@ -1621,6 +2194,38 @@ pub enum RejectReason {
     /// The account is not allowed to send encrypted transfers (or transfer
     /// from/to public to/from encrypted)
     NotAllowedToHandleEncrypted,
+    /// A configure baker transaction is missing one or more arguments in order
+    /// to add a baker.
+    MissingBakerAddParameters,
+    /// Not all baker commissions are within allowed ranges
+    CommissionsNotInRangeForBaking,
+    /// Tried to add baker for an account that already has a delegator.
+    AlreadyADelegator,
+    /// The amount on the account was insufficient to cover the proposed stake.
+    InsufficientBalanceForDelegationStake,
+    /// A configure delegation transaction is missing one or more arguments in
+    /// order to add a delegator.
+    MissingDelegationAddParameters,
+    /// Delegation stake when adding a delegator was 0.
+    InsufficientDelegationStake,
+    /// Account is not a delegation account.
+    DelegatorInCooldown,
+    /// Account is not a delegation account.
+    NotADelegator {
+        #[serde(rename = "contents")]
+        address: AccountAddress,
+    },
+    /// Delegation target is not a baker
+    DelegationTargetNotABaker {
+        #[serde(rename = "contents")]
+        target: BakerId,
+    },
+    /// The amount would result in pool capital higher than the maximum
+    /// threshold.
+    StakeOverMaximumThresholdForPool,
+    /// The amount would result in pool with a too high fraction of delegated
+    /// capital.
+    PoolWouldBecomeOverDelegated,
 }
 
 mod transaction_fee_distribution {
@@ -1628,8 +2233,8 @@ mod transaction_fee_distribution {
     #[derive(SerdeDeserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct TransactionFeeDistributionUnchecked {
-        baker:       RewardFraction,
-        gas_account: RewardFraction,
+        baker:       AmountFraction,
+        gas_account: AmountFraction,
     }
 
     impl TryFrom<TransactionFeeDistributionUnchecked> for TransactionFeeDistribution {

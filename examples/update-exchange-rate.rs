@@ -66,8 +66,16 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Could not obtain last finalized block")?;
 
-    let update_keys = summary.updates.keys.level_2_keys.keys;
-    let update_key_indices = summary.updates.keys.level_2_keys.micro_gtu_per_euro;
+    let (update_keys, update_key_indices) = match &summary {
+        BlockSummary::V0 { data, .. } => (
+            &data.updates.keys.level_2_keys.keys,
+            &data.updates.keys.level_2_keys.micro_gtu_per_euro,
+        ),
+        BlockSummary::V1 { data, .. } => (
+            &data.updates.keys.level_2_keys.v0.keys,
+            &data.updates.keys.level_2_keys.v0.micro_gtu_per_euro,
+        ),
+    };
     // find the key indices to sign with
     let mut signer = Vec::new();
     for kp in kps {
@@ -92,11 +100,21 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    let seq_number = summary
-        .updates
-        .update_queues
-        .micro_gtu_per_euro
-        .next_sequence_number;
+    let seq_number = match &summary {
+        BlockSummary::V0 { data, .. } => {
+            data.updates
+                .update_queues
+                .micro_gtu_per_euro
+                .next_sequence_number
+        }
+        BlockSummary::V1 { data, .. } => {
+            data.updates
+                .update_queues
+                .micro_gtu_per_euro
+                .next_sequence_number
+        }
+    };
+
     let effective_time = 0.into(); // immediate effect
     let timeout =
         TransactionTime::from_seconds(chrono::offset::Utc::now().timestamp() as u64 + 300); // 5min expiry.,

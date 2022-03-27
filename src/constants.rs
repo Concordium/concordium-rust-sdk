@@ -31,3 +31,6 @@ pub const DEFAULT_NETWORK_ID: super::types::network::NetworkId =
 /// Curve used for encrypted transfers. This is the same as the anonymity
 /// revoker curve.
 pub type EncryptedAmountsCurve = id::constants::ArCurve;
+
+/// The maximum allowed length of a [UrlText](crate::types::UrlText) in bytes.
+pub const MAX_URL_TEXT_LENGTH: usize = 2048;

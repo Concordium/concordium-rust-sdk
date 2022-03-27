@@ -1,14 +1,14 @@
 use crate::{
     generated_types::{
         self, node_info_response, p2p_client, AccountAddress, BlockHash, BlockHashAndAmount,
-        BlockHeight, Empty, GetAddressInfoRequest, GetModuleSourceRequest,
+        BlockHeight, Empty, GetAddressInfoRequest, GetModuleSourceRequest, GetPoolStatusRequest,
         GetTransactionStatusInBlockRequest, JsonResponse, PeerConnectRequest, PeerElement,
         PeersRequest, SendTransactionRequest, TransactionHash,
     },
     types::{
         self, network, queries,
         transactions::{self, PayloadLike},
-        BakerId,
+        AccountIndex, BakerId,
     },
 };
 use anyhow::anyhow;
@@ -307,9 +307,11 @@ impl Client {
                             }
                             AddedButWrongKeys => queries::ActiveConsensusState::IncorrectKeys,
                             ActiveInCommittee => queries::ActiveConsensusState::Active {
-                                baker_id:  BakerId::from(ni.consensus_baker_id.ok_or_else(
-                                    || anyhow!("Invalid response, active but no baker id."),
-                                )?),
+                                baker_id:  BakerId::from(AccountIndex::from(
+                                    ni.consensus_baker_id.ok_or_else(|| {
+                                        anyhow!("Invalid response, active but no baker id.")
+                                    })?,
+                                )),
                                 finalizer: ni.consensus_finalizer_committee,
                             },
                         };
@@ -592,6 +594,37 @@ impl Client {
             block_hash: bh.to_string(),
         })?;
         let response = self.client.get_birk_parameters(request).await?;
+        parse_json_response(response)
+    }
+
+    /// Get the IDs of the bakers registered in the given block.
+    /// Note that this list is in general different from the bakers that are
+    /// returned as part of [get_birk_parameters](Client::get_birk_parameters).
+    /// The latter are the bakers that are eligible for baking at the time of
+    /// the block.
+    pub async fn get_baker_list(
+        &mut self,
+        bh: &types::hashes::BlockHash,
+    ) -> QueryResult<Vec<BakerId>> {
+        let request = self.construct_request(BlockHash {
+            block_hash: bh.to_string(),
+        })?;
+        let response = self.client.get_baker_list(request).await?;
+        parse_json_response(response)
+    }
+
+    /// Get the status of a given baker pool or L-pool at the given block.
+    pub async fn get_pool_status(
+        &mut self,
+        baker_id: Option<BakerId>,
+        bh: &types::hashes::BlockHash,
+    ) -> QueryResult<types::PoolStatus> {
+        let request = self.construct_request(GetPoolStatusRequest {
+            block_hash: bh.to_string(),
+            l_pool: baker_id.is_none(),
+            baker_id: baker_id.map_or(0, |bi| u64::from(AccountIndex::from(bi))), // not used if baker_id is none.
+        })?;
+        let response = self.client.get_pool_status(request).await?;
         parse_json_response(response)
     }
 
