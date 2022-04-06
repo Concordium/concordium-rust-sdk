@@ -1556,6 +1556,22 @@ impl Serial for UpdatePayload {
                 13u8.serial(out);
                 add_ip.serial(out)
             }
+            UpdatePayload::CooldownParametersCPV1(cp) => {
+                14u8.serial(out);
+                cp.serial(out)
+            }
+            UpdatePayload::PoolParametersCPV1(pp) => {
+                15u8.serial(out);
+                pp.serial(out)
+            }
+            UpdatePayload::TimeParametersCPV1(tp) => {
+                16u8.serial(out);
+                tp.serial(out)
+            }
+            UpdatePayload::MintDistributionCPV1(md) => {
+                17u8.serial(out);
+                md.serial(out)
+            }
         }
     }
 }
@@ -1576,6 +1592,10 @@ impl Deserial for UpdatePayload {
             11u8 => Ok(UpdatePayload::Level1(source.get()?)),
             12u8 => Ok(UpdatePayload::AddAnonymityRevoker(source.get()?)),
             13u8 => Ok(UpdatePayload::AddIdentityProvider(source.get()?)),
+            14u8 => Ok(UpdatePayload::CooldownParametersCPV1(source.get()?)),
+            15u8 => Ok(UpdatePayload::PoolParametersCPV1(source.get()?)),
+            16u8 => Ok(UpdatePayload::TimeParametersCPV1(source.get()?)),
+            17u8 => Ok(UpdatePayload::MintDistributionCPV1(source.get()?)),
             tag => anyhow::bail!("Unknown update payload tag {}", tag),
         }
     }

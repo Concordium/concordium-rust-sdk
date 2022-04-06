@@ -99,6 +99,9 @@ pub enum UpdateType {
     UpdateLevel1Keys,
     /// Update the level 2 keys
     UpdateLevel2Keys,
+    UpdatePoolParameters,
+    UpdateCooldownParameters,
+    UpdateTimeParameters,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -398,6 +401,10 @@ impl super::UpdatePayload {
             UpdatePayload::Level1(_) => UpdateLevel1Keys,
             UpdatePayload::AddAnonymityRevoker(_) => UpdateAddAnonymityRevoker,
             UpdatePayload::AddIdentityProvider(_) => UpdateAddIdentityProvider,
+            UpdatePayload::CooldownParametersCPV1(_) => UpdateCooldownParameters,
+            UpdatePayload::PoolParametersCPV1(_) => UpdatePoolParameters,
+            UpdatePayload::TimeParametersCPV1(_) => UpdateTimeParameters,
+            UpdatePayload::MintDistributionCPV1(_) => UpdateMintDistribution,
         }
     }
 }

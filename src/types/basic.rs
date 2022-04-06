@@ -674,7 +674,7 @@ pub struct ElectionDifficulty {
     parts_per_hundred_thousands: PartsPerHundredThousands,
 }
 
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 pub struct PartsPerHundredThousands {
     pub(crate) parts: u32,
 }
@@ -715,7 +715,7 @@ pub struct CommissionRates {
     transaction:  AmountFraction,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[derive(Serialize, SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 /// Ranges of allowed commission values that pools may choose from.
 pub struct CommissionRanges {
     /// The range of allowed finalization commissions.
@@ -733,6 +733,22 @@ pub struct CommissionRanges {
 pub struct InclusiveRange<T> {
     min: T,
     max: T,
+}
+
+impl<T: Serial> Serial for InclusiveRange<T> {
+    fn serial<B: Buffer>(&self, out: &mut B) {
+        self.min.serial(out);
+        self.max.serial(out)
+    }
+}
+
+impl<T: Deserial + Ord> Deserial for InclusiveRange<T> {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let min = source.get()?;
+        let max = source.get()?;
+        anyhow::ensure!(min <= max, "Invalid range.");
+        Ok(Self { min, max })
+    }
 }
 
 impl<T: Ord> InclusiveRange<T> {
@@ -883,7 +899,17 @@ pub struct MintRate {
 }
 
 #[derive(
-    Default, Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize, PartialEq, Eq,
+    Default,
+    Debug,
+    Clone,
+    Copy,
+    SerdeSerialize,
+    SerdeDeserialize,
+    Serialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
 )]
 #[serde(transparent)]
 pub struct AmountFraction {

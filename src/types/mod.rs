@@ -1403,6 +1403,14 @@ pub enum UpdatePayload {
     AddAnonymityRevoker(Box<id::types::ArInfo<id::constants::ArCurve>>),
     #[serde(rename = "addIdentityProvider")]
     AddIdentityProvider(Box<id::types::IpInfo<id::constants::IpPairing>>),
+    #[serde(rename = "cooldownParametersCPV1")]
+    CooldownParametersCPV1(CooldownParameters),
+    #[serde(rename = "poolParametersCPV1")]
+    PoolParametersCPV1(PoolParameters),
+    #[serde(rename = "timeParameters")]
+    TimeParametersCPV1(TimeParameters),
+    #[serde(rename = "mintDistributionCPV1")]
+    MintDistributionCPV1(MintDistribution<ChainParameterVersion1>),
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -1858,7 +1866,7 @@ pub struct ChainParametersV0 {
     pub minimum_threshold_for_baking: Amount,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, Copy, Clone)]
+#[derive(Debug, Serialize, SerdeSerialize, SerdeDeserialize, Copy, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CooldownParameters {
     /// Number of seconds that pool owners must cooldown
@@ -1885,20 +1893,21 @@ pub struct CooldownParameters {
     Into,
     SerdeSerialize,
     SerdeDeserialize,
+    Serialize,
 )]
 #[serde(transparent)]
 struct RewardPeriodLength {
     reward_period_epochs: Epoch,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, Copy, Clone)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Serialize, Copy, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TimeParameters {
     reward_period_length: RewardPeriodLength,
     mint_per_payday:      MintRate,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
+#[derive(Debug, Serialize, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 /// Parameters related to staking pools.
 pub struct PoolParameters {
@@ -2197,8 +2206,12 @@ pub enum RejectReason {
     /// A configure baker transaction is missing one or more arguments in order
     /// to add a baker.
     MissingBakerAddParameters,
-    /// Not all baker commissions are within allowed ranges
-    CommissionsNotInRangeForBaking,
+    /// Finalization reward commission is not in the valid range for a baker
+    FinalizationRewardCommissionNotInRange,
+    /// Baking reward commission is not in the valid range for a baker
+    BakingRewardCommissionNotInRange,
+    /// Transaction fee commission is not in the valid range for a baker
+    TransactionFeeCommissionNotInRange,
     /// Tried to add baker for an account that already has a delegator.
     AlreadyADelegator,
     /// The amount on the account was insufficient to cover the proposed stake.
@@ -2226,6 +2239,8 @@ pub enum RejectReason {
     /// The amount would result in pool with a too high fraction of delegated
     /// capital.
     PoolWouldBecomeOverDelegated,
+    /// The pool is not open to delegators.
+    PoolClosed,
 }
 
 mod transaction_fee_distribution {
