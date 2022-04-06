@@ -310,6 +310,8 @@ pub enum PoolStatus {
         /// Status of the pool in the current reward period. This will be [None]
         /// if the pool is not a
         current_payday_status:      Option<CurrentPaydayBakerPoolStatus>,
+        /// Total capital staked across all pools.
+        all_pool_total_capital:     Amount,
     },
     #[serde(rename_all = "camelCase")]
     LPool {
@@ -323,6 +325,8 @@ pub enum PoolStatus {
         /// The effective delegated capital to the L-pool for the current reward
         /// period.
         current_payday_delegated_capital: Amount,
+        /// Total capital staked across all pools.
+        all_pool_total_capital: Amount,
     },
 }
 
