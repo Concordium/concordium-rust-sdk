@@ -1904,15 +1904,15 @@ pub struct CooldownParameters {
     Serialize,
 )]
 #[serde(transparent)]
-struct RewardPeriodLength {
+pub struct RewardPeriodLength {
     reward_period_epochs: Epoch,
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, Serialize, Copy, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TimeParameters {
-    reward_period_length: RewardPeriodLength,
-    mint_per_payday:      MintRate,
+    pub reward_period_length: RewardPeriodLength,
+    pub mint_per_payday:      MintRate,
 }
 
 #[derive(Debug, Serialize, SerdeSerialize, SerdeDeserialize, Clone)]
