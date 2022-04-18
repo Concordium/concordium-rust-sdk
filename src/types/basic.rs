@@ -8,7 +8,7 @@ use crypto_common::{
 use derive_more::{Add, Display, From, FromStr, Into};
 use rand::{CryptoRng, Rng};
 use random_oracle::RandomOracle;
-use std::{convert::TryFrom, fmt};
+use std::{convert::TryFrom, fmt, str::FromStr};
 use thiserror::Error;
 
 /// Duration of a slot in milliseconds.
@@ -674,9 +674,27 @@ pub struct ElectionDifficulty {
     parts_per_hundred_thousands: PartsPerHundredThousands,
 }
 
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Into)]
+/// A fraction between 0 and 1 with a precision of 1/100_000.
+/// The `Into<u32>` implementation returns the number of parts per `100_000`.
 pub struct PartsPerHundredThousands {
     pub(crate) parts: u32,
+}
+
+impl PartsPerHundredThousands {
+    /// Construct a new fraction given the integer number of parts per
+    /// `100_000`. Return [`None`] if the number of parts exceeds `100_000`.
+    pub fn new(parts: u32) -> Option<Self> {
+        if parts <= 100_000 {
+            Some(Self { parts })
+        } else {
+            None
+        }
+    }
+
+    /// Construct a new fraction, but does not check that the resulting fraction
+    /// is valid.
+    pub fn new_unchecked(parts: u32) -> Self { Self { parts } }
 }
 
 impl Serial for PartsPerHundredThousands {
@@ -686,11 +704,8 @@ impl Serial for PartsPerHundredThousands {
 impl Deserial for PartsPerHundredThousands {
     fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
         let parts: u32 = source.get()?;
-        anyhow::ensure!(
-            parts <= 100_000,
-            "No more than 100_000 parts per hundred thousand."
-        );
-        Ok(Self { parts })
+        Self::new(parts)
+            .ok_or_else(|| anyhow::anyhow!("No more than 100_000 parts per hundred thousand."))
     }
 }
 
@@ -910,10 +925,34 @@ pub struct MintRate {
     Eq,
     PartialOrd,
     Ord,
+    Into,
+    FromStr,
 )]
 #[serde(transparent)]
+/// A fraction of an amount with a precision of `1/100_000`.
+/// The [`FromStr`] instance will parse a decimal fraction with up to `5`
+/// decimals.
 pub struct AmountFraction {
     pub(crate) parts_per_hundred_thousands: PartsPerHundredThousands,
+}
+
+impl AmountFraction {
+    /// Construct a new fraction given the integer number of parts per
+    /// `100_000`. Return [`None`] if the number of parts exceeds `100_000`.
+    pub fn new(parts: u32) -> Option<Self> {
+        let parts_per_hundred_thousands = PartsPerHundredThousands::new(parts)?;
+        Some(Self {
+            parts_per_hundred_thousands,
+        })
+    }
+
+    /// Construct a new fraction, but does not check that the resulting fraction
+    /// is valid.
+    pub fn new_unchecked(parts: u32) -> Self {
+        Self {
+            parts_per_hundred_thousands: PartsPerHundredThousands::new_unchecked(parts),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize)]
@@ -970,30 +1009,60 @@ impl SerdeSerialize for PartsPerHundredThousands {
     }
 }
 
-impl<'de> SerdeDeserialize<'de> for PartsPerHundredThousands {
-    fn deserialize<D: serde::Deserializer<'de>>(des: D) -> Result<Self, D::Error> {
-        let mut f: rust_decimal::Decimal =
-            SerdeDeserialize::deserialize(des).map_err(serde::de::Error::custom)?;
+#[derive(Clone, PartialEq, Debug, Error)]
+/// An error that may be raised by converting from a
+/// [`Decimal`](rust_decimal::Decimal) to a [`PartsPerHundredThousands`].
+pub enum ConvertPartsPerHundredThousandsError {
+    #[error("Parts per thousand should not have more than 5 decimals.")]
+    TooManyDecimals,
+    #[error("Parts per thousand should not be negative.")]
+    Negative,
+    #[error("Parts per thousand out of bounds.")]
+    OutOfBounds,
+    #[error("Scale out of bounds.")]
+    ScaleError {
+        #[from]
+        inner: rust_decimal::Error,
+    },
+}
+
+impl TryFrom<rust_decimal::Decimal> for PartsPerHundredThousands {
+    type Error = ConvertPartsPerHundredThousandsError;
+
+    fn try_from(value: rust_decimal::Decimal) -> Result<Self, Self::Error> {
+        let mut f = value;
         f.normalize_assign();
         if f.scale() > 5 {
-            return Err(serde::de::Error::custom(
-                "Parts per thousand should not have more than 5 decimals.",
-            ));
+            return Err(ConvertPartsPerHundredThousandsError::TooManyDecimals);
         }
         if !f.is_sign_positive() && !f.is_zero() {
-            return Err(serde::de::Error::custom(
-                "Parts per thousand should not be negative.",
-            ));
+            return Err(ConvertPartsPerHundredThousandsError::Negative);
         }
-        f.set_scale(5).map_err(serde::de::Error::custom)?;
+        f.rescale(5);
         if f.mantissa() > 100_000 {
-            return Err(serde::de::Error::custom(
-                "Parts per thousand out of bounds.",
-            ));
+            return Err(ConvertPartsPerHundredThousandsError::OutOfBounds);
         }
         Ok(PartsPerHundredThousands {
             parts: f.mantissa() as u32,
         })
+    }
+}
+
+impl FromStr for PartsPerHundredThousands {
+    type Err = ConvertPartsPerHundredThousandsError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let decimal: rust_decimal::Decimal = s.parse()?;
+        Self::try_from(decimal)
+    }
+}
+
+impl<'de> SerdeDeserialize<'de> for PartsPerHundredThousands {
+    fn deserialize<D: serde::Deserializer<'de>>(des: D) -> Result<Self, D::Error> {
+        let f: rust_decimal::Decimal =
+            SerdeDeserialize::deserialize(des).map_err(serde::de::Error::custom)?;
+        let parts = PartsPerHundredThousands::try_from(f).map_err(serde::de::Error::custom)?;
+        Ok(parts)
     }
 }
 
@@ -1028,5 +1097,59 @@ impl<'de> SerdeDeserialize<'de> for MintRate {
                 "Unsupported exponent range for MintRate.",
             ))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_parts_0() {
+        assert_eq!(
+            Ok(PartsPerHundredThousands::new_unchecked(12345)),
+            "0.12345".parse(),
+            "Case 1."
+        );
+        assert_eq!(
+            Ok(PartsPerHundredThousands::new_unchecked(12345)),
+            "0.123450".parse(),
+            "Case 2."
+        );
+        assert_eq!(
+            Ok(PartsPerHundredThousands::new_unchecked(12300)),
+            "0.123".parse(),
+            "Case 3."
+        );
+        assert_eq!(
+            Ok(PartsPerHundredThousands::new_unchecked(12300)),
+            "0.123000".parse(),
+            "Case 4."
+        );
+        assert!("0.123456".parse::<PartsPerHundredThousands>().is_err());
+    }
+
+    #[test]
+    fn test_parts_json() {
+        assert_eq!(
+            PartsPerHundredThousands::new_unchecked(12345),
+            serde_json::from_str("0.12345").unwrap(),
+            "Case 1."
+        );
+        assert_eq!(
+            PartsPerHundredThousands::new_unchecked(12345),
+            serde_json::from_str("0.123450").unwrap(),
+            "Case 2."
+        );
+        assert_eq!(
+            PartsPerHundredThousands::new_unchecked(12300),
+            serde_json::from_str("0.123").unwrap(),
+            "Case 3."
+        );
+        assert_eq!(
+            PartsPerHundredThousands::new_unchecked(12300),
+            serde_json::from_str("0.123000").unwrap(),
+            "Case 4."
+        );
+        assert!(serde_json::from_str::<PartsPerHundredThousands>("0.123456").is_err());
     }
 }

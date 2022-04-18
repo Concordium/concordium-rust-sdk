@@ -359,7 +359,7 @@ pub struct ConfigureBakerPayload {
     pub restake_earnings: Option<bool>,
     /// Whether the pool is open for delegators
     pub open_for_delegation: Option<OpenStatus>,
-    /// The key/proof pairs to verify nbaker.
+    /// The key/proof pairs to verify the baker.
     pub keys_with_proofs: Option<ConfigureBakerKeysPayload>,
     /// The URL referencing the baker's metadata.
     pub metadata_url: Option<UrlText>,

@@ -119,10 +119,10 @@ pub enum AccountStakingInfo {
     /// The account is delegating stake to a baker.
     #[serde(rename_all = "camelCase")]
     Delegated {
-        staked_amount:             Amount,
-        restake_earnings:          bool,
-        delegation_target:         DelegationTarget,
-        delegation_pending_change: Option<StakePendingChange>,
+        staked_amount:     Amount,
+        restake_earnings:  bool,
+        delegation_target: DelegationTarget,
+        pending_change:    Option<StakePendingChange>,
     },
 }
 
@@ -271,7 +271,7 @@ pub struct CurrentPaydayBakerPoolStatus {
     pub delegated_capital:       Amount,
 }
 
-// hack due to a bug in Serde that is caused by the comtination of
+// hack due to a bug in Serde that is caused by the combination of
 // the tag attribute, and the arbitrary_precision feature.
 mod lottery_power_parser {
     use super::SerdeDeserialize;
@@ -999,20 +999,20 @@ pub enum AccountTransactionEffects {
         reject_reason:    RejectReason,
     },
     /// A module was deployed. This corresponds to
-    /// [DeployModule](transactions::Payload::DeployModule) transaction
+    /// [`DeployModule`](transactions::Payload::DeployModule) transaction
     /// type.
     ModuleDeployed {
         module_ref: smart_contracts::ModuleRef,
     },
     /// A contract was initialized was deployed. This corresponds to
-    /// [InitContract](transactions::Payload::InitContract) transaction type.
+    /// [`InitContract`](transactions::Payload::InitContract) transaction type.
     ContractInitialized { data: ContractInitializedEvent },
     /// A contract update transaction was issued and produced the given trace.
     /// This is the result of [Update](transactions::Payload::Update)
     /// transaction.
     ContractUpdateIssued { effects: Vec<ContractTraceElement> },
     /// A simple account to account transfer occurred. This is the result of a
-    /// successful [Transfer](transactions::Payload::Transfer) transaction.
+    /// successful [`Transfer`](transactions::Payload::Transfer) transaction.
     AccountTransfer {
         /// Amount that was transferred.
         amount: Amount,
@@ -1021,7 +1021,8 @@ pub enum AccountTransactionEffects {
     },
     /// A simple account to account transfer occurred with a memo. This is the
     /// result of a successful
-    /// [TransferWithMemo](transactions::Payload::TransferWithMemo) transaction.
+    /// [`TransferWithMemo`](transactions::Payload::TransferWithMemo)
+    /// transaction.
     AccountTransferWithMemo {
         /// Amount that was transferred.
         amount: Amount,
@@ -1031,14 +1032,14 @@ pub enum AccountTransactionEffects {
         memo:   Memo,
     },
     /// An account was registered as a baker. This is the result of a successful
-    /// [AddBaker](transactions::Payload::AddBaker) transaction.
+    /// [`AddBaker`](transactions::Payload::AddBaker) transaction.
     BakerAdded { data: Box<BakerAddedEvent> },
     /// An account was deregistered as a baker. This is the result of a
     /// successful [RemoveBaker](transactions::Payload::RemoveBaker)
     /// transaction.
     BakerRemoved { baker_id: BakerId },
     /// An account was deregistered as a baker. This is the result of a
-    /// successful [UpdateBakerStake](transactions::Payload::UpdateBakerStake)
+    /// successful [`UpdateBakerStake`](transactions::Payload::UpdateBakerStake)
     /// transaction.
     BakerStakeUpdated {
         /// If the stake was updated (that is, it changed and did not stay the
@@ -1047,7 +1048,7 @@ pub enum AccountTransactionEffects {
     },
     /// An account changed its preference for restaking earnings. This is the
     /// result of a successful
-    /// [UpdateBakerRestakeEarnings](
+    /// [`UpdateBakerRestakeEarnings`](
     ///    transactions::Payload::UpdateBakerRestakeEarnings) transaction.
     BakerRestakeEarningsUpdated {
         baker_id:         BakerId,
@@ -1055,10 +1056,10 @@ pub enum AccountTransactionEffects {
         restake_earnings: bool,
     },
     /// The baker's keys were updated. This is the result of a successful
-    /// [UpdateBakerKeys](transactions::Payload::UpdateBakerKeys) transaction.
+    /// [`UpdateBakerKeys`](transactions::Payload::UpdateBakerKeys) transaction.
     BakerKeysUpdated { data: Box<BakerKeysEvent> },
     /// An encrypted amount was transferred. This is the result of a successful
-    /// [EncryptedAmountTransfer](
+    /// [`EncryptedAmountTransfer`](
     ///   transactions::Payload::EncryptedAmountTransfer) transaction.
     EncryptedAmountTransferred {
         // FIXME: It would be better to only have one pointer
@@ -1066,7 +1067,7 @@ pub enum AccountTransactionEffects {
         added:   Box<NewEncryptedAmountEvent>,
     },
     /// An encrypted amount was transferred with an included memo. This is the
-    /// result of a successful [EncryptedAmountTransferWithMemo](
+    /// result of a successful [`EncryptedAmountTransferWithMemo`](
     ///   transactions::Payload::EncryptedAmountTransferWithMemo) transaction.
     EncryptedAmountTransferredWithMemo {
         // FIXME: It would be better to only have one pointer
@@ -1076,21 +1077,22 @@ pub enum AccountTransactionEffects {
     },
     /// An account transferred part of its public balance to its encrypted
     /// balance. This is the result of a successful
-    /// [TransferToEncrypted](transactions::Payload::TransferToEncrypted)
+    /// [`TransferToEncrypted`](transactions::Payload::TransferToEncrypted)
     /// transaction.
     TransferredToEncrypted {
         data: Box<EncryptedSelfAmountAddedEvent>,
     },
     /// An account transferred part of its encrypted balance to its public
     /// balance. This is the result of a successful
-    /// [TransferToPublic](transactions::Payload::TransferToPublic) transaction.
+    /// [`TransferToPublic`](transactions::Payload::TransferToPublic)
+    /// transaction.
     TransferredToPublic {
         removed: Box<EncryptedAmountRemovedEvent>,
         amount:  Amount,
     },
     /// A transfer with schedule was performed. This is the result of a
     /// successful
-    /// [TransferWithSchedule](transactions::Payload::TransferWithSchedule)
+    /// [`TransferWithSchedule`](transactions::Payload::TransferWithSchedule)
     /// transaction.
     TransferredWithSchedule {
         /// Receiver account.
@@ -1099,9 +1101,10 @@ pub enum AccountTransactionEffects {
         amount: Vec<(Timestamp, Amount)>,
     },
     /// A transfer with schedule was performed with an added memo. This is the
-    /// result of a successful
-    /// [TransferWithScheduleAndMemo](transactions::Payload::
-    /// TransferWithScheduleAndMemo) transaction.
+    /// result of a successful [`TransferWithScheduleAndMemo`][link]
+    /// transaction.
+    ///
+    /// [link]: transactions::Payload::TransferWithScheduleAndMemo
     TransferredWithScheduleAndMemo {
         /// Receiver account.
         to:     AccountAddress,
@@ -1111,14 +1114,15 @@ pub enum AccountTransactionEffects {
     },
     /// Keys of a specific credential were updated. This is the result of a
     /// successful
-    /// [UpdateCredentialKeys](transactions::Payload::UpdateCredentialKeys)
+    /// [`UpdateCredentialKeys`](transactions::Payload::UpdateCredentialKeys)
     /// transaction.
     CredentialKeysUpdated {
         /// ID of the credential whose keys were updated.
         cred_id: CredentialRegistrationID,
     },
     /// Account's credentials were updated. This is the result of a
-    /// successful [UpdateCredentials](transactions::Payload::UpdateCredentials)
+    /// successful
+    /// [`UpdateCredentials`](transactions::Payload::UpdateCredentials)
     /// transaction.
     CredentialsUpdated {
         /// The credential ids that were added.
@@ -1129,7 +1133,7 @@ pub enum AccountTransactionEffects {
         new_threshold:    AccountThreshold,
     },
     /// Some data was registered on the chain. This is the result of a
-    /// successful [RegisterData](transactions::Payload::RegisterData)
+    /// successful [`RegisterData`](transactions::Payload::RegisterData)
     /// transaction.
     DataRegistered { data: RegisteredData },
     /// A baker was configured. The details of what happened are contained in
