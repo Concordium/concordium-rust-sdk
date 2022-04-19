@@ -19,7 +19,7 @@ jobs:
           profile: minimal
           toolchain: ${{ env.RUST_VERSION }}
           override: true
-          components: rustfmt, rustdoc
+          components: rustfmt, rust-docs
           
       - name: Generate docs
         run: |
