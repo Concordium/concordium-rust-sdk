@@ -33,6 +33,7 @@ impl From<SlotDuration> for chrono::Duration {
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
+#[derive(schemars::JsonSchema)]
 pub struct DurationSeconds {
     pub seconds: u64,
 }
@@ -51,6 +52,7 @@ impl From<DurationSeconds> for chrono::Duration {
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
+#[derive(schemars::JsonSchema)]
 pub struct BakerId {
     pub id: AccountIndex,
 }
@@ -59,6 +61,7 @@ pub struct BakerId {
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
+#[derive(schemars::JsonSchema)]
 pub struct DelegatorId {
     pub id: AccountIndex,
 }
@@ -80,6 +83,8 @@ pub struct DelegatorId {
     Into,
 )]
 #[serde(try_from = "String", into = "String")]
+#[derive(schemars::JsonSchema)]
+#[schemars(transparent)]
 pub struct UrlText {
     #[string_size_length = 2]
     url: String,
@@ -113,6 +118,7 @@ impl TryFrom<String> for UrlText {
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 #[repr(u8)]
+#[derive(schemars::JsonSchema)]
 pub enum OpenStatus {
     /// New delegators may join the pool.
     OpenForAll   = 0,
@@ -140,6 +146,7 @@ impl Deserial for OpenStatus {
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase", tag = "delegateType")]
+#[derive(schemars::JsonSchema)]
 pub enum DelegationTarget {
     #[serde(rename = "L-Pool")]
     /// Delegate to the lock-up pool.
@@ -212,6 +219,7 @@ pub struct Slot {
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
+#[derive(schemars::JsonSchema)]
 pub struct Epoch {
     pub epoch: u64,
 }
@@ -263,8 +271,10 @@ impl UpdateSequenceNumber {
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Into, Serial)]
 /// The minimum number of credentials that need to sign any transaction coming
 /// from an associated account.
+#[derive(schemars::JsonSchema)]
 pub struct AccountThreshold {
     #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
+    #[schemars(with = "std::num::NonZeroU8")]
     threshold: u8,
 }
 
@@ -405,6 +415,7 @@ impl AbsoluteBlockHeight {
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
 /// Index of the account in the account table. These are assigned sequentially
 /// in the order of creation of accounts. The first account has index 0.
+#[derive(schemars::JsonSchema)]
 pub struct AccountIndex {
     pub index: u64,
 }
@@ -413,6 +424,7 @@ pub struct AccountIndex {
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into, Add)]
+#[derive(schemars::JsonSchema)]
 pub struct Energy {
     pub energy: u64,
 }
@@ -423,6 +435,7 @@ pub struct Energy {
     Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into, Default, Hash,
 )]
 /// Contract index. The default implementation produces contract index 0.
+#[derive(schemars::JsonSchema)]
 pub struct ContractIndex {
     pub index: u64,
 }
@@ -433,6 +446,7 @@ pub struct ContractIndex {
     Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into, Default, Hash,
 )]
 /// Contract subindex. The default implementation produces contract index 0.
+#[derive(schemars::JsonSchema)]
 pub struct ContractSubIndex {
     pub sub_index: u64,
 }
@@ -440,6 +454,7 @@ pub struct ContractSubIndex {
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
+#[derive(schemars::JsonSchema)]
 pub struct ContractAddress {
     pub index:    ContractIndex,
     pub subindex: ContractSubIndex,
@@ -455,6 +470,7 @@ impl ContractAddress {
 #[serde(tag = "type", content = "address")]
 /// Either an account or contract address. Some operations are allowed on both
 /// types of items, hence the need for this type.
+#[derive(schemars::JsonSchema)]
 pub enum Address {
     #[serde(rename = "AddressAccount")]
     Account(id::types::AccountAddress),
@@ -465,6 +481,7 @@ pub enum Address {
 /// Position of the transaction in a block.
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Serialize, Clone, Copy)]
 #[serde(transparent)]
+#[derive(schemars::JsonSchema)]
 pub struct TransactionIndex {
     pub index: u64,
 }
@@ -501,6 +518,25 @@ pub struct BakerAggregationVerifyKey {
     pub(crate) verify_key: aggregate_sig::PublicKey<AggregateSigPairing>,
 }
 
+impl schemars::JsonSchema for BakerAggregationVerifyKey {
+    fn schema_name() -> String {
+        "BakerAggregationVerifyKey".into()
+    }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        use schemars::schema::*;
+        Schema::Object(SchemaObject{
+            instance_type: Some(InstanceType::String.into()),
+            string: Some(StringValidation{
+                max_length: Some(192),
+                min_length: Some(192),
+                pattern: Some("^([0-9]?[a-f]?)*$".into()),
+            }.into()),
+            ..SchemaObject::default()
+        })
+    }
+}
+
 impl From<&BakerAggregationSignKey> for BakerAggregationVerifyKey {
     fn from(secret: &BakerAggregationSignKey) -> Self {
         Self {
@@ -529,6 +565,26 @@ pub struct BakerSignatureVerifyKey {
     pub(crate) verify_key: ed25519_dalek::PublicKey,
 }
 
+impl schemars::JsonSchema for BakerSignatureVerifyKey {
+    fn schema_name() -> String {
+        "BakerSignatureVerifyKey".into()
+    }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        use schemars::schema::*;
+        Schema::Object(SchemaObject{
+            instance_type: Some(InstanceType::String.into()),
+            string: Some(StringValidation{
+                max_length: Some(64),
+                min_length: Some(64),
+                pattern: Some("^([0-9]?[a-f]?)*$".into()),
+            }.into()),
+            ..SchemaObject::default()
+        })
+    }
+}
+
+
 impl From<&BakerSignatureSignKey> for BakerSignatureVerifyKey {
     fn from(secret: &BakerSignatureSignKey) -> Self {
         Self {
@@ -555,6 +611,26 @@ impl BakerElectionSignKey {
 #[derive(SerdeBase16Serialize, Serialize, Clone, Debug)]
 pub struct BakerElectionVerifyKey {
     pub(crate) verify_key: ecvrf::PublicKey,
+}
+
+
+impl schemars::JsonSchema for BakerElectionVerifyKey {
+    fn schema_name() -> String {
+        "BakerElectionVerifyKey".into()
+    }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        use schemars::schema::*;
+        Schema::Object(SchemaObject{
+            instance_type: Some(InstanceType::String.into()),
+            string: Some(StringValidation{
+                max_length: Some(64),
+                min_length: Some(64),
+                pattern: Some("^([0-9]?[a-f]?)*$".into()),
+            }.into()),
+            ..SchemaObject::default()
+        })
+    }
 }
 
 impl From<&BakerElectionSignKey> for BakerElectionVerifyKey {
@@ -631,6 +707,26 @@ impl BakerCredentials {
 #[derive(SerdeBase16Serialize, Serialize, Debug, Clone)]
 pub struct CredentialRegistrationID(id::constants::ArCurve);
 
+impl schemars::JsonSchema for CredentialRegistrationID {
+    fn schema_name() -> String {
+        "CredentialRegistrationID".into()
+    }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        use schemars::schema::*;
+        Schema::Object(SchemaObject{
+            instance_type: Some(InstanceType::String.into()),
+            string: Some(StringValidation{
+                max_length: Some(96),
+                min_length: Some(96),
+                pattern: Some("^([0-9]?[a-f]?)*$".into()),
+            }.into()),
+            ..SchemaObject::default()
+        })
+    }
+}
+
+
 impl fmt::Display for CredentialRegistrationID {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = hex::encode(&crypto_common::to_bytes(self));
@@ -645,8 +741,29 @@ pub struct UpdatePublicKey {
     pub public: id::types::VerifyKey,
 }
 
+impl schemars::JsonSchema for UpdatePublicKey {
+    fn schema_name() -> String {
+        "UpdatePublicKey".into()
+    }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        use schemars::schema::*;
+        Schema::Object(SchemaObject{
+            instance_type: Some(InstanceType::String.into()),
+            string: Some(StringValidation{
+                max_length: Some(64),
+                min_length: Some(64),
+                pattern: Some("^([0-9]?[a-f]?)*$".into()),
+            }.into()),
+            ..SchemaObject::default()
+        })
+    }
+}
+
+
 #[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serial, Into)]
 #[serde(transparent)]
+#[derive(schemars::JsonSchema)]
 pub struct UpdateKeysThreshold {
     #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
     pub(crate) threshold: u16,
@@ -664,12 +781,14 @@ impl Deserial for UpdateKeysThreshold {
     Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize, PartialEq, Eq, PartialOrd, Ord,
 )]
 #[serde(transparent)]
+#[derive(schemars::JsonSchema)]
 pub struct UpdateKeysIndex {
     pub index: u16,
 }
 
 #[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
+#[derive(schemars::JsonSchema)]
 pub struct ElectionDifficulty {
     parts_per_hundred_thousands: PartsPerHundredThousands,
 }
@@ -677,7 +796,10 @@ pub struct ElectionDifficulty {
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Into)]
 /// A fraction between 0 and 1 with a precision of 1/100_000.
 /// The `Into<u32>` implementation returns the number of parts per `100_000`.
+#[derive(schemars::JsonSchema)]
+#[schemars(transparent)]
 pub struct PartsPerHundredThousands {
+    #[schemars(with = "rust_decimal::Decimal")]
     pub(crate) parts: u32,
 }
 
@@ -732,6 +854,7 @@ pub struct CommissionRates {
 
 #[derive(Serialize, SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 /// Ranges of allowed commission values that pools may choose from.
+#[derive(schemars::JsonSchema)]
 pub struct CommissionRanges {
     /// The range of allowed finalization commissions.
     #[serde(rename = "finalizationCommissionRange")]
@@ -745,6 +868,7 @@ pub struct CommissionRanges {
 }
 
 #[derive(Debug, Copy, Clone, SerdeSerialize, SerdeDeserialize)]
+#[derive(schemars::JsonSchema)] // TODO: Check in serde that min <= max
 pub struct InclusiveRange<T> {
     min: T,
     max: T,
@@ -771,6 +895,7 @@ impl<T: Ord> InclusiveRange<T> {
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, Copy)]
+#[derive(schemars::JsonSchema)]
 pub struct ExchangeRate {
     #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
     pub numerator:   u64,
@@ -795,6 +920,7 @@ impl Deserial for ExchangeRate {
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, Copy)]
 #[serde(try_from = "leverage_factor_json::LeverageFactorRaw")]
+#[derive(schemars::JsonSchema)]
 pub struct LeverageFactor {
     #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
     pub numerator:   u64,
@@ -848,6 +974,7 @@ impl Deserial for LeverageFactor {
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+#[derive(schemars::JsonSchema)]
 pub struct MintDistributionV0 {
     mint_per_slot:       MintRate,
     baking_reward:       AmountFraction,
@@ -856,6 +983,7 @@ pub struct MintDistributionV0 {
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+#[derive(schemars::JsonSchema)]
 pub struct MintDistributionV1 {
     baking_reward:       AmountFraction,
     finalization_reward: AmountFraction,
@@ -913,6 +1041,16 @@ pub struct MintRate {
     pub exponent: u8,
 }
 
+impl schemars::JsonSchema for MintRate {
+    fn schema_name() -> String {
+        "MintRate".into()
+    }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        rust_decimal::Decimal::json_schema(gen) // TODO: Could be more precise
+    }
+}
+
 #[derive(
     Default,
     Debug,
@@ -932,6 +1070,7 @@ pub struct MintRate {
 /// A fraction of an amount with a precision of `1/100_000`.
 /// The [`FromStr`] instance will parse a decimal fraction with up to `5`
 /// decimals.
+#[derive(schemars::JsonSchema)]
 pub struct AmountFraction {
     pub(crate) parts_per_hundred_thousands: PartsPerHundredThousands,
 }
@@ -960,6 +1099,7 @@ impl AmountFraction {
 #[repr(transparent)]
 /// A bound on the relative share of the total staked capital that a baker can
 /// have as its stake. This is required to be greater than 0.
+#[derive(schemars::JsonSchema)]
 pub struct CapitalBound {
     #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
     pub bound: AmountFraction,

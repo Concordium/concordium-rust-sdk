@@ -19,6 +19,7 @@ use std::convert::{TryFrom, TryInto};
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Copy, Clone, Display)]
 #[serde(try_from = "u8", into = "u8")]
 #[repr(u8)]
+#[derive(schemars::JsonSchema)]
 pub enum WasmVersion {
     #[display = "V0"]
     V0 = 0u8,
@@ -175,6 +176,7 @@ mod instance_parser {
 )]
 #[serde(into = "String", try_from = "String")]
 /// FIXME: Add structure.
+#[derive(schemars::JsonSchema)]
 pub struct ReceiveName {
     #[string_size_length = 2]
     pub name: String,
@@ -212,6 +214,7 @@ impl Deserial for ReceiveName {
 )]
 #[serde(into = "String", try_from = "String")]
 /// FIXME: Add structure.
+#[derive(schemars::JsonSchema)]
 pub struct InitName {
     #[string_size_length = 2]
     name: String,
@@ -253,6 +256,25 @@ pub struct Parameter {
     bytes: Vec<u8>,
 }
 
+impl schemars::JsonSchema for Parameter {
+    fn schema_name() -> String {
+        "Parameter".into()
+    }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        use schemars::schema::*;
+        Schema::Object(SchemaObject{
+            instance_type: Some(InstanceType::String.into()),
+            string: Some(StringValidation{
+                max_length: Some(MAX_PARAMETER_LEN as u32),
+                min_length: Some(0),
+                pattern: Some("^([0-9]?[a-f]?)*$".into()), // TODO: This is not completely precise. Should ensure even length as well.
+            }.into()),
+            ..SchemaObject::default()
+        })
+    }
+}
+
 /// Manual implementation to ensure size limit.
 impl Deserial for Parameter {
     fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
@@ -278,6 +300,25 @@ pub type ModuleRef = hashes::HashBytes<ModuleRefMarker>;
 pub struct ContractEvent {
     #[serde(with = "crate::internal::byte_array_hex")]
     bytes: Vec<u8>,
+}
+
+impl schemars::JsonSchema for ContractEvent {
+    fn schema_name() -> String {
+        "ContractEvent".into()
+    }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        use schemars::schema::*;
+        Schema::Object(SchemaObject{
+            instance_type: Some(InstanceType::String.into()),
+            string: Some(StringValidation{
+                max_length: None,
+                min_length: Some(0),
+                pattern: Some("^([0-9]?[a-f]?)*$".into()), // TODO: Does not ensure even length
+            }.into()),
+            ..SchemaObject::default()
+        })
+    }
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serial, Clone, Debug, AsRef, From, Into)]

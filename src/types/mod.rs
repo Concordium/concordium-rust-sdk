@@ -1,3 +1,4 @@
+use schemars::JsonSchema;
 mod basic;
 pub mod hashes;
 pub mod network;
@@ -335,6 +336,7 @@ pub enum PoolStatus {
 // Since all variants are fieldless, the default JSON serialization will convert
 // all the variants to simple strings.
 /// Enumeration of the types of credentials.
+#[derive(schemars::JsonSchema)]
 pub enum CredentialType {
     /// Initial credential is a credential that is submitted by the identity
     /// provider on behalf of the user. There is only one initial credential
@@ -351,6 +353,7 @@ pub enum CredentialType {
 // Since all variants are fieldless, the default JSON serialization will convert
 // all the variants to simple strings.
 /// Types of account transactions.
+#[derive(schemars::JsonSchema)]
 pub enum TransactionType {
     /// Deploy a Wasm module.
     DeployModule,
@@ -415,6 +418,7 @@ pub enum TransactionStatusInBlock {
 #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
 #[serde(tag = "status", content = "outcomes", rename_all = "camelCase")]
 /// Status of a transaction known to the node.
+#[derive(schemars::JsonSchema)]
 pub enum TransactionStatus {
     /// Transaction is received, but not yet in any blocks.
     Received,
@@ -752,6 +756,14 @@ pub struct BlockItemSummary {
     /// For successful transactions there is a one to one mapping of transaction
     /// types and variants (together with subvariants) of this type.
     pub details:     BlockItemSummaryDetails,
+}
+
+impl schemars::JsonSchema for BlockItemSummary {
+    fn schema_name() -> String { "BlockItemSummary".into() }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        summary_helper::BlockItemSummary::json_schema(gen)
+    }
 }
 
 impl BlockItemSummary {
@@ -1271,13 +1283,16 @@ pub struct UpdateDetails {
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 /// Event generated when an account receives a new encrypted amount.
+#[derive(schemars::JsonSchema)]
 pub struct NewEncryptedAmountEvent {
     /// The account onto which the amount was added.
     #[serde(rename = "account")]
     pub receiver:         AccountAddress,
     /// The index the amount was assigned.
+    #[schemars(with = "u64")]
     pub new_index:        encrypted_transfers::types::EncryptedAmountIndex,
     /// The encrypted amount that was added.
+    #[schemars(with = "crate::internal::HexSchema")] // TODO: Not ideal, length is fixed.
     pub encrypted_amount: encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
 }
 
@@ -1285,19 +1300,24 @@ pub struct NewEncryptedAmountEvent {
 #[serde(rename_all = "camelCase")]
 /// Event generated when one or more encrypted amounts are consumed from the
 /// account.
+#[derive(schemars::JsonSchema)]
 pub struct EncryptedAmountRemovedEvent {
     /// The affected account.
     pub account:      AccountAddress,
     /// The new self encrypted amount on the affected account.
+    #[schemars(with = "crate::internal::HexSchema")] // TODO: Not ideal, length is fixed.
     pub new_amount:   encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
     /// The input encrypted amount that was removed.
+    #[schemars(with = "crate::internal::HexSchema")] // TODO: Not ideal, length is fixed.
     pub input_amount: encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
     /// The index indicating which amounts were used.
+    #[schemars(with = "u64")]
     pub up_to_index:  encrypted_transfers::types::EncryptedAmountAggIndex,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+#[derive(schemars::JsonSchema)]
 pub struct BakerAddedEvent {
     #[serde(flatten)]
     /// The keys with which the baker registered.
@@ -1313,6 +1333,7 @@ pub struct BakerAddedEvent {
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 /// Result of a successful change of baker keys.
+#[derive(schemars::JsonSchema)]
 pub struct BakerKeysEvent {
     /// ID of the baker whose keys were changed.
     pub baker_id:        BakerId,
@@ -1329,10 +1350,12 @@ pub struct BakerKeysEvent {
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+#[derive(schemars::JsonSchema)]
 pub struct EncryptedSelfAmountAddedEvent {
     /// The affected account.
     pub account:    AccountAddress,
     /// The new self encrypted amount of the account.
+    #[schemars(with = "crate::internal::HexSchema")] // TODO: Not ideal, length is fixed.
     pub new_amount: encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
     /// The amount that was transferred from public to encrypted balance.
     pub amount:     Amount,
@@ -1340,6 +1363,7 @@ pub struct EncryptedSelfAmountAddedEvent {
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+#[derive(schemars::JsonSchema)]
 pub struct ContractInitializedEvent {
     #[serde(default)]
     pub contract_version: smart_contracts::WasmVersion,
@@ -1362,6 +1386,7 @@ pub struct ContractInitializedEvent {
 /// Data generated as part of updating a single contract instance.
 /// In general a single [Update](transactions::Payload::Update) transaction will
 /// generate one or more of these events, together with possibly some transfers.
+#[derive(schemars::JsonSchema)]
 pub struct InstanceUpdatedEvent {
     #[serde(default)]
     pub contract_version: smart_contracts::WasmVersion,
@@ -1384,6 +1409,7 @@ pub struct InstanceUpdatedEvent {
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(tag = "updateType", content = "update")]
 /// The type of an update payload.
+#[derive(schemars::JsonSchema)]
 pub enum UpdatePayload {
     #[serde(rename = "protocol")]
     Protocol(ProtocolUpdate),
@@ -1408,8 +1434,10 @@ pub enum UpdatePayload {
     #[serde(rename = "level1")]
     Level1(Level1Update),
     #[serde(rename = "addAnonymityRevoker")]
+    #[schemars(with = "id::types::ArInfo<wrappers::WrappedCurve>")] // TODO: Fix this
     AddAnonymityRevoker(Box<id::types::ArInfo<id::constants::ArCurve>>),
     #[serde(rename = "addIdentityProvider")]
+    #[schemars(with = "id::types::IpInfo<wrappers::WrappedPairing>")] // TODO: Fix this
     AddIdentityProvider(Box<id::types::IpInfo<id::constants::IpPairing>>),
     #[serde(rename = "cooldownParametersCPV1")]
     CooldownParametersCPV1(CooldownParameters),
@@ -1421,18 +1449,131 @@ pub enum UpdatePayload {
     MintDistributionCPV1(MintDistribution<ChainParameterVersion1>),
 }
 
+mod wrappers {
+    use super::*;
+    use id::curve_arithmetic::*;
+
+    #[derive(Clone, Copy, Eq, PartialEq, Debug, Serialize, Display)]
+    #[repr(transparent)]
+    #[derive(JsonSchema)]
+    #[schemars(transparent)]
+    pub struct WrappedCurve{
+        #[schemars(with = "crate::internal::HexSchema")] // TODO: This is no as precise as it could be.
+        inner: id::constants::ArCurve
+    }
+
+    #[derive(Clone, Debug)]
+    #[derive(JsonSchema)]
+    #[schemars(transparent)]
+    pub struct WrappedPairing{
+        #[schemars(with = "crate::internal::HexSchema")] // TODO: This is no as precise as it could be.
+        inner: id::constants::IpPairing
+    }
+
+    impl id::curve_arithmetic::Pairing for WrappedPairing {
+        type ScalarField = <id::constants::IpPairing as Pairing>::ScalarField;
+
+        type G1 = <id::constants::IpPairing as Pairing>::G1;
+
+        type G2 = <id::constants::IpPairing as Pairing>::G2;
+
+        type G1Prepared = <id::constants::IpPairing as Pairing>::G1Prepared;
+
+        type G2Prepared = <id::constants::IpPairing as Pairing>::G2Prepared;
+
+        type BaseField = <id::constants::IpPairing as Pairing>::BaseField;
+
+        type TargetField = <id::constants::IpPairing as Pairing>::TargetField;
+
+        fn miller_loop<'a, I>(i: I) -> Self::TargetField
+    where
+        I: IntoIterator<Item = &'a (&'a Self::G1Prepared, &'a Self::G2Prepared)> {
+        todo!()
+    }
+
+        fn final_exponentiation(_: &Self::TargetField) -> Option<Self::TargetField> {
+        todo!()
+    }
+
+        fn g1_prepare(_: &Self::G1) -> Self::G1Prepared {
+        todo!()
+    }
+
+        fn g2_prepare(_: &Self::G2) -> Self::G2Prepared {
+        todo!()
+    }
+
+        fn generate_scalar<R: rand::Rng>(rng: &mut R) -> Self::ScalarField {
+        todo!()
+    }
+    }
+
+    impl id::curve_arithmetic::Curve for WrappedCurve {
+        type Base = <id::constants::ArCurve as Curve>::Base;
+        type Compressed = <id::constants::ArCurve as Curve>::Compressed;
+        type Scalar = <id::constants::ArCurve as Curve>::Scalar;
+
+        const GROUP_ELEMENT_LENGTH: usize = <id::constants::ArCurve as Curve>::GROUP_ELEMENT_LENGTH;
+        const SCALAR_LENGTH: usize = <id::constants::ArCurve as Curve>::SCALAR_LENGTH;
+
+        fn zero_point() -> Self { todo!() }
+
+        fn one_point() -> Self { todo!() }
+
+        fn is_zero_point(&self) -> bool { todo!() }
+
+        fn inverse_point(&self) -> Self { todo!() }
+
+        fn double_point(&self) -> Self { todo!() }
+
+        fn plus_point(&self, other: &Self) -> Self { todo!() }
+
+        fn minus_point(&self, other: &Self) -> Self { todo!() }
+
+        fn mul_by_scalar(&self, scalar: &Self::Scalar) -> Self { todo!() }
+
+        fn compress(&self) -> Self::Compressed { todo!() }
+
+        fn decompress(
+            c: &Self::Compressed,
+        ) -> Result<Self, id::curve_arithmetic::CurveDecodingError> {
+            todo!()
+        }
+
+        fn decompress_unchecked(
+            c: &Self::Compressed,
+        ) -> Result<Self, id::curve_arithmetic::CurveDecodingError> {
+            todo!()
+        }
+
+        fn bytes_to_curve_unchecked<R: ReadBytesExt>(b: &mut R) -> anyhow::Result<Self> { todo!() }
+
+        fn generate<R: rand::Rng>(rng: &mut R) -> Self { todo!() }
+
+        fn generate_scalar<R: rand::Rng>(rng: &mut R) -> Self::Scalar { todo!() }
+
+        fn scalar_from_u64(n: u64) -> Self::Scalar { todo!() }
+
+        fn scalar_from_bytes<A: AsRef<[u8]>>(bs: A) -> Self::Scalar { todo!() }
+
+        fn hash_to_group(m: &[u8]) -> Self { todo!() }
+    }
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 /// A generic protocol update. This is essentially an announcement of the
 /// update. The details of the update will be communicated in some off-chain
 /// way, and bakers will need to update their node software to support the
 /// update.
+#[derive(schemars::JsonSchema)]
 pub struct ProtocolUpdate {
     pub message: String,
     #[serde(rename = "specificationURL")]
     pub specification_url: String,
     pub specification_hash: hashes::Hash,
     #[serde(with = "crate::internal::byte_array_hex")]
+    #[schemars(with = "crate::internal::HexSchema")] // TODO
     pub specification_auxiliary_data: Vec<u8>,
 }
 
@@ -1497,6 +1638,7 @@ impl Deserial for ProtocolUpdate {
 #[serde(rename_all = "camelCase")]
 #[serde(try_from = "transaction_fee_distribution::TransactionFeeDistributionUnchecked")]
 /// Update the transaction fee distribution to the specified value.
+#[derive(schemars::JsonSchema)]
 pub struct TransactionFeeDistribution {
     /// The fraction that goes to the baker of the block.
     pub baker:       AmountFraction,
@@ -1521,6 +1663,7 @@ impl Deserial for TransactionFeeDistribution {
 #[serde(rename_all = "camelCase")]
 /// The reward fractions related to the gas account and inclusion of special
 /// transactions.
+#[derive(schemars::JsonSchema)]
 pub struct GASRewards {
     /// `BakerPrevTransFrac`: fraction of the previous gas account paid to the
     /// baker.
@@ -1541,6 +1684,7 @@ pub struct GASRewards {
 #[serde(rename_all = "camelCase")]
 /// An update with root keys of some other set of governance keys, or the root
 /// keys themselves. Each update is a separate transaction.
+#[derive(schemars::JsonSchema)]
 pub enum RootUpdate {
     RootKeysUpdate(HigherLevelAccessStructure<RootKeysKind>),
     Level1KeysUpdate(HigherLevelAccessStructure<Level1KeysKind>),
@@ -1582,6 +1726,7 @@ impl Deserial for RootUpdate {
 #[serde(rename_all = "camelCase")]
 /// An update with level 1 keys of either level 1 or level 2 keys. Each of the
 /// updates must be a separate transaction.
+#[derive(schemars::JsonSchema)]
 pub enum Level1Update {
     Level1KeysUpdate(HigherLevelAccessStructure<Level1KeysKind>),
     Level2KeysUpdate(Box<Authorizations<ChainParameterVersion0>>),
@@ -1617,10 +1762,12 @@ impl Deserial for Level1Update {
 /// A tag for added type safety when using HigherLevelKeys.
 /// This type deliberately has no values. It is meant to exist purely as a
 /// type-level marker.
+#[derive(schemars::JsonSchema)]
 pub enum RootKeysKind {}
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 #[doc(hidden)]
+#[derive(schemars::JsonSchema)]
 /// A tag for added type safety when using HigherLevelKeys.
 /// This type deliberately has no values. It is meant to exist purely as a
 /// type-level marker.
@@ -1633,6 +1780,7 @@ pub enum Level1KeysKind {}
 /// structure, keys and a threshold. The phantom type parameter is used for
 /// added type safety to distinguish different access structures in different
 /// contexts.
+#[derive(schemars::JsonSchema)]
 pub struct HigherLevelAccessStructure<Kind> {
     #[size_length = 2]
     pub keys:      Vec<UpdatePublicKey>,
@@ -1660,6 +1808,7 @@ impl<Kind> Deserial for HigherLevelAccessStructure<Kind> {
 /// And access structure for performing chain updates. The access structure is
 /// only meaningful in the context of a list of update keys to which the indices
 /// refer to.
+#[derive(schemars::JsonSchema)]
 pub struct AccessStructure {
     #[set_size_length = 2]
     pub authorized_keys: BTreeSet<UpdateKeysIndex>,
@@ -1686,6 +1835,7 @@ impl Deserial for AccessStructure {
 #[serde(rename_all = "camelCase")]
 /// Access structures for each of the different possible chain updates, togehter
 /// with the context giving all the possible keys.
+#[derive(schemars::JsonSchema)]
 pub struct AuthorizationsV0 {
     #[size_length = 2]
     /// The list of all keys that are currently authorized to perform updates.
@@ -1722,6 +1872,7 @@ pub struct AuthorizationsV0 {
 #[serde(rename_all = "camelCase")]
 /// Access structures for each of the different possible chain updates, togehter
 /// with the context giving all the possible keys.
+#[derive(schemars::JsonSchema)]
 pub struct AuthorizationsV1 {
     #[serde(flatten)]
     pub v0:                  AuthorizationsV0,
@@ -1752,6 +1903,25 @@ pub struct RegisteredData {
     #[serde(with = "crate::internal::byte_array_hex")]
     #[size_length = 2]
     bytes: Vec<u8>,
+}
+
+impl schemars::JsonSchema for RegisteredData {
+    fn schema_name() -> String {
+        "RegisteredData".into()
+    }
+
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        use schemars::schema::*;
+        Schema::Object(SchemaObject{
+            instance_type: Some(InstanceType::String.into()),
+            string: Some(StringValidation{
+                max_length: Some(MAX_REGISTERED_DATA_SIZE as u32),
+                min_length: Some(0),
+                pattern: Some("^([0-9]?[a-f]?)*$".into()),
+            }.into()),
+            ..SchemaObject::default()
+        })
+    }
 }
 
 /// Registered data is too large.
@@ -1810,6 +1980,26 @@ pub struct Memo {
     #[size_length = 2]
     bytes: Vec<u8>,
 }
+
+impl schemars::JsonSchema for Memo {
+    fn schema_name() -> String {
+        "Memo".into()
+    }
+
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        use schemars::schema::*;
+        Schema::Object(SchemaObject{
+            instance_type: Some(InstanceType::String.into()),
+            string: Some(StringValidation{
+                max_length: Some(MAX_MEMO_SIZE as u32),
+                min_length: Some(0),
+                pattern: Some("^([0-9]?[a-f]?)*$".into()),
+            }.into()),
+            ..SchemaObject::default()
+        })
+    }
+}
+
 
 /// An error used to signal that an object was too big to be converted.
 #[derive(Display, Error, Debug)]
@@ -1876,6 +2066,7 @@ pub struct ChainParametersV0 {
 
 #[derive(Debug, Serialize, SerdeSerialize, SerdeDeserialize, Copy, Clone)]
 #[serde(rename_all = "camelCase")]
+#[derive(schemars::JsonSchema)]
 pub struct CooldownParameters {
     /// Number of seconds that pool owners must cooldown
     /// when reducing their equity capital or closing the pool.
@@ -1904,12 +2095,14 @@ pub struct CooldownParameters {
     Serialize,
 )]
 #[serde(transparent)]
+#[derive(schemars::JsonSchema)]
 pub struct RewardPeriodLength {
     reward_period_epochs: Epoch,
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, Serialize, Copy, Clone)]
 #[serde(rename_all = "camelCase")]
+#[derive(schemars::JsonSchema)]
 pub struct TimeParameters {
     pub reward_period_length: RewardPeriodLength,
     pub mint_per_payday:      MintRate,
@@ -1918,6 +2111,7 @@ pub struct TimeParameters {
 #[derive(Debug, Serialize, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 /// Parameters related to staking pools.
+#[derive(schemars::JsonSchema)]
 pub struct PoolParameters {
     /// Fraction of finalization rewards charged by the L-Pool.
     finalization_commission_l_pool: AmountFraction,
@@ -2093,6 +2287,7 @@ pub type Updates<CPV> =
 ///
 /// NOTE: Some of the variant definitions can look peculiar, but they are
 /// made to be compatible with the serialization of the Haskell datatype.
+#[derive(schemars::JsonSchema)]
 pub enum RejectReason {
     /// Error raised when validating the Wasm module.
     ModuleNotWF,

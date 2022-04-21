@@ -26,6 +26,7 @@ use thiserror::Error;
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 /// Summary of the outcome of a block item.
+#[derive(schemars::JsonSchema)]
 pub(crate) struct BlockItemSummary {
     #[serde(default)]
     /// Sender, if available. The sender is always available for account
@@ -49,6 +50,7 @@ pub(crate) struct BlockItemSummary {
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(tag = "type", content = "contents", rename_all = "camelCase")]
 /// The type of the block item.
+#[derive(schemars::JsonSchema)]
 enum BlockItemType {
     #[serde(rename = "accountTransaction")]
     /// Account transactions are transactions that are signed by an account.
@@ -70,6 +72,7 @@ enum BlockItemType {
 // Since all variants are fieldless, the default JSON serialization will convert
 // all the variants to simple strings.
 /// Enumeration of the types of updates that are possible.
+#[derive(schemars::JsonSchema)]
 pub enum UpdateType {
     /// Update the chain protocol
     UpdateProtocol,
@@ -107,6 +110,7 @@ pub enum UpdateType {
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(tag = "outcome", rename_all = "camelCase")]
 /// Outcome of a block item execution.
+#[derive(schemars::JsonSchema)]
 enum BlockItemResult {
     /// The intended action was completed. The sender was charged, if
     /// applicable. Some events were generated describing the changes that
@@ -120,6 +124,7 @@ enum BlockItemResult {
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(tag = "tag")]
+#[derive(schemars::JsonSchema)]
 /// An event describing the changes that occurred to the state of the chain.
 enum Event {
     /// A smart contract module was successfully deployed.

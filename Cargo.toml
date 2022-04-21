@@ -40,6 +40,7 @@ encrypted_transfers = { version = "*", path = "./concordium-base/rust-src/encryp
 eddsa_ed25519 = { version = "*", path = "./concordium-base/rust-src/eddsa_ed25519/" }
 concordium-contracts-common = { version = "*", path = "./concordium-contracts-common/", features = ["derive-serde"]}
 random_oracle = { version = "*", path = "./concordium-base/rust-src/random_oracle/" }
+schemars = {version = "0.8", features = ["rust_decimal", "chrono"]}
 
 [features]
 postgres = ["tokio-postgres"]

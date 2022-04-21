@@ -229,3 +229,22 @@ impl<Purpose> fmt::Display for HashBytes<Purpose> {
         Ok(())
     }
 }
+
+impl <Purpose>schemars::JsonSchema for HashBytes<Purpose> {
+    fn schema_name() -> String {
+        "SHA256Hash".into()
+    }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        use schemars::schema::*;
+        Schema::Object(SchemaObject{
+            instance_type: Some(InstanceType::String.into()),
+            string: Some(StringValidation{
+                max_length: Some(64),
+                min_length: Some(64),
+                pattern: Some("^([0-9]?[a-f]?)*".into()),
+            }.into()),
+            ..SchemaObject::default()
+        })
+    }
+}
