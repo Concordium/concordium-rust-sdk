@@ -106,7 +106,7 @@ pub enum BlocksAtHeightInput {
 
 #[derive(Clone)]
 /// Client that can perform queries.
-/// All endpoints take a &mut self as an argument which means that a single
+/// All endpoints take a `&mut self` as an argument which means that a single
 /// instance cannot be used concurrently. However instead of putting the Client
 /// behind a Mutex, the intended way to use it is to clone it. Cloning is very
 /// cheap and will reuse the underlying connection.
@@ -126,16 +126,18 @@ impl Client {
     }
 
     /// Construct a new client by connecting to the specified destination.
+    /// The provided `token` must match the authentication token accepted by the
+    /// node.
     pub async fn connect<D: TryInto<Endpoint>>(
         dst: D,
-        token: String,
+        token: impl Into<String>,
     ) -> Result<Self, tonic::transport::Error>
     where
         <D as TryInto<Endpoint>>::Error: std::error::Error + Send + Sync + 'static, {
         let client = p2p_client::P2pClient::connect(dst).await?;
         Ok(Client {
             client,
-            token: Arc::new(token),
+            token: Arc::new(token.into()),
         })
     }
 
