@@ -217,19 +217,102 @@ pub enum StakePendingChange {
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
+#[serde(
+    rename_all = "camelCase",
+    untagged,
+    try_from = "rewards_overview::RewardsDataRaw"
+)]
+/// Information about the state of the CCD distribution at a particular time.
+pub enum RewardsOverview {
+    #[serde(rename_all = "camelCase")]
+    V0 {
+        #[serde(flatten)]
+        data: CommonRewardData,
+    },
+    #[serde(rename_all = "camelCase")]
+    V1 {
+        #[serde(flatten)]
+        common: CommonRewardData,
+        /// The transaction reward fraction accruing to the foundation (to be
+        /// paid at next payday).
+        foundation_transaction_rewards: Amount,
+        /// The time of the next payday.
+        next_payday_time: chrono::DateTime<chrono::Utc>,
+        /// The rate at which CCD will be minted (as a proportion of the total
+        /// supply) at the next payday
+        next_payday_mint_rate: MintRate,
+        /// The total capital put up as stake by bakers and delegators
+        total_staked_capital: Amount,
+    },
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
-/// Current balance statistics.
-pub struct RewardsOverview {
-    #[serde(with = "crate::internal::amounts_as_u64")]
+/// Reward data common to both V0 and V1 rewards.
+pub struct CommonRewardData {
+    /// Protocol version that applies to these rewards. V0 variant
+    /// only exists for protocol versions 1, 2, and 3.
+    protocol_version:                ProtocolVersion,
+    /// The total CCD in existence.
     pub total_amount:                Amount,
-    #[serde(with = "crate::internal::amounts_as_u64")]
+    /// The total CCD in encrypted balances.
     pub total_encrypted_amount:      Amount,
-    #[serde(with = "crate::internal::amounts_as_u64")]
+    /// The amount in the baking reward account.
     pub baking_reward_account:       Amount,
-    #[serde(with = "crate::internal::amounts_as_u64")]
+    /// The amount in the finalization reward account.
     pub finalization_reward_account: Amount,
-    #[serde(with = "crate::internal::amounts_as_u64")]
+    /// The amount in the GAS account.
     pub gas_account:                 Amount,
+}
+
+mod rewards_overview {
+    use super::*;
+    #[derive(SerdeDeserialize)]
+    pub struct RewardsDataRaw {
+        #[serde(flatten)]
+        common: CommonRewardData,
+        /// The transaction reward fraction accruing to the foundation (to be
+        /// paid at next payday).
+        foundation_transaction_rewards: Option<Amount>,
+        /// The time of the next payday.
+        next_payday_time: Option<chrono::DateTime<chrono::Utc>>,
+        /// The rate at which CCD will be minted (as a proportion of the total
+        /// supply) at the next payday
+        next_payday_mint_rate: Option<MintRate>,
+        /// The total capital put up as stake by bakers and delegators
+        total_staked_capital: Option<Amount>,
+    }
+
+    impl TryFrom<RewardsDataRaw> for RewardsOverview {
+        type Error = anyhow::Error;
+
+        fn try_from(value: RewardsDataRaw) -> Result<Self, Self::Error> {
+            if value.common.protocol_version <= ProtocolVersion::P3 {
+                Ok(Self::V0 { data: value.common })
+            } else {
+                let foundation_transaction_rewards =
+                    value.foundation_transaction_rewards.ok_or_else(|| {
+                        anyhow::anyhow!("Missing 'foundationTransactionRewards' field.")
+                    })?;
+                let next_payday_time = value
+                    .next_payday_time
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'nextPaydayTime' field."))?;
+                let next_payday_mint_rate = value
+                    .next_payday_mint_rate
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'nextPaydayMintRate' field."))?;
+                let total_staked_capital = value
+                    .total_staked_capital
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'totalStakedCapital' field."))?;
+                Ok(Self::V1 {
+                    common: value.common,
+                    foundation_transaction_rewards,
+                    next_payday_time,
+                    next_payday_mint_rate,
+                    total_staked_capital,
+                })
+            }
+        }
+    }
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
@@ -315,18 +398,18 @@ pub enum PoolStatus {
         all_pool_total_capital:     Amount,
     },
     #[serde(rename_all = "camelCase")]
-    LPool {
-        /// The total capital delegated to the L-pool.
+    Passive {
+        /// The total capital delegated passively.
         delegated_capital: Amount,
-        /// The L-pool commission rates.
+        /// The passive delegation commission rates.
         commission_rates: CommissionRates,
-        /// The transaction fees accruing to the L-pool in the current reward
-        /// period.
+        /// The transaction fees accruing to the passive delegators in the
+        /// current reward period.
         current_payday_transaction_fees_earned: Amount,
-        /// The effective delegated capital to the L-pool for the current reward
-        /// period.
+        /// The effective delegated capital to the passive delegators for the
+        /// current reward period.
         current_payday_delegated_capital: Amount,
-        /// Total capital staked across all pools.
+        /// Total capital staked across all pools, including passive delegation.
         all_pool_total_capital: Amount,
     },
 }
@@ -529,17 +612,17 @@ pub enum SpecialTransactionOutcome {
         new_gas_account:   Amount,
         /// The amount awarded to the baker.
         baker_reward:      Amount,
-        /// The amount awarded to the L-Pool.
-        l_pool_reward:     Amount,
+        /// The amount awarded to the passive delegators.
+        passive_reward:    Amount,
         /// The amount awarded to the foundation.
         foundation_charge: Amount,
         /// The baker of the block, who will receive the award.
         baker_id:          BakerId,
     },
-    /// Payment distributed to a pool or L-Pool.
+    /// Payment distributed to a pool or passive delegators.
     #[serde(rename_all = "camelCase")]
     PaydayPoolReward {
-        /// The pool owner (L-Pool when 'None').
+        /// The pool owner (passive delegators when 'None').
         pool_owner:          Option<BakerId>,
         /// Accrued transaction fees for pool.
         transaction_fees:    Amount,
@@ -1860,8 +1943,9 @@ pub struct AuthorizationsV0 {
     #[serde(rename = "paramGASRewards")]
     /// Access structure for updating the gas reward distribution parameters.
     pub param_gas_rewards: AccessStructure,
-    /// Access structure for updating the baker stake threshold.
-    pub baker_stake_threshold: AccessStructure,
+    /// Access structure for updating the pool parameters. For V0 this is only
+    /// the baker stake threshold, for V1 there are more.
+    pub pool_parameters: AccessStructure,
     /// Access structure for adding new anonymity revokers.
     pub add_anonymity_revoker: AccessStructure,
     /// Access structure for adding new identity providers.
@@ -2113,23 +2197,23 @@ pub struct TimeParameters {
 /// Parameters related to staking pools.
 #[derive(schemars::JsonSchema)]
 pub struct PoolParameters {
-    /// Fraction of finalization rewards charged by the L-Pool.
-    finalization_commission_l_pool: AmountFraction,
-    /// Fraction of baking rewards charged by the L-Pool.
-    baking_commission_l_pool:       AmountFraction,
+    /// Fraction of finalization rewards charged by the passive delegation.
+    passive_finalization_commission: AmountFraction,
+    /// Fraction of baking rewards charged by the passive delegation.
+    passive_baking_commission:       AmountFraction,
     /// Fraction of transaction rewards charged by the L-pool.
-    transaction_commission_l_pool:  AmountFraction,
+    passive_transaction_commission:  AmountFraction,
     /// Bounds on the commission rates that may be charged by bakers.
     #[serde(flatten)]
-    pub commission_bounds:          CommissionRanges,
+    pub commission_bounds:           CommissionRanges,
     /// Minimum equity capital required for a new baker.
-    pub minimum_equity_capital:     Amount,
+    pub minimum_equity_capital:      Amount,
     /// Maximum fraction of the total staked capital of that a new baker can
     /// have.
-    pub capital_bound:              CapitalBound,
+    pub capital_bound:               CapitalBound,
     /// The maximum leverage that a baker can have as a ratio of total stake
     /// to equity capital.
-    pub leverage_bound:             LeverageFactor,
+    pub leverage_bound:              LeverageFactor,
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize)]

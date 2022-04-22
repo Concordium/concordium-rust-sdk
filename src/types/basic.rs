@@ -148,9 +148,9 @@ impl Deserial for OpenStatus {
 #[serde(rename_all = "camelCase", tag = "delegateType")]
 #[derive(schemars::JsonSchema)]
 pub enum DelegationTarget {
-    #[serde(rename = "L-Pool")]
-    /// Delegate to the lock-up pool.
-    LPool,
+    #[serde(rename = "Passive")]
+    /// Delegate passively, i.e., to no specific baker.
+    Passive,
     #[serde(rename = "Baker")]
     /// Delegate to a specific baker.
     Baker {
@@ -162,7 +162,7 @@ pub enum DelegationTarget {
 impl Serial for DelegationTarget {
     fn serial<B: Buffer>(&self, out: &mut B) {
         match self {
-            DelegationTarget::LPool => 0u8.serial(out),
+            DelegationTarget::Passive => 0u8.serial(out),
             DelegationTarget::Baker { baker_id } => {
                 1u8.serial(out);
                 baker_id.serial(out)
@@ -175,7 +175,7 @@ impl Deserial for DelegationTarget {
     fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
         let tag: u8 = source.get()?;
         match tag {
-            0 => Ok(Self::LPool),
+            0 => Ok(Self::Passive),
             1 => {
                 let baker_id = source.get()?;
                 Ok(Self::Baker { baker_id })
