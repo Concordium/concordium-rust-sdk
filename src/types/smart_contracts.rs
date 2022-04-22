@@ -257,19 +257,23 @@ pub struct Parameter {
 }
 
 impl schemars::JsonSchema for Parameter {
-    fn schema_name() -> String {
-        "Parameter".into()
-    }
+    fn schema_name() -> String { "Parameter".into() }
 
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::*;
-        Schema::Object(SchemaObject{
+        Schema::Object(SchemaObject {
             instance_type: Some(InstanceType::String.into()),
-            string: Some(StringValidation{
-                max_length: Some(MAX_PARAMETER_LEN as u32),
-                min_length: Some(0),
-                pattern: Some("^([0-9]?[a-f]?)*$".into()), // TODO: This is not completely precise. Should ensure even length as well.
-            }.into()),
+            string: Some(
+                StringValidation {
+                    max_length: Some(MAX_PARAMETER_LEN as u32),
+                    min_length: Some(0),
+                    pattern:    Some("^([0-9]?[a-f]?)*$".into()), /* TODO: This is not
+                                                                   * completely precise.
+                                                                   * Should ensure even
+                                                                   * length as well. */
+                }
+                .into(),
+            ),
             ..SchemaObject::default()
         })
     }
@@ -291,6 +295,7 @@ impl Deserial for Parameter {
 #[doc(hidden)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum ModuleRefMarker {}
+
 /// Reference to a deployed Wasm module on the chain.
 pub type ModuleRef = hashes::HashBytes<ModuleRefMarker>;
 
@@ -303,19 +308,21 @@ pub struct ContractEvent {
 }
 
 impl schemars::JsonSchema for ContractEvent {
-    fn schema_name() -> String {
-        "ContractEvent".into()
-    }
+    fn schema_name() -> String { "ContractEvent".into() }
 
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::*;
-        Schema::Object(SchemaObject{
+        Schema::Object(SchemaObject {
             instance_type: Some(InstanceType::String.into()),
-            string: Some(StringValidation{
-                max_length: None,
-                min_length: Some(0),
-                pattern: Some("^([0-9]?[a-f]?)*$".into()), // TODO: Does not ensure even length
-            }.into()),
+            string: Some(
+                StringValidation {
+                    max_length: None,
+                    min_length: Some(0),
+                    pattern:    Some("^([0-9]?[a-f]?)*$".into()), /* TODO: Does not ensure even
+                                                                   * length */
+                }
+                .into(),
+            ),
             ..SchemaObject::default()
         })
     }

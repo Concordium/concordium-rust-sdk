@@ -8,7 +8,7 @@ use crypto_common::{
 use derive_more::{Add, Display, From, FromStr, Into};
 use rand::{CryptoRng, Rng};
 use random_oracle::RandomOracle;
-use std::{convert::TryFrom, fmt, str::FromStr};
+use std::{collections::BTreeMap, convert::TryFrom, fmt, str::FromStr};
 use thiserror::Error;
 
 /// Duration of a slot in milliseconds.
@@ -32,8 +32,20 @@ impl From<SlotDuration> for chrono::Duration {
 /// Duration in seconds.
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
-#[derive(schemars::JsonSchema)]
+#[derive(
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Debug,
+    FromStr,
+    Display,
+    From,
+    Into,
+    schemars::JsonSchema,
+)]
 pub struct DurationSeconds {
     pub seconds: u64,
 }
@@ -51,8 +63,20 @@ impl From<DurationSeconds> for chrono::Duration {
 /// Internal short id of the baker.
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
-#[derive(schemars::JsonSchema)]
+#[derive(
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Debug,
+    FromStr,
+    Display,
+    From,
+    Into,
+    schemars::JsonSchema,
+)]
 pub struct BakerId {
     pub id: AccountIndex,
 }
@@ -60,8 +84,20 @@ pub struct BakerId {
 /// Internal short id of the delegator.
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
-#[derive(schemars::JsonSchema)]
+#[derive(
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Debug,
+    FromStr,
+    Display,
+    From,
+    Into,
+    schemars::JsonSchema,
+)]
 pub struct DelegatorId {
     pub id: AccountIndex,
 }
@@ -218,8 +254,20 @@ pub struct Slot {
 /// Epoch number
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
-#[derive(schemars::JsonSchema)]
+#[derive(
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Debug,
+    FromStr,
+    Display,
+    From,
+    Into,
+    schemars::JsonSchema,
+)]
 pub struct Epoch {
     pub epoch: u64,
 }
@@ -243,7 +291,7 @@ impl Nonce {
     pub fn next_mut(&mut self) { self.nonce += 1; }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize, schemars::JsonSchema)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
 /// Equivalent of a transaction nonce but for update instructions. Update
@@ -298,7 +346,7 @@ impl TryFrom<u8> for AccountThreshold {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize, schemars::JsonSchema)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
 pub struct CredentialsPerBlockLimit {
@@ -307,7 +355,7 @@ pub struct CredentialsPerBlockLimit {
 
 /// Height of a block. Last genesis block is at height 0, a child of a block at
 /// height n is at height n+1. This height counts from the last protocol update.
-#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize, schemars::JsonSchema)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
 pub struct BlockHeight {
@@ -423,8 +471,21 @@ pub struct AccountIndex {
 /// Energy measure.
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into, Add)]
-#[derive(schemars::JsonSchema)]
+#[derive(
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Debug,
+    FromStr,
+    Display,
+    From,
+    Into,
+    Add,
+    schemars::JsonSchema,
+)]
 pub struct Energy {
     pub energy: u64,
 }
@@ -453,8 +514,7 @@ pub struct ContractSubIndex {
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-#[derive(schemars::JsonSchema)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, schemars::JsonSchema)]
 pub struct ContractAddress {
     pub index:    ContractIndex,
     pub subindex: ContractSubIndex,
@@ -519,19 +579,20 @@ pub struct BakerAggregationVerifyKey {
 }
 
 impl schemars::JsonSchema for BakerAggregationVerifyKey {
-    fn schema_name() -> String {
-        "BakerAggregationVerifyKey".into()
-    }
+    fn schema_name() -> String { "BakerAggregationVerifyKey".into() }
 
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::*;
-        Schema::Object(SchemaObject{
+        Schema::Object(SchemaObject {
             instance_type: Some(InstanceType::String.into()),
-            string: Some(StringValidation{
-                max_length: Some(192),
-                min_length: Some(192),
-                pattern: Some("^([0-9]?[a-f]?)*$".into()),
-            }.into()),
+            string: Some(
+                StringValidation {
+                    max_length: Some(192),
+                    min_length: Some(192),
+                    pattern:    Some("^([0-9]?[a-f]?)*$".into()),
+                }
+                .into(),
+            ),
             ..SchemaObject::default()
         })
     }
@@ -566,24 +627,24 @@ pub struct BakerSignatureVerifyKey {
 }
 
 impl schemars::JsonSchema for BakerSignatureVerifyKey {
-    fn schema_name() -> String {
-        "BakerSignatureVerifyKey".into()
-    }
+    fn schema_name() -> String { "BakerSignatureVerifyKey".into() }
 
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::*;
-        Schema::Object(SchemaObject{
+        Schema::Object(SchemaObject {
             instance_type: Some(InstanceType::String.into()),
-            string: Some(StringValidation{
-                max_length: Some(64),
-                min_length: Some(64),
-                pattern: Some("^([0-9]?[a-f]?)*$".into()),
-            }.into()),
+            string: Some(
+                StringValidation {
+                    max_length: Some(64),
+                    min_length: Some(64),
+                    pattern:    Some("^([0-9]?[a-f]?)*$".into()),
+                }
+                .into(),
+            ),
             ..SchemaObject::default()
         })
     }
 }
-
 
 impl From<&BakerSignatureSignKey> for BakerSignatureVerifyKey {
     fn from(secret: &BakerSignatureSignKey) -> Self {
@@ -613,21 +674,21 @@ pub struct BakerElectionVerifyKey {
     pub(crate) verify_key: ecvrf::PublicKey,
 }
 
-
 impl schemars::JsonSchema for BakerElectionVerifyKey {
-    fn schema_name() -> String {
-        "BakerElectionVerifyKey".into()
-    }
+    fn schema_name() -> String { "BakerElectionVerifyKey".into() }
 
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::*;
-        Schema::Object(SchemaObject{
+        Schema::Object(SchemaObject {
             instance_type: Some(InstanceType::String.into()),
-            string: Some(StringValidation{
-                max_length: Some(64),
-                min_length: Some(64),
-                pattern: Some("^([0-9]?[a-f]?)*$".into()),
-            }.into()),
+            string: Some(
+                StringValidation {
+                    max_length: Some(64),
+                    min_length: Some(64),
+                    pattern:    Some("^([0-9]?[a-f]?)*$".into()),
+                }
+                .into(),
+            ),
             ..SchemaObject::default()
         })
     }
@@ -708,24 +769,24 @@ impl BakerCredentials {
 pub struct CredentialRegistrationID(id::constants::ArCurve);
 
 impl schemars::JsonSchema for CredentialRegistrationID {
-    fn schema_name() -> String {
-        "CredentialRegistrationID".into()
-    }
+    fn schema_name() -> String { "CredentialRegistrationID".into() }
 
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::*;
-        Schema::Object(SchemaObject{
+        Schema::Object(SchemaObject {
             instance_type: Some(InstanceType::String.into()),
-            string: Some(StringValidation{
-                max_length: Some(96),
-                min_length: Some(96),
-                pattern: Some("^([0-9]?[a-f]?)*$".into()),
-            }.into()),
+            string: Some(
+                StringValidation {
+                    max_length: Some(96),
+                    min_length: Some(96),
+                    pattern:    Some("^([0-9]?[a-f]?)*$".into()),
+                }
+                .into(),
+            ),
             ..SchemaObject::default()
         })
     }
 }
-
 
 impl fmt::Display for CredentialRegistrationID {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -742,24 +803,48 @@ pub struct UpdatePublicKey {
 }
 
 impl schemars::JsonSchema for UpdatePublicKey {
-    fn schema_name() -> String {
-        "UpdatePublicKey".into()
-    }
+    fn schema_name() -> String { "UpdatePublicKey".into() }
 
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::*;
-        Schema::Object(SchemaObject{
-            instance_type: Some(InstanceType::String.into()),
-            string: Some(StringValidation{
-                max_length: Some(64),
-                min_length: Some(64),
-                pattern: Some("^([0-9]?[a-f]?)*$".into()),
-            }.into()),
+        let mut properties = BTreeMap::new();
+        properties.insert(
+            "verifyKey".to_string(),
+            Schema::Object(SchemaObject {
+                instance_type: Some(InstanceType::String.into()),
+                string: Some(
+                    StringValidation {
+                        max_length: Some(64),
+                        min_length: Some(64),
+                        pattern:    Some("^([0-9]?[a-f]?)*$".into()),
+                    }
+                    .into(),
+                ),
+                ..SchemaObject::default()
+            }),
+        );
+        properties.insert(
+            "schemeId".to_string(),
+            // Consider adding some validation. It seems to always be "Ed25519"
+            Schema::Object(SchemaObject {
+                instance_type: Some(InstanceType::String.into()),
+                ..SchemaObject::default()
+            }),
+        );
+
+        Schema::Object(SchemaObject {
+            instance_type: Some(InstanceType::Object.into()),
+            object: Some(
+                ObjectValidation {
+                    properties,
+                    ..ObjectValidation::default()
+                }
+                .into(),
+            ),
             ..SchemaObject::default()
         })
     }
 }
-
 
 #[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serial, Into)]
 #[serde(transparent)]
@@ -867,8 +952,7 @@ pub struct CommissionRanges {
     transaction:  InclusiveRange<AmountFraction>,
 }
 
-#[derive(Debug, Copy, Clone, SerdeSerialize, SerdeDeserialize)]
-#[derive(schemars::JsonSchema)] // TODO: Check in serde that min <= max
+#[derive(Debug, Copy, Clone, SerdeSerialize, SerdeDeserialize, schemars::JsonSchema)] // TODO: Check in serde that min <= max
 pub struct InclusiveRange<T> {
     min: T,
     max: T,
@@ -894,8 +978,7 @@ impl<T: Ord> InclusiveRange<T> {
     pub fn contains(&self, x: &T) -> bool { &self.min <= x && x <= &self.max }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, Copy)]
-#[derive(schemars::JsonSchema)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, Copy, schemars::JsonSchema)]
 pub struct ExchangeRate {
     #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
     pub numerator:   u64,
@@ -1042,9 +1125,7 @@ pub struct MintRate {
 }
 
 impl schemars::JsonSchema for MintRate {
-    fn schema_name() -> String {
-        "MintRate".into()
-    }
+    fn schema_name() -> String { "MintRate".into() }
 
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         rust_decimal::Decimal::json_schema(gen) // TODO: Could be more precise
@@ -1105,7 +1186,7 @@ pub struct CapitalBound {
     pub bound: AmountFraction,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize, schemars::JsonSchema)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
 /// Sequential index of finalization.

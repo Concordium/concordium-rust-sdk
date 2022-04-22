@@ -516,7 +516,7 @@ pub enum TransactionStatus {
     Committed(BTreeMap<hashes::TransactionHash, BlockItemSummary>),
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, schemars::JsonSchema)]
 #[serde(tag = "tag")]
 /// In addition to the user initiated transactions the protocol generates some
 /// events which are deemed "Special outcomes". These are rewards for running
@@ -527,6 +527,7 @@ pub enum SpecialTransactionOutcome {
     /// in the epoch.
     BakingRewards {
         #[serde(with = "crate::internal::account_amounts")]
+        #[schemars(with = "BTreeMap<AccountAddress, Amount>")]
         baker_rewards: BTreeMap<AccountAddress, Amount>,
         /// Remaining balance of the baking account. This will be transfered to
         /// the next epoch's reward account. It exists since it is not possible
@@ -552,6 +553,7 @@ pub enum SpecialTransactionOutcome {
     /// Distribution of finalization rewards.
     FinalizationRewards {
         #[serde(with = "crate::internal::account_amounts")]
+        #[schemars(with = "BTreeMap<AccountAddress, Amount>")]
         finalization_rewards: BTreeMap<AccountAddress, Amount>,
         /// Remaining balance of the finalization reward account. It exists
         /// since it is not possible to perfectly distribute the
@@ -667,7 +669,7 @@ impl SpecialTransactionOutcome {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockSummaryData<Upd> {
     /// Outcomes of transactions in this block, ordered as in the block.
@@ -683,7 +685,7 @@ pub struct BlockSummaryData<Upd> {
     pub finalization_data:     Option<FinalizationSummary>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize)]
+#[derive(SerdeSerialize, SerdeDeserialize, schemars::JsonSchema)]
 // serialize as untagged, deserialization is custom, looking at the protocol version.
 #[serde(untagged, try_from = "block_summary_parser::BlockSummaryRaw")]
 /// Summary of transactions, protocol generated transfers, and chain parameters
@@ -693,6 +695,7 @@ pub enum BlockSummary {
     V0 {
         /// Protocol version at which this block was baked. This is no more than
         /// [ProtocolVersion::P3]
+        #[schemars(with = "u64")]
         protocol_version: ProtocolVersion,
         #[serde(flatten)]
         data:             BlockSummaryData<Updates<ChainParameterVersion0>>,
@@ -701,6 +704,7 @@ pub enum BlockSummary {
     V1 {
         /// Protocol version at which this block was baked. This is at least
         /// [ProtocolVersion::P4]
+        #[schemars(with = "u64")]
         protocol_version: ProtocolVersion,
         #[serde(flatten)]
         data:             BlockSummaryData<Updates<ChainParameterVersion1>>,
@@ -796,7 +800,7 @@ impl BlockSummary {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, schemars::JsonSchema)]
 /// Summary of the finalization record in a block, if any.
 pub struct FinalizationSummary {
     #[serde(rename = "finalizationBlockPointer")]
@@ -809,7 +813,7 @@ pub struct FinalizationSummary {
     pub finalizers:    Vec<FinalizationSummaryParty>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// Details of a party in a finalization.
 pub struct FinalizationSummaryParty {
@@ -1040,7 +1044,7 @@ impl AccountTransactionEffects {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, schemars::JsonSchema)]
 /// A successful contract invocation produces a sequence of effects on smart
 /// contracts and possibly accounts (if any contract transfers CCD to an
 /// account).
@@ -1066,7 +1070,7 @@ pub enum ContractTraceElement {
     },
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, schemars::JsonSchema)]
 /// Data contained in the transaction response in case a baker stake was updated
 /// (either increased or decreased.)
 pub struct BakerStakeUpdatedData {
@@ -1241,7 +1245,7 @@ pub enum AccountTransactionEffects {
 
 /// Events that may happen as a result of the
 /// [TransactionType::ConfigureDelegation] transaction.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, schemars::JsonSchema)]
 pub enum DelegationEvent {
     DelegationStakeIncreased {
         /// Delegator's id
@@ -1279,7 +1283,7 @@ pub enum DelegationEvent {
 
 /// Events that may result from the [TransactionType::ConfigureBaker]
 /// transaction.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, schemars::JsonSchema)]
 pub enum BakerEvent {
     BakerAdded {
         data: Box<BakerAddedEvent>,
@@ -1341,7 +1345,7 @@ pub enum BakerEvent {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, schemars::JsonSchema)]
 /// Details of an account creation. These transactions are free, and we only
 /// ever get a response for them if the account is created, hence no failure
 /// cases.
@@ -1540,55 +1544,42 @@ mod wrappers {
     #[repr(transparent)]
     #[derive(JsonSchema)]
     #[schemars(transparent)]
-    pub struct WrappedCurve{
-        #[schemars(with = "crate::internal::HexSchema")] // TODO: This is no as precise as it could be.
-        inner: id::constants::ArCurve
+    pub struct WrappedCurve {
+        #[schemars(with = "crate::internal::HexSchema")]
+        // TODO: This is not as precise as it could be.
+        inner: id::constants::ArCurve,
     }
 
-    #[derive(Clone, Debug)]
-    #[derive(JsonSchema)]
+    #[derive(Clone, Debug, JsonSchema)]
     #[schemars(transparent)]
-    pub struct WrappedPairing{
-        #[schemars(with = "crate::internal::HexSchema")] // TODO: This is no as precise as it could be.
-        inner: id::constants::IpPairing
+    pub struct WrappedPairing {
+        #[schemars(with = "crate::internal::HexSchema")]
+        // TODO: This is no as precise as it could be.
+        inner: id::constants::IpPairing,
     }
 
     impl id::curve_arithmetic::Pairing for WrappedPairing {
-        type ScalarField = <id::constants::IpPairing as Pairing>::ScalarField;
-
-        type G1 = <id::constants::IpPairing as Pairing>::G1;
-
-        type G2 = <id::constants::IpPairing as Pairing>::G2;
-
-        type G1Prepared = <id::constants::IpPairing as Pairing>::G1Prepared;
-
-        type G2Prepared = <id::constants::IpPairing as Pairing>::G2Prepared;
-
         type BaseField = <id::constants::IpPairing as Pairing>::BaseField;
-
+        type G1 = <id::constants::IpPairing as Pairing>::G1;
+        type G1Prepared = <id::constants::IpPairing as Pairing>::G1Prepared;
+        type G2 = <id::constants::IpPairing as Pairing>::G2;
+        type G2Prepared = <id::constants::IpPairing as Pairing>::G2Prepared;
+        type ScalarField = <id::constants::IpPairing as Pairing>::ScalarField;
         type TargetField = <id::constants::IpPairing as Pairing>::TargetField;
 
         fn miller_loop<'a, I>(i: I) -> Self::TargetField
-    where
-        I: IntoIterator<Item = &'a (&'a Self::G1Prepared, &'a Self::G2Prepared)> {
-        todo!()
-    }
+        where
+            I: IntoIterator<Item = &'a (&'a Self::G1Prepared, &'a Self::G2Prepared)>, {
+            todo!()
+        }
 
-        fn final_exponentiation(_: &Self::TargetField) -> Option<Self::TargetField> {
-        todo!()
-    }
+        fn final_exponentiation(_: &Self::TargetField) -> Option<Self::TargetField> { todo!() }
 
-        fn g1_prepare(_: &Self::G1) -> Self::G1Prepared {
-        todo!()
-    }
+        fn g1_prepare(_: &Self::G1) -> Self::G1Prepared { todo!() }
 
-        fn g2_prepare(_: &Self::G2) -> Self::G2Prepared {
-        todo!()
-    }
+        fn g2_prepare(_: &Self::G2) -> Self::G2Prepared { todo!() }
 
-        fn generate_scalar<R: rand::Rng>(rng: &mut R) -> Self::ScalarField {
-        todo!()
-    }
+        fn generate_scalar<R: rand::Rng>(rng: &mut R) -> Self::ScalarField { todo!() }
     }
 
     impl id::curve_arithmetic::Curve for WrappedCurve {
@@ -1990,19 +1981,20 @@ pub struct RegisteredData {
 }
 
 impl schemars::JsonSchema for RegisteredData {
-    fn schema_name() -> String {
-        "RegisteredData".into()
-    }
+    fn schema_name() -> String { "RegisteredData".into() }
 
     fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::*;
-        Schema::Object(SchemaObject{
+        Schema::Object(SchemaObject {
             instance_type: Some(InstanceType::String.into()),
-            string: Some(StringValidation{
-                max_length: Some(MAX_REGISTERED_DATA_SIZE as u32),
-                min_length: Some(0),
-                pattern: Some("^([0-9]?[a-f]?)*$".into()),
-            }.into()),
+            string: Some(
+                StringValidation {
+                    max_length: Some(MAX_REGISTERED_DATA_SIZE as u32),
+                    min_length: Some(0),
+                    pattern:    Some("^([0-9]?[a-f]?)*$".into()),
+                }
+                .into(),
+            ),
             ..SchemaObject::default()
         })
     }
@@ -2066,24 +2058,24 @@ pub struct Memo {
 }
 
 impl schemars::JsonSchema for Memo {
-    fn schema_name() -> String {
-        "Memo".into()
-    }
+    fn schema_name() -> String { "Memo".into() }
 
     fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::*;
-        Schema::Object(SchemaObject{
+        Schema::Object(SchemaObject {
             instance_type: Some(InstanceType::String.into()),
-            string: Some(StringValidation{
-                max_length: Some(MAX_MEMO_SIZE as u32),
-                min_length: Some(0),
-                pattern: Some("^([0-9]?[a-f]?)*$".into()),
-            }.into()),
+            string: Some(
+                StringValidation {
+                    max_length: Some(MAX_MEMO_SIZE as u32),
+                    min_length: Some(0),
+                    pattern:    Some("^([0-9]?[a-f]?)*$".into()),
+                }
+                .into(),
+            ),
             ..SchemaObject::default()
         })
     }
 }
-
 
 /// An error used to signal that an object was too big to be converted.
 #[derive(Display, Error, Debug)]
@@ -2110,7 +2102,7 @@ impl Deserial for Memo {
     }
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// The current collection of keys allowed to do updates.
 /// Parametrized by the chain parameter version.
@@ -2124,7 +2116,7 @@ pub struct UpdateKeysCollectionSkeleton<Auths> {
 
 pub type UpdateKeysCollection<CPV> = UpdateKeysCollectionSkeleton<Authorizations<CPV>>;
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// Values of chain parameters that can be updated via chain updates.
 pub struct ChainParametersV0 {
@@ -2216,7 +2208,7 @@ pub struct PoolParameters {
     pub leverage_bound:              LeverageFactor,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// Values of chain parameters that can be updated via chain updates.
 pub struct ChainParametersV1 {
@@ -2256,7 +2248,7 @@ impl ChainParametersFamily for ChainParameterVersion1 {
 
 pub type ChainParameters<CPV> = <CPV as ChainParametersFamily>::Output;
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// Values of reward parameters.
 pub struct RewardParametersSkeleton<MD> {
@@ -2268,7 +2260,7 @@ pub struct RewardParametersSkeleton<MD> {
 
 pub type RewardParameters<CPV> = RewardParametersSkeleton<MintDistribution<CPV>>;
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone, Copy)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone, Copy, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// A scheduled update of a given type.
 pub struct ScheduledUpdate<T> {
@@ -2276,7 +2268,7 @@ pub struct ScheduledUpdate<T> {
     pub update:         T,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// A queue of updates of a given type.
 pub struct UpdateQueue<T> {
@@ -2286,7 +2278,7 @@ pub struct UpdateQueue<T> {
     pub queue:                Vec<ScheduledUpdate<T>>,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PendingUpdatesV0 {
     pub root_keys:                    UpdateQueue<HigherLevelAccessStructure<RootKeysKind>>,
@@ -2302,11 +2294,14 @@ pub struct PendingUpdatesV0 {
     pub transaction_fee_distribution: UpdateQueue<TransactionFeeDistribution>,
     pub gas_rewards:                  UpdateQueue<GASRewards>,
     pub baker_stake_threshold:        UpdateQueue<Amount>,
+    #[schemars(with = "UpdateQueue<id::types::ArInfo<wrappers::WrappedCurve>>")] // TODO: Fix this
     pub add_anonymity_revoker:        UpdateQueue<id::types::ArInfo<id::constants::ArCurve>>,
+    #[schemars(with = "UpdateQueue<id::types::IpInfo<wrappers::WrappedPairing>>")]
+    // TODO: Fix this
     pub add_identity_provider:        UpdateQueue<id::types::IpInfo<id::constants::IpPairing>>,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PendingUpdatesV1 {
     pub root_keys:                    UpdateQueue<HigherLevelAccessStructure<RootKeysKind>>,
@@ -2322,7 +2317,10 @@ pub struct PendingUpdatesV1 {
     pub transaction_fee_distribution: UpdateQueue<TransactionFeeDistribution>,
     pub gas_rewards:                  UpdateQueue<GASRewards>,
     pub pool_parameters:              UpdateQueue<PoolParameters>,
+    #[schemars(with = "UpdateQueue<id::types::ArInfo<wrappers::WrappedCurve>>")] // TODO: Fix this
     pub add_anonymity_revoker:        UpdateQueue<id::types::ArInfo<id::constants::ArCurve>>,
+    #[schemars(with = "UpdateQueue<id::types::IpInfo<wrappers::WrappedPairing>>")]
+    // TODO: Fix this
     pub add_identity_provider:        UpdateQueue<id::types::IpInfo<id::constants::IpPairing>>,
     pub cooldown_parameters:          UpdateQueue<CooldownParameters>,
     pub time_parameters:              UpdateQueue<TimeParameters>,
@@ -2342,7 +2340,7 @@ impl PendingUpdatesFamily for ChainParameterVersion1 {
 
 pub type PendingUpdates<CPV> = <CPV as PendingUpdatesFamily>::Output;
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// State of updates. This includes current values of parameters as well as any
 /// scheduled updates.

@@ -136,23 +136,23 @@ pub(crate) mod duration_millis {
     }
 }
 
-
 pub(crate) struct HexSchema;
 
 impl schemars::JsonSchema for HexSchema {
-    fn schema_name() -> String {
-        "Hex string".into()
-    }
+    fn schema_name() -> String { "Hex string".into() }
 
     fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::*;
-        Schema::Object(SchemaObject{
+        Schema::Object(SchemaObject {
             instance_type: Some(InstanceType::String.into()),
-            string: Some(StringValidation{
-                max_length: None,
-                min_length: Some(0),
-                pattern: Some("^([0-9]?[a-f]?)*$".into()),
-            }.into()),
+            string: Some(
+                StringValidation {
+                    max_length: None,
+                    min_length: Some(0),
+                    pattern:    Some("^([0-9]?[a-f]?)*$".into()),
+                }
+                .into(),
+            ),
             ..SchemaObject::default()
         })
     }
