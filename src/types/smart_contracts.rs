@@ -19,12 +19,19 @@ use std::convert::{TryFrom, TryInto};
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Copy, Clone, Display)]
 #[serde(try_from = "u8", into = "u8")]
 #[repr(u8)]
-#[derive(schemars::JsonSchema)]
 pub enum WasmVersion {
     #[display = "V0"]
     V0 = 0u8,
     #[display = "V1"]
     V1,
+}
+
+impl schemars::JsonSchema for WasmVersion {
+    fn schema_name() -> String { "WasmVersion".into() }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        u8::json_schema(gen)
+    }
 }
 
 /// V0 is the default version of smart contracts.
@@ -85,9 +92,17 @@ pub enum InstanceInfo {
     },
 }
 
+impl schemars::JsonSchema for InstanceInfo {
+    fn schema_name() -> String { "InstanceInfo".into() }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        instance_parser::InstanceInfoHelper::json_schema(gen)
+    }
+}
+
 mod instance_parser {
     use super::*;
-    #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+    #[derive(SerdeSerialize, SerdeDeserialize, Debug, schemars::JsonSchema)]
     #[serde(rename_all = "camelCase", tag = "version")]
     /// Helper struct to derive JSON instances for super::InstanceInfo.
     pub struct InstanceInfoHelper {
@@ -171,12 +186,13 @@ mod instance_parser {
     }
 }
 
+/// FIXME: Add structure.
 #[derive(
     SerdeSerialize, SerdeDeserialize, Serial, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Clone,
 )]
 #[serde(into = "String", try_from = "String")]
-/// FIXME: Add structure.
 #[derive(schemars::JsonSchema)]
+#[schemars(transparent)]
 pub struct ReceiveName {
     #[string_size_length = 2]
     pub name: String,
@@ -215,6 +231,7 @@ impl Deserial for ReceiveName {
 #[serde(into = "String", try_from = "String")]
 /// FIXME: Add structure.
 #[derive(schemars::JsonSchema)]
+#[schemars(transparent)]
 pub struct InitName {
     #[string_size_length = 2]
     name: String,
@@ -259,7 +276,7 @@ pub struct Parameter {
 impl schemars::JsonSchema for Parameter {
     fn schema_name() -> String { "Parameter".into() }
 
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::*;
         Schema::Object(SchemaObject {
             instance_type: Some(InstanceType::String.into()),
@@ -310,7 +327,7 @@ pub struct ContractEvent {
 impl schemars::JsonSchema for ContractEvent {
     fn schema_name() -> String { "ContractEvent".into() }
 
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::*;
         Schema::Object(SchemaObject {
             instance_type: Some(InstanceType::String.into()),

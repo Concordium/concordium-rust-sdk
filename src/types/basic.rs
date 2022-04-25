@@ -12,7 +12,7 @@ use std::{collections::BTreeMap, convert::TryFrom, fmt, str::FromStr};
 use thiserror::Error;
 
 /// Duration of a slot in milliseconds.
-#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize, schemars::JsonSchema)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
 pub struct SlotDuration {
@@ -244,7 +244,7 @@ pub struct AccountStakingDelegationInfo {
 }
 
 /// Slot number
-#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize, schemars::JsonSchema)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
 pub struct Slot {
@@ -272,7 +272,7 @@ pub struct Epoch {
     pub epoch: u64,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize, schemars::JsonSchema)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
 pub struct Nonce {
@@ -365,7 +365,7 @@ pub struct BlockHeight {
 /// Type indicating the index of a (re)genesis block.
 /// The initial genesis block has index `0` and each subsequent regenesis
 /// has an incrementally higher index.
-#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize, schemars::JsonSchema)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
 pub struct GenesisIndex {
@@ -388,6 +388,14 @@ pub enum ProtocolVersion {
     P3,
     #[display(fmt = "P4")]
     P4,
+}
+
+impl schemars::JsonSchema for ProtocolVersion {
+    fn schema_name() -> String { "ProtocolVersion".into() }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        u64::json_schema(gen)
+    }
 }
 
 #[derive(Debug, Error, Display)]
@@ -442,7 +450,7 @@ pub struct ChainParameterVersion0;
 pub struct ChainParameterVersion1;
 
 /// Height of a block since chain genesis.
-#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize, schemars::JsonSchema)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
 pub struct AbsoluteBlockHeight {
@@ -581,7 +589,7 @@ pub struct BakerAggregationVerifyKey {
 impl schemars::JsonSchema for BakerAggregationVerifyKey {
     fn schema_name() -> String { "BakerAggregationVerifyKey".into() }
 
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::*;
         Schema::Object(SchemaObject {
             instance_type: Some(InstanceType::String.into()),
@@ -629,7 +637,7 @@ pub struct BakerSignatureVerifyKey {
 impl schemars::JsonSchema for BakerSignatureVerifyKey {
     fn schema_name() -> String { "BakerSignatureVerifyKey".into() }
 
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::*;
         Schema::Object(SchemaObject {
             instance_type: Some(InstanceType::String.into()),
@@ -677,7 +685,7 @@ pub struct BakerElectionVerifyKey {
 impl schemars::JsonSchema for BakerElectionVerifyKey {
     fn schema_name() -> String { "BakerElectionVerifyKey".into() }
 
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::*;
         Schema::Object(SchemaObject {
             instance_type: Some(InstanceType::String.into()),
@@ -771,7 +779,7 @@ pub struct CredentialRegistrationID(id::constants::ArCurve);
 impl schemars::JsonSchema for CredentialRegistrationID {
     fn schema_name() -> String { "CredentialRegistrationID".into() }
 
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::*;
         Schema::Object(SchemaObject {
             instance_type: Some(InstanceType::String.into()),

@@ -4,7 +4,7 @@ use super::{basic::*, hashes::*, network::RemotePeerId};
 use crypto_common::{SerdeDeserialize, SerdeSerialize};
 use std::net::IpAddr;
 
-#[derive(SerdeDeserialize, Debug, SerdeSerialize)]
+#[derive(SerdeDeserialize, Debug, SerdeSerialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// Metadata about a given block.
 pub struct BlockInfo {
@@ -52,7 +52,7 @@ pub struct BlockInfo {
     pub block_baker:             Option<BakerId>,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// Summary of the current state of consensus.
 pub struct ConsensusInfo {
@@ -89,6 +89,7 @@ pub struct ConsensusInfo {
     /// The number of completed finalizations.
     pub finalization_count:             u64,
     #[serde(with = "crate::internal::duration_millis")]
+    #[schemars(with = "i64")] // TODO: Not sure if this is correct.
     /// Duration of an epoch.
     pub epoch_duration:                 chrono::Duration,
     /// Number of blocks that arrived, i.e., were added to the tree. Note that
@@ -147,7 +148,7 @@ pub struct ConsensusInfo {
     pub current_era_genesis_time:       chrono::DateTime<chrono::Utc>,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// Branches of the tree. This is the part of the tree above the last finalized
 /// block.

@@ -62,7 +62,7 @@ pub struct AccountEncryptedAmount {
     pub incoming_amounts:  Vec<encrypted_transfers::types::EncryptedAmount<ArCurve>>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// State of the account's release schedule. This is the balance of the account
 /// that is owned by the account, but cannot be used until the release point.
@@ -73,11 +73,12 @@ pub struct AccountReleaseSchedule {
     pub schedule: Vec<Release>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// An individual release of a locked balance.
 pub struct Release {
     #[serde(with = "crate::internal::timestamp_millis")]
+    #[schemars(with = "i64")] // TODO: Consider making wrapper type.
     /// Effective time of release.
     pub timestamp:    chrono::DateTime<chrono::Utc>,
     /// Amount to be released.
@@ -246,7 +247,15 @@ pub enum RewardsOverview {
     },
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
+impl schemars::JsonSchema for RewardsOverview {
+    fn schema_name() -> String { "RewardsOverview".into() }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        rewards_overview::RewardsDataRaw::json_schema(gen)
+    }
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// Reward data common to both V0 and V1 rewards.
 pub struct CommonRewardData {
@@ -267,7 +276,7 @@ pub struct CommonRewardData {
 
 mod rewards_overview {
     use super::*;
-    #[derive(SerdeDeserialize)]
+    #[derive(SerdeDeserialize, schemars::JsonSchema)]
     pub struct RewardsDataRaw {
         #[serde(flatten)]
         common: CommonRewardData,
@@ -695,7 +704,6 @@ pub enum BlockSummary {
     V0 {
         /// Protocol version at which this block was baked. This is no more than
         /// [ProtocolVersion::P3]
-        #[schemars(with = "u64")]
         protocol_version: ProtocolVersion,
         #[serde(flatten)]
         data:             BlockSummaryData<Updates<ChainParameterVersion0>>,
@@ -704,7 +712,6 @@ pub enum BlockSummary {
     V1 {
         /// Protocol version at which this block was baked. This is at least
         /// [ProtocolVersion::P4]
-        #[schemars(with = "u64")]
         protocol_version: ProtocolVersion,
         #[serde(flatten)]
         data:             BlockSummaryData<Updates<ChainParameterVersion1>>,
@@ -1567,7 +1574,7 @@ mod wrappers {
         type ScalarField = <id::constants::IpPairing as Pairing>::ScalarField;
         type TargetField = <id::constants::IpPairing as Pairing>::TargetField;
 
-        fn miller_loop<'a, I>(i: I) -> Self::TargetField
+        fn miller_loop<'a, I>(_i: I) -> Self::TargetField
         where
             I: IntoIterator<Item = &'a (&'a Self::G1Prepared, &'a Self::G2Prepared)>, {
             todo!()
@@ -1579,7 +1586,7 @@ mod wrappers {
 
         fn g2_prepare(_: &Self::G2) -> Self::G2Prepared { todo!() }
 
-        fn generate_scalar<R: rand::Rng>(rng: &mut R) -> Self::ScalarField { todo!() }
+        fn generate_scalar<R: rand::Rng>(_rng: &mut R) -> Self::ScalarField { todo!() }
     }
 
     impl id::curve_arithmetic::Curve for WrappedCurve {
@@ -1600,37 +1607,37 @@ mod wrappers {
 
         fn double_point(&self) -> Self { todo!() }
 
-        fn plus_point(&self, other: &Self) -> Self { todo!() }
+        fn plus_point(&self, _other: &Self) -> Self { todo!() }
 
-        fn minus_point(&self, other: &Self) -> Self { todo!() }
+        fn minus_point(&self, _other: &Self) -> Self { todo!() }
 
-        fn mul_by_scalar(&self, scalar: &Self::Scalar) -> Self { todo!() }
+        fn mul_by_scalar(&self, _scalar: &Self::Scalar) -> Self { todo!() }
 
         fn compress(&self) -> Self::Compressed { todo!() }
 
         fn decompress(
-            c: &Self::Compressed,
+            _c: &Self::Compressed,
         ) -> Result<Self, id::curve_arithmetic::CurveDecodingError> {
             todo!()
         }
 
         fn decompress_unchecked(
-            c: &Self::Compressed,
+            _c: &Self::Compressed,
         ) -> Result<Self, id::curve_arithmetic::CurveDecodingError> {
             todo!()
         }
 
-        fn bytes_to_curve_unchecked<R: ReadBytesExt>(b: &mut R) -> anyhow::Result<Self> { todo!() }
+        fn bytes_to_curve_unchecked<R: ReadBytesExt>(_b: &mut R) -> anyhow::Result<Self> { todo!() }
 
-        fn generate<R: rand::Rng>(rng: &mut R) -> Self { todo!() }
+        fn generate<R: rand::Rng>(_rng: &mut R) -> Self { todo!() }
 
-        fn generate_scalar<R: rand::Rng>(rng: &mut R) -> Self::Scalar { todo!() }
+        fn generate_scalar<R: rand::Rng>(_rng: &mut R) -> Self::Scalar { todo!() }
 
-        fn scalar_from_u64(n: u64) -> Self::Scalar { todo!() }
+        fn scalar_from_u64(_n: u64) -> Self::Scalar { todo!() }
 
-        fn scalar_from_bytes<A: AsRef<[u8]>>(bs: A) -> Self::Scalar { todo!() }
+        fn scalar_from_bytes<A: AsRef<[u8]>>(_bs: A) -> Self::Scalar { todo!() }
 
-        fn hash_to_group(m: &[u8]) -> Self { todo!() }
+        fn hash_to_group(_m: &[u8]) -> Self { todo!() }
     }
 }
 
