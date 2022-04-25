@@ -223,7 +223,7 @@ impl Deserial for DelegationTarget {
 
 /// Additional information about a baking pool.
 /// This information is added with the introduction of delegation.
-#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BakerPoolInfo {
     /// Whether the pool allows delegators.
@@ -932,7 +932,7 @@ impl fmt::Display for PartsPerHundredThousands {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, Copy)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, Copy, schemars::JsonSchema)]
 pub struct CommissionRates {
     /// Fraction of finalization rewards charged by the pool owner.
     #[serde(rename = "finalizationCommission")]

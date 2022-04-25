@@ -172,7 +172,7 @@ pub struct AccountInfo {
     pub account_address:          AccountAddress,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// The state of consensus parameters, and allowed participants (i.e., bakers).
 pub struct BirkParameters {
@@ -184,7 +184,7 @@ pub struct BirkParameters {
     pub bakers:              Vec<BirkBaker>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// State of an individual baker.
 pub struct BirkBaker {
@@ -324,7 +324,7 @@ mod rewards_overview {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy, schemars::JsonSchema)]
 #[serde(tag = "pendingChangeType")]
 pub enum PoolPendingChange {
     NoChange,
@@ -342,7 +342,7 @@ pub enum PoolPendingChange {
     },
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CurrentPaydayBakerPoolStatus {
     /// The number of blocks baked in the current reward period.
@@ -379,7 +379,7 @@ mod lottery_power_parser {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, schemars::JsonSchema)]
 #[serde(tag = "poolType")]
 pub enum PoolStatus {
     #[serde(rename_all = "camelCase")]
@@ -407,6 +407,7 @@ pub enum PoolStatus {
         all_pool_total_capital:     Amount,
     },
     #[serde(rename_all = "camelCase")]
+    #[serde(rename = "PassiveDelegation")]
     Passive {
         /// The total capital delegated passively.
         delegated_capital: Amount,
