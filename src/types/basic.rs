@@ -8,7 +8,7 @@ use crypto_common::{
 use derive_more::{Add, Display, From, FromStr, Into};
 use rand::{CryptoRng, Rng};
 use random_oracle::RandomOracle;
-use std::{collections::BTreeMap, convert::TryFrom, fmt, str::FromStr};
+use std::{convert::TryFrom, fmt, str::FromStr};
 use thiserror::Error;
 
 /// Duration of a slot in milliseconds.
@@ -803,55 +803,13 @@ impl fmt::Display for CredentialRegistrationID {
     }
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, Serialize, Clone, Into, From)]
+#[derive(
+    Debug, SerdeSerialize, SerdeDeserialize, Serialize, Clone, Into, From, schemars::JsonSchema,
+)]
 #[serde(transparent)]
 /// A single public key that can sign updates.
 pub struct UpdatePublicKey {
     pub public: id::types::VerifyKey,
-}
-
-impl schemars::JsonSchema for UpdatePublicKey {
-    fn schema_name() -> String { "UpdatePublicKey".into() }
-
-    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        use schemars::schema::*;
-        let mut properties = BTreeMap::new();
-        properties.insert(
-            "verifyKey".to_string(),
-            Schema::Object(SchemaObject {
-                instance_type: Some(InstanceType::String.into()),
-                string: Some(
-                    StringValidation {
-                        max_length: Some(64),
-                        min_length: Some(64),
-                        pattern:    Some("^([0-9]?[a-f]?)*$".into()),
-                    }
-                    .into(),
-                ),
-                ..SchemaObject::default()
-            }),
-        );
-        properties.insert(
-            "schemeId".to_string(),
-            // Consider adding some validation. It seems to always be "Ed25519"
-            Schema::Object(SchemaObject {
-                instance_type: Some(InstanceType::String.into()),
-                ..SchemaObject::default()
-            }),
-        );
-
-        Schema::Object(SchemaObject {
-            instance_type: Some(InstanceType::Object.into()),
-            object: Some(
-                ObjectValidation {
-                    properties,
-                    ..ObjectValidation::default()
-                }
-                .into(),
-            ),
-            ..SchemaObject::default()
-        })
-    }
 }
 
 #[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serial, Into)]

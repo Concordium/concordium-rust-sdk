@@ -21,7 +21,7 @@ use derive_more::*;
 use id::{
     constants::{ArCurve, AttributeKind},
     elgamal,
-    types::{AccountAddress, AccountCredentialWithoutProofs},
+    types::{AccountAddress, AccountCredentialWithoutProofs, ArPublicKeySchemaType},
 };
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
@@ -31,7 +31,7 @@ use std::{
 };
 use thiserror::Error;
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// The state of the encrypted balance of an account.
 pub struct AccountEncryptedAmount {
@@ -43,6 +43,7 @@ pub struct AccountEncryptedAmount {
     /// - encrypted amounts that are transferred from public balance
     ///
     /// When a transfer is made all of these must always be used.
+    #[schemars(with = "encrypted_transfers::types::EncryptedAmount<wrappers::WrappedCurve>")]
     pub self_amount:       encrypted_transfers::types::EncryptedAmount<ArCurve>,
     /// Starting index for incoming encrypted amounts. If an aggregated amount
     /// is present then this index is associated with such an amount and the
@@ -53,12 +54,16 @@ pub struct AccountEncryptedAmount {
     /// If 'Some', the amount that has resulted from aggregating other amounts
     /// and the number of aggregated amounts (must be at least 2 if
     /// present).
+    #[schemars(
+        with = "Option<(encrypted_transfers::types::EncryptedAmount<wrappers::WrappedCurve>, u32)>"
+    )]
     pub aggregated_amount: Option<(encrypted_transfers::types::EncryptedAmount<ArCurve>, u32)>,
     /// Amounts starting at `start_index` (or at `start_index + 1` if there is
     /// an aggregated amount present). They are assumed to be numbered
     /// sequentially. The length of this list is bounded by the maximum number
     /// of incoming amounts on the accounts, which is currently 32. After
     /// that aggregation kicks in.
+    #[schemars(with = "Vec<encrypted_transfers::types::EncryptedAmount<wrappers::WrappedCurve>>")]
     pub incoming_amounts:  Vec<encrypted_transfers::types::EncryptedAmount<ArCurve>>,
 }
 
@@ -87,7 +92,7 @@ pub struct Release {
     pub transactions: Vec<hashes::TransactionHash>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// Information about a baker.
 pub struct BakerInfo {
@@ -105,7 +110,7 @@ pub struct BakerInfo {
     pub baker_aggregation_verify_key: BakerAggregationVerifyKey,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, schemars::JsonSchema)]
 #[serde(untagged)]
 pub enum AccountStakingInfo {
     #[serde(rename_all = "camelCase")]
@@ -128,7 +133,7 @@ pub enum AccountStakingInfo {
     },
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// Account information exposed via the node's API. This is always the state of
 /// an account in a specific block.
@@ -144,6 +149,9 @@ pub struct AccountInfo {
     /// This includes public keys that can sign for the given credentials, as
     /// well as any revealed attributes. This map always contains a credential
     /// with index 0.
+    #[schemars(with = "std::collections::BTreeMap<CredentialIndex, \
+                       Versioned<AccountCredentialWithoutProofs<wrappers::WrappedCurve, \
+                       AttributeKind>>,>")]
     pub account_credentials: std::collections::BTreeMap<
         CredentialIndex,
         Versioned<AccountCredentialWithoutProofs<ArCurve, AttributeKind>>,
@@ -154,6 +162,7 @@ pub struct AccountInfo {
     /// The encrypted balance of the account.
     pub account_encrypted_amount: AccountEncryptedAmount,
     /// The public key for sending encrypted balances to the account.
+    #[schemars(with = "ArPublicKeySchemaType")]
     pub account_encryption_key:   elgamal::PublicKey<ArCurve>,
     /// Internal index of the account. Accounts on the chain get sequential
     /// indices. These should generally not be used outside of the chain,
@@ -197,7 +206,7 @@ pub struct BirkBaker {
     pub baker_account:       AccountAddress,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy, schemars::JsonSchema)]
 #[serde(tag = "change")]
 /// Pending change in the baker's stake.
 pub enum StakePendingChange {
@@ -492,7 +501,7 @@ pub enum TransactionType {
     ConfigureDelegation,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, schemars::JsonSchema)]
 #[serde(tag = "status", content = "result", rename_all = "camelCase")]
 /// Status of a transaction in a given block.
 /// NB: If the transaction is committed or finalized, but not in the given
@@ -1544,7 +1553,7 @@ pub enum UpdatePayload {
     MintDistributionCPV1(MintDistribution<ChainParameterVersion1>),
 }
 
-mod wrappers {
+pub mod wrappers {
     use super::*;
     use id::curve_arithmetic::*;
 

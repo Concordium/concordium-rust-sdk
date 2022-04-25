@@ -159,7 +159,7 @@ pub struct Branch {
     pub children:   Vec<Branch>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// Best guess about the current account nonce, with information about
 /// reliability.
