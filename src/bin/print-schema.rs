@@ -1,7 +1,12 @@
-use concordium_rust_sdk::types::{
-    hashes::TransactionHash,
-    queries::*,
-    smart_contracts::{InstanceInfo, ModuleRef},
+use anyhow::Context;
+use concordium_rust_sdk::{
+    self, endpoints,
+    types::{
+        hashes::TransactionHash,
+        queries::*,
+        smart_contracts::{InstanceInfo, ModuleRef},
+        *,
+    },
     *,
 };
 use id::types::{AccountAddress, ArInfo, GlobalContext, IpInfo};
@@ -9,8 +14,9 @@ use schemars::JsonSchema;
 use std::fs;
 
 const SCHEMA_FOLDER: &str = "schemas";
+const TEST_CASE_FOLDER: &str = "test_cases";
 
-fn main() { generate_and_write_schemas(); }
+// fn main() { generate_and_write_schemas(); }
 
 fn generate_and_write_schemas() {
     // Ensure the schema folder exists.
@@ -51,4 +57,38 @@ fn write_schema_to_file<T: JsonSchema>(endpoint_name: &str) {
         serde_json::to_string_pretty(&schema).expect("Unable to pretty print JSON schema")
     );
     fs::write(file_name, contents).expect("Unable to write file");
+}
+
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> anyhow::Result<()> {
+    // Ensure folder is created for tests
+    let current_test_folder = format!("{}/block_summary", TEST_CASE_FOLDER);
+    fs::create_dir_all(&current_test_folder).expect("Could not create test folder");
+
+    let mut client = endpoints::Client::connect("http://localhost:10000", "rpcadmin").await?;
+
+    let consensus_info = client.get_consensus_status().await?;
+    let gb = consensus_info.genesis_block;
+
+    let mut cb = consensus_info.best_block;
+    while cb != gb {
+        println!("{}", cb);
+
+        // Get block summary and write to a file.
+        let bs = client
+            .get_block_summary_raw(&cb)
+            .await
+            .context("Could not get block summary.")?;
+
+        let file = format!("{}/{}.json", current_test_folder, cb);
+        fs::write(
+            file,
+            serde_json::to_string_pretty(&bs).expect("Unable to pretty print JSON"),
+        )?;
+
+        // Find parent block hash
+        let bi = client.get_block_info(&cb).await?;
+        cb = bi.block_parent;
+    }
+    Ok(())
 }
