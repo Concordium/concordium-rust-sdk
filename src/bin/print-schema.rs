@@ -1,4 +1,5 @@
 use anyhow::Context;
+use common::Versioned;
 use concordium_rust_sdk::{
     self, endpoints,
     types::{
@@ -37,8 +38,8 @@ fn generate_and_write_schemas() {
     write_schema_to_file::<Vec<ContractAddress>>("GetInstances");
     write_schema_to_file::<AccountInfo>("GetAccountInfo");
     write_schema_to_file::<Vec<TransactionHash>>("GetAccountNonFinalized");
-    write_schema_to_file::<AccountNonceResponse>("NextAccountNonce");
-    write_schema_to_file::<InstanceInfo>("GetInstances");
+    write_schema_to_file::<AccountNonceResponse>("GetNextAccountNonce");
+    write_schema_to_file::<InstanceInfo>("GetInstanceInfo");
     // InvokeContract (Omitted)
     write_schema_to_file::<PoolStatus>("GetPoolStatus");
     write_schema_to_file::<Vec<BakerId>>("GetBakerList");
@@ -50,7 +51,9 @@ fn generate_and_write_schemas() {
     // GetBannedPeers..DumpStop (Omitted)
     write_schema_to_file::<Vec<IpInfo<wrappers::WrappedPairing>>>("GetIdentityProviders");
     write_schema_to_file::<Vec<ArInfo<wrappers::WrappedCurve>>>("GetAnonymityRevokers");
-    write_schema_to_file::<GlobalContext<wrappers::WrappedCurve>>("GetCryptographicParameters");
+    write_schema_to_file::<Versioned<GlobalContext<wrappers::WrappedCurve>>>(
+        "GetCryptographicParameters",
+    );
 }
 
 fn write_schema_to_file<T: JsonSchema>(endpoint_name: &str) {
