@@ -51,9 +51,9 @@ pub(crate) mod account_amounts {
     use serde::de::Error;
     use std::collections::BTreeMap;
 
-    #[derive(SerdeSerialize, SerdeDeserialize)]
+    #[derive(SerdeSerialize, SerdeDeserialize, schemars::JsonSchema)]
     #[serde(rename_all = "camelCase")]
-    struct AccountAmount {
+    pub(crate) struct AccountAmount {
         address: AccountAddress,
         amount:  Amount,
     }

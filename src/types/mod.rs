@@ -546,7 +546,7 @@ pub enum SpecialTransactionOutcome {
     /// in the epoch.
     BakingRewards {
         #[serde(with = "crate::internal::account_amounts")]
-        #[schemars(with = "BTreeMap<AccountAddress, Amount>")]
+        #[schemars(with = "Vec<crate::internal::account_amounts::AccountAmount>")]
         baker_rewards: BTreeMap<AccountAddress, Amount>,
         /// Remaining balance of the baking account. This will be transfered to
         /// the next epoch's reward account. It exists since it is not possible
@@ -572,7 +572,7 @@ pub enum SpecialTransactionOutcome {
     /// Distribution of finalization rewards.
     FinalizationRewards {
         #[serde(with = "crate::internal::account_amounts")]
-        #[schemars(with = "BTreeMap<AccountAddress, Amount>")]
+        #[schemars(with = "Vec<crate::internal::account_amounts::AccountAmount>")]
         finalization_rewards: BTreeMap<AccountAddress, Amount>,
         /// Remaining balance of the finalization reward account. It exists
         /// since it is not possible to perfectly distribute the
