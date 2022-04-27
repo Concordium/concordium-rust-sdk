@@ -16,7 +16,12 @@ use std::fs;
 const SCHEMA_FOLDER: &str = "schemas";
 const TEST_CASE_FOLDER: &str = "test_cases";
 
-// fn main() { generate_and_write_schemas(); }
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> anyhow::Result<()> {
+    generate_and_write_schemas();
+    // crawl_and_save_block_summaries().await?;
+    Ok(())
+}
 
 fn generate_and_write_schemas() {
     // Ensure the schema folder exists.
@@ -59,8 +64,7 @@ fn write_schema_to_file<T: JsonSchema>(endpoint_name: &str) {
     fs::write(file_name, contents).expect("Unable to write file");
 }
 
-#[tokio::main(flavor = "multi_thread")]
-async fn main() -> anyhow::Result<()> {
+async fn crawl_and_save_block_summaries() -> anyhow::Result<()> {
     // Ensure folder is created for tests
     let current_test_folder = format!("{}/block_summary", TEST_CASE_FOLDER);
     fs::create_dir_all(&current_test_folder).expect("Could not create test folder");
