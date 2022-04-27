@@ -49,7 +49,7 @@ pub struct AccountEncryptedAmount {
     /// + 1`.
     pub start_index:       u64,
     #[serde(default)]
-    /// If 'Some', the amount that has resulted from aggregating other amounts
+    /// If ['Some'], the amount that has resulted from aggregating other amounts
     /// and the number of aggregated amounts (must be at least 2 if
     /// present).
     pub aggregated_amount: Option<(encrypted_transfers::types::EncryptedAmount<ArCurve>, u32)>,
@@ -1972,10 +1972,10 @@ pub struct ChainParametersV0 {
 pub struct CooldownParameters {
     /// Number of seconds that pool owners must cooldown
     /// when reducing their equity capital or closing the pool.
-    pool_owner_cooldown: DurationSeconds,
+    pub pool_owner_cooldown: DurationSeconds,
     /// Number of seconds that a delegator must cooldown
     /// when reducing their delegated stake.
-    delegator_cooldown:  DurationSeconds,
+    pub delegator_cooldown:  DurationSeconds,
 }
 
 /// Length of a reward period in epochs.
@@ -2003,6 +2003,9 @@ pub struct RewardPeriodLength {
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, Serialize, Copy, Clone)]
 #[serde(rename_all = "camelCase")]
+/// The time parameters are introduced as of protocol version 4, and consist of
+/// the reward period length and the mint rate per payday. These are coupled as
+/// a change to either affects the overall rate of minting.
 pub struct TimeParameters {
     pub reward_period_length: RewardPeriodLength,
     pub mint_per_payday:      MintRate,
@@ -2013,22 +2016,22 @@ pub struct TimeParameters {
 /// Parameters related to staking pools.
 pub struct PoolParameters {
     /// Fraction of finalization rewards charged by the passive delegation.
-    passive_finalization_commission: AmountFraction,
+    pub passive_finalization_commission: AmountFraction,
     /// Fraction of baking rewards charged by the passive delegation.
-    passive_baking_commission:       AmountFraction,
+    pub passive_baking_commission:       AmountFraction,
     /// Fraction of transaction rewards charged by the L-pool.
-    passive_transaction_commission:  AmountFraction,
+    pub passive_transaction_commission:  AmountFraction,
     /// Bounds on the commission rates that may be charged by bakers.
     #[serde(flatten)]
-    pub commission_bounds:           CommissionRanges,
+    pub commission_bounds:               CommissionRanges,
     /// Minimum equity capital required for a new baker.
-    pub minimum_equity_capital:      Amount,
+    pub minimum_equity_capital:          Amount,
     /// Maximum fraction of the total staked capital of that a new baker can
     /// have.
-    pub capital_bound:               CapitalBound,
+    pub capital_bound:                   CapitalBound,
     /// The maximum leverage that a baker can have as a ratio of total stake
     /// to equity capital.
-    pub leverage_bound:              LeverageFactor,
+    pub leverage_bound:                  LeverageFactor,
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize)]

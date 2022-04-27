@@ -8,7 +8,11 @@ use crypto_common::{
 use derive_more::{Add, Display, From, FromStr, Into};
 use rand::{CryptoRng, Rng};
 use random_oracle::RandomOracle;
-use std::{convert::TryFrom, fmt, str::FromStr};
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt,
+    str::FromStr,
+};
 use thiserror::Error;
 
 /// Duration of a slot in milliseconds.
@@ -717,17 +721,17 @@ impl fmt::Display for PartsPerHundredThousands {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, Copy)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize, Debug, Clone, Copy)]
 pub struct CommissionRates {
     /// Fraction of finalization rewards charged by the pool owner.
     #[serde(rename = "finalizationCommission")]
-    finalization: AmountFraction,
+    pub finalization: AmountFraction,
     /// Fraction of baking rewards charged by the pool owner.
     #[serde(rename = "bakingCommission")]
-    baking:       AmountFraction,
+    pub baking:       AmountFraction,
     /// Fraction of transaction rewards charged by the pool owner.
     #[serde(rename = "transactionCommission")]
-    transaction:  AmountFraction,
+    pub transaction:  AmountFraction,
 }
 
 #[derive(Serialize, SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -735,19 +739,19 @@ pub struct CommissionRates {
 pub struct CommissionRanges {
     /// The range of allowed finalization commissions.
     #[serde(rename = "finalizationCommissionRange")]
-    finalization: InclusiveRange<AmountFraction>,
+    pub finalization: InclusiveRange<AmountFraction>,
     /// The range of allowed baker commissions.
     #[serde(rename = "bakingCommissionRange")]
-    baking:       InclusiveRange<AmountFraction>,
+    pub baking:       InclusiveRange<AmountFraction>,
     /// The range of allowed transaction commissions.
     #[serde(rename = "transactionCommissionRange")]
-    transaction:  InclusiveRange<AmountFraction>,
+    pub transaction:  InclusiveRange<AmountFraction>,
 }
 
 #[derive(Debug, Copy, Clone, SerdeSerialize, SerdeDeserialize)]
 pub struct InclusiveRange<T> {
-    min: T,
-    max: T,
+    pub min: T,
+    pub max: T,
 }
 
 impl<T: Serial> Serial for InclusiveRange<T> {
@@ -800,6 +804,16 @@ pub struct LeverageFactor {
     pub numerator:   u64,
     #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
     pub denominator: u64,
+}
+
+impl LeverageFactor {
+    /// Construct an integral leverage factor.
+    pub fn new(factor: u64) -> Self {
+        Self {
+            numerator:   factor,
+            denominator: 1,
+        }
+    }
 }
 
 mod leverage_factor_json {
@@ -955,7 +969,7 @@ impl AmountFraction {
     }
 }
 
-#[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize)]
+#[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize, FromStr)]
 #[serde(transparent)]
 #[repr(transparent)]
 /// A bound on the relative share of the total staked capital that a baker can
@@ -1076,27 +1090,40 @@ impl SerdeSerialize for MintRate {
     }
 }
 
+impl FromStr for MintRate {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let f: rust_decimal::Decimal = s.parse()?;
+        f.try_into()
+    }
+}
+
+impl TryFrom<rust_decimal::Decimal> for MintRate {
+    type Error = anyhow::Error;
+
+    fn try_from(mut value: rust_decimal::Decimal) -> Result<Self, Self::Error> {
+        // FIXME: exponents will only be 28 at most for this type, so it is not entirely
+        // compatible with the Haskell code.
+        value.normalize_assign();
+        if let Ok(exponent) = u8::try_from(value.scale()) {
+            if let Ok(mantissa) = u32::try_from(value.mantissa()) {
+                Ok(MintRate { mantissa, exponent })
+            } else {
+                anyhow::bail!("Unsupported mantissa range for MintRate.",);
+            }
+        } else {
+            anyhow::bail!("Unsupported exponent range for MintRate.");
+        }
+    }
+}
+
 impl<'de> SerdeDeserialize<'de> for MintRate {
     fn deserialize<D>(des: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>, {
-        let mut f: rust_decimal::Decimal = SerdeDeserialize::deserialize(des)?;
-        // FIXME: exponents will only be 28 at most for this type, so it is not entirely
-        // compatible with the Haskell code.
-        f.normalize_assign();
-        if let Ok(exponent) = u8::try_from(f.scale()) {
-            if let Ok(mantissa) = u32::try_from(f.mantissa()) {
-                Ok(MintRate { mantissa, exponent })
-            } else {
-                Err(serde::de::Error::custom(
-                    "Unsupported mantissa range for MintRate.",
-                ))
-            }
-        } else {
-            Err(serde::de::Error::custom(
-                "Unsupported exponent range for MintRate.",
-            ))
-        }
+        let f: rust_decimal::Decimal = SerdeDeserialize::deserialize(des)?;
+        MintRate::try_from(f).map_err(serde::de::Error::custom)
     }
 }
 
