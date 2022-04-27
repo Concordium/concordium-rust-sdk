@@ -790,6 +790,15 @@ impl BlockSummary {
             BlockSummary::V1 { data, .. } => data.finalization_data.as_ref(),
         }
     }
+
+    /// Get the keys for parameter updates that are common to all versions of
+    /// the summary.
+    pub fn common_update_keys(&self) -> &AuthorizationsV0 {
+        match self {
+            BlockSummary::V0 { data, .. } => &data.updates.keys.level_2_keys,
+            BlockSummary::V1 { data, .. } => &data.updates.keys.level_2_keys.v0,
+        }
+    }
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]

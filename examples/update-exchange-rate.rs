@@ -66,16 +66,8 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Could not obtain last finalized block")?;
 
-    let (update_keys, update_key_indices) = match &summary {
-        BlockSummary::V0 { data, .. } => (
-            &data.updates.keys.level_2_keys.keys,
-            &data.updates.keys.level_2_keys.micro_gtu_per_euro,
-        ),
-        BlockSummary::V1 { data, .. } => (
-            &data.updates.keys.level_2_keys.v0.keys,
-            &data.updates.keys.level_2_keys.v0.micro_gtu_per_euro,
-        ),
-    };
+    let update_keys = &summary.common_update_keys().keys;
+    let update_key_indices = &summary.common_update_keys().micro_gtu_per_euro;
     // find the key indices to sign with
     let mut signer = Vec::new();
     for kp in kps {
