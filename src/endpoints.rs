@@ -615,7 +615,10 @@ impl Client {
         parse_json_response(response)
     }
 
-    /// Get the status of a given baker pool or L-pool at the given block.
+    /// Get the status of a given baker pool or passive delegation at the given
+    /// block. This is only supported if the node's protocol version is at least
+    /// [P4](crate::types::ProtocolVersion::P4). For earlier versions it will
+    /// return [NotFound](QueryError::NotFound).
     pub async fn get_pool_status(
         &mut self,
         baker_id: Option<BakerId>,

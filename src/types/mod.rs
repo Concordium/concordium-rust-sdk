@@ -1494,7 +1494,7 @@ pub enum UpdatePayload {
     #[serde(rename = "gASRewards")]
     GASRewards(GASRewards),
     #[serde(rename = "bakerStakeThreshold")]
-    BakerStakeThreshold(Amount),
+    BakerStakeThreshold(BakerParameters),
     #[serde(rename = "root")]
     Root(RootUpdate),
     #[serde(rename = "level1")]
@@ -1511,6 +1511,12 @@ pub enum UpdatePayload {
     TimeParametersCPV1(TimeParameters),
     #[serde(rename = "mintDistributionCPV1")]
     MintDistributionCPV1(MintDistribution<ChainParameterVersion1>),
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BakerParameters {
+    minimum_threshold_for_baking: Amount,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -2119,7 +2125,7 @@ pub struct PendingUpdatesV0 {
     pub mint_distribution:            UpdateQueue<MintDistribution<ChainParameterVersion0>>,
     pub transaction_fee_distribution: UpdateQueue<TransactionFeeDistribution>,
     pub gas_rewards:                  UpdateQueue<GASRewards>,
-    pub baker_stake_threshold:        UpdateQueue<Amount>,
+    pub baker_stake_threshold:        UpdateQueue<BakerParameters>,
     pub add_anonymity_revoker:        UpdateQueue<id::types::ArInfo<id::constants::ArCurve>>,
     pub add_identity_provider:        UpdateQueue<id::types::IpInfo<id::constants::IpPairing>>,
 }
