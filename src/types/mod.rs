@@ -397,7 +397,7 @@ pub enum PoolStatus {
         all_pool_total_capital:     Amount,
     },
     #[serde(rename_all = "camelCase")]
-    Passive {
+    PassiveDelegation {
         /// The total capital delegated passively.
         delegated_capital: Amount,
         /// The passive delegation commission rates.
