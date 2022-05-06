@@ -2,11 +2,11 @@ use crate::{
     generated_types::{
         self, node_info_response, p2p_client, AccountAddress, BlockHash, BlockHashAndAmount,
         BlockHeight, Empty, GetAddressInfoRequest, GetModuleSourceRequest, GetPoolStatusRequest,
-        GetTransactionStatusInBlockRequest, JsonResponse, PeerConnectRequest, PeerElement,
-        PeersRequest, SendTransactionRequest, TransactionHash,
+        GetTransactionStatusInBlockRequest, InvokeContractRequest, JsonResponse,
+        PeerConnectRequest, PeerElement, PeersRequest, SendTransactionRequest, TransactionHash,
     },
     types::{
-        self, network, queries,
+        self, network, queries, smart_contracts,
         transactions::{self, PayloadLike},
         AccountIndex, BakerId,
     },
@@ -797,6 +797,27 @@ impl Client {
         let response = self.client.get_next_account_nonce(request).await?;
         let nn = serde_json::from_str(response.into_inner().value.as_str())?;
         Ok(nn)
+    }
+
+    /// Invoke a contract in the given context and get the response.
+    /// Note that this is purely node-local transient operation and no
+    /// transaction or payment is involved. Use
+    /// [`send_transaction`](Self::send_transaction) if you need to update
+    /// the state of the contract on the chain.
+    pub async fn invoke_contract(
+        &mut self,
+        bh: &types::hashes::BlockHash,
+        context: &smart_contracts::ContractContext,
+    ) -> RPCResult<smart_contracts::InvokeContractResult> {
+        let request = self.construct_request(InvokeContractRequest {
+            block_hash: bh.to_string(),
+            context:    serde_json::to_string(context)
+                .expect("Context serialization always succeeds."),
+        })?;
+        let response = self.client.invoke_contract(request).await?;
+        let val = serde_json::from_str::<serde_json::Value>(response.into_inner().value.as_str())?;
+        let res = serde_json::from_value(val)?;
+        Ok(res)
     }
 
     /// Send the given block item on the given network.
