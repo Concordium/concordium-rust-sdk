@@ -1,0 +1,35 @@
+name: Build and Deploy documentation
+on:
+  workflow_dispatch: # allows manual trigger
+  
+env:
+  RUST_VERSION: 1.53
+  
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
+          components: rustfmt, rust-docs
+          
+      - name: Generate docs
+        run: |
+          cargo doc --no-deps
+          rm -rf ./docs
+          echo "<meta http-equiv=\"refresh\" content=\"0; url=concordium_rust_sdk\">" > target/doc/index.html # add an index file to redirect to the crate root
+          mv target/doc ./docs
+
+      - name: Deploy
+        uses: JamesIves/github-pages-deploy-action@v4.3.0
+        with:
+          branch: gh-pages # The branch the action should deploy to.
+          folder: docs # The folder the action should deploy.
