@@ -1402,6 +1402,10 @@ pub struct UpdateDetails {
     pub payload:        UpdatePayload,
 }
 
+impl UpdateDetails {
+    pub fn update_type(&self) -> UpdateType { self.payload.update_type() }
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 /// Event generated when an account receives a new encrypted amount.
@@ -1553,6 +1557,70 @@ pub enum UpdatePayload {
     TimeParametersCPV1(TimeParameters),
     #[serde(rename = "mintDistributionCPV1")]
     MintDistributionCPV1(MintDistribution<ChainParameterVersion1>),
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+// Since all variants are fieldless, the default JSON serialization will convert
+// all the variants to simple strings.
+/// Enumeration of the types of updates that are possible.
+pub enum UpdateType {
+    /// Update the chain protocol
+    UpdateProtocol,
+    /// Update the election difficulty
+    UpdateElectionDifficulty,
+    /// Update the euro per energy exchange rate
+    UpdateEuroPerEnergy,
+    /// Update the microCCD per euro exchange rate
+    UpdateMicroGTUPerEuro,
+    /// Update the address of the foundation account
+    UpdateFoundationAccount,
+    /// Update the distribution of newly minted CCD
+    UpdateMintDistribution,
+    /// Update the distribution of transaction fees
+    UpdateTransactionFeeDistribution,
+    /// Update the GAS rewards
+    UpdateGASRewards,
+    /// Minimum amount to register as a baker
+    UpdateBakerStakeThreshold,
+    /// Add new anonymity revoker
+    UpdateAddAnonymityRevoker,
+    /// Add new identity provider
+    UpdateAddIdentityProvider,
+    /// Update the root keys
+    UpdateRootKeys,
+    /// Update the level 1 keys
+    UpdateLevel1Keys,
+    /// Update the level 2 keys
+    UpdateLevel2Keys,
+    UpdatePoolParameters,
+    UpdateCooldownParameters,
+    UpdateTimeParameters,
+}
+
+impl UpdatePayload {
+    fn update_type(&self) -> UpdateType {
+        use UpdateType::*;
+        match self {
+            UpdatePayload::Protocol(_) => UpdateProtocol,
+            UpdatePayload::ElectionDifficulty(_) => UpdateElectionDifficulty,
+            UpdatePayload::EuroPerEnergy(_) => UpdateEuroPerEnergy,
+            UpdatePayload::MicroGTUPerEuro(_) => UpdateMicroGTUPerEuro,
+            UpdatePayload::FoundationAccount(_) => UpdateFoundationAccount,
+            UpdatePayload::MintDistribution(_) => UpdateMintDistribution,
+            UpdatePayload::TransactionFeeDistribution(_) => UpdateTransactionFeeDistribution,
+            UpdatePayload::GASRewards(_) => UpdateGASRewards,
+            UpdatePayload::BakerStakeThreshold(_) => UpdateBakerStakeThreshold,
+            UpdatePayload::Root(_) => UpdateRootKeys,
+            UpdatePayload::Level1(_) => UpdateLevel1Keys,
+            UpdatePayload::AddAnonymityRevoker(_) => UpdateAddAnonymityRevoker,
+            UpdatePayload::AddIdentityProvider(_) => UpdateAddIdentityProvider,
+            UpdatePayload::CooldownParametersCPV1(_) => UpdateCooldownParameters,
+            UpdatePayload::PoolParametersCPV1(_) => UpdatePoolParameters,
+            UpdatePayload::TimeParametersCPV1(_) => UpdateTimeParameters,
+            UpdatePayload::MintDistributionCPV1(_) => UpdateMintDistribution,
+        }
+    }
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize, Debug, Clone)]
