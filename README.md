@@ -16,6 +16,11 @@ concordium-rust-sdk = { path = "./deps/concordium-rust-sdk", version = "1" }
 
 assuming the submodule is cloned into the directory `./deps/concordium-rust-sdk`.
 
+## Versions
+
+- Minimum supported Rust version: 1.53.
+- Node version compatibility: 4.*
+
 ## Basic usage
 
 The core structure of the SDK is the [Client](http://developer.concordium.software/concordium-rust-sdk/concordium_rust_sdk/endpoints/struct.Client.html) which maintains a connection to the node and supports querying the node and sending messages to it.

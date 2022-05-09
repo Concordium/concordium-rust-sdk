@@ -6,14 +6,10 @@ use concordium_rust_sdk::{
     endpoints,
     types::{
         transactions::{update, BlockItem, Payload},
-        BlockSummary, ExchangeRate, TransactionStatus, UpdateKeyPair, UpdateKeysIndex,
-        UpdatePayload,
+        BlockSummary, ExchangeRate, TransactionStatus, UpdateKeyPair, UpdatePayload,
     },
 };
-use crypto_common::{
-    base16_encode_string,
-    types::{KeyPair, TransactionTime},
-};
+use crypto_common::types::TransactionTime;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
