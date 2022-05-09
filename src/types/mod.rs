@@ -530,10 +530,7 @@ impl TransactionStatus {
             TransactionStatus::Received => None,
             TransactionStatus::Finalized(e) => {
                 if e.len() == 1 {
-                    for p in e.iter() {
-                        return Some(p);
-                    }
-                    return None; // unreachable
+                    e.iter().next()
                 } else {
                     None
                 }
