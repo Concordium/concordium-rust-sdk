@@ -124,7 +124,7 @@ async fn main() -> anyhow::Result<()> {
     .into();
 
     let response = client
-        .send_transaction(DEFAULT_NETWORK_ID, &block_item)
+        .send_block_item(&block_item)
         .await
         .context("Could not send transaction.")?;
     anyhow::ensure!(response, "Submission of the update instruction failed.");

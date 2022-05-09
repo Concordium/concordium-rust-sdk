@@ -1,11 +1,12 @@
 use crypto_common::{
     derive::{SerdeBase16Serialize, Serial, Serialize},
     deserial_string,
-    types::Amount,
+    types::{Amount, Signature},
     Buffer, Deserial, Get, ParseResult, Put, ReadBytesExt, SerdeDeserialize, SerdeSerialize,
     Serial,
 };
 use derive_more::{Add, Display, From, FromStr, Into};
+use id::types::VerifyKey;
 use rand::{CryptoRng, Rng};
 use random_oracle::RandomOracle;
 use std::{
@@ -70,6 +71,8 @@ pub struct DelegatorId {
 /// A unicode representation of a Url.
 /// The Utf8 encoding of the Url must be at most
 /// [`MAX_URL_TEXT_LENGTH`](crate::constants::MAX_URL_TEXT_LENGTH) bytes.
+///
+/// The default instance produces the empty URL.
 #[derive(
     SerdeSerialize,
     SerdeDeserialize,
@@ -82,6 +85,7 @@ pub struct DelegatorId {
     Debug,
     Display,
     Into,
+    Default,
 )]
 #[serde(try_from = "String", into = "String")]
 pub struct UrlText {
@@ -576,7 +580,7 @@ impl From<&BakerElectionSignKey> for BakerElectionVerifyKey {
 ///
 /// Note: This type contains unencrypted secret keys and should be treated
 /// carefully.
-#[derive(SerdeSerialize, Serialize)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 pub struct BakerKeyPairs {
     #[serde(rename = "signatureSignKey")]
     pub signature_sign:     BakerSignatureSignKey,
@@ -642,11 +646,53 @@ impl fmt::Display for CredentialRegistrationID {
     }
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, Serialize, Clone, Into, From)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Serialize, Clone, Into, From, PartialEq, Eq)]
 #[serde(transparent)]
 /// A single public key that can sign updates.
 pub struct UpdatePublicKey {
-    pub public: id::types::VerifyKey,
+    pub public: VerifyKey,
+}
+
+/// A ed25519 keypair. This is available in the `ed25519::dalek` crate, but the
+/// JSON serialization there is not compatible with what we use, so we redefine
+/// it there.
+#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+pub struct UpdateKeyPair {
+    #[serde(
+        rename = "signKey",
+        serialize_with = "crypto_common::base16_encode",
+        deserialize_with = "crypto_common::base16_decode"
+    )]
+    pub secret: ed25519_dalek::SecretKey,
+    pub public: UpdatePublicKey,
+}
+
+impl UpdateKeyPair {
+    pub fn generate<R: rand::CryptoRng + rand::Rng>(rng: &mut R) -> Self {
+        let kp = ed25519_dalek::Keypair::generate(rng);
+        Self {
+            secret: kp.secret,
+            public: UpdatePublicKey {
+                public: VerifyKey::Ed25519VerifyKey(kp.public),
+            },
+        }
+    }
+
+    pub fn sign(&self, msg: &[u8]) -> Signature {
+        let expanded = ed25519_dalek::ExpandedSecretKey::from(&self.secret);
+        match self.public.public {
+            VerifyKey::Ed25519VerifyKey(vf) => {
+                let sig = expanded.sign(msg, &vf);
+                Signature {
+                    sig: sig.to_bytes().to_vec(),
+                }
+            }
+        }
+    }
+}
+
+impl<'a> From<&UpdateKeyPair> for UpdatePublicKey {
+    fn from(kp: &UpdateKeyPair) -> Self { kp.public.clone() }
 }
 
 #[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serial, Into)]

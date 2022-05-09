@@ -5,8 +5,8 @@ use super::{
     hashes, smart_contracts, AccountInfo, AccountThreshold, AggregateSigPairing, AmountFraction,
     BakerAggregationVerifyKey, BakerElectionVerifyKey, BakerKeyPairs, BakerSignatureVerifyKey,
     ContractAddress, CredentialIndex, CredentialRegistrationID, DelegationTarget, Energy, Memo,
-    Nonce, OpenStatus, RegisteredData, UpdateKeysIndex, UpdatePayload, UpdateSequenceNumber,
-    UrlText,
+    Nonce, OpenStatus, RegisteredData, UpdateKeyPair, UpdateKeysIndex, UpdatePayload,
+    UpdateSequenceNumber, UrlText,
 };
 use crate::{constants::*, types::TransactionType};
 use crypto_common::{
@@ -303,6 +303,13 @@ impl BakerUpdateKeysPayload {
     }
 }
 
+impl ConfigureBakerKeysPayload {
+    /// Construct a BakerKeysPayload with proofs for updating baker keys.
+    pub fn new<T: Rng>(baker_keys: &BakerKeyPairs, sender: AccountAddress, csprng: &mut T) -> Self {
+        BakerKeysPayload::new_payload(baker_keys, sender, b"configureBaker", csprng)
+    }
+}
+
 #[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize)]
 #[serde(rename_all = "camelCase")]
 /// Payload of the `AddBaker` transaction. This transaction registers the
@@ -373,6 +380,14 @@ pub struct ConfigureBakerPayload {
 
 impl ConfigureBakerPayload {
     pub fn new() -> Self { Self::default() }
+
+    /// Construct a new payload to remove a baker.
+    pub fn new_remove_baker() -> Self {
+        Self {
+            capital: Some(Amount::from_micro_ccd(0)),
+            ..Self::new()
+        }
+    }
 
     pub fn set_capital(&mut self, amount: Amount) -> &mut Self {
         self.capital.insert(amount);
@@ -447,6 +462,34 @@ pub struct ConfigureDelegationPayload {
     pub restake_earnings:  Option<bool>,
     /// The target of the delegation.
     pub delegation_target: Option<DelegationTarget>,
+}
+
+impl ConfigureDelegationPayload {
+    /// Construct a new payload that has all the options unset.
+    pub fn new() -> Self { Self::default() }
+
+    /// Construct a new payload to remove a delegation.
+    pub fn new_remove_delegation() -> Self {
+        Self {
+            capital: Some(Amount::from_micro_ccd(0)),
+            ..Self::new()
+        }
+    }
+
+    pub fn set_capital(&mut self, amount: Amount) -> &mut Self {
+        self.capital.insert(amount);
+        self
+    }
+
+    pub fn set_restake_earnings(&mut self, restake_earnings: bool) -> &mut Self {
+        self.restake_earnings.insert(restake_earnings);
+        self
+    }
+
+    pub fn set_delegation_target(&mut self, target: DelegationTarget) -> &mut Self {
+        self.delegation_target.insert(target);
+        self
+    }
 }
 
 #[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize)]
@@ -1228,7 +1271,7 @@ pub trait UpdateSigner {
         -> UpdateInstructionSignature;
 }
 
-impl UpdateSigner for BTreeMap<UpdateKeysIndex, KeyPair> {
+impl UpdateSigner for &BTreeMap<UpdateKeysIndex, UpdateKeyPair> {
     fn sign_update_hash(
         &self,
         hash_to_sign: &hashes::UpdateSignHash,
@@ -1241,7 +1284,7 @@ impl UpdateSigner for BTreeMap<UpdateKeysIndex, KeyPair> {
     }
 }
 
-impl UpdateSigner for &[(UpdateKeysIndex, KeyPair)] {
+impl UpdateSigner for &[(UpdateKeysIndex, UpdateKeyPair)] {
     fn sign_update_hash(
         &self,
         hash_to_sign: &hashes::UpdateSignHash,
@@ -2549,6 +2592,31 @@ pub mod send {
             restake_earnings,
         )
         .sign(signer)
+    }
+
+    /// Configure the account as a baker. Only valid for protocol version 4 and
+    /// up.
+    pub fn configure_baker(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        payload: ConfigureBakerPayload,
+    ) -> AccountTransaction<EncodedPayload> {
+        construct::configure_baker(signer.num_keys(), sender, nonce, expiry, payload).sign(signer)
+    }
+
+    /// Configure the account as a delegator. Only valid for protocol version 4
+    /// and up.
+    pub fn configure_delegation(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        payload: ConfigureDelegationPayload,
+    ) -> AccountTransaction<EncodedPayload> {
+        construct::configure_delegation(signer.num_keys(), sender, nonce, expiry, payload)
+            .sign(signer)
     }
 
     /// Construct a transction to register the given piece of data.

@@ -1,4 +1,5 @@
 use crate::{
+    constants::DEFAULT_NETWORK_ID,
     generated_types::{
         self, node_info_response, p2p_client, AccountAddress, BlockHash, BlockHashAndAmount,
         BlockHeight, Empty, GetAddressInfoRequest, GetModuleSourceRequest, GetPoolStatusRequest,
@@ -820,21 +821,26 @@ impl Client {
         Ok(res)
     }
 
-    /// Send the given block item on the given network.
-    pub async fn send_transaction<PayloadType: PayloadLike>(
+    /// Send the given block item.
+    pub async fn send_block_item<PayloadType: PayloadLike>(
         &mut self,
-        network_id: network::NetworkId,
         bi: &transactions::BlockItem<PayloadType>,
-    ) -> RPCResult<bool> {
+    ) -> RPCResult<types::hashes::TransactionHash> {
         let request = self.construct_request(SendTransactionRequest {
-            network_id: u32::from(u16::from(network_id)),
+            network_id: u32::from(u16::from(DEFAULT_NETWORK_ID)),
             payload:    crypto_common::to_bytes(&crypto_common::Versioned::new(
                 crypto_common::VERSION_0,
                 bi,
             )),
         })?;
         let response = self.client.send_transaction(request).await?;
-        Ok(response.into_inner().value)
+        if response.into_inner().value {
+            Ok(bi.hash())
+        } else {
+            Err(RPCError::CallError(tonic::Status::invalid_argument(
+                "Transaction was invalid and thus not accepted by the node.",
+            )))
+        }
     }
 
     /// Send the given account transaction item on the given network.
@@ -845,7 +851,6 @@ impl Client {
     /// that can be used to query the status is returned.
     pub async fn send_raw_account_transaction(
         &mut self,
-        network_id: network::NetworkId,
         signatures: &TransactionSignature, // signatures for the transaction.
         body: &[u8],                       // body of the transaction (header + payload)
     ) -> RPCResult<types::hashes::TransactionHash> {
@@ -859,7 +864,7 @@ impl Client {
                                       // compute the hash of the transaction
         let hash = types::hashes::HashBytes::new(sha2::Sha256::digest(&data).into());
         let request = self.construct_request(SendTransactionRequest {
-            network_id: u32::from(u16::from(network_id)),
+            network_id: u32::from(u16::from(DEFAULT_NETWORK_ID)),
             payload:    data,
         })?;
         let response = self.client.send_transaction(request).await?;

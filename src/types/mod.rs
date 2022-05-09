@@ -215,6 +215,16 @@ pub enum StakePendingChange {
     },
 }
 
+impl StakePendingChange {
+    /// Effective time of the pending change.
+    pub fn effective_time(&self) -> chrono::DateTime<chrono::Utc> {
+        match self {
+            StakePendingChange::ReduceStake { effective_time, .. } => *effective_time,
+            StakePendingChange::RemoveStake { effective_time } => *effective_time,
+        }
+    }
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
 #[serde(
     rename_all = "camelCase",
@@ -504,12 +514,33 @@ pub enum TransactionStatus {
     /// Transaction is finalized in the given block, with the given summary.
     /// If the finalization committee is not corrupt then this will always
     /// be a singleton map.
-    Finalized(BTreeMap<hashes::TransactionHash, BlockItemSummary>),
+    Finalized(BTreeMap<hashes::BlockHash, BlockItemSummary>),
     /// Transaction is committed to one or more blocks. The outcomes are listed
     /// for each block. Note that in the vast majority of cases the outcome of a
     /// transaction should not be dependent on the block it is in, but this
     /// can in principle happen.
-    Committed(BTreeMap<hashes::TransactionHash, BlockItemSummary>),
+    Committed(BTreeMap<hashes::BlockHash, BlockItemSummary>),
+}
+
+impl TransactionStatus {
+    /// If the transaction is finalized return the block hash in which it is
+    /// contained, and the result.
+    pub fn is_finalized(&self) -> Option<(&hashes::BlockHash, &BlockItemSummary)> {
+        match self {
+            TransactionStatus::Received => None,
+            TransactionStatus::Finalized(e) => {
+                if e.len() == 1 {
+                    for p in e.iter() {
+                        return Some(p);
+                    }
+                    return None; // unreachable
+                } else {
+                    None
+                }
+            }
+            TransactionStatus::Committed(_) => None,
+        }
+    }
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -990,6 +1021,9 @@ impl AccountTransactionDetails {
     /// variant in case the transaction failed with serialization failure
     /// reason.
     pub fn transaction_type(&self) -> Option<TransactionType> { self.effects.transaction_type() }
+
+    /// Return [`Some`] if the transaction has been rejected.
+    pub fn is_rejected(&self) -> Option<&RejectReason> { self.effects.is_rejected() }
 }
 
 impl AccountTransactionEffects {
@@ -1234,6 +1268,17 @@ pub enum AccountTransactionEffects {
     /// An account configured delegation. The details of what happened are
     /// contained in the list of [delegation events](DelegationEvent).
     DelegationConfigured { data: Vec<DelegationEvent> },
+}
+
+impl AccountTransactionEffects {
+    /// Return [`Some`] if the transaction has been rejected.
+    pub fn is_rejected(&self) -> Option<&RejectReason> {
+        if let Self::None { reject_reason, .. } = self {
+            Some(reject_reason)
+        } else {
+            None
+        }
+    }
 }
 
 /// Events that may happen as a result of the
@@ -1817,6 +1862,50 @@ pub struct AuthorizationsV0 {
     pub add_identity_provider: AccessStructure,
 }
 
+impl AuthorizationsV0 {
+    /// Find key indices given a set of keys and an access structure.
+    /// If any of the given `actual_keys` are not authorized in the access
+    /// structure [`None`] will be returned.
+    /// If there are duplicate keys among `actual_keys` this function also
+    /// returns [`None`].
+    pub fn construct_update_signer<K>(
+        &self,
+        update_key_indices: &AccessStructure,
+        actual_keys: impl IntoIterator<Item = K>,
+    ) -> Option<BTreeMap<UpdateKeysIndex, K>>
+    where
+        UpdatePublicKey: for<'a> From<&'a K>, {
+        construct_update_signer_worker(&self.keys, update_key_indices, actual_keys)
+    }
+}
+
+// See [AuthorizationsV0::construct_update_signer] for documentation.
+fn construct_update_signer_worker<K>(
+    keys: &[UpdatePublicKey],
+    update_key_indices: &AccessStructure,
+    actual_keys: impl IntoIterator<Item = K>,
+) -> Option<BTreeMap<UpdateKeysIndex, K>>
+where
+    UpdatePublicKey: for<'a> From<&'a K>, {
+    let mut signer = BTreeMap::new();
+    for kp in actual_keys {
+        let known_key = &UpdatePublicKey::from(&kp);
+        if let Some(i) = keys.iter().position(|public| public == known_key) {
+            let idx = UpdateKeysIndex { index: i as u16 };
+            if update_key_indices.authorized_keys.contains(&idx) {
+                if signer.insert(idx, kp).is_some() {
+                    return None;
+                }
+            } else {
+                return None;
+            }
+        } else {
+            return None;
+        }
+    }
+    Some(signer)
+}
+
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 /// Access structures for each of the different possible chain updates, togehter
@@ -1828,6 +1917,23 @@ pub struct AuthorizationsV1 {
     pub cooldown_parameters: AccessStructure,
     /// Keys for changing the lenghts of the reward period.
     pub time_parameters:     AccessStructure,
+}
+
+impl AuthorizationsV1 {
+    /// Find key indices given a set of keys and an access structure.
+    /// If any of the given `actual_keys` are not authorized in the access
+    /// structure [`None`] will be returned.
+    /// If there are duplicate keys among `actual_keys` this function also
+    /// returns [`None`].
+    pub fn construct_update_signer<K>(
+        &self,
+        update_key_indices: &AccessStructure,
+        actual_keys: impl IntoIterator<Item = K>,
+    ) -> Option<BTreeMap<UpdateKeysIndex, K>>
+    where
+        UpdatePublicKey: for<'a> From<&'a K>, {
+        construct_update_signer_worker(&self.v0.keys, update_key_indices, actual_keys)
+    }
 }
 
 pub trait AuthorizationsFamily {
