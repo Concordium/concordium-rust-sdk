@@ -1,12 +1,19 @@
 use crypto_common::{
     derive::{SerdeBase16Serialize, Serial, Serialize},
+    deserial_string,
+    types::{Amount, Signature},
     Buffer, Deserial, Get, ParseResult, Put, ReadBytesExt, SerdeDeserialize, SerdeSerialize,
     Serial,
 };
 use derive_more::{Add, Display, From, FromStr, Into};
+use id::types::VerifyKey;
 use rand::{CryptoRng, Rng};
 use random_oracle::RandomOracle;
-use std::{convert::TryFrom, fmt};
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt,
+    str::FromStr,
+};
 use thiserror::Error;
 
 /// Duration of a slot in milliseconds.
@@ -27,12 +34,178 @@ impl From<SlotDuration> for chrono::Duration {
     }
 }
 
+/// Duration in seconds.
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
+#[serde(transparent)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
+pub struct DurationSeconds {
+    pub seconds: u64,
+}
+
+impl From<DurationSeconds> for chrono::Duration {
+    fn from(s: DurationSeconds) -> Self {
+        // this is technically iffy in cases
+        // where duration would exceed
+        // i64::MAX. But that will not
+        // happen.
+        Self::seconds(s.seconds as i64)
+    }
+}
+
 /// Internal short id of the baker.
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
 pub struct BakerId {
-    pub id: u64,
+    pub id: AccountIndex,
+}
+
+/// Internal short id of the delegator.
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
+#[serde(transparent)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
+pub struct DelegatorId {
+    pub id: AccountIndex,
+}
+
+/// A unicode representation of a Url.
+/// The Utf8 encoding of the Url must be at most
+/// [`MAX_URL_TEXT_LENGTH`](crate::constants::MAX_URL_TEXT_LENGTH) bytes.
+///
+/// The default instance produces the empty URL.
+#[derive(
+    SerdeSerialize,
+    SerdeDeserialize,
+    Serial,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Debug,
+    Display,
+    Into,
+    Default,
+)]
+#[serde(try_from = "String", into = "String")]
+pub struct UrlText {
+    #[string_size_length = 2]
+    url: String,
+}
+
+impl Deserial for UrlText {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let len: u16 = source.get()?;
+        anyhow::ensure!(
+            usize::from(len) <= crate::constants::MAX_URL_TEXT_LENGTH,
+            "URL length exceeds maximum allowed."
+        );
+        let url = deserial_string(source, len.into())?;
+        Ok(Self { url })
+    }
+}
+
+impl TryFrom<String> for UrlText {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        anyhow::ensure!(
+            value.as_bytes().len() <= crate::constants::MAX_URL_TEXT_LENGTH,
+            "URL length exceeds maximum allowed."
+        );
+        Ok(Self { url: value })
+    }
+}
+
+/// The status of whether a baking pool allows delegators to join.
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+#[repr(u8)]
+pub enum OpenStatus {
+    /// New delegators may join the pool.
+    OpenForAll   = 0,
+    /// New delegators may not join, but existing delegators are kept.
+    ClosedForNew = 1,
+    /// No delegators are allowed.
+    ClosedForAll = 2,
+}
+
+impl Serial for OpenStatus {
+    fn serial<B: Buffer>(&self, out: &mut B) { (*self as u8).serial(out) }
+}
+
+impl Deserial for OpenStatus {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let tag: u8 = source.get()?;
+        match tag {
+            0 => Ok(Self::OpenForAll),
+            1 => Ok(Self::ClosedForNew),
+            2 => Ok(Self::ClosedForAll),
+            _ => anyhow::bail!("Unrecognized OpenStatus tag {}", tag),
+        }
+    }
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase", tag = "delegateType")]
+pub enum DelegationTarget {
+    #[serde(rename = "Passive")]
+    /// Delegate passively, i.e., to no specific baker.
+    Passive,
+    #[serde(rename = "Baker")]
+    /// Delegate to a specific baker.
+    Baker {
+        #[serde(rename = "bakerId")]
+        baker_id: BakerId,
+    },
+}
+
+impl Serial for DelegationTarget {
+    fn serial<B: Buffer>(&self, out: &mut B) {
+        match self {
+            DelegationTarget::Passive => 0u8.serial(out),
+            DelegationTarget::Baker { baker_id } => {
+                1u8.serial(out);
+                baker_id.serial(out)
+            }
+        }
+    }
+}
+
+impl Deserial for DelegationTarget {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let tag: u8 = source.get()?;
+        match tag {
+            0 => Ok(Self::Passive),
+            1 => {
+                let baker_id = source.get()?;
+                Ok(Self::Baker { baker_id })
+            }
+            _ => anyhow::bail!("Unrecognized delegation target tag: {}", tag),
+        }
+    }
+}
+
+/// Additional information about a baking pool.
+/// This information is added with the introduction of delegation.
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BakerPoolInfo {
+    /// Whether the pool allows delegators.
+    open_status:      OpenStatus,
+    /// The URL that links to the metadata about the pool.
+    metadata_url:     UrlText,
+    /// The commission rates charged by the pool owner.
+    commission_rates: CommissionRates,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+/// Information about the delegated stake of the account.
+pub struct AccountStakingDelegationInfo {
+    staked_amount:     Amount,
+    restake_earnings:  bool,
+    delegation_target: BakerId,
 }
 
 /// Slot number
@@ -163,6 +336,8 @@ pub enum ProtocolVersion {
     P2,
     #[display(fmt = "P3")]
     P3,
+    #[display(fmt = "P4")]
+    P4,
 }
 
 #[derive(Debug, Error, Display)]
@@ -181,6 +356,7 @@ impl TryFrom<u64> for ProtocolVersion {
             1 => Ok(ProtocolVersion::P1),
             2 => Ok(ProtocolVersion::P2),
             3 => Ok(ProtocolVersion::P3),
+            4 => Ok(ProtocolVersion::P4),
             version => Err(UnknownProtocolVersion { version }),
         }
     }
@@ -192,6 +368,7 @@ impl From<ProtocolVersion> for u64 {
             ProtocolVersion::P1 => 1,
             ProtocolVersion::P2 => 2,
             ProtocolVersion::P3 => 3,
+            ProtocolVersion::P4 => 4,
         }
     }
 }
@@ -210,6 +387,9 @@ impl Deserial for ProtocolVersion {
         Ok(pv)
     }
 }
+
+pub struct ChainParameterVersion0;
+pub struct ChainParameterVersion1;
 
 /// Height of a block since chain genesis.
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
@@ -400,7 +580,7 @@ impl From<&BakerElectionSignKey> for BakerElectionVerifyKey {
 ///
 /// Note: This type contains unencrypted secret keys and should be treated
 /// carefully.
-#[derive(SerdeSerialize, Serialize)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 pub struct BakerKeyPairs {
     #[serde(rename = "signatureSignKey")]
     pub signature_sign:     BakerSignatureSignKey,
@@ -466,11 +646,54 @@ impl fmt::Display for CredentialRegistrationID {
     }
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, Serialize, Clone, Into, From)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, Serialize, Clone, Into, From, PartialEq, Eq)]
 #[serde(transparent)]
 /// A single public key that can sign updates.
 pub struct UpdatePublicKey {
-    pub public: id::types::VerifyKey,
+    pub public: VerifyKey,
+}
+
+/// A ed25519 keypair. This is available in the `ed25519::dalek` crate, but the
+/// JSON serialization there is not compatible with what we use, so we redefine
+/// it there.
+#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+pub struct UpdateKeyPair {
+    #[serde(
+        rename = "signKey",
+        serialize_with = "crypto_common::base16_encode",
+        deserialize_with = "crypto_common::base16_decode"
+    )]
+    pub secret: ed25519_dalek::SecretKey,
+    #[serde(rename = "verifyKey")]
+    pub public: UpdatePublicKey,
+}
+
+impl UpdateKeyPair {
+    pub fn generate<R: rand::CryptoRng + rand::Rng>(rng: &mut R) -> Self {
+        let kp = ed25519_dalek::Keypair::generate(rng);
+        Self {
+            secret: kp.secret,
+            public: UpdatePublicKey {
+                public: VerifyKey::Ed25519VerifyKey(kp.public),
+            },
+        }
+    }
+
+    pub fn sign(&self, msg: &[u8]) -> Signature {
+        let expanded = ed25519_dalek::ExpandedSecretKey::from(&self.secret);
+        match self.public.public {
+            VerifyKey::Ed25519VerifyKey(vf) => {
+                let sig = expanded.sign(msg, &vf);
+                Signature {
+                    sig: sig.to_bytes().to_vec(),
+                }
+            }
+        }
+    }
+}
+
+impl<'a> From<&UpdateKeyPair> for UpdatePublicKey {
+    fn from(kp: &UpdateKeyPair) -> Self { kp.public.clone() }
 }
 
 #[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serial, Into)]
@@ -502,9 +725,27 @@ pub struct ElectionDifficulty {
     parts_per_hundred_thousands: PartsPerHundredThousands,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Into)]
+/// A fraction between 0 and 1 with a precision of 1/100_000.
+/// The `Into<u32>` implementation returns the number of parts per `100_000`.
 pub struct PartsPerHundredThousands {
     pub(crate) parts: u32,
+}
+
+impl PartsPerHundredThousands {
+    /// Construct a new fraction given the integer number of parts per
+    /// `100_000`. Return [`None`] if the number of parts exceeds `100_000`.
+    pub fn new(parts: u32) -> Option<Self> {
+        if parts <= 100_000 {
+            Some(Self { parts })
+        } else {
+            None
+        }
+    }
+
+    /// Construct a new fraction, but does not check that the resulting fraction
+    /// is valid.
+    pub fn new_unchecked(parts: u32) -> Self { Self { parts } }
 }
 
 impl Serial for PartsPerHundredThousands {
@@ -514,11 +755,8 @@ impl Serial for PartsPerHundredThousands {
 impl Deserial for PartsPerHundredThousands {
     fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
         let parts: u32 = source.get()?;
-        anyhow::ensure!(
-            parts <= 100_000,
-            "No more than 100_000 parts per hundred thousand."
-        );
-        Ok(Self { parts })
+        Self::new(parts)
+            .ok_or_else(|| anyhow::anyhow!("No more than 100_000 parts per hundred thousand."))
     }
 }
 
@@ -528,6 +766,59 @@ impl fmt::Display for PartsPerHundredThousands {
         let x = rust_decimal::Decimal::try_new(self.parts.into(), 5).map_err(|_| fmt::Error)?;
         x.fmt(f)
     }
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize, Debug, Clone, Copy)]
+pub struct CommissionRates {
+    /// Fraction of finalization rewards charged by the pool owner.
+    #[serde(rename = "finalizationCommission")]
+    pub finalization: AmountFraction,
+    /// Fraction of baking rewards charged by the pool owner.
+    #[serde(rename = "bakingCommission")]
+    pub baking:       AmountFraction,
+    /// Fraction of transaction rewards charged by the pool owner.
+    #[serde(rename = "transactionCommission")]
+    pub transaction:  AmountFraction,
+}
+
+#[derive(Serialize, SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+/// Ranges of allowed commission values that pools may choose from.
+pub struct CommissionRanges {
+    /// The range of allowed finalization commissions.
+    #[serde(rename = "finalizationCommissionRange")]
+    pub finalization: InclusiveRange<AmountFraction>,
+    /// The range of allowed baker commissions.
+    #[serde(rename = "bakingCommissionRange")]
+    pub baking:       InclusiveRange<AmountFraction>,
+    /// The range of allowed transaction commissions.
+    #[serde(rename = "transactionCommissionRange")]
+    pub transaction:  InclusiveRange<AmountFraction>,
+}
+
+#[derive(Debug, Copy, Clone, SerdeSerialize, SerdeDeserialize)]
+pub struct InclusiveRange<T> {
+    pub min: T,
+    pub max: T,
+}
+
+impl<T: Serial> Serial for InclusiveRange<T> {
+    fn serial<B: Buffer>(&self, out: &mut B) {
+        self.min.serial(out);
+        self.max.serial(out)
+    }
+}
+
+impl<T: Deserial + Ord> Deserial for InclusiveRange<T> {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let min = source.get()?;
+        let max = source.get()?;
+        anyhow::ensure!(min <= max, "Invalid range.");
+        Ok(Self { min, max })
+    }
+}
+
+impl<T: Ord> InclusiveRange<T> {
+    pub fn contains(&self, x: &T) -> bool { &self.min <= x && x <= &self.max }
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, Copy)]
@@ -553,19 +844,89 @@ impl Deserial for ExchangeRate {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct MintDistribution {
-    mint_per_slot:       MintRate,
-    baking_reward:       RewardFraction,
-    finalization_reward: RewardFraction,
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, Copy)]
+#[serde(try_from = "leverage_factor_json::LeverageFactorRaw")]
+pub struct LeverageFactor {
+    #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
+    pub numerator:   u64,
+    #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
+    pub denominator: u64,
 }
 
-impl Deserial for MintDistribution {
+impl LeverageFactor {
+    /// Construct an integral leverage factor.
+    pub fn new(factor: u64) -> Self {
+        Self {
+            numerator:   factor,
+            denominator: 1,
+        }
+    }
+}
+
+mod leverage_factor_json {
+    #[derive(super::SerdeDeserialize)]
+    pub struct LeverageFactorRaw {
+        pub numerator:   u64,
+        pub denominator: u64,
+    }
+
+    impl std::convert::TryFrom<LeverageFactorRaw> for super::LeverageFactor {
+        type Error = anyhow::Error;
+
+        fn try_from(value: LeverageFactorRaw) -> Result<Self, Self::Error> {
+            let numerator = value.numerator;
+            let denominator = value.denominator;
+            anyhow::ensure!(
+                numerator >= denominator
+                    && denominator != 0
+                    && num::integer::gcd(numerator, denominator) == 1,
+                "Invalid leverage factor."
+            );
+            Ok(super::LeverageFactor {
+                numerator,
+                denominator,
+            })
+        }
+    }
+}
+
+impl Deserial for LeverageFactor {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let numerator = source.get()?;
+        let denominator = source.get()?;
+        anyhow::ensure!(
+            numerator >= denominator
+                && denominator != 0
+                && num::integer::gcd(numerator, denominator) == 1,
+            "Invalid leverage factor."
+        );
+        Ok(Self {
+            numerator,
+            denominator,
+        })
+    }
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct MintDistributionV0 {
+    mint_per_slot:       MintRate,
+    baking_reward:       AmountFraction,
+    finalization_reward: AmountFraction,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct MintDistributionV1 {
+    baking_reward:       AmountFraction,
+    finalization_reward: AmountFraction,
+}
+
+impl Deserial for MintDistributionV0 {
     fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
         let mint_per_slot = source.get()?;
-        let baking_reward: RewardFraction = source.get()?;
-        let finalization_reward: RewardFraction = source.get()?;
+        let baking_reward: AmountFraction = source.get()?;
+        let finalization_reward: AmountFraction = source.get()?;
         anyhow::ensure!(
             (baking_reward + finalization_reward).is_some(),
             "Reward fractions exceed 100%."
@@ -578,25 +939,97 @@ impl Deserial for MintDistribution {
     }
 }
 
+impl Deserial for MintDistributionV1 {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let baking_reward: AmountFraction = source.get()?;
+        let finalization_reward: AmountFraction = source.get()?;
+        anyhow::ensure!(
+            (baking_reward + finalization_reward).is_some(),
+            "Reward fractions exceed 100%."
+        );
+        Ok(Self {
+            baking_reward,
+            finalization_reward,
+        })
+    }
+}
+
+pub trait MintDistributionFamily {
+    type Output;
+}
+
+impl MintDistributionFamily for ChainParameterVersion0 {
+    type Output = MintDistributionV0;
+}
+
+impl MintDistributionFamily for ChainParameterVersion1 {
+    type Output = MintDistributionV1;
+}
+
+pub type MintDistribution<CPV> = <CPV as MintDistributionFamily>::Output;
+
 #[derive(Debug, Serialize, Clone, Copy)]
 pub struct MintRate {
     pub mantissa: u32,
     pub exponent: u8,
 }
 
-#[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize)]
+#[derive(
+    Default,
+    Debug,
+    Clone,
+    Copy,
+    SerdeSerialize,
+    SerdeDeserialize,
+    Serialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Into,
+    FromStr,
+)]
 #[serde(transparent)]
-pub struct RewardFraction {
+/// A fraction of an amount with a precision of `1/100_000`.
+/// The [`FromStr`] instance will parse a decimal fraction with up to `5`
+/// decimals.
+pub struct AmountFraction {
     pub(crate) parts_per_hundred_thousands: PartsPerHundredThousands,
 }
 
-/// Sequential index of finalization.
+impl AmountFraction {
+    /// Construct a new fraction given the integer number of parts per
+    /// `100_000`. Return [`None`] if the number of parts exceeds `100_000`.
+    pub fn new(parts: u32) -> Option<Self> {
+        let parts_per_hundred_thousands = PartsPerHundredThousands::new(parts)?;
+        Some(Self {
+            parts_per_hundred_thousands,
+        })
+    }
+
+    /// Construct a new fraction, but does not check that the resulting fraction
+    /// is valid.
+    pub fn new_unchecked(parts: u32) -> Self {
+        Self {
+            parts_per_hundred_thousands: PartsPerHundredThousands::new_unchecked(parts),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize, FromStr)]
+#[serde(transparent)]
+#[repr(transparent)]
+/// A bound on the relative share of the total staked capital that a baker can
+/// have as its stake. This is required to be greater than 0.
+pub struct CapitalBound {
+    #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
+    pub bound: AmountFraction,
+}
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 #[serde(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
-/// Index of the account in the account table. These are assigned sequentially
-/// in the order of creation of accounts. The first account has index 0.
+/// Sequential index of finalization.
 pub struct FinalizationIndex {
     pub index: u64,
 }
@@ -616,13 +1049,13 @@ impl std::ops::Add for PartsPerHundredThousands {
 }
 
 /// Add two reward fractions checking that they sum up to no more than 1.
-impl std::ops::Add for RewardFraction {
+impl std::ops::Add for AmountFraction {
     type Output = Option<Self>;
 
     fn add(self, rhs: Self) -> Self::Output {
         let parts_per_hundred_thousands =
             (self.parts_per_hundred_thousands + rhs.parts_per_hundred_thousands)?;
-        Some(RewardFraction {
+        Some(AmountFraction {
             parts_per_hundred_thousands,
         })
     }
@@ -637,30 +1070,60 @@ impl SerdeSerialize for PartsPerHundredThousands {
     }
 }
 
-impl<'de> SerdeDeserialize<'de> for PartsPerHundredThousands {
-    fn deserialize<D: serde::Deserializer<'de>>(des: D) -> Result<Self, D::Error> {
-        let mut f: rust_decimal::Decimal =
-            SerdeDeserialize::deserialize(des).map_err(serde::de::Error::custom)?;
+#[derive(Clone, PartialEq, Debug, Error)]
+/// An error that may be raised by converting from a
+/// [`Decimal`](rust_decimal::Decimal) to a [`PartsPerHundredThousands`].
+pub enum ConvertPartsPerHundredThousandsError {
+    #[error("Parts per thousand should not have more than 5 decimals.")]
+    TooManyDecimals,
+    #[error("Parts per thousand should not be negative.")]
+    Negative,
+    #[error("Parts per thousand out of bounds.")]
+    OutOfBounds,
+    #[error("Scale out of bounds.")]
+    ScaleError {
+        #[from]
+        inner: rust_decimal::Error,
+    },
+}
+
+impl TryFrom<rust_decimal::Decimal> for PartsPerHundredThousands {
+    type Error = ConvertPartsPerHundredThousandsError;
+
+    fn try_from(value: rust_decimal::Decimal) -> Result<Self, Self::Error> {
+        let mut f = value;
         f.normalize_assign();
         if f.scale() > 5 {
-            return Err(serde::de::Error::custom(
-                "Parts per thousand should not have more than 5 decimals.",
-            ));
+            return Err(ConvertPartsPerHundredThousandsError::TooManyDecimals);
         }
         if !f.is_sign_positive() && !f.is_zero() {
-            return Err(serde::de::Error::custom(
-                "Parts per thousand should not be negative.",
-            ));
+            return Err(ConvertPartsPerHundredThousandsError::Negative);
         }
-        f.set_scale(5).map_err(serde::de::Error::custom)?;
+        f.rescale(5);
         if f.mantissa() > 100_000 {
-            return Err(serde::de::Error::custom(
-                "Parts per thousand out of bounds.",
-            ));
+            return Err(ConvertPartsPerHundredThousandsError::OutOfBounds);
         }
         Ok(PartsPerHundredThousands {
             parts: f.mantissa() as u32,
         })
+    }
+}
+
+impl FromStr for PartsPerHundredThousands {
+    type Err = ConvertPartsPerHundredThousandsError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let decimal: rust_decimal::Decimal = s.parse()?;
+        Self::try_from(decimal)
+    }
+}
+
+impl<'de> SerdeDeserialize<'de> for PartsPerHundredThousands {
+    fn deserialize<D: serde::Deserializer<'de>>(des: D) -> Result<Self, D::Error> {
+        let f: rust_decimal::Decimal =
+            SerdeDeserialize::deserialize(des).map_err(serde::de::Error::custom)?;
+        let parts = PartsPerHundredThousands::try_from(f).map_err(serde::de::Error::custom)?;
+        Ok(parts)
     }
 }
 
@@ -674,26 +1137,93 @@ impl SerdeSerialize for MintRate {
     }
 }
 
+impl FromStr for MintRate {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let f: rust_decimal::Decimal = s.parse()?;
+        f.try_into()
+    }
+}
+
+impl TryFrom<rust_decimal::Decimal> for MintRate {
+    type Error = anyhow::Error;
+
+    fn try_from(mut value: rust_decimal::Decimal) -> Result<Self, Self::Error> {
+        // FIXME: exponents will only be 28 at most for this type, so it is not entirely
+        // compatible with the Haskell code.
+        value.normalize_assign();
+        if let Ok(exponent) = u8::try_from(value.scale()) {
+            if let Ok(mantissa) = u32::try_from(value.mantissa()) {
+                Ok(MintRate { mantissa, exponent })
+            } else {
+                anyhow::bail!("Unsupported mantissa range for MintRate.",);
+            }
+        } else {
+            anyhow::bail!("Unsupported exponent range for MintRate.");
+        }
+    }
+}
+
 impl<'de> SerdeDeserialize<'de> for MintRate {
     fn deserialize<D>(des: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>, {
-        let mut f: rust_decimal::Decimal = SerdeDeserialize::deserialize(des)?;
-        // FIXME: exponents will only be 28 at most for this type, so it is not entirely
-        // compatible with the Haskell code.
-        f.normalize_assign();
-        if let Ok(exponent) = u8::try_from(f.scale()) {
-            if let Ok(mantissa) = u32::try_from(f.mantissa()) {
-                Ok(MintRate { mantissa, exponent })
-            } else {
-                Err(serde::de::Error::custom(
-                    "Unsupported mantissa range for MintRate.",
-                ))
-            }
-        } else {
-            Err(serde::de::Error::custom(
-                "Unsupported exponent range for MintRate.",
-            ))
-        }
+        let f: rust_decimal::Decimal = SerdeDeserialize::deserialize(des)?;
+        MintRate::try_from(f).map_err(serde::de::Error::custom)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_parts_0() {
+        assert_eq!(
+            Ok(PartsPerHundredThousands::new_unchecked(12345)),
+            "0.12345".parse(),
+            "Case 1."
+        );
+        assert_eq!(
+            Ok(PartsPerHundredThousands::new_unchecked(12345)),
+            "0.123450".parse(),
+            "Case 2."
+        );
+        assert_eq!(
+            Ok(PartsPerHundredThousands::new_unchecked(12300)),
+            "0.123".parse(),
+            "Case 3."
+        );
+        assert_eq!(
+            Ok(PartsPerHundredThousands::new_unchecked(12300)),
+            "0.123000".parse(),
+            "Case 4."
+        );
+        assert!("0.123456".parse::<PartsPerHundredThousands>().is_err());
+    }
+
+    #[test]
+    fn test_parts_json() {
+        assert_eq!(
+            PartsPerHundredThousands::new_unchecked(12345),
+            serde_json::from_str("0.12345").unwrap(),
+            "Case 1."
+        );
+        assert_eq!(
+            PartsPerHundredThousands::new_unchecked(12345),
+            serde_json::from_str("0.123450").unwrap(),
+            "Case 2."
+        );
+        assert_eq!(
+            PartsPerHundredThousands::new_unchecked(12300),
+            serde_json::from_str("0.123").unwrap(),
+            "Case 3."
+        );
+        assert_eq!(
+            PartsPerHundredThousands::new_unchecked(12300),
+            serde_json::from_str("0.123000").unwrap(),
+            "Case 4."
+        );
+        assert!(serde_json::from_str::<PartsPerHundredThousands>("0.123456").is_err());
     }
 }

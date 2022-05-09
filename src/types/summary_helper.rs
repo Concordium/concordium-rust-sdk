@@ -7,7 +7,21 @@
 //! has too much freedom which makes it harder for consumers of the API to use
 //! the values. The [super::BlockItemSummary] definition is more precise and
 //! thus easier to consume.
-use crypto_common::{SerdeDeserialize, SerdeSerialize};
+use super::{
+    hashes, smart_contracts, AccountThreshold, AmountFraction, BakerAddedEvent, BakerId,
+    BakerKeysEvent, ContractInitializedEvent, CredentialRegistrationID, CredentialType,
+    DelegationTarget, DelegatorId, EncryptedAmountRemovedEvent, EncryptedSelfAmountAddedEvent,
+    Energy, InstanceUpdatedEvent, Memo, NewEncryptedAmountEvent, OpenStatus, RegisteredData,
+    RejectReason, TransactionIndex, TransactionType, UpdatePayload, UrlText,
+};
+use crate::types::Address;
+use crypto_common::{
+    types::{Amount, Timestamp, TransactionTime},
+    SerdeDeserialize, SerdeSerialize,
+};
+use id::types::AccountAddress;
+use std::convert::{TryFrom, TryInto};
+use thiserror::Error;
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -48,43 +62,7 @@ enum BlockItemType {
     #[serde(rename = "updateTransaction")]
     /// Chain updates are signed by the governance keys. They affect the core
     /// parameters of the chain.
-    Update(UpdateType),
-}
-
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
-#[serde(rename_all = "camelCase")]
-// Since all variants are fieldless, the default JSON serialization will convert
-// all the variants to simple strings.
-/// Enumeration of the types of updates that are possible.
-pub enum UpdateType {
-    /// Update the chain protocol
-    UpdateProtocol,
-    /// Update the election difficulty
-    UpdateElectionDifficulty,
-    /// Update the euro per energy exchange rate
-    UpdateEuroPerEnergy,
-    /// Update the microCCD per euro exchange rate
-    UpdateMicroGTUPerEuro,
-    /// Update the address of the foundation account
-    UpdateFoundationAccount,
-    /// Update the distribution of newly minted CCD
-    UpdateMintDistribution,
-    /// Update the distribution of transaction fees
-    UpdateTransactionFeeDistribution,
-    /// Update the GAS rewards
-    UpdateGASRewards,
-    /// Minimum amount to register as a baker
-    UpdateBakerStakeThreshold,
-    /// Add new anonymity revoker
-    UpdateAddAnonymityRevoker,
-    /// Add new identity provider
-    UpdateAddIdentityProvider,
-    /// Update the root keys
-    UpdateRootKeys,
-    /// Update the level 1 keys
-    UpdateLevel1Keys,
-    /// Update the level 2 keys
-    UpdateLevel2Keys,
+    Update(super::UpdateType),
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -104,7 +82,7 @@ enum BlockItemResult {
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(tag = "tag")]
 /// An event describing the changes that occurred to the state of the chain.
-enum Event {
+pub(crate) enum Event {
     /// A smart contract module was successfully deployed.
     ModuleDeployed {
         #[serde(rename = "contents")]
@@ -248,38 +226,162 @@ enum Event {
     #[serde(rename_all = "camelCase")]
     /// Memo
     TransferMemo { memo: Memo },
+    /// A V1 contract was interrupted.
+    #[serde(rename_all = "camelCase")]
+    Interrupted {
+        /// Address of the contract that was interrupted.
+        address: super::ContractAddress,
+        /// Events generated up to the interrupt.
+        events:  Vec<smart_contracts::ContractEvent>,
+    },
+    /// A V1 contract resumed execution.
+    #[serde(rename_all = "camelCase")]
+    Resumed {
+        /// Address of the contract that is resuming.
+        address: super::ContractAddress,
+        /// Whether the interrupt succeeded or not.
+        success: bool,
+    },
+    /// Updated open status for a baker pool
+    #[serde(rename_all = "camelCase")]
+    BakerSetOpenStatus {
+        /// Baker's id
+        baker_id:    BakerId,
+        /// Baker account
+        account:     AccountAddress,
+        /// The open status.
+        open_status: OpenStatus,
+    },
+    /// Updated metadata url for baker pool
+    #[serde(rename_all = "camelCase")]
+    BakerSetMetadataURL {
+        /// Baker's id
+        baker_id:     BakerId,
+        /// Baker account
+        account:      AccountAddress,
+        /// The URL.
+        #[serde(rename = "metadataURL")]
+        metadata_url: UrlText,
+    },
+    /// Updated transaction fee commission for baker pool
+    #[serde(rename_all = "camelCase")]
+    BakerSetTransactionFeeCommission {
+        /// Baker's id
+        baker_id:                   BakerId,
+        /// Baker account
+        account:                    AccountAddress,
+        /// The transaction fee commission.
+        transaction_fee_commission: AmountFraction,
+    },
+    /// Updated baking reward commission for baker pool
+    #[serde(rename_all = "camelCase")]
+    BakerSetBakingRewardCommission {
+        /// Baker's id
+        baker_id:                 BakerId,
+        /// Baker account
+        account:                  AccountAddress,
+        /// The baking reward commission
+        baking_reward_commission: AmountFraction,
+    },
+    /// Updated finalization reward commission for baker pool
+    #[serde(rename_all = "camelCase")]
+    BakerSetFinalizationRewardCommission {
+        /// Baker's id
+        baker_id: BakerId,
+        /// Baker account
+        account: AccountAddress,
+        /// The finalization reward commission
+        finalization_reward_commission: AmountFraction,
+    },
+    #[serde(rename_all = "camelCase")]
+    DelegationStakeIncreased {
+        /// Delegator's id
+        delegator_id: DelegatorId,
+        /// Delegator account
+        account:      AccountAddress,
+        /// New stake
+        new_stake:    Amount,
+    },
+    #[serde(rename_all = "camelCase")]
+    DelegationStakeDecreased {
+        /// Delegator's id
+        delegator_id: DelegatorId,
+        /// Delegator account
+        account:      AccountAddress,
+        /// New stake
+        new_stake:    Amount,
+    },
+    #[serde(rename_all = "camelCase")]
+    DelegationSetRestakeEarnings {
+        /// Delegator's id
+        delegator_id:     DelegatorId,
+        /// Delegator account
+        account:          AccountAddress,
+        /// Whether earnings will be restaked
+        restake_earnings: bool,
+    },
+    #[serde(rename_all = "camelCase")]
+    DelegationSetDelegationTarget {
+        /// Delegator's id
+        delegator_id:      DelegatorId,
+        /// Delegator account
+        account:           AccountAddress,
+        /// New delegation target
+        delegation_target: DelegationTarget,
+    },
+    #[serde(rename_all = "camelCase")]
+    DelegationAdded {
+        /// Delegator's id
+        delegator_id: DelegatorId,
+        /// Delegator account
+        account:      AccountAddress,
+    },
+    #[serde(rename_all = "camelCase")]
+    DelegationRemoved {
+        /// Delegator's id
+        delegator_id: DelegatorId,
+        /// Delegator account
+        account:      AccountAddress,
+    },
 }
 
-use super::{
-    hashes, smart_contracts, AccountThreshold, BakerAddedEvent, BakerId, BakerKeysEvent,
-    ContractInitializedEvent, CredentialRegistrationID, CredentialType,
-    EncryptedAmountRemovedEvent, EncryptedSelfAmountAddedEvent, Energy, InstanceUpdatedEvent, Memo,
-    NewEncryptedAmountEvent, RegisteredData, RejectReason, TransactionIndex, TransactionType,
-    UpdatePayload,
-};
-use crate::types::Address;
-use crypto_common::types::{Amount, Timestamp, TransactionTime};
-use id::types::AccountAddress;
-use std::convert::{TryFrom, TryInto};
-use thiserror::Error;
+impl From<super::ContractTraceElement> for Event {
+    fn from(e: super::ContractTraceElement) -> Self {
+        match e {
+            super::ContractTraceElement::Updated { data } => Event::Updated { data },
+            super::ContractTraceElement::Transferred { from, amount, to } => Event::Transferred {
+                from: Address::Contract(from),
+                amount,
+                to: Address::Account(to),
+            },
+            crate::types::ContractTraceElement::Interrupted { address, events } => {
+                Event::Interrupted { address, events }
+            }
+            crate::types::ContractTraceElement::Resumed { address, success } => {
+                Event::Resumed { address, success }
+            }
+        }
+    }
+}
 
-impl super::UpdatePayload {
-    fn update_type(&self) -> UpdateType {
-        use UpdateType::*;
-        match self {
-            UpdatePayload::Protocol(_) => UpdateProtocol,
-            UpdatePayload::ElectionDifficulty(_) => UpdateElectionDifficulty,
-            UpdatePayload::EuroPerEnergy(_) => UpdateEuroPerEnergy,
-            UpdatePayload::MicroGTUPerEuro(_) => UpdateMicroGTUPerEuro,
-            UpdatePayload::FoundationAccount(_) => UpdateFoundationAccount,
-            UpdatePayload::MintDistribution(_) => UpdateMintDistribution,
-            UpdatePayload::TransactionFeeDistribution(_) => UpdateTransactionFeeDistribution,
-            UpdatePayload::GASRewards(_) => UpdateGASRewards,
-            UpdatePayload::BakerStakeThreshold(_) => UpdateBakerStakeThreshold,
-            UpdatePayload::Root(_) => UpdateRootKeys,
-            UpdatePayload::Level1(_) => UpdateLevel1Keys,
-            UpdatePayload::AddAnonymityRevoker(_) => UpdateAddAnonymityRevoker,
-            UpdatePayload::AddIdentityProvider(_) => UpdateAddIdentityProvider,
+impl TryFrom<Event> for super::ContractTraceElement {
+    type Error = ConversionError;
+
+    fn try_from(value: Event) -> Result<Self, Self::Error> {
+        match value {
+            Event::Updated { data } => Ok(super::ContractTraceElement::Updated { data }),
+            Event::Transferred {
+                from: Address::Contract(from),
+                amount,
+                to: Address::Account(to),
+            } => Ok(super::ContractTraceElement::Transferred { from, amount, to }),
+            Event::Interrupted { address, events } => {
+                Ok(super::ContractTraceElement::Interrupted { address, events })
+            }
+            Event::Resumed { address, success } => {
+                Ok(super::ContractTraceElement::Resumed { address, success })
+            }
+            _ => Err(ConversionError::InvalidTransactionResult),
         }
     }
 }
@@ -324,21 +426,7 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                         })
                     }
                     super::AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                        let events = effects
-                            .into_iter()
-                            .map(|e| match e {
-                                super::ContractTraceElement::Updated { data } => {
-                                    Event::Updated { data }
-                                }
-                                super::ContractTraceElement::Transferred { from, amount, to } => {
-                                    Event::Transferred {
-                                        from: Address::Contract(from),
-                                        amount,
-                                        to: Address::Account(to),
-                                    }
-                                }
-                            })
-                            .collect::<Vec<_>>();
+                        let events = effects.into_iter().map(Event::from).collect::<Vec<_>>();
                         (Some(TransactionType::Update), BlockItemResult::Success {
                             events,
                         })
@@ -494,6 +582,144 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                             data,
                         })
                     }
+                    super::AccountTransactionEffects::BakerConfigured { data } => {
+                        let ty = TransactionType::ConfigureBaker;
+                        let events = data
+                            .into_iter()
+                            .map(|ev| match ev {
+                                super::BakerEvent::BakerAdded { data } => {
+                                    Event::BakerAdded { data }
+                                }
+                                super::BakerEvent::BakerRemoved { baker_id } => {
+                                    Event::BakerRemoved {
+                                        baker_id,
+                                        account: sender,
+                                    }
+                                }
+                                super::BakerEvent::BakerStakeIncreased {
+                                    baker_id,
+                                    new_stake,
+                                } => Event::BakerStakeIncreased {
+                                    baker_id,
+                                    account: sender,
+                                    new_stake,
+                                },
+                                super::BakerEvent::BakerStakeDecreased {
+                                    baker_id,
+                                    new_stake,
+                                } => Event::BakerStakeDecreased {
+                                    baker_id,
+                                    account: sender,
+                                    new_stake,
+                                },
+                                super::BakerEvent::BakerSetOpenStatus {
+                                    baker_id,
+                                    open_status,
+                                } => Event::BakerSetOpenStatus {
+                                    baker_id,
+                                    account: sender,
+                                    open_status,
+                                },
+                                super::BakerEvent::BakerSetMetadataURL {
+                                    baker_id,
+                                    metadata_url,
+                                } => Event::BakerSetMetadataURL {
+                                    baker_id,
+                                    account: sender,
+                                    metadata_url,
+                                },
+                                super::BakerEvent::BakerSetTransactionFeeCommission {
+                                    baker_id,
+                                    transaction_fee_commission,
+                                } => Event::BakerSetTransactionFeeCommission {
+                                    baker_id,
+                                    account: sender,
+                                    transaction_fee_commission,
+                                },
+                                super::BakerEvent::BakerSetBakingRewardCommission {
+                                    baker_id,
+                                    baking_reward_commission,
+                                } => Event::BakerSetBakingRewardCommission {
+                                    baker_id,
+                                    account: sender,
+                                    baking_reward_commission,
+                                },
+                                super::BakerEvent::BakerSetFinalizationRewardCommission {
+                                    baker_id,
+                                    finalization_reward_commission,
+                                } => Event::BakerSetFinalizationRewardCommission {
+                                    baker_id,
+                                    account: sender,
+                                    finalization_reward_commission,
+                                },
+                                super::BakerEvent::BakerRestakeEarningsUpdated {
+                                    baker_id,
+                                    restake_earnings,
+                                } => Event::BakerSetRestakeEarnings {
+                                    baker_id,
+                                    account: sender,
+                                    restake_earnings,
+                                },
+                                super::BakerEvent::BakerKeysUpdated { data } => {
+                                    Event::BakerKeysUpdated { data }
+                                }
+                            })
+                            .collect();
+                        (Some(ty), BlockItemResult::Success { events })
+                    }
+                    super::AccountTransactionEffects::DelegationConfigured { data } => {
+                        let ty = TransactionType::ConfigureDelegation;
+                        let events = data
+                            .into_iter()
+                            .map(|ev| match ev {
+                                super::DelegationEvent::DelegationStakeIncreased {
+                                    delegator_id,
+                                    new_stake,
+                                } => Event::DelegationStakeIncreased {
+                                    delegator_id,
+                                    account: sender,
+                                    new_stake,
+                                },
+                                super::DelegationEvent::DelegationStakeDecreased {
+                                    delegator_id,
+                                    new_stake,
+                                } => Event::DelegationStakeDecreased {
+                                    delegator_id,
+                                    account: sender,
+                                    new_stake,
+                                },
+                                super::DelegationEvent::DelegationSetRestakeEarnings {
+                                    delegator_id,
+                                    restake_earnings,
+                                } => Event::DelegationSetRestakeEarnings {
+                                    delegator_id,
+                                    account: sender,
+                                    restake_earnings,
+                                },
+                                super::DelegationEvent::DelegationSetDelegationTarget {
+                                    delegator_id,
+                                    delegation_target,
+                                } => Event::DelegationSetDelegationTarget {
+                                    delegator_id,
+                                    account: sender,
+                                    delegation_target,
+                                },
+                                super::DelegationEvent::DelegationAdded { delegator_id } => {
+                                    Event::DelegationAdded {
+                                        delegator_id,
+                                        account: sender,
+                                    }
+                                }
+                                super::DelegationEvent::DelegationRemoved { delegator_id } => {
+                                    Event::DelegationRemoved {
+                                        delegator_id,
+                                        account: sender,
+                                    }
+                                }
+                            })
+                            .collect();
+                        (Some(ty), BlockItemResult::Success { events })
+                    }
                 };
                 BlockItemSummary {
                     sender: Some(sender),
@@ -628,15 +854,7 @@ fn convert_account_transaction(
         TransactionType::Update => {
             let effects = events
                 .into_iter()
-                .map(|e| match e {
-                    Event::Updated { data } => Ok(super::ContractTraceElement::Updated { data }),
-                    Event::Transferred {
-                        from: Address::Contract(from),
-                        amount,
-                        to: Address::Account(to),
-                    } => Ok(super::ContractTraceElement::Transferred { from, amount, to }),
-                    _ => Err(ConversionError::InvalidTransactionResult),
-                })
+                .map(super::ContractTraceElement::try_from)
                 .collect::<Result<_, _>>()?;
             mk_success(super::AccountTransactionEffects::ContractUpdateIssued { effects })
         }
@@ -861,6 +1079,135 @@ fn convert_account_transaction(
                 _ => None,
             })?;
             mk_success(effects)
+        }
+        TransactionType::ConfigureBaker => {
+            let data = events
+                .into_iter()
+                .map(|ev| match ev {
+                    Event::BakerAdded { data } => Ok(super::BakerEvent::BakerAdded { data }),
+                    Event::BakerRemoved { baker_id, .. } => {
+                        Ok(super::BakerEvent::BakerRemoved { baker_id })
+                    }
+                    Event::BakerSetOpenStatus {
+                        baker_id,
+                        account: _,
+                        open_status,
+                    } => Ok(super::BakerEvent::BakerSetOpenStatus {
+                        baker_id,
+                        open_status,
+                    }),
+                    Event::BakerStakeIncreased {
+                        baker_id,
+                        new_stake,
+                        ..
+                    } => Ok(super::BakerEvent::BakerStakeIncreased {
+                        baker_id,
+                        new_stake,
+                    }),
+                    Event::BakerStakeDecreased {
+                        baker_id,
+                        new_stake,
+                        ..
+                    } => Ok(super::BakerEvent::BakerStakeDecreased {
+                        baker_id,
+                        new_stake,
+                    }),
+                    Event::BakerSetRestakeEarnings {
+                        baker_id,
+                        restake_earnings,
+                        ..
+                    } => Ok(super::BakerEvent::BakerRestakeEarningsUpdated {
+                        baker_id,
+                        restake_earnings,
+                    }),
+                    Event::BakerKeysUpdated { data } => {
+                        Ok(super::BakerEvent::BakerKeysUpdated { data })
+                    }
+                    Event::BakerSetMetadataURL {
+                        baker_id,
+                        account: _,
+                        metadata_url,
+                    } => Ok(super::BakerEvent::BakerSetMetadataURL {
+                        baker_id,
+                        metadata_url,
+                    }),
+                    Event::BakerSetTransactionFeeCommission {
+                        baker_id,
+                        account: _,
+                        transaction_fee_commission,
+                    } => Ok(super::BakerEvent::BakerSetTransactionFeeCommission {
+                        baker_id,
+                        transaction_fee_commission,
+                    }),
+                    Event::BakerSetBakingRewardCommission {
+                        baker_id,
+                        account: _,
+                        baking_reward_commission,
+                    } => Ok(super::BakerEvent::BakerSetBakingRewardCommission {
+                        baker_id,
+                        baking_reward_commission,
+                    }),
+                    Event::BakerSetFinalizationRewardCommission {
+                        baker_id,
+                        account: _,
+                        finalization_reward_commission,
+                    } => Ok(super::BakerEvent::BakerSetFinalizationRewardCommission {
+                        baker_id,
+                        finalization_reward_commission,
+                    }),
+                    _ => Err(ConversionError::InvalidTransactionResult),
+                })
+                .collect::<Result<_, ConversionError>>()?;
+            mk_success(super::AccountTransactionEffects::BakerConfigured { data })
+        }
+        TransactionType::ConfigureDelegation => {
+            let data = events
+                .into_iter()
+                .map(|ev| match ev {
+                    Event::DelegationStakeIncreased {
+                        delegator_id,
+                        account: _,
+                        new_stake,
+                    } => Ok(super::DelegationEvent::DelegationStakeIncreased {
+                        delegator_id,
+                        new_stake,
+                    }),
+                    Event::DelegationStakeDecreased {
+                        delegator_id,
+                        account: _,
+                        new_stake,
+                    } => Ok(super::DelegationEvent::DelegationStakeDecreased {
+                        delegator_id,
+                        new_stake,
+                    }),
+                    Event::DelegationSetRestakeEarnings {
+                        delegator_id,
+                        account: _,
+                        restake_earnings,
+                    } => Ok(super::DelegationEvent::DelegationSetRestakeEarnings {
+                        delegator_id,
+                        restake_earnings,
+                    }),
+                    Event::DelegationSetDelegationTarget {
+                        delegator_id,
+                        account: _,
+                        delegation_target,
+                    } => Ok(super::DelegationEvent::DelegationSetDelegationTarget {
+                        delegator_id,
+                        delegation_target,
+                    }),
+                    Event::DelegationAdded {
+                        delegator_id,
+                        account: _,
+                    } => Ok(super::DelegationEvent::DelegationAdded { delegator_id }),
+                    Event::DelegationRemoved {
+                        delegator_id,
+                        account: _,
+                    } => Ok(super::DelegationEvent::DelegationRemoved { delegator_id }),
+                    _ => Err(ConversionError::InvalidTransactionResult),
+                })
+                .collect::<Result<_, ConversionError>>()?;
+            mk_success(super::AccountTransactionEffects::DelegationConfigured { data })
         }
     }
 }

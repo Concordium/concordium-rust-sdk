@@ -6,7 +6,7 @@ use concordium_rust_sdk::{
     common::SerdeSerialize,
     endpoints,
     id::types::AccountAddress,
-    types::{hashes::BlockHash, CredentialType},
+    types::{hashes::BlockHash, AccountStakingInfo, CredentialType},
 };
 use crypto_common::types::Amount;
 use serde::Serializer;
@@ -83,7 +83,8 @@ async fn main() -> anyhow::Result<()> {
     let total_accounts = accounts.len();
     let mut num_bakers = 0;
     let mut num_initial = 0;
-    let mut staked_amount: Amount = 0.into();
+    let mut total_staked_amount: Amount = 0.into();
+    let mut total_delegated_amount: Amount = 0.into();
     let mut total_amount: Amount = 0.into();
 
     let mut acc_balances = Vec::with_capacity(accounts.len());
@@ -92,18 +93,30 @@ async fn main() -> anyhow::Result<()> {
         for acc in accs {
             let mut client = client.clone();
             handles.push(tokio::spawn(async move {
-                let info = client.get_account_info(&acc, &block).await?;
+                let info = client
+                    .get_account_info(&acc, &block)
+                    .await
+                    .context(format!("Getting account {} failed.", acc))?;
                 Ok::<_, anyhow::Error>((acc, info))
             }));
         }
 
         for res in futures::future::join_all(handles).await {
             let (acc, info) = res??;
-            let is_baker = if let Some(baker) = info.account_baker {
-                num_bakers += 1;
-                staked_amount = (staked_amount + baker.staked_amount)
-                    .context("Total staked amount exceeds u64. This should not happen.")?;
-                true
+            let is_baker = if let Some(account_stake) = info.account_stake {
+                match account_stake {
+                    AccountStakingInfo::Baker { staked_amount, .. } => {
+                        num_bakers += 1;
+                        total_staked_amount = (total_staked_amount + staked_amount)
+                            .context("Total staked amount exceeds u64. This should not happen.")?;
+                        true
+                    }
+                    AccountStakingInfo::Delegated { staked_amount, .. } => {
+                        total_delegated_amount = (total_delegated_amount + staked_amount)
+                            .context("Total staked amount exceeds u64. This should not happen.")?;
+                        false
+                    }
+                }
             } else {
                 false
             };
@@ -154,8 +167,13 @@ async fn main() -> anyhow::Result<()> {
     println!("Total amount of CCD is {}.", total_amount);
     println!(
         "Total amount of staked CCD is {}, which amounts to {:.2}%.",
-        staked_amount,
-        (u64::from(staked_amount) as f64 / u64::from(total_amount) as f64) * 100f64
+        total_staked_amount,
+        (u64::from(total_staked_amount) as f64 / u64::from(total_amount) as f64) * 100f64
+    );
+    println!(
+        "Total amount of delegated CCD is {}, which amounts to {:.2}%.",
+        total_delegated_amount,
+        (u64::from(total_delegated_amount) as f64 / u64::from(total_amount) as f64) * 100f64
     );
 
     Ok(())

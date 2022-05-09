@@ -141,7 +141,7 @@ pub struct ConsensusInfo {
     pub genesis_index:                  GenesisIndex,
     /// Block hash of the genesis block of current era, i.e., since the last
     /// protocol update. Initially this is equal to
-    /// [ConsensusInfo::genesis_hash]'.
+    /// [`genesis_block`](Self::genesis_block)'.
     pub current_era_genesis_block:      BlockHash,
     /// Time when the current era started.
     pub current_era_genesis_time:       chrono::DateTime<chrono::Utc>,

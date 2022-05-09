@@ -1,3 +1,4 @@
+use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::{SerdeDeserialize, SerdeSerialize},
@@ -5,6 +6,7 @@ use concordium_rust_sdk::{
     id::types::{AccountAddress, AccountKeys},
     types,
 };
+use rand::{prelude::SliceRandom, thread_rng};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -28,7 +30,7 @@ struct AccountData {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
-    let app = {
+    let app: App = {
         let app = App::clap()
             // .setting(AppSettings::ArgRequiredElseHelp)
             .global_setting(AppSettings::ColoredHelp);
@@ -51,14 +53,19 @@ async fn main() -> anyhow::Result<()> {
 
     let gb = consensus_info.genesis_block;
     let mut cb = app.start_block.unwrap_or(consensus_info.best_block);
+    let mut rng = thread_rng();
     while cb != gb {
         println!("{}", cb);
         let bi = client.get_block_info(&cb).await?;
         if bi.transaction_count != 0 {
             println!("Processing block {}", cb);
             let accs = client.get_account_list(&cb).await?;
+            let accs = accs
+                .choose_multiple(&mut rng, 100)
+                .copied()
+                .collect::<Vec<_>>();
             {
-                let mut handles = Vec::with_capacity(accs.len());
+                let mut handles = Vec::with_capacity(100);
                 for acc in accs {
                     let cc = client.clone();
                     handles.push(tokio::spawn(async move {
@@ -72,12 +79,20 @@ async fn main() -> anyhow::Result<()> {
                     let _info = res??;
                 }
             }
-            let _birks = client.get_birk_parameters(&cb).await?;
+            let _birks = client
+                .get_birk_parameters(&cb)
+                .await
+                .context("Could not get birk parameters.")?;
             // println!("{:?}", birks);
-
-            let _summary = client.get_block_summary(&cb).await?;
-            // println!("{:?}", summary);
         }
+        let start = chrono::Utc::now();
+        let _summary = client
+            .get_block_summary(&cb)
+            .await
+            .context("Could not get block summary.")?;
+        let end = chrono::Utc::now();
+        let diff = end.signed_duration_since(start).num_milliseconds();
+        println!("  Took {}ms to query block summary.", diff);
         cb = bi.block_parent;
     }
 

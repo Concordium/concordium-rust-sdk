@@ -2,10 +2,11 @@
 //! with their serialization, signing, and similar auxiliary methods.
 
 use super::{
-    hashes, smart_contracts, AccountInfo, AccountThreshold, AggregateSigPairing,
+    hashes, smart_contracts, AccountInfo, AccountThreshold, AggregateSigPairing, AmountFraction,
     BakerAggregationVerifyKey, BakerElectionVerifyKey, BakerKeyPairs, BakerSignatureVerifyKey,
-    ContractAddress, CredentialIndex, CredentialRegistrationID, Energy, Memo, Nonce,
-    RegisteredData, UpdateKeysIndex, UpdatePayload, UpdateSequenceNumber,
+    ContractAddress, CredentialIndex, CredentialRegistrationID, DelegationTarget, Energy, Memo,
+    Nonce, OpenStatus, RegisteredData, UpdateKeyPair, UpdateKeysIndex, UpdatePayload,
+    UpdateSequenceNumber, UrlText,
 };
 use crate::{constants::*, types::TransactionType};
 use crypto_common::{
@@ -204,6 +205,11 @@ pub enum AddBakerKeysMarker {}
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum UpdateBakerKeysMarker {}
 
+/// Marker for `ConfigureBakerKeysPayload` indicating the proofs contained in
+/// `ConfigureBaker` have been generated for an `ConfigureBaker` transaction.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ConfigureBakerKeysMarker {}
+
 #[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize)]
 #[serde(rename_all = "camelCase")]
 /// Auxiliary type that contains public keys and proof of ownership of those
@@ -237,6 +243,10 @@ pub type BakerAddKeysPayload = BakerKeysPayload<AddBakerKeysMarker>;
 /// Baker keys payload containing proofs construct for a `UpdateBakerKeys`
 /// transaction.
 pub type BakerUpdateKeysPayload = BakerKeysPayload<UpdateBakerKeysMarker>;
+
+/// Baker keys payload containing proofs construct for a `ConfigureBaker`
+/// transaction.
+pub type ConfigureBakerKeysPayload = BakerKeysPayload<ConfigureBakerKeysMarker>;
 
 impl<T> BakerKeysPayload<T> {
     /// Construct a BakerKeysPayload taking a prefix for the challenge.
@@ -293,6 +303,13 @@ impl BakerUpdateKeysPayload {
     }
 }
 
+impl ConfigureBakerKeysPayload {
+    /// Construct a BakerKeysPayload with proofs for updating baker keys.
+    pub fn new<T: Rng>(baker_keys: &BakerKeyPairs, sender: AccountAddress, csprng: &mut T) -> Self {
+        BakerKeysPayload::new_payload(baker_keys, sender, b"configureBaker", csprng)
+    }
+}
+
 #[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize)]
 #[serde(rename_all = "camelCase")]
 /// Payload of the `AddBaker` transaction. This transaction registers the
@@ -334,6 +351,145 @@ pub struct UpdateContractPayload {
     pub receive_name: smart_contracts::ReceiveName,
     /// Message to send to the contract instance.
     pub message:      smart_contracts::Parameter,
+}
+
+#[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize, Default)]
+#[serde(rename_all = "camelCase")]
+/// Payload for configuring a baker. The different constructors cover
+/// the different common cases.
+/// The [Default] implementation produces an empty configure that will have no
+/// effects.
+pub struct ConfigureBakerPayload {
+    /// The equity capital of the baker
+    pub capital: Option<Amount>,
+    /// Whether the baker's earnings are restaked
+    pub restake_earnings: Option<bool>,
+    /// Whether the pool is open for delegators
+    pub open_for_delegation: Option<OpenStatus>,
+    /// The key/proof pairs to verify the baker.
+    pub keys_with_proofs: Option<ConfigureBakerKeysPayload>,
+    /// The URL referencing the baker's metadata.
+    pub metadata_url: Option<UrlText>,
+    /// The commission the pool owner takes on transaction fees.
+    pub transaction_fee_commission: Option<AmountFraction>,
+    /// The commission the pool owner takes on baking rewards.
+    pub baking_reward_commission: Option<AmountFraction>,
+    /// The commission the pool owner takes on finalization rewards.
+    pub finalization_reward_commission: Option<AmountFraction>,
+}
+
+impl ConfigureBakerPayload {
+    pub fn new() -> Self { Self::default() }
+
+    /// Construct a new payload to remove a baker.
+    pub fn new_remove_baker() -> Self {
+        Self {
+            capital: Some(Amount::from_micro_ccd(0)),
+            ..Self::new()
+        }
+    }
+
+    pub fn set_capital(&mut self, amount: Amount) -> &mut Self {
+        self.capital.insert(amount);
+        self
+    }
+
+    pub fn set_restake_earnings(&mut self, restake_earnings: bool) -> &mut Self {
+        self.restake_earnings.insert(restake_earnings);
+        self
+    }
+
+    pub fn set_open_for_delegation(&mut self, open_for_delegation: OpenStatus) -> &mut Self {
+        self.open_for_delegation.insert(open_for_delegation);
+        self
+    }
+
+    /// Add keys to the payload. This will construct proofs of validity and
+    /// insert the public keys into the payload.
+    pub fn add_keys<T: Rng>(
+        &mut self,
+        baker_keys: &BakerKeyPairs,
+        sender: AccountAddress,
+        csprng: &mut T,
+    ) -> &mut Self {
+        let keys_with_proofs =
+            BakerKeysPayload::new_payload(baker_keys, sender, b"configureBaker", csprng);
+        self.keys_with_proofs.insert(keys_with_proofs);
+        self
+    }
+
+    pub fn set_metadata_url(&mut self, metadata_url: UrlText) -> &mut Self {
+        self.metadata_url.insert(metadata_url);
+        self
+    }
+
+    pub fn set_transaction_fee_commission(
+        &mut self,
+        transaction_fee_commission: AmountFraction,
+    ) -> &mut Self {
+        self.transaction_fee_commission
+            .insert(transaction_fee_commission);
+        self
+    }
+
+    pub fn set_baking_reward_commission(
+        &mut self,
+        baking_reward_commission: AmountFraction,
+    ) -> &mut Self {
+        self.baking_reward_commission
+            .insert(baking_reward_commission);
+        self
+    }
+
+    pub fn set_finalization_reward_commission(
+        &mut self,
+        finalization_reward_commission: AmountFraction,
+    ) -> &mut Self {
+        self.finalization_reward_commission
+            .insert(finalization_reward_commission);
+        self
+    }
+}
+
+#[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize, Default)]
+#[serde(rename_all = "camelCase")]
+/// Payload for configuring delegation. The [Default] implementation produces an
+/// empty configuration that will not change anything.
+pub struct ConfigureDelegationPayload {
+    /// The capital delegated to the pool.
+    pub capital:           Option<Amount>,
+    /// Whether the delegator's earnings are restaked.
+    pub restake_earnings:  Option<bool>,
+    /// The target of the delegation.
+    pub delegation_target: Option<DelegationTarget>,
+}
+
+impl ConfigureDelegationPayload {
+    /// Construct a new payload that has all the options unset.
+    pub fn new() -> Self { Self::default() }
+
+    /// Construct a new payload to remove a delegation.
+    pub fn new_remove_delegation() -> Self {
+        Self {
+            capital: Some(Amount::from_micro_ccd(0)),
+            ..Self::new()
+        }
+    }
+
+    pub fn set_capital(&mut self, amount: Amount) -> &mut Self {
+        self.capital.insert(amount);
+        self
+    }
+
+    pub fn set_restake_earnings(&mut self, restake_earnings: bool) -> &mut Self {
+        self.restake_earnings.insert(restake_earnings);
+        self
+    }
+
+    pub fn set_delegation_target(&mut self, target: DelegationTarget) -> &mut Self {
+        self.delegation_target.insert(target);
+        self
+    }
 }
 
 #[derive(Debug, Clone, SerdeDeserialize, SerdeSerialize)]
@@ -466,6 +622,16 @@ pub enum Payload {
         /// The release schedule. This can be at most 255 elements.
         schedule: Vec<(Timestamp, Amount)>,
     },
+    /// Configure a baker on an account.
+    ConfigureBaker {
+        #[serde(flatten)]
+        data: Box<ConfigureBakerPayload>,
+    },
+    ///  Configure an account's stake delegation.
+    ConfigureDelegation {
+        #[serde(flatten)]
+        data: ConfigureDelegationPayload,
+    },
 }
 
 impl Payload {
@@ -498,6 +664,8 @@ impl Payload {
             Payload::TransferWithScheduleAndMemo { .. } => {
                 TransactionType::TransferWithScheduleAndMemo
             }
+            Payload::ConfigureBaker { .. } => TransactionType::ConfigureBaker,
+            Payload::ConfigureDelegation { .. } => TransactionType::ConfigureDelegation,
         }
     }
 }
@@ -603,6 +771,75 @@ impl Serial for Payload {
                 out.put(memo);
                 out.put(&(schedule.len() as u8));
                 crypto_common::serial_vector_no_length(schedule, out);
+            }
+            Payload::ConfigureBaker { data } => {
+                out.put(&25u8);
+                let set_if = |n, b| if b { 1u16 << n } else { 0 };
+                let bitmap: u16 = set_if(0, data.capital.is_some())
+                    | set_if(1, data.restake_earnings.is_some())
+                    | set_if(2, data.open_for_delegation.is_some())
+                    | set_if(3, data.keys_with_proofs.is_some())
+                    | set_if(4, data.metadata_url.is_some())
+                    | set_if(5, data.transaction_fee_commission.is_some())
+                    | set_if(6, data.baking_reward_commission.is_some())
+                    | set_if(7, data.finalization_reward_commission.is_some());
+                out.put(&bitmap);
+                if let Some(capital) = &data.capital {
+                    out.put(capital);
+                }
+                if let Some(restake_earnings) = &data.restake_earnings {
+                    out.put(restake_earnings);
+                }
+                if let Some(open_for_delegation) = &data.open_for_delegation {
+                    out.put(open_for_delegation);
+                }
+                if let Some(keys_with_proofs) = &data.keys_with_proofs {
+                    // this is serialized manually since the serialization in Haskell is not
+                    // consistent with the serialization of baker add
+                    // transactions. The order of fields is different.
+                    out.put(&keys_with_proofs.election_verify_key);
+                    out.put(&keys_with_proofs.proof_election);
+                    out.put(&keys_with_proofs.signature_verify_key);
+                    out.put(&keys_with_proofs.proof_sig);
+                    out.put(&keys_with_proofs.aggregation_verify_key);
+                    out.put(&keys_with_proofs.proof_aggregation);
+                }
+                if let Some(metadata_url) = &data.metadata_url {
+                    out.put(metadata_url);
+                }
+                if let Some(transaction_fee_commission) = &data.transaction_fee_commission {
+                    out.put(transaction_fee_commission);
+                }
+                if let Some(baking_reward_commission) = &data.baking_reward_commission {
+                    out.put(baking_reward_commission);
+                }
+                if let Some(finalization_reward_commission) = &data.finalization_reward_commission {
+                    out.put(finalization_reward_commission);
+                }
+            }
+            Payload::ConfigureDelegation {
+                data:
+                    ConfigureDelegationPayload {
+                        capital,
+                        restake_earnings,
+                        delegation_target,
+                    },
+            } => {
+                out.put(&26u8);
+                let set_if = |n, b| if b { 1u16 << n } else { 0 };
+                let bitmap: u16 = set_if(0, capital.is_some())
+                    | set_if(1, restake_earnings.is_some())
+                    | set_if(2, delegation_target.is_some());
+                out.put(&bitmap);
+                if let Some(capital) = capital {
+                    out.put(capital);
+                }
+                if let Some(restake_earnings) = restake_earnings {
+                    out.put(restake_earnings);
+                }
+                if let Some(delegation_target) = delegation_target {
+                    out.put(delegation_target);
+                }
             }
         }
     }
@@ -716,6 +953,87 @@ impl Deserial for Payload {
                 let len: u8 = source.get()?;
                 let schedule = crypto_common::deserial_vector_no_length(source, len.into())?;
                 Ok(Payload::TransferWithScheduleAndMemo { to, memo, schedule })
+            }
+            25 => {
+                let bitmap: u16 = source.get()?;
+                let mut capital = None;
+                let mut restake_earnings = None;
+                let mut open_for_delegation = None;
+                let mut keys_with_proofs = None;
+                let mut metadata_url = None;
+                let mut transaction_fee_commission = None;
+                let mut baking_reward_commission = None;
+                let mut finalization_reward_commission = None;
+                if bitmap & 1 != 0 {
+                    capital.insert(source.get()?);
+                }
+                if bitmap & (1 << 1) != 0 {
+                    restake_earnings.insert(source.get()?);
+                }
+                if bitmap & (1 << 2) != 0 {
+                    open_for_delegation.insert(source.get()?);
+                }
+                if bitmap & (1 << 3) != 0 {
+                    // this is serialized manually since the serialization in Haskell is not
+                    // consistent with the serialization of baker add
+                    // transactions. The order of fields is different.
+                    let election_verify_key = source.get()?;
+                    let proof_election = source.get()?;
+                    let signature_verify_key = source.get()?;
+                    let proof_sig = source.get()?;
+                    let aggregation_verify_key = source.get()?;
+                    let proof_aggregation = source.get()?;
+                    keys_with_proofs.insert(BakerKeysPayload {
+                        phantom: PhantomData,
+                        election_verify_key,
+                        signature_verify_key,
+                        aggregation_verify_key,
+                        proof_sig,
+                        proof_election,
+                        proof_aggregation,
+                    });
+                }
+                if bitmap & (1 << 4) != 0 {
+                    metadata_url.insert(source.get()?);
+                }
+                if bitmap & (1 << 5) != 0 {
+                    transaction_fee_commission.insert(source.get()?);
+                }
+                if bitmap & (1 << 6) != 0 {
+                    baking_reward_commission.insert(source.get()?);
+                }
+                if bitmap & (1 << 7) != 0 {
+                    finalization_reward_commission.insert(source.get()?);
+                }
+                let data = Box::new(ConfigureBakerPayload {
+                    capital,
+                    restake_earnings,
+                    open_for_delegation,
+                    keys_with_proofs,
+                    metadata_url,
+                    transaction_fee_commission,
+                    baking_reward_commission,
+                    finalization_reward_commission,
+                });
+                Ok(Payload::ConfigureBaker { data })
+            }
+            26 => {
+                let mut data = ConfigureDelegationPayload::default();
+                let bitmap: u16 = source.get()?;
+                anyhow::ensure!(
+                    bitmap & 0b111 == bitmap,
+                    "Incorrect bitmap for configure delegation."
+                );
+                if bitmap & 1 != 0 {
+                    data.capital.insert(source.get()?);
+                }
+                if bitmap & (1 << 1) != 0 {
+                    data.restake_earnings.insert(source.get()?);
+                }
+                if bitmap & (1 << 2) != 0 {
+                    data.delegation_target.insert(source.get()?);
+                }
+                Ok(Payload::ConfigureDelegation { data })
             }
             _ => {
                 anyhow::bail!("Unsupported transaction payload tag {}", tag)
@@ -953,7 +1271,7 @@ pub trait UpdateSigner {
         -> UpdateInstructionSignature;
 }
 
-impl UpdateSigner for BTreeMap<UpdateKeysIndex, KeyPair> {
+impl UpdateSigner for &BTreeMap<UpdateKeysIndex, UpdateKeyPair> {
     fn sign_update_hash(
         &self,
         hash_to_sign: &hashes::UpdateSignHash,
@@ -966,7 +1284,7 @@ impl UpdateSigner for BTreeMap<UpdateKeysIndex, KeyPair> {
     }
 }
 
-impl UpdateSigner for &[(UpdateKeysIndex, KeyPair)] {
+impl UpdateSigner for &[(UpdateKeysIndex, UpdateKeyPair)] {
     fn sign_update_hash(
         &self,
         hash_to_sign: &hashes::UpdateSignHash,
@@ -1281,6 +1599,22 @@ impl Serial for UpdatePayload {
                 13u8.serial(out);
                 add_ip.serial(out)
             }
+            UpdatePayload::CooldownParametersCPV1(cp) => {
+                14u8.serial(out);
+                cp.serial(out)
+            }
+            UpdatePayload::PoolParametersCPV1(pp) => {
+                15u8.serial(out);
+                pp.serial(out)
+            }
+            UpdatePayload::TimeParametersCPV1(tp) => {
+                16u8.serial(out);
+                tp.serial(out)
+            }
+            UpdatePayload::MintDistributionCPV1(md) => {
+                17u8.serial(out);
+                md.serial(out)
+            }
         }
     }
 }
@@ -1301,6 +1635,10 @@ impl Deserial for UpdatePayload {
             11u8 => Ok(UpdatePayload::Level1(source.get()?)),
             12u8 => Ok(UpdatePayload::AddAnonymityRevoker(source.get()?)),
             13u8 => Ok(UpdatePayload::AddIdentityProvider(source.get()?)),
+            14u8 => Ok(UpdatePayload::CooldownParametersCPV1(source.get()?)),
+            15u8 => Ok(UpdatePayload::PoolParametersCPV1(source.get()?)),
+            16u8 => Ok(UpdatePayload::TimeParametersCPV1(source.get()?)),
+            17u8 => Ok(UpdatePayload::MintDistributionCPV1(source.get()?)),
             tag => anyhow::bail!("Unknown update payload tag {}", tag),
         }
     }
@@ -1369,6 +1707,16 @@ pub mod cost {
 
     /// Additional cost of registering a piece of data.
     pub const REGISTER_DATA: Energy = Energy { energy: 300 };
+
+    /// Additional cost of configuring a baker if new keys are registered.
+    pub const CONFIGURE_BAKER_WITH_KEYS: Energy = Energy { energy: 4050 };
+
+    /// Additional cost of configuring a baker if new keys are **not**
+    /// registered.
+    pub const CONFIGURE_BAKER_WITHOUT_KEYS: Energy = Energy { energy: 300 };
+
+    /// Additional cost of configuring delegation.
+    pub const CONFIGURE_DELEGATION: Energy = Energy { energy: 300 };
 
     /// Additional cost of deploying a smart contract module, parametrized by
     /// the size of the module, which is defined to be the size of
@@ -1890,12 +2238,10 @@ pub mod construct {
         sender: AccountAddress,
         nonce: Nonce,
         expiry: TransactionTime,
-        source: smart_contracts::ModuleSource,
+        module: smart_contracts::WasmModule,
     ) -> PreAccountTransaction {
-        let module_size = source.size();
-        let payload = Payload::DeployModule {
-            module: smart_contracts::WasmModule { version: 0, source },
-        };
+        let module_size = module.source.size();
+        let payload = Payload::DeployModule { module };
         make_transaction(
             sender,
             nonce,
@@ -1950,6 +2296,54 @@ pub mod construct {
             nonce,
             expiry,
             GivenEnergy::Add { num_sigs, energy },
+            payload,
+        )
+    }
+
+    /// Configure the account as a baker. Only valid for protocol version 4 and
+    /// up.
+    pub fn configure_baker(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        payload: ConfigureBakerPayload,
+    ) -> PreAccountTransaction {
+        let energy = if payload.keys_with_proofs.is_some() {
+            cost::CONFIGURE_BAKER_WITH_KEYS
+        } else {
+            cost::CONFIGURE_BAKER_WITHOUT_KEYS
+        };
+        let payload = Payload::ConfigureBaker {
+            data: Box::new(payload),
+        };
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add { num_sigs, energy },
+            payload,
+        )
+    }
+
+    /// Configure the account as a delegator. Only valid for protocol version 4
+    /// and up.
+    pub fn configure_delegation(
+        num_sigs: u32,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        payload: ConfigureDelegationPayload,
+    ) -> PreAccountTransaction {
+        let payload = Payload::ConfigureDelegation { data: payload };
+        make_transaction(
+            sender,
+            nonce,
+            expiry,
+            GivenEnergy::Add {
+                num_sigs,
+                energy: cost::CONFIGURE_DELEGATION,
+            },
             payload,
         )
     }
@@ -2200,6 +2594,31 @@ pub mod send {
         .sign(signer)
     }
 
+    /// Configure the account as a baker. Only valid for protocol version 4 and
+    /// up.
+    pub fn configure_baker(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        payload: ConfigureBakerPayload,
+    ) -> AccountTransaction<EncodedPayload> {
+        construct::configure_baker(signer.num_keys(), sender, nonce, expiry, payload).sign(signer)
+    }
+
+    /// Configure the account as a delegator. Only valid for protocol version 4
+    /// and up.
+    pub fn configure_delegation(
+        signer: &impl ExactSizeTransactionSigner,
+        sender: AccountAddress,
+        nonce: Nonce,
+        expiry: TransactionTime,
+        payload: ConfigureDelegationPayload,
+    ) -> AccountTransaction<EncodedPayload> {
+        construct::configure_delegation(signer.num_keys(), sender, nonce, expiry, payload)
+            .sign(signer)
+    }
+
     /// Construct a transction to register the given piece of data.
     pub fn register_data(
         signer: &impl ExactSizeTransactionSigner,
@@ -2218,9 +2637,9 @@ pub mod send {
         sender: AccountAddress,
         nonce: Nonce,
         expiry: TransactionTime,
-        source: smart_contracts::ModuleSource,
+        module: smart_contracts::WasmModule,
     ) -> AccountTransaction<EncodedPayload> {
-        construct::deploy_module(signer.num_keys(), sender, nonce, expiry, source).sign(signer)
+        construct::deploy_module(signer.num_keys(), sender, nonce, expiry, module).sign(signer)
     }
 
     /// Initialize a smart contract, giving it the given amount of energy for

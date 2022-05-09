@@ -1,14 +1,15 @@
 use crate::{
+    constants::DEFAULT_NETWORK_ID,
     generated_types::{
         self, node_info_response, p2p_client, AccountAddress, BlockHash, BlockHashAndAmount,
-        BlockHeight, Empty, GetAddressInfoRequest, GetModuleSourceRequest,
-        GetTransactionStatusInBlockRequest, JsonResponse, PeerConnectRequest, PeerElement,
-        PeersRequest, SendTransactionRequest, TransactionHash,
+        BlockHeight, Empty, GetAddressInfoRequest, GetModuleSourceRequest, GetPoolStatusRequest,
+        GetTransactionStatusInBlockRequest, InvokeContractRequest, JsonResponse,
+        PeerConnectRequest, PeerElement, PeersRequest, SendTransactionRequest, TransactionHash,
     },
     types::{
-        self, network, queries,
+        self, network, queries, smart_contracts,
         transactions::{self, PayloadLike},
-        BakerId,
+        AccountIndex, BakerId,
     },
 };
 use anyhow::anyhow;
@@ -106,7 +107,7 @@ pub enum BlocksAtHeightInput {
 
 #[derive(Clone)]
 /// Client that can perform queries.
-/// All endpoints take a &mut self as an argument which means that a single
+/// All endpoints take a `&mut self` as an argument which means that a single
 /// instance cannot be used concurrently. However instead of putting the Client
 /// behind a Mutex, the intended way to use it is to clone it. Cloning is very
 /// cheap and will reuse the underlying connection.
@@ -126,16 +127,18 @@ impl Client {
     }
 
     /// Construct a new client by connecting to the specified destination.
+    /// The provided `token` must match the authentication token accepted by the
+    /// node.
     pub async fn connect<D: TryInto<Endpoint>>(
         dst: D,
-        token: String,
+        token: impl Into<String>,
     ) -> Result<Self, tonic::transport::Error>
     where
         <D as TryInto<Endpoint>>::Error: std::error::Error + Send + Sync + 'static, {
         let client = p2p_client::P2pClient::connect(dst).await?;
         Ok(Client {
             client,
-            token: Arc::new(token),
+            token: Arc::new(token.into()),
         })
     }
 
@@ -307,9 +310,11 @@ impl Client {
                             }
                             AddedButWrongKeys => queries::ActiveConsensusState::IncorrectKeys,
                             ActiveInCommittee => queries::ActiveConsensusState::Active {
-                                baker_id:  BakerId::from(ni.consensus_baker_id.ok_or_else(
-                                    || anyhow!("Invalid response, active but no baker id."),
-                                )?),
+                                baker_id:  BakerId::from(AccountIndex::from(
+                                    ni.consensus_baker_id.ok_or_else(|| {
+                                        anyhow!("Invalid response, active but no baker id.")
+                                    })?,
+                                )),
                                 finalizer: ni.consensus_finalizer_committee,
                             },
                         };
@@ -595,6 +600,40 @@ impl Client {
         parse_json_response(response)
     }
 
+    /// Get the IDs of the bakers registered in the given block.
+    /// Note that this list is in general different from the bakers that are
+    /// returned as part of [get_birk_parameters](Client::get_birk_parameters).
+    /// The latter are the bakers that are eligible for baking at the time of
+    /// the block.
+    pub async fn get_baker_list(
+        &mut self,
+        bh: &types::hashes::BlockHash,
+    ) -> QueryResult<Vec<BakerId>> {
+        let request = self.construct_request(BlockHash {
+            block_hash: bh.to_string(),
+        })?;
+        let response = self.client.get_baker_list(request).await?;
+        parse_json_response(response)
+    }
+
+    /// Get the status of a given baker pool or passive delegation at the given
+    /// block. This is only supported if the node's protocol version is at least
+    /// [P4](crate::types::ProtocolVersion::P4). For earlier versions it will
+    /// return [NotFound](QueryError::NotFound).
+    pub async fn get_pool_status(
+        &mut self,
+        baker_id: Option<BakerId>,
+        bh: &types::hashes::BlockHash,
+    ) -> QueryResult<types::PoolStatus> {
+        let request = self.construct_request(GetPoolStatusRequest {
+            block_hash: bh.to_string(),
+            l_pool: baker_id.is_none(),
+            baker_id: baker_id.map_or(0, |bi| u64::from(AccountIndex::from(bi))), // not used if baker_id is none.
+        })?;
+        let response = self.client.get_pool_status(request).await?;
+        parse_json_response(response)
+    }
+
     /// Get the list of smart contract modules in the given block.
     pub async fn get_module_list(
         &mut self,
@@ -761,21 +800,47 @@ impl Client {
         Ok(nn)
     }
 
-    /// Send the given block item on the given network.
-    pub async fn send_transaction<PayloadType: PayloadLike>(
+    /// Invoke a contract in the given context and get the response.
+    /// Note that this is purely node-local transient operation and no
+    /// transaction or payment is involved. Use
+    /// [`send_transaction`](Self::send_transaction) if you need to update
+    /// the state of the contract on the chain.
+    pub async fn invoke_contract(
         &mut self,
-        network_id: network::NetworkId,
+        bh: &types::hashes::BlockHash,
+        context: &smart_contracts::ContractContext,
+    ) -> RPCResult<smart_contracts::InvokeContractResult> {
+        let request = self.construct_request(InvokeContractRequest {
+            block_hash: bh.to_string(),
+            context:    serde_json::to_string(context)
+                .expect("Context serialization always succeeds."),
+        })?;
+        let response = self.client.invoke_contract(request).await?;
+        let val = serde_json::from_str::<serde_json::Value>(response.into_inner().value.as_str())?;
+        let res = serde_json::from_value(val)?;
+        Ok(res)
+    }
+
+    /// Send the given block item.
+    pub async fn send_block_item<PayloadType: PayloadLike>(
+        &mut self,
         bi: &transactions::BlockItem<PayloadType>,
-    ) -> RPCResult<bool> {
+    ) -> RPCResult<types::hashes::TransactionHash> {
         let request = self.construct_request(SendTransactionRequest {
-            network_id: u32::from(u16::from(network_id)),
+            network_id: u32::from(u16::from(DEFAULT_NETWORK_ID)),
             payload:    crypto_common::to_bytes(&crypto_common::Versioned::new(
                 crypto_common::VERSION_0,
                 bi,
             )),
         })?;
         let response = self.client.send_transaction(request).await?;
-        Ok(response.into_inner().value)
+        if response.into_inner().value {
+            Ok(bi.hash())
+        } else {
+            Err(RPCError::CallError(tonic::Status::invalid_argument(
+                "Transaction was invalid and thus not accepted by the node.",
+            )))
+        }
     }
 
     /// Send the given account transaction item on the given network.
@@ -786,7 +851,6 @@ impl Client {
     /// that can be used to query the status is returned.
     pub async fn send_raw_account_transaction(
         &mut self,
-        network_id: network::NetworkId,
         signatures: &TransactionSignature, // signatures for the transaction.
         body: &[u8],                       // body of the transaction (header + payload)
     ) -> RPCResult<types::hashes::TransactionHash> {
@@ -800,7 +864,7 @@ impl Client {
                                       // compute the hash of the transaction
         let hash = types::hashes::HashBytes::new(sha2::Sha256::digest(&data).into());
         let request = self.construct_request(SendTransactionRequest {
-            network_id: u32::from(u16::from(network_id)),
+            network_id: u32::from(u16::from(DEFAULT_NETWORK_ID)),
             payload:    data,
         })?;
         let response = self.client.send_transaction(request).await?;
