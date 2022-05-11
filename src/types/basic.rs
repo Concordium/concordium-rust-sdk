@@ -1,7 +1,7 @@
 use crypto_common::{
     derive::{SerdeBase16Serialize, Serial, Serialize},
     deserial_string,
-    types::{Amount, Signature},
+    types::Signature,
     Buffer, Deserial, Get, ParseResult, Put, ReadBytesExt, SerdeDeserialize, SerdeSerialize,
     Serial,
 };
@@ -192,20 +192,11 @@ impl Deserial for DelegationTarget {
 #[serde(rename_all = "camelCase")]
 pub struct BakerPoolInfo {
     /// Whether the pool allows delegators.
-    open_status:      OpenStatus,
+    pub open_status:      OpenStatus,
     /// The URL that links to the metadata about the pool.
-    metadata_url:     UrlText,
+    pub metadata_url:     UrlText,
     /// The commission rates charged by the pool owner.
-    commission_rates: CommissionRates,
-}
-
-#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, Copy)]
-#[serde(rename_all = "camelCase")]
-/// Information about the delegated stake of the account.
-pub struct AccountStakingDelegationInfo {
-    staked_amount:     Amount,
-    restake_earnings:  bool,
-    delegation_target: BakerId,
+    pub commission_rates: CommissionRates,
 }
 
 /// Slot number

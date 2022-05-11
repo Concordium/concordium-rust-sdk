@@ -261,7 +261,7 @@ pub enum RewardsOverview {
 pub struct CommonRewardData {
     /// Protocol version that applies to these rewards. V0 variant
     /// only exists for protocol versions 1, 2, and 3.
-    protocol_version:                ProtocolVersion,
+    pub protocol_version:            ProtocolVersion,
     /// The total CCD in existence.
     pub total_amount:                Amount,
     /// The total CCD in encrypted balances.
