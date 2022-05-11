@@ -1553,7 +1553,7 @@ pub enum UpdatePayload {
     CooldownParametersCPV1(CooldownParameters),
     #[serde(rename = "poolParametersCPV1")]
     PoolParametersCPV1(PoolParameters),
-    #[serde(rename = "timeParameters")]
+    #[serde(rename = "timeParametersCPV1")]
     TimeParametersCPV1(TimeParameters),
     #[serde(rename = "mintDistributionCPV1")]
     MintDistributionCPV1(MintDistribution<ChainParameterVersion1>),
