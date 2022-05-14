@@ -20,7 +20,10 @@ use id::{
     types::{ArInfo, GlobalContext, IpInfo},
 };
 use sha2::Digest;
-use std::{borrow::Borrow, convert::TryInto, net::IpAddr, sync::Arc, time::UNIX_EPOCH};
+use std::{
+    borrow::Borrow, collections::BTreeMap, convert::TryInto, net::IpAddr, sync::Arc,
+    time::UNIX_EPOCH,
+};
 use thiserror::Error;
 pub use tonic::transport::Endpoint;
 use tonic::{
@@ -874,6 +877,77 @@ impl Client {
             Err(RPCError::CallError(tonic::Status::invalid_argument(
                 "Transaction was invalid and thus not accepted by the node.",
             )))
+        }
+    }
+
+    // The methods below are not direct methods, but build on top to provide common
+    // functionality.
+
+    /// Wait until the transaction is finalized. Returns
+    /// [`NotFound`](QueryError::NotFound) in case the transaction is not
+    /// known to the node. In case of success, the return value is a pair of the
+    /// block hash of the block that contains the transactions, and its
+    /// outcome in the block.
+    ///
+    /// Since this can take an indefinite amount of time in general, users of
+    /// this function might wish to wrap it inside
+    /// [`timeout`](tokio::time::timeout) handler and handle the resulting
+    /// failure.
+    pub async fn wait_until_finalized(
+        &mut self,
+        hash: &types::hashes::TransactionHash,
+    ) -> QueryResult<(types::hashes::BlockHash, types::BlockItemSummary)> {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(250));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            interval.tick().await;
+            if let types::TransactionStatus::Finalized(blocks) =
+                self.get_transaction_status(hash).await?
+            {
+                let mut iter = blocks.into_iter();
+                if let Some(rv) = iter.next() {
+                    if iter.next().is_some() {
+                        return Err(tonic::Status::internal(
+                            "Finalized transaction finalized into multiple blocks. This cannot \
+                             happen.",
+                        )
+                        .into());
+                    } else {
+                        return Ok(rv);
+                    }
+                } else {
+                    return Err(tonic::Status::internal(
+                        "Finalized transaction finalized into no blocks. This cannot happen.",
+                    )
+                    .into());
+                }
+            }
+        }
+    }
+
+    /// Wait until the transaction is committed to a block. Returns
+    /// [`NotFound`](QueryError::NotFound) in case the transaction is not
+    /// known to the node. In case of success, the return value is a map
+    /// mapping block hashes of the blocks that contains the transactions to the
+    /// outcomes of the transaction in that block.
+    ///
+    /// Since this can take an indefinite amount of time in general, users of
+    /// this function might wish to wrap it inside
+    /// [`timeout`](tokio::time::timeout) handler and handle the resulting
+    /// failure.
+    pub async fn wait_until_committed(
+        &mut self,
+        hash: &types::hashes::TransactionHash,
+    ) -> QueryResult<BTreeMap<types::hashes::BlockHash, types::BlockItemSummary>> {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(250));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            interval.tick().await;
+            match self.get_transaction_status(hash).await? {
+                types::TransactionStatus::Received => continue,
+                types::TransactionStatus::Finalized(blocks) => return Ok(blocks),
+                types::TransactionStatus::Committed(blocks) => return Ok(blocks),
+            }
         }
     }
 }
