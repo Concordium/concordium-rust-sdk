@@ -1,5 +1,9 @@
 ## Unreleased changes
 
+## 1.0.2
+
+- Let AmountFraction derive Display.
+
 ## 1.0.0
 
 - Replace `send_transaction` with `send_block_item`.
