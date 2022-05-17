@@ -1581,8 +1581,6 @@ pub enum UpdateType {
     UpdateTransactionFeeDistribution,
     /// Update the GAS rewards
     UpdateGASRewards,
-    /// Minimum amount to register as a baker
-    UpdateBakerStakeThreshold,
     /// Add new anonymity revoker
     UpdateAddAnonymityRevoker,
     /// Add new identity provider
@@ -1593,6 +1591,9 @@ pub enum UpdateType {
     UpdateLevel1Keys,
     /// Update the level 2 keys
     UpdateLevel2Keys,
+    /// Update the baker pool parameters. In protocol versions <= 3 this
+    /// corresponds to the the update of the baker stake threshold. In
+    /// protocol version 4 and up this includes other pool parameters.
     UpdatePoolParameters,
     UpdateCooldownParameters,
     UpdateTimeParameters,
@@ -1610,7 +1611,7 @@ impl UpdatePayload {
             UpdatePayload::MintDistribution(_) => UpdateMintDistribution,
             UpdatePayload::TransactionFeeDistribution(_) => UpdateTransactionFeeDistribution,
             UpdatePayload::GASRewards(_) => UpdateGASRewards,
-            UpdatePayload::BakerStakeThreshold(_) => UpdateBakerStakeThreshold,
+            UpdatePayload::BakerStakeThreshold(_) => UpdatePoolParameters,
             UpdatePayload::Root(_) => UpdateRootKeys,
             UpdatePayload::Level1(_) => UpdateLevel1Keys,
             UpdatePayload::AddAnonymityRevoker(_) => UpdateAddAnonymityRevoker,
