@@ -613,8 +613,8 @@ pub enum SpecialTransactionOutcome {
         development_charge: Amount,
     },
     /// Payment for a particular account.
-    /// The account delegates to the pool given by the last PaydayPoolReward
-    /// outcome listed before this outcome.
+    /// When listed in a block summary, the delegated pool of the account is
+    /// given by the last PaydayPoolReward outcome included before this outcome.
     #[serde(rename_all = "camelCase")]
     PaydayAccountReward {
         /// The account that got rewarded.
