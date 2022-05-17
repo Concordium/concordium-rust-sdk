@@ -277,6 +277,7 @@ pub struct CommonRewardData {
 mod rewards_overview {
     use super::*;
     #[derive(SerdeDeserialize)]
+    #[serde(rename_all = "camelCase")]
     pub struct RewardsDataRaw {
         #[serde(flatten)]
         common: CommonRewardData,
