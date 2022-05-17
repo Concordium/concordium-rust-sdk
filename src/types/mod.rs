@@ -277,6 +277,7 @@ pub struct CommonRewardData {
 mod rewards_overview {
     use super::*;
     #[derive(SerdeDeserialize)]
+    #[serde(rename_all = "camelCase")]
     pub struct RewardsDataRaw {
         #[serde(flatten)]
         common: CommonRewardData,
@@ -612,6 +613,8 @@ pub enum SpecialTransactionOutcome {
         development_charge: Amount,
     },
     /// Payment for a particular account.
+    /// When listed in a block summary, the delegated pool of the account is
+    /// given by the last PaydayPoolReward outcome included before this outcome.
     #[serde(rename_all = "camelCase")]
     PaydayAccountReward {
         /// The account that got rewarded.

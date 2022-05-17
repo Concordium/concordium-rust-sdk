@@ -968,6 +968,7 @@ pub struct MintRate {
 #[derive(
     Default,
     Debug,
+    Display,
     Clone,
     Copy,
     SerdeSerialize,

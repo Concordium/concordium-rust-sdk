@@ -1,5 +1,10 @@
 ## Unreleased changes
 
+## 1.0.2
+
+- Let AmountFraction derive Display.
+- Fix JSON parsing bug.
+
 ## 1.0.0
 
 - Replace `send_transaction` with `send_block_item`.
