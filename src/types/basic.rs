@@ -694,6 +694,18 @@ pub struct UpdateKeysThreshold {
     pub(crate) threshold: u16,
 }
 
+impl TryFrom<u16> for UpdateKeysThreshold {
+    type Error = &'static str;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        if value == 0 {
+            Err("Threshold cannot be 0.")
+        } else {
+            Ok(Self { threshold: value })
+        }
+    }
+}
+
 impl Deserial for UpdateKeysThreshold {
     fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
         let threshold = source.get()?;
@@ -703,7 +715,17 @@ impl Deserial for UpdateKeysThreshold {
 }
 
 #[derive(
-    Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize, PartialEq, Eq, PartialOrd, Ord,
+    Debug,
+    Clone,
+    Copy,
+    SerdeSerialize,
+    SerdeDeserialize,
+    Serialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    From,
 )]
 #[serde(transparent)]
 pub struct UpdateKeysIndex {
