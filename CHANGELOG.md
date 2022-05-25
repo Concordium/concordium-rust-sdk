@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+- Expose helper methods to wait for new blocks or finalization.
+
 ## 1.0.2
 
 - Let AmountFraction derive Display.

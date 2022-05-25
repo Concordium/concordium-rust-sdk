@@ -883,6 +883,53 @@ impl Client {
     // The methods below are not direct methods, but build on top to provide common
     // functionality.
 
+    /// Wait until a block is finalized at a height strictly larger than the
+    /// given one. Return the block hash and the height.
+    ///
+    /// Since this can take an indefinite amount of time in general, users of
+    /// this function might wish to wrap it inside
+    /// [`timeout`](tokio::time::timeout) handler and handle the resulting
+    /// failure.
+    pub async fn wait_for_finalization(
+        &mut self,
+        height: types::AbsoluteBlockHeight,
+    ) -> RPCResult<(types::AbsoluteBlockHeight, types::hashes::BlockHash)> {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(250));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            interval.tick().await;
+            let cs = self.get_consensus_status().await?;
+            if cs.last_finalized_block_height > height {
+                return Ok((cs.last_finalized_block_height, cs.last_finalized_block));
+            }
+        }
+    }
+
+    /// Wait until at least one block exists at the given height. Return all
+    /// hashes at the given height. Note that because these blocks are not
+    /// necessarily finalized, querying them might yield a
+    /// [`NotFound`](QueryError::NotFound).
+    ///
+    /// Since this can take an indefinite amount of time in general, users of
+    /// this function might wish to wrap it inside
+    /// [`timeout`](tokio::time::timeout) handler and handle the resulting
+    /// failure.
+    pub async fn wait_for_blocks_at(
+        &mut self,
+        height: types::AbsoluteBlockHeight,
+    ) -> RPCResult<Vec<types::hashes::BlockHash>> {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(250));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        let input: BlocksAtHeightInput = height.into();
+        loop {
+            interval.tick().await;
+            let blocks = self.get_blocks_at_height(input).await?;
+            if !blocks.is_empty() {
+                return Ok(blocks);
+            }
+        }
+    }
+
     /// Wait until the transaction is finalized. Returns
     /// [`NotFound`](QueryError::NotFound) in case the transaction is not
     /// known to the node. In case of success, the return value is a pair of the

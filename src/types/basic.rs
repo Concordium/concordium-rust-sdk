@@ -276,11 +276,11 @@ impl Deserial for AccountThreshold {
 }
 
 impl TryFrom<u8> for AccountThreshold {
-    type Error = &'static str;
+    type Error = ZeroSignatureThreshold;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         if value == 0 {
-            Err("Account threshold cannot be 0.")
+            Err(ZeroSignatureThreshold)
         } else {
             Ok(AccountThreshold { threshold: value })
         }
@@ -694,6 +694,24 @@ pub struct UpdateKeysThreshold {
     pub(crate) threshold: u16,
 }
 
+#[derive(Debug, Error)]
+#[error("Signature threshold cannot be 0.")]
+/// An error type that indicates that a 0 attempted to be used as a signature
+/// threshold.
+pub struct ZeroSignatureThreshold;
+
+impl TryFrom<u16> for UpdateKeysThreshold {
+    type Error = ZeroSignatureThreshold;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        if value == 0 {
+            Err(ZeroSignatureThreshold)
+        } else {
+            Ok(Self { threshold: value })
+        }
+    }
+}
+
 impl Deserial for UpdateKeysThreshold {
     fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
         let threshold = source.get()?;
@@ -703,7 +721,17 @@ impl Deserial for UpdateKeysThreshold {
 }
 
 #[derive(
-    Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize, PartialEq, Eq, PartialOrd, Ord,
+    Debug,
+    Clone,
+    Copy,
+    SerdeSerialize,
+    SerdeDeserialize,
+    Serialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    From,
 )]
 #[serde(transparent)]
 pub struct UpdateKeysIndex {
