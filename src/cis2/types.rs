@@ -2,11 +2,97 @@ use crate::types::smart_contracts::concordium_contracts_common::{
     deserial_vector_no_length, serial_vector_no_length, AccountAddress, Address, ContractAddress,
     Deserial, OwnedReceiveName, ParseError, Read, Serial, Write,
 };
-use std::{convert::TryFrom, fmt::Display, str::FromStr};
+use std::{convert::TryFrom, fmt::Display, ops, str::FromStr};
 use thiserror::*;
 
-/// CIS2 Amount of tokens.
-pub type TokenAmount = u64;
+#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
+pub struct TokenAmountU64(pub u64);
+
+pub type TokenAmount = TokenAmountU64;
+
+impl From<u64> for TokenAmountU64 {
+    fn from(v: u64) -> TokenAmountU64 { TokenAmountU64(v) }
+}
+
+impl From<TokenAmountU64> for u64 {
+    fn from(v: TokenAmountU64) -> u64 { v.0 }
+}
+
+impl ops::Add<Self> for TokenAmountU64 {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output { TokenAmountU64(self.0 + rhs.0) }
+}
+
+impl ops::AddAssign for TokenAmountU64 {
+    fn add_assign(&mut self, other: Self) { *self = *self + other; }
+}
+
+impl ops::Sub<Self> for TokenAmountU64 {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output { TokenAmountU64(self.0 - rhs.0) }
+}
+
+impl ops::SubAssign for TokenAmountU64 {
+    fn sub_assign(&mut self, other: Self) { *self = *self - other; }
+}
+
+impl ops::Mul<Self> for TokenAmountU64 {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output { TokenAmountU64(self.0 * rhs.0) }
+}
+
+impl ops::MulAssign for TokenAmountU64 {
+    fn mul_assign(&mut self, other: Self) { *self = *self * other; }
+}
+
+impl ops::Div<Self> for TokenAmountU64 {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output { TokenAmountU64(self.0 / rhs.0) }
+}
+
+impl ops::DivAssign for TokenAmountU64 {
+    fn div_assign(&mut self, other: Self) { *self = *self / other; }
+}
+
+impl Serial for TokenAmountU64 {
+    fn serial<W: Write>(&self, out: &mut W) -> Result<(), W::Err> {
+        let mut value = self.0;
+        loop {
+            let mut byte = (value as u8) & 0b0111_1111;
+            value >>= 7;
+            if value != 0 {
+                byte |= 0b1000_0000;
+            }
+            out.write_u8(byte)?;
+
+            if value == 0 {
+                return Ok(());
+            }
+        }
+    }
+}
+
+impl Deserial for TokenAmountU64 {
+    fn deserial<R: Read>(source: &mut R) -> concordium_contracts_common::ParseResult<Self> {
+        let mut result = 0u64;
+        for i in 0..37 {
+            let byte = source.read_u8()?;
+            let value_byte = (byte & 0b0111_1111) as u64;
+            result = result
+                .checked_add(value_byte << (i * 7))
+                .ok_or(concordium_contracts_common::ParseError {})?;
+
+            if byte & 0b1000_0000 == 0 {
+                return Ok(TokenAmountU64(result));
+            }
+        }
+        Err(concordium_contracts_common::ParseError {})
+    }
+}
 
 /// CIS2 Token ID can be up to 255 bytes in size.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]

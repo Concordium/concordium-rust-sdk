@@ -1,6 +1,6 @@
 mod types;
 
-use std::convert::TryFrom;
+use std::convert::{From, TryFrom};
 
 pub use types::*;
 
@@ -8,12 +8,58 @@ use crate::{common, endpoints::Client, id, types as sdk_types};
 use sdk_types::{smart_contracts, transactions, ContractAddress};
 use smart_contracts::concordium_contracts_common;
 
+use thiserror::*;
+
 /// A wrapper around the client representing a CIS2 token smart contract and
 /// provides functions for interaction.
 pub struct Cis2Contract {
     client:        Client,
     address:       ContractAddress,
     contract_name: String,
+}
+
+#[derive(Debug, Error)]
+pub enum Cis2TransactionError {
+    #[error("Invalid receive name")]
+    InvalidContractName(concordium_contracts_common::NewReceiveNameError),
+
+    #[error("Rejected by the node: {0}")]
+    NodeRejected(#[from] crate::endpoints::RPCError),
+}
+
+impl From<concordium_contracts_common::NewReceiveNameError> for Cis2TransactionError {
+    fn from(err: concordium_contracts_common::NewReceiveNameError) -> Self {
+        Self::InvalidContractName(err)
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum Cis2QueryError {
+    #[error("Invalid receive name")]
+    InvalidContractName(concordium_contracts_common::NewReceiveNameError),
+
+    #[error("Rejected by the node: {0}")]
+    NodeRejected(#[from] crate::endpoints::RPCError),
+
+    #[error("Failed parsing the response")]
+    ResponseParseError(concordium_contracts_common::ParseError),
+
+    #[error("Query failed")]
+    QueryFailed(sdk_types::RejectReason),
+}
+
+impl From<concordium_contracts_common::NewReceiveNameError> for Cis2QueryError {
+    fn from(err: concordium_contracts_common::NewReceiveNameError) -> Self {
+        Self::InvalidContractName(err)
+    }
+}
+
+impl From<concordium_contracts_common::ParseError> for Cis2QueryError {
+    fn from(err: concordium_contracts_common::ParseError) -> Self { Self::ResponseParseError(err) }
+}
+
+impl From<sdk_types::RejectReason> for Cis2QueryError {
+    fn from(err: sdk_types::RejectReason) -> Self { Self::QueryFailed(err) }
 }
 
 impl Cis2Contract {
@@ -36,12 +82,11 @@ impl Cis2Contract {
         energy: transactions::send::GivenEnergy,
         amount: common::types::Amount,
         transfers: Vec<Transfer>,
-    ) -> anyhow::Result<sdk_types::hashes::TransactionHash> {
+    ) -> Result<sdk_types::hashes::TransactionHash, Cis2TransactionError> {
         let parameter = TransferParams::from(transfers);
         let bytes = concordium_contracts_common::to_bytes(&parameter);
         let receive_name =
-            smart_contracts::ReceiveName::try_from(format!("{}.transfer", self.contract_name))
-                .map_err(|e| anyhow!("Invalid receive name"))?;
+            smart_contracts::ReceiveName::try_from(format!("{}.transfer", self.contract_name))?;
 
         let payload = transactions::Payload::Update {
             payload: transactions::UpdateContractPayload {
@@ -60,10 +105,8 @@ impl Cis2Contract {
             payload,
         );
         let bi = transactions::BlockItem::AccountTransaction(tx);
-        self.client
-            .send_block_item(&bi)
-            .await
-            .context("Transaction was rejected by the node.")
+        let hash = self.client.send_block_item(&bi).await?;
+        Ok(hash)
     }
 
     /// Send a CIS2 updateOperator transaction.
@@ -76,12 +119,13 @@ impl Cis2Contract {
         energy: transactions::send::GivenEnergy,
         amount: common::types::Amount,
         updates: Vec<UpdateOperator>,
-    ) -> anyhow::Result<sdk_types::hashes::TransactionHash> {
+    ) -> anyhow::Result<sdk_types::hashes::TransactionHash, Cis2TransactionError> {
         let parameter = UpdateOperatorParams::from(updates);
         let bytes = concordium_contracts_common::to_bytes(&parameter);
-        let receive_name = smart_contracts::ReceiveName {
-            name: "updateOperator",
-        };
+        let receive_name = smart_contracts::ReceiveName::try_from(format!(
+            "{}.updateOperator",
+            self.contract_name
+        ))?;
 
         let payload = transactions::Payload::Update {
             payload: transactions::UpdateContractPayload {
@@ -100,10 +144,8 @@ impl Cis2Contract {
             payload,
         );
         let bi = transactions::BlockItem::AccountTransaction(tx);
-        self.client
-            .send_block_item(&bi)
-            .await
-            .context("Transaction was rejected by the node.")
+        let hash = self.client.send_block_item(&bi).await?;
+        Ok(hash)
     }
 
     /// Invoke CIS2 balanceOf.
@@ -111,10 +153,11 @@ impl Cis2Contract {
         mut self,
         block_hash: &sdk_types::hashes::BlockHash,
         queries: Vec<BalanceOfQuery>,
-    ) -> anyhow::Result<BalanceOfQueryResponse> {
+    ) -> Result<BalanceOfQueryResponse, Cis2QueryError> {
         let parameter = BalanceOfQueryParams::from(queries);
         let bytes = concordium_contracts_common::to_bytes(&parameter);
-        let receive_name = smart_contracts::ReceiveName { name: "balanceOf" };
+        let receive_name =
+            smart_contracts::ReceiveName::try_from(format!("{}.balanceOf", self.contract_name))?;
 
         let contract_context = smart_contracts::ContractContext {
             invoker:   None,
@@ -128,20 +171,18 @@ impl Cis2Contract {
         let invoke_result = self
             .client
             .invoke_contract(block_hash, &contract_context)
-            .await
-            .context("Contract invocation failed.")?;
+            .await?;
 
-        if let smart_contracts::InvokeContractResult::Success {
-            return_value: Some(bytes),
-            ..
-        } = invoke_result
-        {
-            let mut cursor = concordium_contracts_common::Cursor::new(bytes.value);
-            let response = BalanceOfQueryResponse::deserial(&mut cursor)
-                .map_err(|_| anyhow!("Failed parsing contract state"))?;
-            Ok(response)
-        } else {
-            bail!("balanceOf query was rejected.");
+        match invoke_result {
+            smart_contracts::InvokeContractResult::Success { return_value, .. } => {
+                let bytes: smart_contracts::ReturnValue = return_value.ok_or(
+                    Cis2QueryError::ResponseParseError(concordium_contracts_common::ParseError {}),
+                )?;
+                let response: BalanceOfQueryResponse =
+                    concordium_contracts_common::from_bytes(&bytes.value)?;
+                Ok(response)
+            }
+            smart_contracts::InvokeContractResult::Failure { reason, .. } => Err(reason.into()),
         }
     }
 
@@ -150,10 +191,11 @@ impl Cis2Contract {
         mut self,
         block_hash: &sdk_types::hashes::BlockHash,
         queries: Vec<OperatorOfQuery>,
-    ) -> anyhow::Result<OperatorOfQueryResponse> {
+    ) -> Result<OperatorOfQueryResponse, Cis2QueryError> {
         let parameter = OperatorOfQueryParams::from(queries);
         let bytes = concordium_contracts_common::to_bytes(&parameter);
-        let receive_name = smart_contracts::ReceiveName { name: "operatorOf" };
+        let receive_name =
+            smart_contracts::ReceiveName::try_from(format!("{}.operatorOf", self.contract_name))?;
 
         let contract_context = smart_contracts::ContractContext {
             invoker:   None,
@@ -167,20 +209,18 @@ impl Cis2Contract {
         let invoke_result = self
             .client
             .invoke_contract(block_hash, &contract_context)
-            .await
-            .context("Contract invocation failed.")?;
+            .await?;
 
-        if let smart_contracts::InvokeContractResult::Success {
-            return_value: Some(bytes),
-            ..
-        } = invoke_result
-        {
-            let mut cursor = concordium_contracts_common::Cursor::new(bytes.value);
-            let response = OperatorOfQueryResponse::deserial(&mut cursor)
-                .map_err(|_| anyhow!("Failed parsing contract state"))?;
-            Ok(response)
-        } else {
-            bail!("operatorOf query was rejected.");
+        match invoke_result {
+            smart_contracts::InvokeContractResult::Success { return_value, .. } => {
+                let bytes: smart_contracts::ReturnValue = return_value.ok_or(
+                    Cis2QueryError::ResponseParseError(concordium_contracts_common::ParseError {}),
+                )?;
+                let response: OperatorOfQueryResponse =
+                    concordium_contracts_common::from_bytes(&bytes.value)?;
+                Ok(response)
+            }
+            smart_contracts::InvokeContractResult::Failure { reason, .. } => Err(reason.into()),
         }
     }
 
@@ -189,12 +229,13 @@ impl Cis2Contract {
         mut self,
         block_hash: &sdk_types::hashes::BlockHash,
         queries: Vec<TokenIdVec>,
-    ) -> anyhow::Result<TokenMetadataQueryResponse> {
+    ) -> Result<TokenMetadataQueryResponse, Cis2QueryError> {
         let parameter = TokenMetadataQueryParams::from(queries);
         let bytes = concordium_contracts_common::to_bytes(&parameter);
-        let receive_name = smart_contracts::ReceiveName {
-            name: "tokenMetadata",
-        };
+        let receive_name = smart_contracts::ReceiveName::try_from(format!(
+            "{}.tokenMetadata",
+            self.contract_name
+        ))?;
 
         let contract_context = smart_contracts::ContractContext {
             invoker:   None,
@@ -208,20 +249,18 @@ impl Cis2Contract {
         let invoke_result = self
             .client
             .invoke_contract(block_hash, &contract_context)
-            .await
-            .context("Contract invocation failed.")?;
+            .await?;
 
-        if let smart_contracts::InvokeContractResult::Success {
-            return_value: Some(bytes),
-            ..
-        } = invoke_result
-        {
-            let mut cursor = concordium_contracts_common::Cursor::new(bytes.value);
-            let response = TokenMetadataQueryResponse::deserial(&mut cursor)
-                .map_err(|_| anyhow!("Failed parsing contract state"))?;
-            Ok(response)
-        } else {
-            bail!("tokenMetadata query was rejected.");
+        match invoke_result {
+            smart_contracts::InvokeContractResult::Success { return_value, .. } => {
+                let bytes: smart_contracts::ReturnValue = return_value.ok_or(
+                    Cis2QueryError::ResponseParseError(concordium_contracts_common::ParseError {}),
+                )?;
+                let response: TokenMetadataQueryResponse =
+                    concordium_contracts_common::from_bytes(&bytes.value)?;
+                Ok(response)
+            }
+            smart_contracts::InvokeContractResult::Failure { reason, .. } => Err(reason.into()),
         }
     }
 }
