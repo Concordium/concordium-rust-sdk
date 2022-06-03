@@ -397,7 +397,7 @@ pub enum InvokeContractResult {
         events:       Vec<ContractTraceElement>,
         used_energy:  Energy,
     },
-    #[serde(rename = "success", rename_all = "camelCase")]
+    #[serde(rename = "failure", rename_all = "camelCase")]
     Failure {
         return_value: Option<ReturnValue>,
         reason:       RejectReason,
