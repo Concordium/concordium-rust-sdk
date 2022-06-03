@@ -18,6 +18,13 @@ impl From<TokenAmountU64> for u64 {
     fn from(v: TokenAmountU64) -> u64 { v.0 }
 }
 
+impl Display for TokenAmountU64 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.0)?;
+        Ok(())
+    }
+}
+
 impl ops::Add<Self> for TokenAmountU64 {
     type Output = Self;
 
@@ -188,26 +195,6 @@ impl From<i32> for Cis2ErrorRejectReason {
     }
 }
 
-/// The parameter for the NFT Contract function "CIS2-NFT.mint".
-/// Important: this is specific to this NFT smart contract and contract
-/// functions for minting are not part of the CIS2 specification.
-#[derive(Debug)]
-pub struct MintParams {
-    pub owner:     Address,
-    pub token_ids: Vec<TokenIdVec>,
-}
-
-/// Serialization for the minting contract function parameter.
-/// Must match the serialization specified in the NFT smart contract.
-impl Serial for MintParams {
-    fn serial<W: Write>(&self, out: &mut W) -> Result<(), W::Err> {
-        self.owner.serial(out)?;
-        let len = u8::try_from(self.token_ids.len()).map_err(|_| W::Err::default())?;
-        len.serial(out)?;
-        serial_vector_no_length(&self.token_ids, out)
-    }
-}
-
 /// Additional data bytes which can be included for each transfer in the
 /// transfer parameter for the CIS2 contract function "transfer".
 #[derive(Debug, Clone)]
@@ -267,7 +254,7 @@ pub struct Transfer {
     /// The ID of the token type to transfer.
     pub token_id: TokenIdVec,
     /// The amount of tokens to transfer.
-    pub amount:   u64,
+    pub amount:   TokenAmountU64,
     /// The address currently owning the tokens being transferred.
     pub from:     Address,
     /// The receiver for the tokens being transferred.
@@ -304,7 +291,7 @@ impl AsRef<[Transfer]> for TransferParams {
 /// specification.
 impl Serial for TransferParams {
     fn serial<W: Write>(&self, out: &mut W) -> Result<(), W::Err> {
-        let len = u8::try_from(self.0.len()).map_err(|_| W::Err::default())?;
+        let len = u16::try_from(self.0.len()).map_err(|_| W::Err::default())?;
         len.serial(out)?;
         serial_vector_no_length(&self.0, out)
     }
@@ -380,7 +367,7 @@ pub struct UpdateOperatorParams(pub Vec<UpdateOperator>);
 /// specification.
 impl Serial for UpdateOperatorParams {
     fn serial<W: Write>(&self, out: &mut W) -> Result<(), W::Err> {
-        let len = u8::try_from(self.0.len()).map_err(|_| W::Err::default())?;
+        let len = u16::try_from(self.0.len()).map_err(|_| W::Err::default())?;
         len.serial(out)?;
         serial_vector_no_length(&self.0, out)
     }
@@ -421,7 +408,7 @@ pub struct BalanceOfQueryParams(pub Vec<BalanceOfQuery>);
 /// specification.
 impl Serial for BalanceOfQueryParams {
     fn serial<W: Write>(&self, out: &mut W) -> Result<(), W::Err> {
-        let len = u8::try_from(self.0.len()).map_err(|_| W::Err::default())?;
+        let len = u16::try_from(self.0.len()).map_err(|_| W::Err::default())?;
         len.serial(out)?;
         serial_vector_no_length(&self.0, out)
     }
@@ -489,7 +476,7 @@ pub struct OperatorOfQueryParams(pub Vec<OperatorOfQuery>);
 /// specification.
 impl Serial for OperatorOfQueryParams {
     fn serial<W: Write>(&self, out: &mut W) -> Result<(), W::Err> {
-        let len = u8::try_from(self.0.len()).map_err(|_| W::Err::default())?;
+        let len = u16::try_from(self.0.len()).map_err(|_| W::Err::default())?;
         len.serial(out)?;
         serial_vector_no_length(&self.0, out)
     }
@@ -539,7 +526,7 @@ pub struct TokenMetadataQueryParams(pub Vec<TokenIdVec>);
 /// specification.
 impl Serial for TokenMetadataQueryParams {
     fn serial<W: Write>(&self, out: &mut W) -> Result<(), W::Err> {
-        let len = u8::try_from(self.0.len()).map_err(|_| W::Err::default())?;
+        let len = u16::try_from(self.0.len()).map_err(|_| W::Err::default())?;
         len.serial(out)?;
         serial_vector_no_length(&self.0, out)
     }
