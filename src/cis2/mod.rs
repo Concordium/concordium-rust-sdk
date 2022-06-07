@@ -73,6 +73,7 @@ impl Cis2Contract {
     }
 
     /// Send a CIS2 transfer transaction.
+    #[allow(clippy::too_many_arguments)]
     pub async fn transfer(
         mut self,
         sender_keys: &id::types::AccountKeys,
@@ -110,6 +111,7 @@ impl Cis2Contract {
     }
 
     /// Send a CIS2 updateOperator transaction.
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_operator(
         mut self,
         sender_keys: &id::types::AccountKeys,
