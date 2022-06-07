@@ -51,7 +51,7 @@ pub struct AccountEncryptedAmount {
     /// + 1`.
     pub start_index:       u64,
     #[serde(default)]
-    /// If 'Some', the amount that has resulted from aggregating other amounts
+    /// If ['Some'], the amount that has resulted from aggregating other amounts
     /// and the number of aggregated amounts (must be at least 2 if
     /// present).
     #[schemars(
@@ -226,6 +226,16 @@ pub enum StakePendingChange {
     },
 }
 
+impl StakePendingChange {
+    /// Effective time of the pending change.
+    pub fn effective_time(&self) -> chrono::DateTime<chrono::Utc> {
+        match self {
+            StakePendingChange::ReduceStake { effective_time, .. } => *effective_time,
+            StakePendingChange::RemoveStake { effective_time } => *effective_time,
+        }
+    }
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
 #[serde(
     rename_all = "camelCase",
@@ -270,7 +280,7 @@ impl schemars::JsonSchema for RewardsOverview {
 pub struct CommonRewardData {
     /// Protocol version that applies to these rewards. V0 variant
     /// only exists for protocol versions 1, 2, and 3.
-    protocol_version:                ProtocolVersion,
+    pub protocol_version:            ProtocolVersion,
     /// The total CCD in existence.
     pub total_amount:                Amount,
     /// The total CCD in encrypted balances.
@@ -286,6 +296,7 @@ pub struct CommonRewardData {
 mod rewards_overview {
     use super::*;
     #[derive(SerdeDeserialize, schemars::JsonSchema)]
+    #[serde(rename_all = "camelCase")]
     pub struct RewardsDataRaw {
         #[serde(flatten)]
         common: CommonRewardData,
@@ -527,12 +538,30 @@ pub enum TransactionStatus {
     /// Transaction is finalized in the given block, with the given summary.
     /// If the finalization committee is not corrupt then this will always
     /// be a singleton map.
-    Finalized(BTreeMap<hashes::TransactionHash, BlockItemSummary>),
+    Finalized(BTreeMap<hashes::BlockHash, BlockItemSummary>),
     /// Transaction is committed to one or more blocks. The outcomes are listed
     /// for each block. Note that in the vast majority of cases the outcome of a
     /// transaction should not be dependent on the block it is in, but this
     /// can in principle happen.
-    Committed(BTreeMap<hashes::TransactionHash, BlockItemSummary>),
+    Committed(BTreeMap<hashes::BlockHash, BlockItemSummary>),
+}
+
+impl TransactionStatus {
+    /// If the transaction is finalized return the block hash in which it is
+    /// contained, and the result.
+    pub fn is_finalized(&self) -> Option<(&hashes::BlockHash, &BlockItemSummary)> {
+        match self {
+            TransactionStatus::Received => None,
+            TransactionStatus::Finalized(e) => {
+                if e.len() == 1 {
+                    e.iter().next()
+                } else {
+                    None
+                }
+            }
+            TransactionStatus::Committed(_) => None,
+        }
+    }
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, schemars::JsonSchema)]
@@ -609,6 +638,8 @@ pub enum SpecialTransactionOutcome {
         development_charge: Amount,
     },
     /// Payment for a particular account.
+    /// When listed in a block summary, the delegated pool of the account is
+    /// given by the last PaydayPoolReward outcome included before this outcome.
     #[serde(rename_all = "camelCase")]
     PaydayAccountReward {
         /// The account that got rewarded.
@@ -815,6 +846,15 @@ impl BlockSummary {
             BlockSummary::V1 { data, .. } => data.finalization_data.as_ref(),
         }
     }
+
+    /// Get the keys for parameter updates that are common to all versions of
+    /// the summary.
+    pub fn common_update_keys(&self) -> &AuthorizationsV0 {
+        match self {
+            BlockSummary::V0 { data, .. } => &data.updates.keys.level_2_keys,
+            BlockSummary::V1 { data, .. } => &data.updates.keys.level_2_keys.v0,
+        }
+    }
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, schemars::JsonSchema)]
@@ -1014,6 +1054,9 @@ impl AccountTransactionDetails {
     /// variant in case the transaction failed with serialization failure
     /// reason.
     pub fn transaction_type(&self) -> Option<TransactionType> { self.effects.transaction_type() }
+
+    /// Return [`Some`] if the transaction has been rejected.
+    pub fn is_rejected(&self) -> Option<&RejectReason> { self.effects.is_rejected() }
 }
 
 impl AccountTransactionEffects {
@@ -1260,6 +1303,17 @@ pub enum AccountTransactionEffects {
     DelegationConfigured { data: Vec<DelegationEvent> },
 }
 
+impl AccountTransactionEffects {
+    /// Return [`Some`] if the transaction has been rejected.
+    pub fn is_rejected(&self) -> Option<&RejectReason> {
+        if let Self::None { reject_reason, .. } = self {
+            Some(reject_reason)
+        } else {
+            None
+        }
+    }
+}
+
 /// Events that may happen as a result of the
 /// [TransactionType::ConfigureDelegation] transaction.
 #[derive(Debug, Clone, schemars::JsonSchema)]
@@ -1382,6 +1436,10 @@ pub struct AccountCreationDetails {
 pub struct UpdateDetails {
     pub effective_time: TransactionTime,
     pub payload:        UpdatePayload,
+}
+
+impl UpdateDetails {
+    pub fn update_type(&self) -> UpdateType { self.payload.update_type() }
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -1532,7 +1590,7 @@ pub enum UpdatePayload {
     #[serde(rename = "gASRewards")]
     GASRewards(GASRewards),
     #[serde(rename = "bakerStakeThreshold")]
-    BakerStakeThreshold(Amount),
+    BakerStakeThreshold(BakerParameters),
     #[serde(rename = "root")]
     Root(RootUpdate),
     #[serde(rename = "level1")]
@@ -1547,7 +1605,7 @@ pub enum UpdatePayload {
     CooldownParametersCPV1(CooldownParameters),
     #[serde(rename = "poolParametersCPV1")]
     PoolParametersCPV1(PoolParameters),
-    #[serde(rename = "timeParameters")]
+    #[serde(rename = "timeParametersCPV1")]
     TimeParametersCPV1(TimeParameters),
     #[serde(rename = "mintDistributionCPV1")]
     MintDistributionCPV1(MintDistribution<ChainParameterVersion1>),
@@ -1649,6 +1707,79 @@ pub mod wrappers {
 
         fn hash_to_group(_m: &[u8]) -> Self { todo!() }
     }
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+// Since all variants are fieldless, the default JSON serialization will convert
+// all the variants to simple strings.
+/// Enumeration of the types of updates that are possible.
+#[derive(schemars::JsonSchema)]
+pub enum UpdateType {
+    /// Update the chain protocol
+    UpdateProtocol,
+    /// Update the election difficulty
+    UpdateElectionDifficulty,
+    /// Update the euro per energy exchange rate
+    UpdateEuroPerEnergy,
+    /// Update the microCCD per euro exchange rate
+    UpdateMicroGTUPerEuro,
+    /// Update the address of the foundation account
+    UpdateFoundationAccount,
+    /// Update the distribution of newly minted CCD
+    UpdateMintDistribution,
+    /// Update the distribution of transaction fees
+    UpdateTransactionFeeDistribution,
+    /// Update the GAS rewards
+    UpdateGASRewards,
+    /// Add new anonymity revoker
+    UpdateAddAnonymityRevoker,
+    /// Add new identity provider
+    UpdateAddIdentityProvider,
+    /// Update the root keys
+    UpdateRootKeys,
+    /// Update the level 1 keys
+    UpdateLevel1Keys,
+    /// Update the level 2 keys
+    UpdateLevel2Keys,
+    /// Update the baker pool parameters. In protocol versions <= 3 this
+    /// corresponds to the the update of the baker stake threshold. In
+    /// protocol version 4 and up this includes other pool parameters.
+    UpdatePoolParameters,
+    UpdateCooldownParameters,
+    UpdateTimeParameters,
+}
+
+impl UpdatePayload {
+    fn update_type(&self) -> UpdateType {
+        use UpdateType::*;
+        match self {
+            UpdatePayload::Protocol(_) => UpdateProtocol,
+            UpdatePayload::ElectionDifficulty(_) => UpdateElectionDifficulty,
+            UpdatePayload::EuroPerEnergy(_) => UpdateEuroPerEnergy,
+            UpdatePayload::MicroGTUPerEuro(_) => UpdateMicroGTUPerEuro,
+            UpdatePayload::FoundationAccount(_) => UpdateFoundationAccount,
+            UpdatePayload::MintDistribution(_) => UpdateMintDistribution,
+            UpdatePayload::TransactionFeeDistribution(_) => UpdateTransactionFeeDistribution,
+            UpdatePayload::GASRewards(_) => UpdateGASRewards,
+            UpdatePayload::BakerStakeThreshold(_) => UpdatePoolParameters,
+            UpdatePayload::Root(_) => UpdateRootKeys,
+            UpdatePayload::Level1(_) => UpdateLevel1Keys,
+            UpdatePayload::AddAnonymityRevoker(_) => UpdateAddAnonymityRevoker,
+            UpdatePayload::AddIdentityProvider(_) => UpdateAddIdentityProvider,
+            UpdatePayload::CooldownParametersCPV1(_) => UpdateCooldownParameters,
+            UpdatePayload::PoolParametersCPV1(_) => UpdatePoolParameters,
+            UpdatePayload::TimeParametersCPV1(_) => UpdateTimeParameters,
+            UpdatePayload::MintDistributionCPV1(_) => UpdateMintDistribution,
+        }
+    }
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+#[derive(schemars::JsonSchema)]
+pub struct BakerParameters {
+    minimum_threshold_for_baking: Amount,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -1960,6 +2091,50 @@ pub struct AuthorizationsV0 {
     pub add_identity_provider: AccessStructure,
 }
 
+impl AuthorizationsV0 {
+    /// Find key indices given a set of keys and an access structure.
+    /// If any of the given `actual_keys` are not authorized in the access
+    /// structure [`None`] will be returned.
+    /// If there are duplicate keys among `actual_keys` this function also
+    /// returns [`None`].
+    pub fn construct_update_signer<K>(
+        &self,
+        update_key_indices: &AccessStructure,
+        actual_keys: impl IntoIterator<Item = K>,
+    ) -> Option<BTreeMap<UpdateKeysIndex, K>>
+    where
+        UpdatePublicKey: for<'a> From<&'a K>, {
+        construct_update_signer_worker(&self.keys, update_key_indices, actual_keys)
+    }
+}
+
+// See [AuthorizationsV0::construct_update_signer] for documentation.
+fn construct_update_signer_worker<K>(
+    keys: &[UpdatePublicKey],
+    update_key_indices: &AccessStructure,
+    actual_keys: impl IntoIterator<Item = K>,
+) -> Option<BTreeMap<UpdateKeysIndex, K>>
+where
+    UpdatePublicKey: for<'a> From<&'a K>, {
+    let mut signer = BTreeMap::new();
+    for kp in actual_keys {
+        let known_key = &UpdatePublicKey::from(&kp);
+        if let Some(i) = keys.iter().position(|public| public == known_key) {
+            let idx = UpdateKeysIndex { index: i as u16 };
+            if update_key_indices.authorized_keys.contains(&idx) {
+                if signer.insert(idx, kp).is_some() {
+                    return None;
+                }
+            } else {
+                return None;
+            }
+        } else {
+            return None;
+        }
+    }
+    Some(signer)
+}
+
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 /// Access structures for each of the different possible chain updates, togehter
@@ -1972,6 +2147,23 @@ pub struct AuthorizationsV1 {
     pub cooldown_parameters: AccessStructure,
     /// Keys for changing the lenghts of the reward period.
     pub time_parameters:     AccessStructure,
+}
+
+impl AuthorizationsV1 {
+    /// Find key indices given a set of keys and an access structure.
+    /// If any of the given `actual_keys` are not authorized in the access
+    /// structure [`None`] will be returned.
+    /// If there are duplicate keys among `actual_keys` this function also
+    /// returns [`None`].
+    pub fn construct_update_signer<K>(
+        &self,
+        update_key_indices: &AccessStructure,
+        actual_keys: impl IntoIterator<Item = K>,
+    ) -> Option<BTreeMap<UpdateKeysIndex, K>>
+    where
+        UpdatePublicKey: for<'a> From<&'a K>, {
+        construct_update_signer_worker(&self.v0.keys, update_key_indices, actual_keys)
+    }
 }
 
 pub trait AuthorizationsFamily {
@@ -2163,10 +2355,10 @@ pub struct ChainParametersV0 {
 pub struct CooldownParameters {
     /// Number of seconds that pool owners must cooldown
     /// when reducing their equity capital or closing the pool.
-    pool_owner_cooldown: DurationSeconds,
+    pub pool_owner_cooldown: DurationSeconds,
     /// Number of seconds that a delegator must cooldown
     /// when reducing their delegated stake.
-    delegator_cooldown:  DurationSeconds,
+    pub delegator_cooldown:  DurationSeconds,
 }
 
 /// Length of a reward period in epochs.
@@ -2196,6 +2388,9 @@ pub struct RewardPeriodLength {
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, Serialize, Copy, Clone)]
 #[serde(rename_all = "camelCase")]
 #[derive(schemars::JsonSchema)]
+/// The time parameters are introduced as of protocol version 4, and consist of
+/// the reward period length and the mint rate per payday. These are coupled as
+/// a change to either affects the overall rate of minting.
 pub struct TimeParameters {
     pub reward_period_length: RewardPeriodLength,
     pub mint_per_payday:      MintRate,
@@ -2207,22 +2402,22 @@ pub struct TimeParameters {
 #[derive(schemars::JsonSchema)]
 pub struct PoolParameters {
     /// Fraction of finalization rewards charged by the passive delegation.
-    passive_finalization_commission: AmountFraction,
+    pub passive_finalization_commission: AmountFraction,
     /// Fraction of baking rewards charged by the passive delegation.
-    passive_baking_commission:       AmountFraction,
+    pub passive_baking_commission:       AmountFraction,
     /// Fraction of transaction rewards charged by the L-pool.
-    passive_transaction_commission:  AmountFraction,
+    pub passive_transaction_commission:  AmountFraction,
     /// Bounds on the commission rates that may be charged by bakers.
     #[serde(flatten)]
-    pub commission_bounds:           CommissionRanges,
+    pub commission_bounds:               CommissionRanges,
     /// Minimum equity capital required for a new baker.
-    pub minimum_equity_capital:      Amount,
+    pub minimum_equity_capital:          Amount,
     /// Maximum fraction of the total staked capital of that a new baker can
     /// have.
-    pub capital_bound:               CapitalBound,
+    pub capital_bound:                   CapitalBound,
     /// The maximum leverage that a baker can have as a ratio of total stake
     /// to equity capital.
-    pub leverage_bound:              LeverageFactor,
+    pub leverage_bound:                  LeverageFactor,
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, schemars::JsonSchema)]
@@ -2310,7 +2505,7 @@ pub struct PendingUpdatesV0 {
     pub mint_distribution:            UpdateQueue<MintDistribution<ChainParameterVersion0>>,
     pub transaction_fee_distribution: UpdateQueue<TransactionFeeDistribution>,
     pub gas_rewards:                  UpdateQueue<GASRewards>,
-    pub baker_stake_threshold:        UpdateQueue<Amount>,
+    pub baker_stake_threshold:        UpdateQueue<BakerParameters>,
     #[schemars(with = "UpdateQueue<id::types::ArInfo<wrappers::WrappedCurve>>")] // TODO: Fix this
     pub add_anonymity_revoker:        UpdateQueue<id::types::ArInfo<id::constants::ArCurve>>,
     #[schemars(with = "UpdateQueue<id::types::IpInfo<wrappers::WrappedPairing>>")]

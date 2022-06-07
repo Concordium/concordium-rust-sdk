@@ -1,6 +1,6 @@
 //! Types related to smart contracts.
 
-use super::hashes;
+use super::{hashes, Address, ContractAddress, ContractTraceElement, Energy, RejectReason};
 use crate::constants::*;
 /// Re-export of common helper functionality for smart contract, such as types
 /// and serialization specific for smart contracts.
@@ -264,9 +264,13 @@ impl Deserial for InitName {
     }
 }
 
-/// FIXME: Move to Wasm, and check size also in JSON deserialization
-#[derive(SerdeSerialize, SerdeDeserialize, derive::Serial, Debug, Clone, AsRef, Into, From)]
+// FIXME: Move to Wasm, and check size also in JSON deserialization
+#[derive(
+    SerdeSerialize, SerdeDeserialize, derive::Serial, Debug, Clone, AsRef, Into, From, Default,
+)]
 #[serde(transparent)]
+/// A smart contract parameter. The [Default] implementation produces an empty
+/// parameter.
 pub struct Parameter {
     #[serde(with = "crate::internal::byte_array_hex")]
     #[size_length = 2]
@@ -388,5 +392,95 @@ impl WasmModule {
         let mut hasher = sha2::Sha256::new();
         self.serial(&mut hasher);
         ModuleRef::from(<[u8; 32]>::from(hasher.finalize()))
+    }
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Clone)]
+/// Data needed to invoke the contract.
+pub struct ContractContext {
+    /// Invoker of the contract. If this is not supplied then the contract will
+    /// be invoked, by an account with address 0, no credentials and
+    /// sufficient amount of CCD to cover the transfer amount. If given, the
+    /// relevant address must exist in the blockstate.
+    pub invoker:   Option<Address>,
+    /// Contract to invoke.
+    pub contract:  ContractAddress,
+    /// Amount to invoke the contract with.
+    #[serde(default = "return_zero_amount")]
+    pub amount:    Amount,
+    /// Which entrypoint to invoke.
+    pub method:    ReceiveName,
+    /// And with what parameter.
+    #[serde(default)]
+    pub parameter: Parameter,
+    /// And what amount of energy to allow for execution. This should be small
+    /// enough so that it can be converted to interpreter energy.
+    #[serde(default = "return_default_invoke_energy")]
+    pub energy:    Energy,
+}
+
+pub const DEFAULT_INVOKE_ENERGY: Energy = Energy { energy: 10_000_000 };
+
+impl ContractContext {
+    /// Construct a minimal context with defaults for omitted values. The
+    /// defaults are
+    /// - the [`invoker`](ContractContext::invoker) is set to [`None`]
+    /// - the [`amount`](ContractContext::amount) is set to `0CCD`
+    /// - the [`parameter`](ContractContext::parameter) is set to the empty
+    ///   parameter
+    /// - the [`energy`](ContractContext::energy) is set to
+    ///   [`DEFAULT_INVOKE_ENERGY`]
+    pub fn new(contract: ContractAddress, method: ReceiveName) -> Self {
+        Self {
+            invoker: None,
+            contract,
+            amount: Amount::from_micro_ccd(0),
+            method,
+            parameter: Parameter::default(),
+            energy: DEFAULT_INVOKE_ENERGY,
+        }
+    }
+}
+
+fn return_zero_amount() -> Amount { Amount::from_micro_ccd(0) }
+fn return_default_invoke_energy() -> Energy { DEFAULT_INVOKE_ENERGY }
+
+#[derive(SerdeDeserialize, SerdeSerialize, Debug, Clone, Into)]
+#[serde(transparent)]
+pub struct ReturnValue {
+    #[serde(with = "crate::internal::byte_array_hex")]
+    pub value: Vec<u8>,
+}
+
+#[derive(Debug, Clone, SerdeDeserialize)]
+#[serde(tag = "tag")]
+pub enum InvokeContractResult {
+    #[serde(rename = "success", rename_all = "camelCase")]
+    Success {
+        return_value: Option<ReturnValue>,
+        #[serde(deserialize_with = "contract_trace_via_events::deserialize")]
+        events:       Vec<ContractTraceElement>,
+        used_energy:  Energy,
+    },
+    #[serde(rename = "failure", rename_all = "camelCase")]
+    Failure {
+        return_value: Option<ReturnValue>,
+        reason:       RejectReason,
+        used_energy:  Energy,
+    },
+}
+
+mod contract_trace_via_events {
+    use super::*;
+    use serde::de::Error;
+    /// Deserialize (via Serde) chrono::Duration in milliseconds as an i64.
+    pub fn deserialize<'de, D: serde::Deserializer<'de>>(
+        des: D,
+    ) -> Result<Vec<ContractTraceElement>, D::Error> {
+        let xs = Vec::<super::super::summary_helper::Event>::deserialize(des)?;
+        xs.into_iter()
+            .map(ContractTraceElement::try_from)
+            .collect::<Result<_, _>>()
+            .map_err(|e| D::Error::custom(format!("Conversion failure: {}", e)))
     }
 }

@@ -16,6 +16,11 @@ concordium-rust-sdk = { path = "./deps/concordium-rust-sdk", version = "1" }
 
 assuming the submodule is cloned into the directory `./deps/concordium-rust-sdk`.
 
+## Versions
+
+- Minimum supported Rust version: 1.53.
+- Node version compatibility: 4.*
+
 ## Basic usage
 
 The core structure of the SDK is the [Client](http://developer.concordium.software/concordium-rust-sdk/concordium_rust_sdk/endpoints/struct.Client.html) which maintains a connection to the node and supports querying the node and sending messages to it.
@@ -61,7 +66,7 @@ immediately signed.
 Each supported transaction has a method to construct it that takes minimal data
 needed for the transaction. Once a transaction is constructed it can be sent to
 the node and the chain using the
-[`send_transaction`](http://developer.concordium.software/concordium-rust-sdk/concordium_rust_sdk/endpoints/struct.Client.html#method.send_transaction)
+[`send_block_item`](http://developer.concordium.software/concordium-rust-sdk/concordium_rust_sdk/endpoints/struct.Client.html#method.send_block_item)
 endpoint.
 
 
@@ -120,15 +125,11 @@ async fn main() -> anyhow::Result<()> {
     let item = BlockItem::AccountTransaction(tx);
     let transaction_hash = item.hash();
     // submit the transaction to the chain
-    if !client.send_transaction(DEFAULT_NETWORK_ID, &item).await? {
-        println!("Could not send transaction with nonce {}.", nonce);
-    } else {
-        println!(
-            "Transaction {} submitted (nonce = {}).",
-            transaction_hash, nonce,
-        );
-    }
-
+    let transaction_hash = client.send_block_item(&item).await?;
+    println!(
+        "Transaction {} submitted (nonce = {}).",
+        transaction_hash, nonce,
+    );
     Ok(())
 }
 ```

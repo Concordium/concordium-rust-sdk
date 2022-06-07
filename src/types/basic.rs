@@ -1,14 +1,19 @@
 use crypto_common::{
     derive::{SerdeBase16Serialize, Serial, Serialize},
     deserial_string,
-    types::Amount,
+    types::Signature,
     Buffer, Deserial, Get, ParseResult, Put, ReadBytesExt, SerdeDeserialize, SerdeSerialize,
     Serial,
 };
 use derive_more::{Add, Display, From, FromStr, Into};
+use id::types::VerifyKey;
 use rand::{CryptoRng, Rng};
 use random_oracle::RandomOracle;
-use std::{convert::TryFrom, fmt, str::FromStr};
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt,
+    str::FromStr,
+};
 use thiserror::Error;
 
 /// Duration of a slot in milliseconds.
@@ -105,6 +110,8 @@ pub struct DelegatorId {
 /// A unicode representation of a Url.
 /// The Utf8 encoding of the Url must be at most
 /// [`MAX_URL_TEXT_LENGTH`](crate::constants::MAX_URL_TEXT_LENGTH) bytes.
+///
+/// The default instance produces the empty URL.
 #[derive(
     SerdeSerialize,
     SerdeDeserialize,
@@ -117,6 +124,7 @@ pub struct DelegatorId {
     Debug,
     Display,
     Into,
+    Default,
 )]
 #[serde(try_from = "String", into = "String")]
 #[derive(schemars::JsonSchema)]
@@ -227,20 +235,11 @@ impl Deserial for DelegationTarget {
 #[serde(rename_all = "camelCase")]
 pub struct BakerPoolInfo {
     /// Whether the pool allows delegators.
-    open_status:      OpenStatus,
+    pub open_status:      OpenStatus,
     /// The URL that links to the metadata about the pool.
-    metadata_url:     UrlText,
+    pub metadata_url:     UrlText,
     /// The commission rates charged by the pool owner.
-    commission_rates: CommissionRates,
-}
-
-#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, Copy)]
-#[serde(rename_all = "camelCase")]
-/// Information about the delegated stake of the account.
-pub struct AccountStakingDelegationInfo {
-    staked_amount:     Amount,
-    restake_earnings:  bool,
-    delegation_target: BakerId,
+    pub commission_rates: CommissionRates,
 }
 
 /// Slot number
@@ -335,11 +334,11 @@ impl Deserial for AccountThreshold {
 }
 
 impl TryFrom<u8> for AccountThreshold {
-    type Error = &'static str;
+    type Error = ZeroSignatureThreshold;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         if value == 0 {
-            Err("Account threshold cannot be 0.")
+            Err(ZeroSignatureThreshold)
         } else {
             Ok(AccountThreshold { threshold: value })
         }
@@ -717,7 +716,7 @@ impl From<&BakerElectionSignKey> for BakerElectionVerifyKey {
 ///
 /// Note: This type contains unencrypted secret keys and should be treated
 /// carefully.
-#[derive(SerdeSerialize, Serialize)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
 pub struct BakerKeyPairs {
     #[serde(rename = "signatureSignKey")]
     pub signature_sign:     BakerSignatureSignKey,
@@ -804,12 +803,64 @@ impl fmt::Display for CredentialRegistrationID {
 }
 
 #[derive(
-    Debug, SerdeSerialize, SerdeDeserialize, Serialize, Clone, Into, From, schemars::JsonSchema,
+    Debug,
+    SerdeSerialize,
+    SerdeDeserialize,
+    Serialize,
+    Clone,
+    Into,
+    From,
+    PartialEq,
+    Eq,
+    schemars::JsonSchema,
 )]
 #[serde(transparent)]
 /// A single public key that can sign updates.
 pub struct UpdatePublicKey {
-    pub public: id::types::VerifyKey,
+    pub public: VerifyKey,
+}
+
+/// A ed25519 keypair. This is available in the `ed25519::dalek` crate, but the
+/// JSON serialization there is not compatible with what we use, so we redefine
+/// it there.
+#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+pub struct UpdateKeyPair {
+    #[serde(
+        rename = "signKey",
+        serialize_with = "crypto_common::base16_encode",
+        deserialize_with = "crypto_common::base16_decode"
+    )]
+    pub secret: ed25519_dalek::SecretKey,
+    #[serde(rename = "verifyKey")]
+    pub public: UpdatePublicKey,
+}
+
+impl UpdateKeyPair {
+    pub fn generate<R: rand::CryptoRng + rand::Rng>(rng: &mut R) -> Self {
+        let kp = ed25519_dalek::Keypair::generate(rng);
+        Self {
+            secret: kp.secret,
+            public: UpdatePublicKey {
+                public: VerifyKey::Ed25519VerifyKey(kp.public),
+            },
+        }
+    }
+
+    pub fn sign(&self, msg: &[u8]) -> Signature {
+        let expanded = ed25519_dalek::ExpandedSecretKey::from(&self.secret);
+        match self.public.public {
+            VerifyKey::Ed25519VerifyKey(vf) => {
+                let sig = expanded.sign(msg, &vf);
+                Signature {
+                    sig: sig.to_bytes().to_vec(),
+                }
+            }
+        }
+    }
+}
+
+impl<'a> From<&UpdateKeyPair> for UpdatePublicKey {
+    fn from(kp: &UpdateKeyPair) -> Self { kp.public.clone() }
 }
 
 #[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serial, Into)]
@@ -818,6 +869,24 @@ pub struct UpdatePublicKey {
 pub struct UpdateKeysThreshold {
     #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
     pub(crate) threshold: u16,
+}
+
+#[derive(Debug, Error)]
+#[error("Signature threshold cannot be 0.")]
+/// An error type that indicates that a 0 attempted to be used as a signature
+/// threshold.
+pub struct ZeroSignatureThreshold;
+
+impl TryFrom<u16> for UpdateKeysThreshold {
+    type Error = ZeroSignatureThreshold;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        if value == 0 {
+            Err(ZeroSignatureThreshold)
+        } else {
+            Ok(Self { threshold: value })
+        }
+    }
 }
 
 impl Deserial for UpdateKeysThreshold {
@@ -829,7 +898,17 @@ impl Deserial for UpdateKeysThreshold {
 }
 
 #[derive(
-    Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize, PartialEq, Eq, PartialOrd, Ord,
+    Debug,
+    Clone,
+    Copy,
+    SerdeSerialize,
+    SerdeDeserialize,
+    Serialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    From,
 )]
 #[serde(transparent)]
 #[derive(schemars::JsonSchema)]
@@ -890,17 +969,17 @@ impl fmt::Display for PartsPerHundredThousands {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone, Copy, schemars::JsonSchema)]
+#[derive(SerdeSerialize, SerdeDeserialize, Serialize, Debug, Clone, Copy, schemars::JsonSchema)]
 pub struct CommissionRates {
     /// Fraction of finalization rewards charged by the pool owner.
     #[serde(rename = "finalizationCommission")]
-    finalization: AmountFraction,
+    pub finalization: AmountFraction,
     /// Fraction of baking rewards charged by the pool owner.
     #[serde(rename = "bakingCommission")]
-    baking:       AmountFraction,
+    pub baking:       AmountFraction,
     /// Fraction of transaction rewards charged by the pool owner.
     #[serde(rename = "transactionCommission")]
-    transaction:  AmountFraction,
+    pub transaction:  AmountFraction,
 }
 
 #[derive(Serialize, SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -909,19 +988,19 @@ pub struct CommissionRates {
 pub struct CommissionRanges {
     /// The range of allowed finalization commissions.
     #[serde(rename = "finalizationCommissionRange")]
-    finalization: InclusiveRange<AmountFraction>,
+    pub finalization: InclusiveRange<AmountFraction>,
     /// The range of allowed baker commissions.
     #[serde(rename = "bakingCommissionRange")]
-    baking:       InclusiveRange<AmountFraction>,
+    pub baking:       InclusiveRange<AmountFraction>,
     /// The range of allowed transaction commissions.
     #[serde(rename = "transactionCommissionRange")]
-    transaction:  InclusiveRange<AmountFraction>,
+    pub transaction:  InclusiveRange<AmountFraction>,
 }
 
 #[derive(Debug, Copy, Clone, SerdeSerialize, SerdeDeserialize, schemars::JsonSchema)] // TODO: Check in serde that min <= max
 pub struct InclusiveRange<T> {
-    min: T,
-    max: T,
+    pub min: T,
+    pub max: T,
 }
 
 impl<T: Serial> Serial for InclusiveRange<T> {
@@ -975,6 +1054,16 @@ pub struct LeverageFactor {
     pub numerator:   u64,
     #[serde(deserialize_with = "crate::internal::deserialize_non_default::deserialize")]
     pub denominator: u64,
+}
+
+impl LeverageFactor {
+    /// Construct an integral leverage factor.
+    pub fn new(factor: u64) -> Self {
+        Self {
+            numerator:   factor,
+            denominator: 1,
+        }
+    }
 }
 
 mod leverage_factor_json {
@@ -1101,6 +1190,7 @@ impl schemars::JsonSchema for MintRate {
 #[derive(
     Default,
     Debug,
+    Display,
     Clone,
     Copy,
     SerdeSerialize,
@@ -1141,7 +1231,7 @@ impl AmountFraction {
     }
 }
 
-#[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize)]
+#[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize, FromStr)]
 #[serde(transparent)]
 #[repr(transparent)]
 /// A bound on the relative share of the total staked capital that a baker can
@@ -1263,27 +1353,40 @@ impl SerdeSerialize for MintRate {
     }
 }
 
+impl FromStr for MintRate {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let f: rust_decimal::Decimal = s.parse()?;
+        f.try_into()
+    }
+}
+
+impl TryFrom<rust_decimal::Decimal> for MintRate {
+    type Error = anyhow::Error;
+
+    fn try_from(mut value: rust_decimal::Decimal) -> Result<Self, Self::Error> {
+        // FIXME: exponents will only be 28 at most for this type, so it is not entirely
+        // compatible with the Haskell code.
+        value.normalize_assign();
+        if let Ok(exponent) = u8::try_from(value.scale()) {
+            if let Ok(mantissa) = u32::try_from(value.mantissa()) {
+                Ok(MintRate { mantissa, exponent })
+            } else {
+                anyhow::bail!("Unsupported mantissa range for MintRate.",);
+            }
+        } else {
+            anyhow::bail!("Unsupported exponent range for MintRate.");
+        }
+    }
+}
+
 impl<'de> SerdeDeserialize<'de> for MintRate {
     fn deserialize<D>(des: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>, {
-        let mut f: rust_decimal::Decimal = SerdeDeserialize::deserialize(des)?;
-        // FIXME: exponents will only be 28 at most for this type, so it is not entirely
-        // compatible with the Haskell code.
-        f.normalize_assign();
-        if let Ok(exponent) = u8::try_from(f.scale()) {
-            if let Ok(mantissa) = u32::try_from(f.mantissa()) {
-                Ok(MintRate { mantissa, exponent })
-            } else {
-                Err(serde::de::Error::custom(
-                    "Unsupported mantissa range for MintRate.",
-                ))
-            }
-        } else {
-            Err(serde::de::Error::custom(
-                "Unsupported exponent range for MintRate.",
-            ))
-        }
+        let f: rust_decimal::Decimal = SerdeDeserialize::deserialize(des)?;
+        MintRate::try_from(f).map_err(serde::de::Error::custom)
     }
 }
 

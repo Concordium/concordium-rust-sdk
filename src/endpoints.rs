@@ -1,12 +1,13 @@
 use crate::{
+    constants::DEFAULT_NETWORK_ID,
     generated_types::{
         self, node_info_response, p2p_client, AccountAddress, BlockHash, BlockHashAndAmount,
         BlockHeight, Empty, GetAddressInfoRequest, GetModuleSourceRequest, GetPoolStatusRequest,
-        GetTransactionStatusInBlockRequest, JsonResponse, PeerConnectRequest, PeerElement,
-        PeersRequest, SendTransactionRequest, TransactionHash,
+        GetTransactionStatusInBlockRequest, InvokeContractRequest, JsonResponse,
+        PeerConnectRequest, PeerElement, PeersRequest, SendTransactionRequest, TransactionHash,
     },
     types::{
-        self, network, queries,
+        self, network, queries, smart_contracts,
         transactions::{self, PayloadLike},
         AccountIndex, BakerId,
     },
@@ -19,7 +20,10 @@ use id::{
     types::{ArInfo, GlobalContext, IpInfo},
 };
 use sha2::Digest;
-use std::{borrow::Borrow, convert::TryInto, net::IpAddr, sync::Arc, time::UNIX_EPOCH};
+use std::{
+    borrow::Borrow, collections::BTreeMap, convert::TryInto, net::IpAddr, sync::Arc,
+    time::UNIX_EPOCH,
+};
 use thiserror::Error;
 pub use tonic::transport::Endpoint;
 use tonic::{
@@ -615,7 +619,10 @@ impl Client {
         parse_json_response(response)
     }
 
-    /// Get the status of a given baker pool or L-pool at the given block.
+    /// Get the status of a given baker pool or passive delegation at the given
+    /// block. This is only supported if the node's protocol version is at least
+    /// [P4](crate::types::ProtocolVersion::P4). For earlier versions it will
+    /// return [NotFound](QueryError::NotFound).
     pub async fn get_pool_status(
         &mut self,
         baker_id: Option<BakerId>,
@@ -796,21 +803,47 @@ impl Client {
         Ok(nn)
     }
 
-    /// Send the given block item on the given network.
-    pub async fn send_transaction<PayloadType: PayloadLike>(
+    /// Invoke a contract in the given context and get the response.
+    /// Note that this is purely node-local transient operation and no
+    /// transaction or payment is involved. Use
+    /// [`send_transaction`](Self::send_transaction) if you need to update
+    /// the state of the contract on the chain.
+    pub async fn invoke_contract(
         &mut self,
-        network_id: network::NetworkId,
+        bh: &types::hashes::BlockHash,
+        context: &smart_contracts::ContractContext,
+    ) -> RPCResult<smart_contracts::InvokeContractResult> {
+        let request = self.construct_request(InvokeContractRequest {
+            block_hash: bh.to_string(),
+            context:    serde_json::to_string(context)
+                .expect("Context serialization always succeeds."),
+        })?;
+        let response = self.client.invoke_contract(request).await?;
+        let val = serde_json::from_str::<serde_json::Value>(response.into_inner().value.as_str())?;
+        let res = serde_json::from_value(val)?;
+        Ok(res)
+    }
+
+    /// Send the given block item.
+    pub async fn send_block_item<PayloadType: PayloadLike>(
+        &mut self,
         bi: &transactions::BlockItem<PayloadType>,
-    ) -> RPCResult<bool> {
+    ) -> RPCResult<types::hashes::TransactionHash> {
         let request = self.construct_request(SendTransactionRequest {
-            network_id: u32::from(u16::from(network_id)),
+            network_id: u32::from(u16::from(DEFAULT_NETWORK_ID)),
             payload:    crypto_common::to_bytes(&crypto_common::Versioned::new(
                 crypto_common::VERSION_0,
                 bi,
             )),
         })?;
         let response = self.client.send_transaction(request).await?;
-        Ok(response.into_inner().value)
+        if response.into_inner().value {
+            Ok(bi.hash())
+        } else {
+            Err(RPCError::CallError(tonic::Status::invalid_argument(
+                "Transaction was invalid and thus not accepted by the node.",
+            )))
+        }
     }
 
     /// Send the given account transaction item on the given network.
@@ -821,7 +854,6 @@ impl Client {
     /// that can be used to query the status is returned.
     pub async fn send_raw_account_transaction(
         &mut self,
-        network_id: network::NetworkId,
         signatures: &TransactionSignature, // signatures for the transaction.
         body: &[u8],                       // body of the transaction (header + payload)
     ) -> RPCResult<types::hashes::TransactionHash> {
@@ -835,7 +867,7 @@ impl Client {
                                       // compute the hash of the transaction
         let hash = types::hashes::HashBytes::new(sha2::Sha256::digest(&data).into());
         let request = self.construct_request(SendTransactionRequest {
-            network_id: u32::from(u16::from(network_id)),
+            network_id: u32::from(u16::from(DEFAULT_NETWORK_ID)),
             payload:    data,
         })?;
         let response = self.client.send_transaction(request).await?;
@@ -845,6 +877,124 @@ impl Client {
             Err(RPCError::CallError(tonic::Status::invalid_argument(
                 "Transaction was invalid and thus not accepted by the node.",
             )))
+        }
+    }
+
+    // The methods below are not direct methods, but build on top to provide common
+    // functionality.
+
+    /// Wait until a block is finalized at a height strictly larger than the
+    /// given one. Return the block hash and the height.
+    ///
+    /// Since this can take an indefinite amount of time in general, users of
+    /// this function might wish to wrap it inside
+    /// [`timeout`](tokio::time::timeout) handler and handle the resulting
+    /// failure.
+    pub async fn wait_for_finalization(
+        &mut self,
+        height: types::AbsoluteBlockHeight,
+    ) -> RPCResult<(types::AbsoluteBlockHeight, types::hashes::BlockHash)> {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(250));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            interval.tick().await;
+            let cs = self.get_consensus_status().await?;
+            if cs.last_finalized_block_height > height {
+                return Ok((cs.last_finalized_block_height, cs.last_finalized_block));
+            }
+        }
+    }
+
+    /// Wait until at least one block exists at the given height. Return all
+    /// hashes at the given height. Note that because these blocks are not
+    /// necessarily finalized, querying them might yield a
+    /// [`NotFound`](QueryError::NotFound).
+    ///
+    /// Since this can take an indefinite amount of time in general, users of
+    /// this function might wish to wrap it inside
+    /// [`timeout`](tokio::time::timeout) handler and handle the resulting
+    /// failure.
+    pub async fn wait_for_blocks_at(
+        &mut self,
+        height: types::AbsoluteBlockHeight,
+    ) -> RPCResult<Vec<types::hashes::BlockHash>> {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(250));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        let input: BlocksAtHeightInput = height.into();
+        loop {
+            interval.tick().await;
+            let blocks = self.get_blocks_at_height(input).await?;
+            if !blocks.is_empty() {
+                return Ok(blocks);
+            }
+        }
+    }
+
+    /// Wait until the transaction is finalized. Returns
+    /// [`NotFound`](QueryError::NotFound) in case the transaction is not
+    /// known to the node. In case of success, the return value is a pair of the
+    /// block hash of the block that contains the transactions, and its
+    /// outcome in the block.
+    ///
+    /// Since this can take an indefinite amount of time in general, users of
+    /// this function might wish to wrap it inside
+    /// [`timeout`](tokio::time::timeout) handler and handle the resulting
+    /// failure.
+    pub async fn wait_until_finalized(
+        &mut self,
+        hash: &types::hashes::TransactionHash,
+    ) -> QueryResult<(types::hashes::BlockHash, types::BlockItemSummary)> {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(250));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            interval.tick().await;
+            if let types::TransactionStatus::Finalized(blocks) =
+                self.get_transaction_status(hash).await?
+            {
+                let mut iter = blocks.into_iter();
+                if let Some(rv) = iter.next() {
+                    if iter.next().is_some() {
+                        return Err(tonic::Status::internal(
+                            "Finalized transaction finalized into multiple blocks. This cannot \
+                             happen.",
+                        )
+                        .into());
+                    } else {
+                        return Ok(rv);
+                    }
+                } else {
+                    return Err(tonic::Status::internal(
+                        "Finalized transaction finalized into no blocks. This cannot happen.",
+                    )
+                    .into());
+                }
+            }
+        }
+    }
+
+    /// Wait until the transaction is committed to a block. Returns
+    /// [`NotFound`](QueryError::NotFound) in case the transaction is not
+    /// known to the node. In case of success, the return value is a map
+    /// mapping block hashes of the blocks that contains the transactions to the
+    /// outcomes of the transaction in that block.
+    ///
+    /// Since this can take an indefinite amount of time in general, users of
+    /// this function might wish to wrap it inside
+    /// [`timeout`](tokio::time::timeout) handler and handle the resulting
+    /// failure.
+    pub async fn wait_until_committed(
+        &mut self,
+        hash: &types::hashes::TransactionHash,
+    ) -> QueryResult<BTreeMap<types::hashes::BlockHash, types::BlockItemSummary>> {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(250));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            interval.tick().await;
+            match self.get_transaction_status(hash).await? {
+                types::TransactionStatus::Received => continue,
+                types::TransactionStatus::Finalized(blocks) => return Ok(blocks),
+                types::TransactionStatus::Committed(blocks) => return Ok(blocks),
+            }
         }
     }
 }

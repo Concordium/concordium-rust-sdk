@@ -64,47 +64,7 @@ enum BlockItemType {
     #[serde(rename = "updateTransaction")]
     /// Chain updates are signed by the governance keys. They affect the core
     /// parameters of the chain.
-    Update(UpdateType),
-}
-
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
-#[serde(rename_all = "camelCase")]
-// Since all variants are fieldless, the default JSON serialization will convert
-// all the variants to simple strings.
-/// Enumeration of the types of updates that are possible.
-#[derive(schemars::JsonSchema)]
-pub enum UpdateType {
-    /// Update the chain protocol
-    UpdateProtocol,
-    /// Update the election difficulty
-    UpdateElectionDifficulty,
-    /// Update the euro per energy exchange rate
-    UpdateEuroPerEnergy,
-    /// Update the microCCD per euro exchange rate
-    UpdateMicroGTUPerEuro,
-    /// Update the address of the foundation account
-    UpdateFoundationAccount,
-    /// Update the distribution of newly minted CCD
-    UpdateMintDistribution,
-    /// Update the distribution of transaction fees
-    UpdateTransactionFeeDistribution,
-    /// Update the GAS rewards
-    UpdateGASRewards,
-    /// Minimum amount to register as a baker
-    UpdateBakerStakeThreshold,
-    /// Add new anonymity revoker
-    UpdateAddAnonymityRevoker,
-    /// Add new identity provider
-    UpdateAddIdentityProvider,
-    /// Update the root keys
-    UpdateRootKeys,
-    /// Update the level 1 keys
-    UpdateLevel1Keys,
-    /// Update the level 2 keys
-    UpdateLevel2Keys,
-    UpdatePoolParameters,
-    UpdateCooldownParameters,
-    UpdateTimeParameters,
+    Update(super::UpdateType),
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -126,7 +86,7 @@ enum BlockItemResult {
 #[serde(tag = "tag")]
 #[derive(schemars::JsonSchema)]
 /// An event describing the changes that occurred to the state of the chain.
-enum Event {
+pub(crate) enum Event {
     /// A smart contract module was successfully deployed.
     ModuleDeployed {
         #[serde(rename = "contents")]
@@ -389,27 +349,43 @@ enum Event {
     },
 }
 
-impl super::UpdatePayload {
-    fn update_type(&self) -> UpdateType {
-        use UpdateType::*;
-        match self {
-            UpdatePayload::Protocol(_) => UpdateProtocol,
-            UpdatePayload::ElectionDifficulty(_) => UpdateElectionDifficulty,
-            UpdatePayload::EuroPerEnergy(_) => UpdateEuroPerEnergy,
-            UpdatePayload::MicroGTUPerEuro(_) => UpdateMicroGTUPerEuro,
-            UpdatePayload::FoundationAccount(_) => UpdateFoundationAccount,
-            UpdatePayload::MintDistribution(_) => UpdateMintDistribution,
-            UpdatePayload::TransactionFeeDistribution(_) => UpdateTransactionFeeDistribution,
-            UpdatePayload::GASRewards(_) => UpdateGASRewards,
-            UpdatePayload::BakerStakeThreshold(_) => UpdateBakerStakeThreshold,
-            UpdatePayload::Root(_) => UpdateRootKeys,
-            UpdatePayload::Level1(_) => UpdateLevel1Keys,
-            UpdatePayload::AddAnonymityRevoker(_) => UpdateAddAnonymityRevoker,
-            UpdatePayload::AddIdentityProvider(_) => UpdateAddIdentityProvider,
-            UpdatePayload::CooldownParametersCPV1(_) => UpdateCooldownParameters,
-            UpdatePayload::PoolParametersCPV1(_) => UpdatePoolParameters,
-            UpdatePayload::TimeParametersCPV1(_) => UpdateTimeParameters,
-            UpdatePayload::MintDistributionCPV1(_) => UpdateMintDistribution,
+impl From<super::ContractTraceElement> for Event {
+    fn from(e: super::ContractTraceElement) -> Self {
+        match e {
+            super::ContractTraceElement::Updated { data } => Event::Updated { data },
+            super::ContractTraceElement::Transferred { from, amount, to } => Event::Transferred {
+                from: Address::Contract(from),
+                amount,
+                to: Address::Account(to),
+            },
+            crate::types::ContractTraceElement::Interrupted { address, events } => {
+                Event::Interrupted { address, events }
+            }
+            crate::types::ContractTraceElement::Resumed { address, success } => {
+                Event::Resumed { address, success }
+            }
+        }
+    }
+}
+
+impl TryFrom<Event> for super::ContractTraceElement {
+    type Error = ConversionError;
+
+    fn try_from(value: Event) -> Result<Self, Self::Error> {
+        match value {
+            Event::Updated { data } => Ok(super::ContractTraceElement::Updated { data }),
+            Event::Transferred {
+                from: Address::Contract(from),
+                amount,
+                to: Address::Account(to),
+            } => Ok(super::ContractTraceElement::Transferred { from, amount, to }),
+            Event::Interrupted { address, events } => {
+                Ok(super::ContractTraceElement::Interrupted { address, events })
+            }
+            Event::Resumed { address, success } => {
+                Ok(super::ContractTraceElement::Resumed { address, success })
+            }
+            _ => Err(ConversionError::InvalidTransactionResult),
         }
     }
 }
@@ -454,29 +430,7 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                         })
                     }
                     super::AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                        let events = effects
-                            .into_iter()
-                            .map(|e| match e {
-                                super::ContractTraceElement::Updated { data } => {
-                                    Event::Updated { data }
-                                }
-                                super::ContractTraceElement::Transferred { from, amount, to } => {
-                                    Event::Transferred {
-                                        from: Address::Contract(from),
-                                        amount,
-                                        to: Address::Account(to),
-                                    }
-                                }
-                                crate::types::ContractTraceElement::Interrupted {
-                                    address,
-                                    events,
-                                } => Event::Interrupted { address, events },
-                                crate::types::ContractTraceElement::Resumed {
-                                    address,
-                                    success,
-                                } => Event::Resumed { address, success },
-                            })
-                            .collect::<Vec<_>>();
+                        let events = effects.into_iter().map(Event::from).collect::<Vec<_>>();
                         (Some(TransactionType::Update), BlockItemResult::Success {
                             events,
                         })
@@ -904,21 +858,7 @@ fn convert_account_transaction(
         TransactionType::Update => {
             let effects = events
                 .into_iter()
-                .map(|e| match e {
-                    Event::Updated { data } => Ok(super::ContractTraceElement::Updated { data }),
-                    Event::Transferred {
-                        from: Address::Contract(from),
-                        amount,
-                        to: Address::Account(to),
-                    } => Ok(super::ContractTraceElement::Transferred { from, amount, to }),
-                    Event::Interrupted { address, events } => {
-                        Ok(super::ContractTraceElement::Interrupted { address, events })
-                    }
-                    Event::Resumed { address, success } => {
-                        Ok(super::ContractTraceElement::Resumed { address, success })
-                    }
-                    _ => Err(ConversionError::InvalidTransactionResult),
-                })
+                .map(super::ContractTraceElement::try_from)
                 .collect::<Result<_, _>>()?;
             mk_success(super::AccountTransactionEffects::ContractUpdateIssued { effects })
         }

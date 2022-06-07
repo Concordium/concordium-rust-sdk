@@ -2,7 +2,6 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize},
-    constants::DEFAULT_NETWORK_ID,
     endpoints,
     id::types::{AccountAddress, AccountKeys},
     types::{
@@ -115,16 +114,11 @@ async fn main() -> anyhow::Result<()> {
             let nonce = tx.header.nonce;
             let energy = tx.header.energy_amount;
             let item = BlockItem::AccountTransaction(tx);
-            let transaction_hash = item.hash();
-            if !client.send_transaction(DEFAULT_NETWORK_ID, &item).await? {
-                println!("Could not send transaction with nonce {}.", nonce);
-                break;
-            } else {
-                println!(
-                    "Transaction {} submitted (nonce = {}, energy = {}).",
-                    transaction_hash, nonce, energy
-                );
-            }
+            let transaction_hash = client.send_block_item(&item).await?;
+            println!(
+                "Transaction {} submitted (nonce = {}, energy = {}).",
+                transaction_hash, nonce, energy
+            );
         } else {
             break;
         }
