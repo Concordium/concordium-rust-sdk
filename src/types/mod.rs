@@ -43,7 +43,6 @@ pub struct AccountEncryptedAmount {
     /// - encrypted amounts that are transferred from public balance
     ///
     /// When a transfer is made all of these must always be used.
-    #[schemars(with = "encrypted_transfers::types::EncryptedAmount<wrappers::WrappedCurve>")]
     pub self_amount:       encrypted_transfers::types::EncryptedAmount<ArCurve>,
     /// Starting index for incoming encrypted amounts. If an aggregated amount
     /// is present then this index is associated with such an amount and the
@@ -54,16 +53,12 @@ pub struct AccountEncryptedAmount {
     /// If ['Some'], the amount that has resulted from aggregating other amounts
     /// and the number of aggregated amounts (must be at least 2 if
     /// present).
-    #[schemars(
-        with = "Option<(encrypted_transfers::types::EncryptedAmount<wrappers::WrappedCurve>, u32)>"
-    )]
     pub aggregated_amount: Option<(encrypted_transfers::types::EncryptedAmount<ArCurve>, u32)>,
     /// Amounts starting at `start_index` (or at `start_index + 1` if there is
     /// an aggregated amount present). They are assumed to be numbered
     /// sequentially. The length of this list is bounded by the maximum number
     /// of incoming amounts on the accounts, which is currently 32. After
     /// that aggregation kicks in.
-    #[schemars(with = "Vec<encrypted_transfers::types::EncryptedAmount<wrappers::WrappedCurve>>")]
     pub incoming_amounts:  Vec<encrypted_transfers::types::EncryptedAmount<ArCurve>>,
 }
 
@@ -1454,7 +1449,6 @@ pub struct NewEncryptedAmountEvent {
     #[schemars(with = "u64")]
     pub new_index:        encrypted_transfers::types::EncryptedAmountIndex,
     /// The encrypted amount that was added.
-    #[schemars(with = "crate::internal::HexSchema")] // TODO: Not ideal, length is fixed.
     pub encrypted_amount: encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
 }
 
@@ -1467,10 +1461,8 @@ pub struct EncryptedAmountRemovedEvent {
     /// The affected account.
     pub account:      AccountAddress,
     /// The new self encrypted amount on the affected account.
-    #[schemars(with = "crate::internal::HexSchema")] // TODO: Not ideal, length is fixed.
     pub new_amount:   encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
     /// The input encrypted amount that was removed.
-    #[schemars(with = "crate::internal::HexSchema")] // TODO: Not ideal, length is fixed.
     pub input_amount: encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
     /// The index indicating which amounts were used.
     #[schemars(with = "u64")]
@@ -1517,7 +1509,6 @@ pub struct EncryptedSelfAmountAddedEvent {
     /// The affected account.
     pub account:    AccountAddress,
     /// The new self encrypted amount of the account.
-    #[schemars(with = "crate::internal::HexSchema")] // TODO: Not ideal, length is fixed.
     pub new_amount: encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
     /// The amount that was transferred from public to encrypted balance.
     pub amount:     Amount,
