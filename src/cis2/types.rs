@@ -2,17 +2,14 @@ use crate::types::smart_contracts::concordium_contracts_common::{
     deserial_vector_no_length, serial_vector_no_length, AccountAddress, Address, ContractAddress,
     Deserial, OwnedReceiveName, ParseError, Read, Serial, Write,
 };
+use derive_more::{AsRef, Display, From};
 use std::{convert::TryFrom, fmt::Display, ops, str::FromStr};
 use thiserror::*;
 
-#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, From)]
 pub struct TokenAmountU64(pub u64);
 
 pub type TokenAmount = TokenAmountU64;
-
-impl From<u64> for TokenAmountU64 {
-    fn from(v: u64) -> TokenAmountU64 { TokenAmountU64(v) }
-}
 
 impl From<TokenAmountU64> for u64 {
     fn from(v: TokenAmountU64) -> u64 { v.0 }
@@ -197,7 +194,7 @@ impl From<i32> for Cis2ErrorRejectReason {
 
 /// Additional data bytes which can be included for each transfer in the
 /// transfer parameter for the CIS2 contract function "transfer".
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, From, AsRef)]
 pub struct AdditionalData {
     pub data: Vec<u8>,
 }
@@ -276,16 +273,8 @@ impl Serial for Transfer {
 }
 
 /// The parameter type for the NFT contract function `CIS2-NFT.transfer`.
-#[derive(Debug)]
+#[derive(Debug, AsRef, From)]
 pub struct TransferParams(pub Vec<Transfer>);
-
-impl From<Vec<Transfer>> for TransferParams {
-    fn from(transfers: Vec<Transfer>) -> Self { TransferParams(transfers) }
-}
-
-impl AsRef<[Transfer]> for TransferParams {
-    fn as_ref(&self) -> &[Transfer] { &self.0 }
-}
 
 /// Serialization of the transfer parameter, according to the CIS2
 /// specification.
@@ -298,7 +287,7 @@ impl Serial for TransferParams {
 }
 
 /// The type of update for an operator update.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Display)]
 pub enum OperatorUpdate {
     /// Remove the operator.
     Remove,
@@ -330,16 +319,6 @@ impl Deserial for OperatorUpdate {
     }
 }
 
-impl Display for OperatorUpdate {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let str = match self {
-            OperatorUpdate::Remove => "Remove",
-            OperatorUpdate::Add => "Add",
-        };
-        write!(f, "{}", str)
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct UpdateOperator {
     /// The update for this operator.
@@ -360,7 +339,7 @@ impl Serial for UpdateOperator {
 }
 
 /// The parameter type for the NFT contract function `CIS2-NFT.updateOperator`.
-#[derive(Debug)]
+#[derive(Debug, From, AsRef)]
 pub struct UpdateOperatorParams(pub Vec<UpdateOperator>);
 
 /// Serialization of the updateOperator parameter, according to the CIS2
@@ -371,14 +350,6 @@ impl Serial for UpdateOperatorParams {
         len.serial(out)?;
         serial_vector_no_length(&self.0, out)
     }
-}
-
-impl From<Vec<UpdateOperator>> for UpdateOperatorParams {
-    fn from(transfers: Vec<UpdateOperator>) -> Self { UpdateOperatorParams(transfers) }
-}
-
-impl AsRef<[UpdateOperator]> for UpdateOperatorParams {
-    fn as_ref(&self) -> &[UpdateOperator] { &self.0 }
 }
 
 /// A query for the balance of a given address for a given token.
@@ -401,7 +372,7 @@ impl Serial for BalanceOfQuery {
 }
 
 /// The parameter type for the NFT contract function `CIS2-NFT.balanceOf`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, From, AsRef)]
 pub struct BalanceOfQueryParams(pub Vec<BalanceOfQuery>);
 
 /// Serialization of the balanceOf parameter, according to the CIS2
@@ -414,27 +385,11 @@ impl Serial for BalanceOfQueryParams {
     }
 }
 
-impl From<Vec<BalanceOfQuery>> for BalanceOfQueryParams {
-    fn from(queries: Vec<BalanceOfQuery>) -> Self { BalanceOfQueryParams(queries) }
-}
-
-impl AsRef<[BalanceOfQuery]> for BalanceOfQueryParams {
-    fn as_ref(&self) -> &[BalanceOfQuery] { &self.0 }
-}
-
 /// The response which is sent back when calling the contract function
 /// `balanceOf`.
 /// It consists of the list of token amounts in the same order as the queries.
-#[derive(Debug)]
+#[derive(Debug, From, AsRef)]
 pub struct BalanceOfQueryResponse(pub Vec<TokenAmount>);
-
-impl From<Vec<TokenAmount>> for BalanceOfQueryResponse {
-    fn from(results: Vec<TokenAmount>) -> Self { BalanceOfQueryResponse(results) }
-}
-
-impl AsRef<[TokenAmount]> for BalanceOfQueryResponse {
-    fn as_ref(&self) -> &[TokenAmount] { &self.0 }
-}
 
 /// Deserialization for BalanceOfQueryResponse according to the CIS2
 /// specification.
@@ -469,7 +424,7 @@ impl Serial for OperatorOfQuery {
 }
 
 /// The parameter type for the NFT contract function `CIS2-NFT.operatorOf`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, AsRef, From)]
 pub struct OperatorOfQueryParams(pub Vec<OperatorOfQuery>);
 
 /// Serialization of the operatorOf parameter, according to the CIS2
@@ -482,28 +437,12 @@ impl Serial for OperatorOfQueryParams {
     }
 }
 
-impl From<Vec<OperatorOfQuery>> for OperatorOfQueryParams {
-    fn from(queries: Vec<OperatorOfQuery>) -> Self { OperatorOfQueryParams(queries) }
-}
-
-impl AsRef<[OperatorOfQuery]> for OperatorOfQueryParams {
-    fn as_ref(&self) -> &[OperatorOfQuery] { &self.0 }
-}
-
 /// The response which is sent back when calling the contract function
 /// `operatorOf`.
 /// It consists of the list of result in the same order and length as the
 /// queries in the parameter.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, From, AsRef)]
 pub struct OperatorOfQueryResponse(pub Vec<bool>);
-
-impl From<Vec<bool>> for OperatorOfQueryResponse {
-    fn from(results: Vec<bool>) -> Self { OperatorOfQueryResponse(results) }
-}
-
-impl AsRef<[bool]> for OperatorOfQueryResponse {
-    fn as_ref(&self) -> &[bool] { &self.0 }
-}
 
 /// Deserialization for OperatorOfQueryResponse according to the CIS2
 /// specification.
@@ -519,8 +458,8 @@ impl Deserial for OperatorOfQueryResponse {
 }
 
 /// The parameter type for the NFT contract function `CIS2-NFT.operatorOf`.
-#[derive(Debug, Clone)]
-pub struct TokenMetadataQueryParams(pub Vec<TokenIdVec>);
+#[derive(Debug, Clone, From, AsRef)]
+pub struct TokenMetadataQueryParams(Vec<TokenIdVec>);
 
 /// Serialization of the operatorOf parameter, according to the CIS2
 /// specification.
@@ -532,27 +471,11 @@ impl Serial for TokenMetadataQueryParams {
     }
 }
 
-impl From<Vec<TokenIdVec>> for TokenMetadataQueryParams {
-    fn from(queries: Vec<TokenIdVec>) -> Self { TokenMetadataQueryParams(queries) }
-}
-
-impl AsRef<[TokenIdVec]> for TokenMetadataQueryParams {
-    fn as_ref(&self) -> &[TokenIdVec] { &self.0 }
-}
-
 /// The response which is sent back when calling the contract function
 /// `tokenMetadata`.
 /// It consists of the list of queries paired with their corresponding result.
-#[derive(Debug, Clone)]
-pub struct TokenMetadataQueryResponse(pub Vec<MetadataUrl>);
-
-impl From<Vec<MetadataUrl>> for TokenMetadataQueryResponse {
-    fn from(results: Vec<MetadataUrl>) -> Self { TokenMetadataQueryResponse(results) }
-}
-
-impl AsRef<[MetadataUrl]> for TokenMetadataQueryResponse {
-    fn as_ref(&self) -> &[MetadataUrl] { &self.0 }
-}
+#[derive(Debug, Clone, From, AsRef)]
+pub struct TokenMetadataQueryResponse(Vec<MetadataUrl>);
 
 /// Deserialization for TokenMetadataQueryResponse according to the CIS2
 /// specification.
@@ -593,9 +516,15 @@ impl Deserial for MetadataUrl {
 }
 
 /// Smart contract logged event, part of the CIS2 specification.
-#[derive(Debug)]
+#[derive(Debug, Display)]
 pub enum Event {
     /// Transfer of an amount of tokens
+    #[display(
+        fmt = "Transferred token with ID {} from {} to {}",
+        token_id,
+        "address_display(from)",
+        "address_display(to)"
+    )]
     Transfer {
         token_id: TokenIdVec,
         amount:   TokenAmount,
@@ -603,106 +532,60 @@ pub enum Event {
         to:       Address,
     },
     /// Minting an amount of tokens
+    #[display(
+        fmt = "Minted token with ID {} for {}",
+        token_id,
+        "address_display(owner)"
+    )]
     Mint {
         token_id: TokenIdVec,
         amount:   TokenAmount,
         owner:    Address,
     },
     /// Burning an amount of tokens
+    #[display(
+        fmt = "Burned token with ID {} for {}",
+        token_id,
+        "address_display(owner)"
+    )]
     Burn {
         token_id: TokenIdVec,
         amount:   TokenAmount,
         owner:    Address,
     },
     /// Add/Remove an address as operator for some other address.
+    #[display(
+        fmt = "{} {} as operator for {}",
+        update,
+        "address_display(operator)",
+        "address_display(owner)"
+    )]
     UpdateOperator {
         update:   OperatorUpdate,
         owner:    Address,
         operator: Address,
     },
     /// Provide an URL with the metadata for a certain token.
+    #[display(
+        fmt = "Added metadata url {} ({}) for token with ID {}",
+        "metadata_url.url",
+        "display_hash(metadata_url.hash)",
+        token_id
+    )]
     TokenMetadata {
         token_id:     TokenIdVec,
         metadata_url: MetadataUrl,
     },
     /// Custom event outside of the CIS2 specification.
+    #[display(fmt = "Unknown event: Event is not part of CIS2 specification")]
     Unknown,
 }
 
-impl Display for Event {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            Event::Transfer {
-                token_id,
-                from,
-                to,
-                amount: _,
-            } => {
-                write!(
-                    f,
-                    "Transferred token with ID {} from {} to {}",
-                    token_id,
-                    address_display(from),
-                    address_display(to)
-                )?;
-            }
-            Event::Mint {
-                token_id,
-                amount: _,
-                owner,
-            } => {
-                write!(
-                    f,
-                    "Minted token with ID {} for {}",
-                    token_id,
-                    address_display(owner)
-                )?;
-            }
-            Event::Burn {
-                token_id,
-                amount: _,
-                owner,
-            } => {
-                write!(
-                    f,
-                    "Burned token with ID {} for {}",
-                    token_id,
-                    address_display(owner)
-                )?;
-            }
-            Event::UpdateOperator {
-                update,
-                owner,
-                operator,
-            } => {
-                write!(
-                    f,
-                    "{} {} as operator for {}",
-                    update,
-                    address_display(operator),
-                    address_display(owner)
-                )?;
-            }
-            Event::TokenMetadata {
-                token_id,
-                metadata_url,
-            } => {
-                let hash = if let Some(hash) = metadata_url.hash {
-                    format!("with hash {}", hex::encode(hash))
-                } else {
-                    "without hash".to_string()
-                };
-                write!(
-                    f,
-                    "Added metadata url {} ({}) for token with ID {}",
-                    metadata_url.url, hash, token_id
-                )?;
-            }
-            Event::Unknown => {
-                write!(f, "Unknown event: Event is not part of CIS2 specification")?;
-            }
-        }
-        Ok(())
+fn display_hash(hash_opt: Option<Sha256>) -> String {
+    if let Some(hash) = hash_opt {
+        format!("with hash {}", hex::encode(hash))
+    } else {
+        "without hash".to_string()
     }
 }
 
