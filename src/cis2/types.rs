@@ -239,10 +239,10 @@ impl Serial for Receiver {
                 0u8.serial(out)?;
                 address.serial(out)
             }
-            Receiver::Contract(address, receive_name) => {
+            Receiver::Contract(address, owned_receive_name) => {
                 1u8.serial(out)?;
                 address.serial(out)?;
-                receive_name.as_ref().serial(out)
+                owned_receive_name.as_receive_name().serial(out)
             }
         }
     }

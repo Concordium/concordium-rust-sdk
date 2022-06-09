@@ -1,30 +1,41 @@
+//! This module contains types and functions for interacting with smart
+//! contracts following the [CIS-2](https://proposals.concordium.software/CIS/cis-2.html) specification.
+//!
+//! The type [Cis2Contract](Cis2Contract) act as a wrapper around the
+//! [Client](crate::endpoints::Client) and a contract address providing
+//! functions for querying and making transactions to smart contract.
 mod types;
-
-use std::convert::{From, TryFrom};
-
-pub use types::*;
 
 use crate::{common, endpoints::Client, id, types as sdk_types};
 use sdk_types::{smart_contracts, transactions, ContractAddress};
 use smart_contracts::concordium_contracts_common;
-
+use std::convert::{From, TryFrom};
 use thiserror::*;
+pub use types::*;
 
 /// A wrapper around the client representing a CIS2 token smart contract and
 /// provides functions for interaction.
-pub struct Cis2Contract {
+///
+/// Note that cloning is cheap and is therefore the intended way of sharing
+/// between multiple tasks.
+#[derive(Debug, Clone)]
+pub struct Cis2Contract<'a> {
     client:        Client,
     address:       ContractAddress,
-    contract_name: String,
+    contract_name: concordium_contracts_common::ContractName<'a>,
 }
 
+/// Error which can occur when submitting a transaction such as `tranfer` and
+/// `updateOperator` to a CIS2 smart contract.
 #[derive(Debug, Error)]
 pub enum Cis2TransactionError {
-    #[error("Invalid receive name")]
+    /// The smart contract receive name is invalid.
+    #[error("Invalid receive name: {0}")]
     InvalidContractName(concordium_contracts_common::NewReceiveNameError),
 
-    #[error("Rejected by the node: {0}")]
-    NodeRejected(#[from] crate::endpoints::RPCError),
+    /// A general RPC error occured.
+    #[error("RPC error: {0}")]
+    RPCError(#[from] crate::endpoints::RPCError),
 }
 
 impl From<concordium_contracts_common::NewReceiveNameError> for Cis2TransactionError {
@@ -33,19 +44,25 @@ impl From<concordium_contracts_common::NewReceiveNameError> for Cis2TransactionE
     }
 }
 
+/// Error which can occur when invoking a query such as `balanceOf` and
+/// `operatorOf` or `tokenMetadata` to a CIS2 smart contract.
 #[derive(Debug, Error)]
 pub enum Cis2QueryError {
-    #[error("Invalid receive name")]
+    /// The smart contract receive name is invalid.
+    #[error("Invalid receive name: {0}")]
     InvalidContractName(concordium_contracts_common::NewReceiveNameError),
 
-    #[error("Rejected by the node: {0}")]
-    NodeRejected(#[from] crate::endpoints::RPCError),
+    /// A general RPC error occured.
+    #[error("RPC error: {0}")]
+    RPCError(#[from] crate::endpoints::RPCError),
 
+    /// The returned bytes from invoking the smart contract could not be parsed.
     #[error("Failed parsing the response")]
     ResponseParseError(concordium_contracts_common::ParseError),
 
-    #[error("Query failed")]
-    QueryFailed(sdk_types::RejectReason),
+    /// The node rejected the invocation.
+    #[error("Rejected by the node")]
+    NodeRejected(sdk_types::RejectReason),
 }
 
 impl From<concordium_contracts_common::NewReceiveNameError> for Cis2QueryError {
@@ -59,12 +76,39 @@ impl From<concordium_contracts_common::ParseError> for Cis2QueryError {
 }
 
 impl From<sdk_types::RejectReason> for Cis2QueryError {
-    fn from(err: sdk_types::RejectReason) -> Self { Self::QueryFailed(err) }
+    fn from(err: sdk_types::RejectReason) -> Self { Self::NodeRejected(err) }
 }
 
-impl Cis2Contract {
-    /// Construct a Cis2Contract
-    pub fn new(client: Client, address: ContractAddress, contract_name: String) -> Cis2Contract {
+/// Transaction metadata for CIS-2
+#[derive(Debug, Clone, Copy)]
+pub struct Cis2TransactionMetadata {
+    /// The account address sending the transaction.
+    pub sender_address: id::types::AccountAddress,
+    /// The nonce to use for the transaction.
+    pub nonce:          sdk_types::Nonce,
+    /// Expiry date of the transaction.
+    pub expiry:         common::types::TransactionTime,
+    /// The limit on energy to use for the transaction.
+    pub energy:         transactions::send::GivenEnergy,
+    /// The amount of CCD to include in the transaction.
+    pub amount:         common::types::Amount,
+}
+
+impl<'a> Cis2Contract<'a> {
+    /// Construct a Cis2Contract.
+    ///
+    /// # Arguments
+    ///
+    /// * `client` - The RPC client for the concordium node. Note that cloning
+    ///   [Client](crate::endpoints::Client) is cheap and is therefore the
+    ///   intended way of sharing.
+    /// * `address` - The contract address of the CIS2 token smart contract.
+    /// * `contract_name` - The name of the contract.
+    pub fn new(
+        client: Client,
+        address: ContractAddress,
+        contract_name: concordium_contracts_common::ContractName,
+    ) -> Cis2Contract {
         Cis2Contract {
             client,
             address,
@@ -72,37 +116,43 @@ impl Cis2Contract {
         }
     }
 
-    /// Send a CIS2 transfer transaction.
+    /// Construct and send a CIS2 transfer smart contract update transaction
+    /// given a list of CIS2 transfers. Returns a Result with the
+    /// transaction hash.
+    ///
+    /// # Arguments
+    ///
+    /// * `signer` - The account keys to use for signing the smart contract
+    ///   update transaction.
+    /// * `transaction_metadata` - Metadata for constructing the transaction.
+    /// * `transfers` - A list of CIS2 token transfers to execute.
     #[allow(clippy::too_many_arguments)]
     pub async fn transfer(
-        mut self,
-        sender_keys: &id::types::AccountKeys,
-        sender_address: &id::types::AccountAddress,
-        nonce: sdk_types::Nonce,
-        expiry: common::types::TransactionTime,
-        energy: transactions::send::GivenEnergy,
-        amount: common::types::Amount,
+        &mut self,
+        signer: &impl transactions::ExactSizeTransactionSigner,
+        transaction_metadata: Cis2TransactionMetadata,
         transfers: Vec<Transfer>,
     ) -> Result<sdk_types::hashes::TransactionHash, Cis2TransactionError> {
         let parameter = TransferParams::from(transfers);
         let bytes = concordium_contracts_common::to_bytes(&parameter);
+        let contract_name = self.contract_name.contract_name();
         let receive_name =
-            smart_contracts::ReceiveName::try_from(format!("{}.transfer", self.contract_name))?;
+            smart_contracts::ReceiveName::try_from(format!("{}.transfer", contract_name))?;
 
         let payload = transactions::Payload::Update {
             payload: transactions::UpdateContractPayload {
-                amount,
+                amount: transaction_metadata.amount,
                 address: self.address,
                 receive_name,
                 message: smart_contracts::Parameter::from(bytes),
             },
         };
         let tx = transactions::send::make_and_sign_transaction(
-            sender_keys,
-            *sender_address,
-            nonce,
-            expiry,
-            energy,
+            signer,
+            transaction_metadata.sender_address,
+            transaction_metadata.nonce,
+            transaction_metadata.expiry,
+            transaction_metadata.energy,
             payload,
         );
         let bi = transactions::BlockItem::AccountTransaction(tx);
@@ -111,38 +161,44 @@ impl Cis2Contract {
     }
 
     /// Send a CIS2 updateOperator transaction.
+    /// Construct and send a CIS2 updateOperator smart contract update
+    /// transaction given a list of CIS2 UpdateOperators. Returns a Result
+    /// with the transaction hash.
+    ///
+    /// # Arguments
+    ///
+    /// * `signer` - The account keys to use for signing the smart contract
+    ///   update transaction.
+    /// * `sender_address` - The account address of the signing keys.
+    /// * `transaction_metadata` - Metadata for constructing the transaction.
+    /// * `updates` - A list of CIS2 UpdateOperators to update.
     #[allow(clippy::too_many_arguments)]
     pub async fn update_operator(
-        mut self,
-        sender_keys: &id::types::AccountKeys,
-        sender_address: &id::types::AccountAddress,
-        nonce: sdk_types::Nonce,
-        expiry: common::types::TransactionTime,
-        energy: transactions::send::GivenEnergy,
-        amount: common::types::Amount,
+        &mut self,
+        signer: &impl transactions::ExactSizeTransactionSigner,
+        transaction_metadata: Cis2TransactionMetadata,
         updates: Vec<UpdateOperator>,
     ) -> anyhow::Result<sdk_types::hashes::TransactionHash, Cis2TransactionError> {
         let parameter = UpdateOperatorParams::from(updates);
         let bytes = concordium_contracts_common::to_bytes(&parameter);
-        let receive_name = smart_contracts::ReceiveName::try_from(format!(
-            "{}.updateOperator",
-            self.contract_name
-        ))?;
+        let contract_name = self.contract_name.contract_name();
+        let receive_name =
+            smart_contracts::ReceiveName::try_from(format!("{}.updateOperator", contract_name))?;
 
         let payload = transactions::Payload::Update {
             payload: transactions::UpdateContractPayload {
-                amount,
+                amount: transaction_metadata.amount,
                 address: self.address,
                 receive_name,
                 message: smart_contracts::Parameter::from(bytes),
             },
         };
         let tx = transactions::send::make_and_sign_transaction(
-            sender_keys,
-            *sender_address,
-            nonce,
-            expiry,
-            energy,
+            signer,
+            transaction_metadata.sender_address,
+            transaction_metadata.nonce,
+            transaction_metadata.expiry,
+            transaction_metadata.energy,
             payload,
         );
         let bi = transactions::BlockItem::AccountTransaction(tx);
@@ -150,16 +206,26 @@ impl Cis2Contract {
         Ok(hash)
     }
 
-    /// Invoke CIS2 balanceOf.
+    /// Invoke the CIS2 balanceOf query given a list of BalanceOfQuery.
+    ///
+    /// Note: the query is executed locally by the node and does not produce a
+    /// transaction on-chain.
+    ///
+    /// # Arguments
+    ///
+    /// * `block_hash` - The hash of the block to locally execute the query
+    ///   after.
+    /// * `queries` - A list queries to execute.
     pub async fn balance_of(
-        mut self,
+        &mut self,
         block_hash: &sdk_types::hashes::BlockHash,
         queries: Vec<BalanceOfQuery>,
     ) -> Result<BalanceOfQueryResponse, Cis2QueryError> {
         let parameter = BalanceOfQueryParams::from(queries);
         let bytes = concordium_contracts_common::to_bytes(&parameter);
+        let contract_name = self.contract_name.contract_name();
         let receive_name =
-            smart_contracts::ReceiveName::try_from(format!("{}.balanceOf", self.contract_name))?;
+            smart_contracts::ReceiveName::try_from(format!("{}.balanceOf", contract_name))?;
 
         let contract_context = smart_contracts::ContractContext {
             invoker:   None,
@@ -167,7 +233,7 @@ impl Cis2Contract {
             amount:    common::types::Amount::from(0),
             method:    receive_name,
             parameter: smart_contracts::Parameter::from(bytes),
-            energy:    sdk_types::Energy::from(10_000_000),
+            energy:    smart_contracts::MAX_ALLOWED_INVOKE_ENERGY,
         };
 
         let invoke_result = self
@@ -188,16 +254,26 @@ impl Cis2Contract {
         }
     }
 
-    /// Invoke CIS2 operatorOf.
+    /// Invoke the CIS2 operatorOf query given a list of OperatorOfQuery.
+    ///
+    /// Note: the query is executed locally by the node and does not produce a
+    /// transaction on-chain.
+    ///
+    /// # Arguments
+    ///
+    /// * `block_hash` - The hash of the block to locally execute the query
+    ///   after.
+    /// * `queries` - A list queries to execute.
     pub async fn operator_of(
-        mut self,
+        &mut self,
         block_hash: &sdk_types::hashes::BlockHash,
         queries: Vec<OperatorOfQuery>,
     ) -> Result<OperatorOfQueryResponse, Cis2QueryError> {
         let parameter = OperatorOfQueryParams::from(queries);
         let bytes = concordium_contracts_common::to_bytes(&parameter);
+        let contract_name = self.contract_name.contract_name();
         let receive_name =
-            smart_contracts::ReceiveName::try_from(format!("{}.operatorOf", self.contract_name))?;
+            smart_contracts::ReceiveName::try_from(format!("{}.operatorOf", contract_name))?;
 
         let contract_context = smart_contracts::ContractContext {
             invoker:   None,
@@ -205,7 +281,7 @@ impl Cis2Contract {
             amount:    common::types::Amount::from(0),
             method:    receive_name,
             parameter: smart_contracts::Parameter::from(bytes),
-            energy:    sdk_types::Energy::from(10_000_000),
+            energy:    smart_contracts::MAX_ALLOWED_INVOKE_ENERGY,
         };
 
         let invoke_result = self
@@ -226,18 +302,26 @@ impl Cis2Contract {
         }
     }
 
-    /// Invoke CIS2 tokenMetadata.
+    /// Invoke the CIS2 tokenMetadata query given a list of CIS2 TokenIds.
+    ///
+    /// Note: the query is executed locally by the node and does not produce a
+    /// transaction on-chain.
+    ///
+    /// # Arguments
+    ///
+    /// * `block_hash` - The hash of the block to locally execute the query
+    ///   after.
+    /// * `queries` - A list queries to execute.
     pub async fn token_metadata(
-        mut self,
+        &mut self,
         block_hash: &sdk_types::hashes::BlockHash,
         queries: Vec<TokenIdVec>,
     ) -> Result<TokenMetadataQueryResponse, Cis2QueryError> {
         let parameter = TokenMetadataQueryParams::from(queries);
         let bytes = concordium_contracts_common::to_bytes(&parameter);
-        let receive_name = smart_contracts::ReceiveName::try_from(format!(
-            "{}.tokenMetadata",
-            self.contract_name
-        ))?;
+        let contract_name = self.contract_name.contract_name();
+        let receive_name =
+            smart_contracts::ReceiveName::try_from(format!("{}.tokenMetadata", contract_name))?;
 
         let contract_context = smart_contracts::ContractContext {
             invoker:   None,
@@ -245,7 +329,7 @@ impl Cis2Contract {
             amount:    common::types::Amount::from(0),
             method:    receive_name,
             parameter: smart_contracts::Parameter::from(bytes),
-            energy:    sdk_types::Energy::from(10_000_000),
+            energy:    smart_contracts::MAX_ALLOWED_INVOKE_ENERGY,
         };
 
         let invoke_result = self

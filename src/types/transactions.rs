@@ -2676,6 +2676,7 @@ pub mod send {
             .sign(signer)
     }
 
+    #[derive(Debug, Copy, Clone)]
     pub enum GivenEnergy {
         /// Use this exact amount of energy.
         Absolute(Energy),

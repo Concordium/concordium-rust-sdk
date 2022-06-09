@@ -355,6 +355,9 @@ pub struct ContractContext {
 }
 
 pub const DEFAULT_INVOKE_ENERGY: Energy = Energy { energy: 10_000_000 };
+pub const MAX_ALLOWED_INVOKE_ENERGY: Energy = Energy {
+    energy: 100_000_000_000,
+};
 
 impl ContractContext {
     /// Construct a minimal context with defaults for omitted values. The
