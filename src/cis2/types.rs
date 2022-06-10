@@ -1,12 +1,25 @@
-use crate::types::smart_contracts::concordium_contracts_common::{
-    deserial_vector_no_length, serial_vector_no_length, AccountAddress, Address, ContractAddress,
-    Deserial, OwnedReceiveName, ParseError, Read, Serial, Write,
+//! This module contains types and their implementations related to the CIS-2
+//! token standard.
+
+use crate::types::{
+    hashes::Hash,
+    smart_contracts::concordium_contracts_common::{
+        deserial_vector_no_length, serial_vector_no_length, AccountAddress, Address,
+        ContractAddress, Deserial, OwnedReceiveName, ParseError, Read, Serial, Write,
+    },
 };
 use derive_more::{AsRef, Display, From};
 use std::{convert::TryFrom, fmt::Display, ops, str::FromStr};
 use thiserror::*;
 
+/// CIS-2 token amount wrapper for u64 with serialization as according to CIS-2.
+///
+/// According to the CIS-2 specification a token amount can be in the range from
+/// 0 to 2^256 - 1. However, not every token require such an amount and using
+/// u64 can be more efficient. This type is a specialisation of the token amount
+/// and will fail when deserializing token amounts larger then `u64::MAX`.
 #[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, From)]
+#[repr(transparent)]
 pub struct TokenAmountU64(pub u64);
 
 pub type TokenAmount = TokenAmountU64;
@@ -490,15 +503,13 @@ impl Deserial for TokenMetadataQueryResponse {
     }
 }
 
-type Sha256 = [u8; 32];
-
 /// A URL for the metadata.
 #[derive(Debug, Clone)]
 pub struct MetadataUrl {
     /// The url encoded according to CIS2.
     pub url:  String,
     /// An optional checksum of the content found at the URL.
-    pub hash: Option<Sha256>,
+    pub hash: Option<Hash>,
 }
 
 /// Deserialization for MetadataUrl according to the CIS2 specification.
@@ -510,7 +521,7 @@ impl Deserial for MetadataUrl {
             bytes.push(source.read_u8()?)
         }
         let url = String::from_utf8(bytes)?;
-        let hash = Option::<Sha256>::deserial(source)?;
+        let hash = Option::<[u8; 32]>::deserial(source)?.map(|b| b.into());
         Ok(MetadataUrl { url, hash })
     }
 }
@@ -581,7 +592,7 @@ pub enum Event {
     Unknown,
 }
 
-fn display_hash(hash_opt: Option<Sha256>) -> String {
+fn display_hash(hash_opt: Option<Hash>) -> String {
     if let Some(hash) = hash_opt {
         format!("with hash {}", hex::encode(hash))
     } else {
