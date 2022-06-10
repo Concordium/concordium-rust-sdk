@@ -9,102 +9,108 @@ use crate::types::{
     },
 };
 use derive_more::{AsRef, Display, From};
-use std::{convert::TryFrom, fmt::Display, ops, str::FromStr};
+use num::ToPrimitive;
+use num_bigint::BigUint;
+use num_traits::Zero;
+use std::{convert::TryFrom, ops, str::FromStr};
 use thiserror::*;
 
-/// CIS-2 token amount wrapper for u64 with serialization as according to CIS-2.
+/// CIS-2 token amount with serialization as according to CIS-2.
 ///
 /// According to the CIS-2 specification a token amount can be in the range from
-/// 0 to 2^256 - 1. However, not every token require such an amount and using
-/// u64 can be more efficient. This type is a specialisation of the token amount
-/// and will fail when deserializing token amounts larger then `u64::MAX`.
-#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, From)]
-#[repr(transparent)]
-pub struct TokenAmountU64(pub u64);
+/// 0 to 2^256 - 1.
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, From, Display)]
+pub struct TokenAmount(pub BigUint);
 
-pub type TokenAmount = TokenAmountU64;
-
-impl From<TokenAmountU64> for u64 {
-    fn from(v: TokenAmountU64) -> u64 { v.0 }
+impl From<TokenAmount> for BigUint {
+    fn from(v: TokenAmount) -> BigUint { v.0 }
 }
 
-impl Display for TokenAmountU64 {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.0)?;
-        Ok(())
-    }
+impl From<u8> for TokenAmount {
+    fn from(v: u8) -> TokenAmount { TokenAmount(v.into()) }
 }
 
-impl ops::Add<Self> for TokenAmountU64 {
+impl From<u16> for TokenAmount {
+    fn from(v: u16) -> TokenAmount { TokenAmount(v.into()) }
+}
+
+impl From<u32> for TokenAmount {
+    fn from(v: u32) -> TokenAmount { TokenAmount(v.into()) }
+}
+
+impl From<u64> for TokenAmount {
+    fn from(v: u64) -> TokenAmount { TokenAmount(v.into()) }
+}
+
+impl ops::Add<Self> for TokenAmount {
     type Output = Self;
 
-    fn add(self, rhs: Self) -> Self::Output { TokenAmountU64(self.0 + rhs.0) }
+    fn add(self, rhs: Self) -> Self::Output { TokenAmount(self.0 + rhs.0) }
 }
 
-impl ops::AddAssign for TokenAmountU64 {
-    fn add_assign(&mut self, other: Self) { *self = *self + other; }
+impl ops::AddAssign for TokenAmount {
+    fn add_assign(&mut self, other: Self) { self.0 += other.0 }
 }
 
-impl ops::Sub<Self> for TokenAmountU64 {
+impl ops::Sub<Self> for TokenAmount {
     type Output = Self;
 
-    fn sub(self, rhs: Self) -> Self::Output { TokenAmountU64(self.0 - rhs.0) }
+    fn sub(self, rhs: Self) -> Self::Output { TokenAmount(self.0 - rhs.0) }
 }
 
-impl ops::SubAssign for TokenAmountU64 {
-    fn sub_assign(&mut self, other: Self) { *self = *self - other; }
+impl ops::SubAssign for TokenAmount {
+    fn sub_assign(&mut self, other: Self) { self.0 -= other.0 }
 }
 
-impl ops::Mul<Self> for TokenAmountU64 {
+impl ops::Mul<Self> for TokenAmount {
     type Output = Self;
 
-    fn mul(self, rhs: Self) -> Self::Output { TokenAmountU64(self.0 * rhs.0) }
+    fn mul(self, rhs: Self) -> Self::Output { TokenAmount(self.0 * rhs.0) }
 }
 
-impl ops::MulAssign for TokenAmountU64 {
-    fn mul_assign(&mut self, other: Self) { *self = *self * other; }
+impl ops::MulAssign for TokenAmount {
+    fn mul_assign(&mut self, other: Self) { self.0 *= other.0 }
 }
 
-impl ops::Div<Self> for TokenAmountU64 {
+impl ops::Div<Self> for TokenAmount {
     type Output = Self;
 
-    fn div(self, rhs: Self) -> Self::Output { TokenAmountU64(self.0 / rhs.0) }
+    fn div(self, rhs: Self) -> Self::Output { TokenAmount(self.0 / rhs.0) }
 }
 
-impl ops::DivAssign for TokenAmountU64 {
-    fn div_assign(&mut self, other: Self) { *self = *self / other; }
+impl ops::DivAssign for TokenAmount {
+    fn div_assign(&mut self, other: Self) { self.0 /= other.0 }
 }
 
-impl Serial for TokenAmountU64 {
+impl Serial for TokenAmount {
     fn serial<W: Write>(&self, out: &mut W) -> Result<(), W::Err> {
-        let mut value = self.0;
-        loop {
-            let mut byte = (value as u8) & 0b0111_1111;
+        let mut value = self.0.clone();
+        for _ in 0..37 {
+            let mut byte = (value.clone() % BigUint::from(128u8)).to_u8().unwrap(); // Safe to unwrap since we have truncated
             value >>= 7;
-            if value != 0 {
+            if !value.is_zero() {
                 byte |= 0b1000_0000;
             }
             out.write_u8(byte)?;
 
-            if value == 0 {
+            if value.is_zero() {
                 return Ok(());
             }
         }
+        Err(W::Err::default())
     }
 }
 
-impl Deserial for TokenAmountU64 {
+impl Deserial for TokenAmount {
     fn deserial<R: Read>(source: &mut R) -> concordium_contracts_common::ParseResult<Self> {
-        let mut result = 0u64;
+        let mut result = BigUint::zero();
         for i in 0..37 {
             let byte = source.read_u8()?;
-            let value_byte = (byte & 0b0111_1111) as u64;
-            result = result
-                .checked_add(value_byte << (i * 7))
-                .ok_or(concordium_contracts_common::ParseError {})?;
+            let value_byte = BigUint::from(byte & 0b0111_1111);
+            result += value_byte << (i * 7);
 
             if byte & 0b1000_0000 == 0 {
-                return Ok(TokenAmountU64(result));
+                return Ok(TokenAmount::from(result));
             }
         }
         Err(concordium_contracts_common::ParseError {})
@@ -120,7 +126,7 @@ pub struct TokenIdVec(pub Vec<u8>);
 pub enum ParseTokenIdVecError {
     #[error("Invalid hex string: {0}")]
     ParseIntError(#[from] hex::FromHexError),
-    #[error("Token ID too large. Maximum allowed size is 255 bytes. {0} bytes was provided.")]
+    #[error("Token ID too large. Maximum allowed size is 255 bytes. {0} bytes were provided.")]
     TooManyBytes(usize),
 }
 
@@ -141,7 +147,9 @@ impl FromStr for TokenIdVec {
 /// Display the token ID as a hex string.
 impl std::fmt::Display for TokenIdVec {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", hex::encode(&self.0))?;
+        for b in &self.0 {
+            write!(f, "{:02x}", b)?;
+        }
         Ok(())
     }
 }
@@ -168,26 +176,18 @@ impl Deserial for TokenIdVec {
 #[derive(Debug, PartialEq, Eq, Error)]
 pub enum Cis2ErrorRejectReason {
     /// Invalid token id (Error code: -42000001).
+    #[error("Invalid token ID")]
     InvalidTokenId,
     /// The balance of the token owner is insufficient for the transfer (Error
     /// code: -42000002).
+    #[error("Insufficient funds for the transfer")]
     InsufficientFunds,
     /// Sender is unauthorized to call this function (Error code: -42000003).
+    #[error("Sender is unauthorized to call this function")]
     Unauthorized,
     /// Unknown error code for CIS2.
+    #[error("Non-CIS2 error code: {0}")]
     Other(i32),
-}
-
-impl std::fmt::Display for Cis2ErrorRejectReason {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use Cis2ErrorRejectReason::*;
-        match self {
-            InvalidTokenId => write!(f, "Invalid token ID"),
-            InsufficientFunds => write!(f, "Insufficient funds for the transfer"),
-            Unauthorized => write!(f, "Sender is unauthorized to call this function"),
-            Other(e) => write!(f, "Non-CIS2 error code: {}", e),
-        }
-    }
 }
 
 /// Convert Cis2Error into a reject with error code:
@@ -205,8 +205,8 @@ impl From<i32> for Cis2ErrorRejectReason {
     }
 }
 
-/// Additional data bytes which can be included for each transfer in the
-/// transfer parameter for the CIS2 contract function "transfer".
+/// Additional data which can be included for each transfer in the
+/// transfer parameter for the CIS2 contract function `transfer`.
 #[derive(Debug, Clone, From, AsRef)]
 pub struct AdditionalData {
     pub data: Vec<u8>,
@@ -233,9 +233,9 @@ impl FromStr for AdditionalData {
     }
 }
 
-/// Address to receive an amount of tokens, it differs by the Address type by
-/// additionally requiring a contract receive function name when the address is
-/// a contract address.
+/// Address to receive an amount of tokens, it differs from the [`Address`] type
+/// by additionally requiring a contract receive function name when the address
+/// is a contract address.
 #[derive(Debug, Clone)]
 pub enum Receiver {
     Account(AccountAddress),
@@ -264,7 +264,7 @@ pub struct Transfer {
     /// The ID of the token type to transfer.
     pub token_id: TokenIdVec,
     /// The amount of tokens to transfer.
-    pub amount:   TokenAmountU64,
+    pub amount:   TokenAmount,
     /// The address currently owning the tokens being transferred.
     pub from:     Address,
     /// The receiver for the tokens being transferred.
