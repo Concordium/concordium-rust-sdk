@@ -118,34 +118,51 @@ impl Deserial for TokenAmount {
 }
 
 /// CIS2 Token ID can be up to 255 bytes in size.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub struct TokenIdVec(pub Vec<u8>);
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, AsRef)]
+pub struct TokenId(Vec<u8>);
+
+/// Error for constructing a new [`TokenId`](TokenId).
+#[derive(Debug, PartialEq, Eq, Error)]
+#[error("Token ID too large. Maximum allowed size is 255 bytes. {0} bytes were provided.")]
+pub struct NewTokenIdError(usize);
+
+impl TokenId {
+    /// Construct a new TokenId.
+    /// Ensures the length of the provided bytes are within `u8::MAX`.
+    pub fn new(bytes: Vec<u8>) -> Result<Self, NewTokenIdError> {
+        if bytes.len() > u8::MAX.into() {
+            return Err(NewTokenIdError(bytes.len()));
+        }
+        Ok(TokenId(bytes))
+    }
+
+    /// Construct a new TokenId.
+    /// Without ensuring the length of the provided bytes are within `u8::MAX`.
+    pub fn new_unchecked(bytes: Vec<u8>) -> Self { TokenId(bytes) }
+}
 
 /// Error from parsing a token ID bytes from a hex encoded string.
 #[derive(Debug, Error)]
 pub enum ParseTokenIdVecError {
     #[error("Invalid hex string: {0}")]
     ParseIntError(#[from] hex::FromHexError),
-    #[error("Token ID too large. Maximum allowed size is 255 bytes. {0} bytes were provided.")]
-    TooManyBytes(usize),
+    #[error("Invalid token ID: {0}")]
+    InvalidTokenId(#[from] NewTokenIdError),
 }
 
 /// Parse a Token ID from a hex encoded string.
-impl FromStr for TokenIdVec {
+impl FromStr for TokenId {
     type Err = ParseTokenIdVecError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let bytes = hex::decode(s)?;
-        if bytes.len() > 255 {
-            Err(ParseTokenIdVecError::TooManyBytes(bytes.len()))
-        } else {
-            Ok(TokenIdVec(bytes))
-        }
+        let token_id = TokenId::new(bytes)?;
+        Ok(token_id)
     }
 }
 
 /// Display the token ID as a hex string.
-impl std::fmt::Display for TokenIdVec {
+impl std::fmt::Display for TokenId {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for b in &self.0 {
             write!(f, "{:02x}", b)?;
@@ -155,7 +172,7 @@ impl std::fmt::Display for TokenIdVec {
 }
 
 /// Serialize the token ID according to CIS2 specification.
-impl Serial for TokenIdVec {
+impl Serial for TokenId {
     fn serial<W: Write>(&self, out: &mut W) -> Result<(), W::Err> {
         let len = u8::try_from(self.0.len()).map_err(|_| W::Err::default())?;
         len.serial(out)?;
@@ -164,11 +181,11 @@ impl Serial for TokenIdVec {
 }
 
 /// Deserialize bytes to a Token ID according to CIS2 specification.
-impl Deserial for TokenIdVec {
+impl Deserial for TokenId {
     fn deserial<R: Read>(source: &mut R) -> Result<Self, ParseError> {
         let tokens_id_length = u8::deserial(source)?;
         let bytes = deserial_vector_no_length(source, tokens_id_length.into())?;
-        Ok(TokenIdVec(bytes))
+        Ok(TokenId(bytes))
     }
 }
 
@@ -294,7 +311,7 @@ impl Serial for Receiver {
 #[derive(Debug)]
 pub struct Transfer {
     /// The ID of the token type to transfer.
-    pub token_id: TokenIdVec,
+    pub token_id: TokenId,
     /// The amount of tokens to transfer.
     pub amount:   TokenAmount,
     /// The address currently owning the tokens being transferred.
@@ -443,7 +460,7 @@ impl Serial for UpdateOperatorParams {
 #[derive(Debug, Clone)]
 pub struct BalanceOfQuery {
     /// The ID of the token for which to query the balance of.
-    pub token_id: TokenIdVec,
+    pub token_id: TokenId,
     /// The address for which to query the balance of.
     pub address:  Address,
 }
@@ -632,7 +649,7 @@ impl Deserial for OperatorOfQueryResponse {
 }
 
 /// A query for token metadata for a given token.
-pub type TokenMetadataQuery = TokenIdVec;
+pub type TokenMetadataQuery = TokenId;
 
 /// The parameter type for the NFT contract function `CIS2-NFT.operatorOf`.
 #[derive(Debug, Clone, From, AsRef)]
@@ -772,7 +789,7 @@ pub enum Event {
         "display_address(to)"
     )]
     Transfer {
-        token_id: TokenIdVec,
+        token_id: TokenId,
         amount:   TokenAmount,
         from:     Address,
         to:       Address,
@@ -784,7 +801,7 @@ pub enum Event {
         "display_address(owner)"
     )]
     Mint {
-        token_id: TokenIdVec,
+        token_id: TokenId,
         amount:   TokenAmount,
         owner:    Address,
     },
@@ -795,7 +812,7 @@ pub enum Event {
         "display_address(owner)"
     )]
     Burn {
-        token_id: TokenIdVec,
+        token_id: TokenId,
         amount:   TokenAmount,
         owner:    Address,
     },
@@ -819,7 +836,7 @@ pub enum Event {
         token_id
     )]
     TokenMetadata {
-        token_id:     TokenIdVec,
+        token_id:     TokenId,
         metadata_url: MetadataUrl,
     },
     /// Custom event outside of the CIS2 specification.
@@ -841,18 +858,18 @@ impl Deserial for Event {
         let discriminant = u8::deserial(source)?;
         match discriminant {
             0 => Ok(Event::Transfer {
-                token_id: TokenIdVec::deserial(source)?,
+                token_id: TokenId::deserial(source)?,
                 amount:   TokenAmount::deserial(source)?,
                 from:     Address::deserial(source)?,
                 to:       Address::deserial(source)?,
             }),
             1 => Ok(Event::Mint {
-                token_id: TokenIdVec::deserial(source)?,
+                token_id: TokenId::deserial(source)?,
                 amount:   TokenAmount::deserial(source)?,
                 owner:    Address::deserial(source)?,
             }),
             2 => Ok(Event::Burn {
-                token_id: TokenIdVec::deserial(source)?,
+                token_id: TokenId::deserial(source)?,
                 amount:   TokenAmount::deserial(source)?,
                 owner:    Address::deserial(source)?,
             }),
@@ -862,7 +879,7 @@ impl Deserial for Event {
                 operator: Address::deserial(source)?,
             }),
             4 => Ok(Event::TokenMetadata {
-                token_id:     TokenIdVec::deserial(source)?,
+                token_id:     TokenId::deserial(source)?,
                 metadata_url: MetadataUrl::deserial(source)?,
             }),
             _ => Ok(Event::Unknown),

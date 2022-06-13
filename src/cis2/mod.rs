@@ -347,7 +347,7 @@ impl Cis2Contract {
     pub async fn token_metadata(
         &mut self,
         block_hash: &sdk_types::hashes::BlockHash,
-        queries: Vec<TokenIdVec>,
+        queries: Vec<TokenId>,
     ) -> Result<TokenMetadataQueryResponse, Cis2QueryError> {
         let parameter = TokenMetadataQueryParams::new(queries)?;
         let bytes = concordium_contracts_common::to_bytes(&parameter);
