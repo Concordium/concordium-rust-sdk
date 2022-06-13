@@ -13,11 +13,11 @@ use std::convert::{From, TryFrom};
 use thiserror::*;
 pub use types::*;
 
-/// A wrapper around the client representing a CIS2 token smart contract and
+/// A wrapper around the client representing a CIS2 token smart contract, which 
 /// provides functions for interaction.
 ///
-/// Note that cloning is cheap and is therefore the intended way of sharing
-/// between multiple tasks.
+/// Note that cloning is cheap and is, therefore, the intended way of sharing
+/// this type between multiple tasks.
 #[derive(Debug, Clone)]
 pub struct Cis2Contract<'a> {
     client:        Client,
@@ -25,7 +25,7 @@ pub struct Cis2Contract<'a> {
     contract_name: concordium_contracts_common::ContractName<'a>,
 }
 
-/// Error which can occur when submitting a transaction such as `tranfer` and
+/// Error which can occur when submitting a transaction such as `transfer` and
 /// `updateOperator` to a CIS2 smart contract.
 #[derive(Debug, Error)]
 pub enum Cis2TransactionError {
@@ -261,8 +261,7 @@ impl<'a> Cis2Contract<'a> {
     ///
     /// # Arguments
     ///
-    /// * `block_hash` - The hash of the block to locally execute the query
-    ///   after.
+    /// * `block_hash` - Hash of a block. The query will be executed in the state of the chain at the end of the block.
     /// * `queries` - A list queries to execute.
     pub async fn operator_of(
         &mut self,

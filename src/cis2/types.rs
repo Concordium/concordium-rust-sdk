@@ -17,7 +17,7 @@ use thiserror::*;
 
 /// CIS-2 token amount with serialization as according to CIS-2.
 ///
-/// According to the CIS-2 specification a token amount can be in the range from
+/// According to the CIS-2 specification, a token amount can be in the range from
 /// 0 to 2^256 - 1.
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, From, Display)]
 pub struct TokenAmount(pub BigUint);
@@ -191,9 +191,9 @@ pub enum Cis2ErrorRejectReason {
 }
 
 /// Convert Cis2Error into a reject with error code:
-/// - InvalidTokenId: -42000001
-/// - InsufficientFunds: -42000002
-/// - Unauthorized: -42000003
+/// - [`InvalidTokenId`](Cis2ErrorRejectReason::InvalidTokenId): `-42000001`
+/// - [`InsufficientFunds`](Cis2ErrorRejectReason::InsufficientFunds): `-42000002`
+/// - [`Unauthorized`](Cis2ErrorRejectReason::Unauthorized): `-42000003`
 impl From<i32> for Cis2ErrorRejectReason {
     fn from(error_code: i32) -> Self {
         match error_code {
@@ -269,7 +269,7 @@ pub struct Transfer {
     pub from:     Address,
     /// The receiver for the tokens being transferred.
     pub to:       Receiver,
-    /// Additional data to include for the transfer
+    /// Additional data to include for the transfer.
     pub data:     AdditionalData,
 }
 
@@ -452,7 +452,7 @@ impl Serial for OperatorOfQueryParams {
 
 /// The response which is sent back when calling the contract function
 /// `operatorOf`.
-/// It consists of the list of result in the same order and length as the
+/// It consists of the list of results in the same order and length as the
 /// queries in the parameter.
 #[derive(Debug, Clone, From, AsRef)]
 pub struct OperatorOfQueryResponse(pub Vec<bool>);
