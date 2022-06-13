@@ -20,7 +20,7 @@ use thiserror::*;
 /// According to the CIS-2 specification, a token amount can be in the range
 /// from 0 to 2^256 - 1.
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, From, Display)]
-pub struct TokenAmount(pub BigUint);
+pub struct TokenAmount(BigUint);
 
 impl From<TokenAmount> for BigUint {
     fn from(v: TokenAmount) -> BigUint { v.0 }
@@ -893,5 +893,21 @@ fn display_address(a: &Address) -> String {
     match a {
         Address::Account(addr) => format!("{}", addr),
         Address::Contract(addr) => format!("{}", addr),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::types::smart_contracts::concordium_contracts_common::{from_bytes, to_bytes};
+
+    #[test]
+    fn test_serialize_token_amount() {
+        for n in (0..1000).map(|i: u64| i.pow(3)) {
+            let amount = TokenAmount::from(n);
+            let bytes = to_bytes(&amount);
+            let new_amount = from_bytes(&bytes).expect("Failed to deserialize amount");
+            assert_eq!(amount, new_amount)
+        }
     }
 }
