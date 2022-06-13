@@ -160,8 +160,13 @@ async fn crawl_and_save_test_cases() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Validates whether the schema generated for the type `T` is valid according
+/// to the Json Schema Draft 7 specification.
 fn validate_schema<T: JsonSchema>(schema_name: &str) {
     let schema = schemars::schema_for!(T);
     let schema_json = serde_json::value::to_value(schema).expect("Schema should be valid JSON");
-    let res = JSONSchema::compile(&schema_json).expect(&format!("{} is not valid", schema_name));
+    JSONSchema::options()
+        .with_draft(jsonschema::Draft::Draft7)
+        .compile(&schema_json)
+        .expect(&format!("{} is not valid", schema_name));
 }

@@ -139,7 +139,7 @@ pub(crate) mod duration_millis {
 pub(crate) struct HexSchema;
 
 impl schemars::JsonSchema for HexSchema {
-    fn schema_name() -> String { "Hex string".into() }
+    fn schema_name() -> String { "HexString".into() }
 
     fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::*;
