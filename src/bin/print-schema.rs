@@ -11,7 +11,9 @@ use concordium_rust_sdk::{
     *,
 };
 use id::types::{AccountAddress, ArInfo, GlobalContext, IpInfo};
+use jsonschema::JSONSchema;
 use schemars::JsonSchema;
+use serde_json::json;
 use std::fs;
 
 const SCHEMA_FOLDER: &str = "schemas";
@@ -20,8 +22,38 @@ const TEST_CASE_FOLDER: &str = "test_cases";
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
     // generate_and_write_schemas();
-    crawl_and_save_test_cases().await;
+    // crawl_and_save_test_cases().await;
+    validate_all_schemas();
     Ok(())
+}
+
+fn validate_all_schemas() {
+    validate_schema::<TransactionStatusInBlock>("GetTransactionStatusInBlock");
+    validate_schema::<TransactionStatus>("GetTransactionStatus");
+    validate_schema::<ConsensusInfo>("GetConsensusInfo");
+    validate_schema::<BlockInfo>("GetBlockInfo");
+    validate_schema::<BlockSummary>("GetBlockSummary");
+    // GetBlocksAtHeight (Omitted)
+    validate_schema::<Vec<AccountAddress>>("GetAccountList");
+    validate_schema::<Vec<ContractAddress>>("GetInstances");
+    validate_schema::<AccountInfo>("GetAccountInfo");
+    validate_schema::<Vec<TransactionHash>>("GetAccountNonFinalized");
+    validate_schema::<AccountNonceResponse>("GetNextAccountNonce");
+    validate_schema::<InstanceInfo>("GetInstanceInfo");
+    // InvokeContract (Omitted)
+    validate_schema::<PoolStatus>("GetPoolStatus");
+    validate_schema::<Vec<BakerId>>("GetBakerList");
+    validate_schema::<RewardsOverview>("GetRewardStatus");
+    validate_schema::<BirkParameters>("GetBirkParameters");
+    validate_schema::<Vec<ModuleRef>>("GetModuleList");
+    // GetNodeInfo..GetAncestors (Omitted)
+    validate_schema::<Branch>("GetBranches");
+    // GetBannedPeers..DumpStop (Omitted)
+    validate_schema::<Vec<IpInfo<wrappers::WrappedPairing>>>("GetIdentityProviders");
+    validate_schema::<Vec<ArInfo<wrappers::WrappedCurve>>>("GetAnonymityRevokers");
+    validate_schema::<Versioned<GlobalContext<wrappers::WrappedCurve>>>(
+        "GetCryptographicParameters",
+    );
 }
 
 fn generate_and_write_schemas() {
@@ -126,4 +158,10 @@ async fn crawl_and_save_test_cases() -> anyhow::Result<()> {
         cb = bi.block_parent;
     }
     Ok(())
+}
+
+fn validate_schema<T: JsonSchema>(schema_name: &str) {
+    let schema = schemars::schema_for!(T);
+    let schema_json = serde_json::value::to_value(schema).expect("Schema should be valid JSON");
+    let res = JSONSchema::compile(&schema_json).expect(&format!("{} is not valid", schema_name));
 }
