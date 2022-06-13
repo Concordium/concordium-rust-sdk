@@ -9,20 +9,23 @@ mod types;
 use crate::{common, endpoints::Client, id, types as sdk_types};
 use sdk_types::{smart_contracts, transactions, ContractAddress};
 use smart_contracts::concordium_contracts_common;
-use std::convert::{From, TryFrom};
+use std::{
+    convert::{From, TryFrom},
+    sync::Arc,
+};
 use thiserror::*;
 pub use types::*;
 
-/// A wrapper around the client representing a CIS2 token smart contract, which 
+/// A wrapper around the client representing a CIS2 token smart contract, which
 /// provides functions for interaction.
 ///
 /// Note that cloning is cheap and is, therefore, the intended way of sharing
 /// this type between multiple tasks.
 #[derive(Debug, Clone)]
-pub struct Cis2Contract<'a> {
+pub struct Cis2Contract {
     client:        Client,
     address:       ContractAddress,
-    contract_name: concordium_contracts_common::ContractName<'a>,
+    contract_name: Arc<concordium_contracts_common::OwnedContractName>,
 }
 
 /// Error which can occur when submitting a transaction such as `transfer` and
@@ -31,16 +34,27 @@ pub struct Cis2Contract<'a> {
 pub enum Cis2TransactionError {
     /// The smart contract receive name is invalid.
     #[error("Invalid receive name: {0}")]
-    InvalidContractName(concordium_contracts_common::NewReceiveNameError),
+    InvalidReceiveName(concordium_contracts_common::NewReceiveNameError),
+
+    /// The parameter for `transfer` is invalid.
+    #[error("Invalid transfer parameter: {0}")]
+    InvalidTransferParams(#[from] NewTransferParamsError),
+
+    /// The parameter for `updateOperator` is invalid.
+    #[error("Invalid updateOperator parameter: {0}")]
+    InvalidUpdateOperatorParams(#[from] NewUpdateOperatorParamsError),
 
     /// A general RPC error occured.
     #[error("RPC error: {0}")]
     RPCError(#[from] crate::endpoints::RPCError),
 }
 
+// This is implemented manually, since deriving it using thiserror requires
+// `concordium_contracts_common::NewReceiveNameError` to implement
+// std::error::Error.
 impl From<concordium_contracts_common::NewReceiveNameError> for Cis2TransactionError {
     fn from(err: concordium_contracts_common::NewReceiveNameError) -> Self {
-        Self::InvalidContractName(err)
+        Self::InvalidReceiveName(err)
     }
 }
 
@@ -50,31 +64,50 @@ impl From<concordium_contracts_common::NewReceiveNameError> for Cis2TransactionE
 pub enum Cis2QueryError {
     /// The smart contract receive name is invalid.
     #[error("Invalid receive name: {0}")]
-    InvalidContractName(concordium_contracts_common::NewReceiveNameError),
+    InvalidReceiveName(concordium_contracts_common::NewReceiveNameError),
+
+    /// The parameter for `balanceOf` is invalid.
+    #[error("Invalid balanceOf parameter: {0}")]
+    InvalidBalanceOfParams(#[from] NewBalanceOfQueryParamsError),
+
+    /// The parameter for `operatorOf` is invalid.
+    #[error("Invalid operatorOf parameter: {0}")]
+    InvalidOperatorOfParams(#[from] NewOperatorOfQueryParamsError),
+
+    /// The parameter for `tokenMetadata` is invalid.
+    #[error("Invalid tokenMetadata parameter: {0}")]
+    InvalidTokenMetadataParams(#[from] NewTokenMetadataQueryParamsError),
 
     /// A general RPC error occured.
     #[error("RPC error: {0}")]
     RPCError(#[from] crate::endpoints::RPCError),
 
     /// The returned bytes from invoking the smart contract could not be parsed.
-    #[error("Failed parsing the response")]
+    #[error("Failed parsing the response.")]
     ResponseParseError(concordium_contracts_common::ParseError),
 
     /// The node rejected the invocation.
-    #[error("Rejected by the node")]
+    #[error("Rejected by the node.")]
     NodeRejected(sdk_types::RejectReason),
 }
 
+// This is implemented manually, since deriving it using thiserror requires
+// `concordium_contracts_common::NewReceiveNameError` to implement
+// std::error::Error.
 impl From<concordium_contracts_common::NewReceiveNameError> for Cis2QueryError {
     fn from(err: concordium_contracts_common::NewReceiveNameError) -> Self {
-        Self::InvalidContractName(err)
+        Self::InvalidReceiveName(err)
     }
 }
 
+// This is implemented manually, since deriving it using thiserror requires
+// `concordium_contracts_common::ParseError` to implement std::error::Error.
 impl From<concordium_contracts_common::ParseError> for Cis2QueryError {
     fn from(err: concordium_contracts_common::ParseError) -> Self { Self::ResponseParseError(err) }
 }
 
+// This is implemented manually, since deriving it using thiserror requires
+// `RejectReason` to implement std::error::Error.
 impl From<sdk_types::RejectReason> for Cis2QueryError {
     fn from(err: sdk_types::RejectReason) -> Self { Self::NodeRejected(err) }
 }
@@ -94,7 +127,7 @@ pub struct Cis2TransactionMetadata {
     pub amount:         common::types::Amount,
 }
 
-impl<'a> Cis2Contract<'a> {
+impl Cis2Contract {
     /// Construct a Cis2Contract.
     ///
     /// # Arguments
@@ -107,12 +140,12 @@ impl<'a> Cis2Contract<'a> {
     pub fn new(
         client: Client,
         address: ContractAddress,
-        contract_name: concordium_contracts_common::ContractName,
+        contract_name: concordium_contracts_common::OwnedContractName,
     ) -> Cis2Contract {
         Cis2Contract {
             client,
             address,
-            contract_name,
+            contract_name: Arc::new(contract_name),
         }
     }
 
@@ -126,16 +159,15 @@ impl<'a> Cis2Contract<'a> {
     ///   update transaction.
     /// * `transaction_metadata` - Metadata for constructing the transaction.
     /// * `transfers` - A list of CIS2 token transfers to execute.
-    #[allow(clippy::too_many_arguments)]
     pub async fn transfer(
         &mut self,
         signer: &impl transactions::ExactSizeTransactionSigner,
         transaction_metadata: Cis2TransactionMetadata,
         transfers: Vec<Transfer>,
     ) -> Result<sdk_types::hashes::TransactionHash, Cis2TransactionError> {
-        let parameter = TransferParams::from(transfers);
+        let parameter = TransferParams::new(transfers)?;
         let bytes = concordium_contracts_common::to_bytes(&parameter);
-        let contract_name = self.contract_name.contract_name();
+        let contract_name = self.contract_name.as_contract_name().contract_name();
         let receive_name =
             smart_contracts::ReceiveName::try_from(format!("{}.transfer", contract_name))?;
 
@@ -172,16 +204,16 @@ impl<'a> Cis2Contract<'a> {
     /// * `sender_address` - The account address of the signing keys.
     /// * `transaction_metadata` - Metadata for constructing the transaction.
     /// * `updates` - A list of CIS2 UpdateOperators to update.
-    #[allow(clippy::too_many_arguments)]
     pub async fn update_operator(
         &mut self,
         signer: &impl transactions::ExactSizeTransactionSigner,
         transaction_metadata: Cis2TransactionMetadata,
         updates: Vec<UpdateOperator>,
     ) -> anyhow::Result<sdk_types::hashes::TransactionHash, Cis2TransactionError> {
-        let parameter = UpdateOperatorParams::from(updates);
+        let parameter = UpdateOperatorParams::new(updates)?;
         let bytes = concordium_contracts_common::to_bytes(&parameter);
-        let contract_name = self.contract_name.contract_name();
+        let contract_name = self.contract_name.as_contract_name().contract_name();
+
         let receive_name =
             smart_contracts::ReceiveName::try_from(format!("{}.updateOperator", contract_name))?;
 
@@ -213,17 +245,17 @@ impl<'a> Cis2Contract<'a> {
     ///
     /// # Arguments
     ///
-    /// * `block_hash` - The hash of the block to locally execute the query
-    ///   after.
+    /// * `block_hash` - Hash of a block. The query will be executed in the
+    ///   state of the chain at the end of the block.
     /// * `queries` - A list queries to execute.
     pub async fn balance_of(
         &mut self,
         block_hash: &sdk_types::hashes::BlockHash,
         queries: Vec<BalanceOfQuery>,
     ) -> Result<BalanceOfQueryResponse, Cis2QueryError> {
-        let parameter = BalanceOfQueryParams::from(queries);
+        let parameter = BalanceOfQueryParams::new(queries)?;
         let bytes = concordium_contracts_common::to_bytes(&parameter);
-        let contract_name = self.contract_name.contract_name();
+        let contract_name = self.contract_name.as_contract_name().contract_name();
         let receive_name =
             smart_contracts::ReceiveName::try_from(format!("{}.balanceOf", contract_name))?;
 
@@ -261,16 +293,17 @@ impl<'a> Cis2Contract<'a> {
     ///
     /// # Arguments
     ///
-    /// * `block_hash` - Hash of a block. The query will be executed in the state of the chain at the end of the block.
+    /// * `block_hash` - Hash of a block. The query will be executed in the
+    ///   state of the chain at the end of the block.
     /// * `queries` - A list queries to execute.
     pub async fn operator_of(
         &mut self,
         block_hash: &sdk_types::hashes::BlockHash,
         queries: Vec<OperatorOfQuery>,
     ) -> Result<OperatorOfQueryResponse, Cis2QueryError> {
-        let parameter = OperatorOfQueryParams::from(queries);
+        let parameter = OperatorOfQueryParams::new(queries)?;
         let bytes = concordium_contracts_common::to_bytes(&parameter);
-        let contract_name = self.contract_name.contract_name();
+        let contract_name = self.contract_name.as_contract_name().contract_name();
         let receive_name =
             smart_contracts::ReceiveName::try_from(format!("{}.operatorOf", contract_name))?;
 
@@ -308,17 +341,17 @@ impl<'a> Cis2Contract<'a> {
     ///
     /// # Arguments
     ///
-    /// * `block_hash` - The hash of the block to locally execute the query
-    ///   after.
+    /// * `block_hash` - Hash of a block. The query will be executed in the
+    ///   state of the chain at the end of the block.
     /// * `queries` - A list queries to execute.
     pub async fn token_metadata(
         &mut self,
         block_hash: &sdk_types::hashes::BlockHash,
         queries: Vec<TokenIdVec>,
     ) -> Result<TokenMetadataQueryResponse, Cis2QueryError> {
-        let parameter = TokenMetadataQueryParams::from(queries);
+        let parameter = TokenMetadataQueryParams::new(queries)?;
         let bytes = concordium_contracts_common::to_bytes(&parameter);
-        let contract_name = self.contract_name.contract_name();
+        let contract_name = self.contract_name.as_contract_name().contract_name();
         let receive_name =
             smart_contracts::ReceiveName::try_from(format!("{}.tokenMetadata", contract_name))?;
 

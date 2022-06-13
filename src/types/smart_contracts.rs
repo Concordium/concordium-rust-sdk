@@ -355,6 +355,9 @@ pub struct ContractContext {
 }
 
 pub const DEFAULT_INVOKE_ENERGY: Energy = Energy { energy: 10_000_000 };
+
+/// The highest amount of energy allowed when invoking a smart contract endpoint
+/// with a concordium node.
 pub const MAX_ALLOWED_INVOKE_ENERGY: Energy = Energy {
     energy: 100_000_000_000,
 };

@@ -1,5 +1,5 @@
 //! This module contains types and their implementations related to the CIS-2
-//! token standard.
+//! Token standard.
 
 use crate::types::{
     hashes::Hash,
@@ -17,8 +17,8 @@ use thiserror::*;
 
 /// CIS-2 token amount with serialization as according to CIS-2.
 ///
-/// According to the CIS-2 specification, a token amount can be in the range from
-/// 0 to 2^256 - 1.
+/// According to the CIS-2 specification, a token amount can be in the range
+/// from 0 to 2^256 - 1.
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, From, Display)]
 pub struct TokenAmount(pub BigUint);
 
@@ -176,14 +176,14 @@ impl Deserial for TokenIdVec {
 #[derive(Debug, PartialEq, Eq, Error)]
 pub enum Cis2ErrorRejectReason {
     /// Invalid token id (Error code: -42000001).
-    #[error("Invalid token ID")]
+    #[error("Invalid token ID.")]
     InvalidTokenId,
     /// The balance of the token owner is insufficient for the transfer (Error
     /// code: -42000002).
-    #[error("Insufficient funds for the transfer")]
+    #[error("Insufficient funds for the transfer.")]
     InsufficientFunds,
     /// Sender is unauthorized to call this function (Error code: -42000003).
-    #[error("Sender is unauthorized to call this function")]
+    #[error("Sender is unauthorized to call this function.")]
     Unauthorized,
     /// Unknown error code for CIS2.
     #[error("Non-CIS2 error code: {0}")]
@@ -192,7 +192,8 @@ pub enum Cis2ErrorRejectReason {
 
 /// Convert Cis2Error into a reject with error code:
 /// - [`InvalidTokenId`](Cis2ErrorRejectReason::InvalidTokenId): `-42000001`
-/// - [`InsufficientFunds`](Cis2ErrorRejectReason::InsufficientFunds): `-42000002`
+/// - [`InsufficientFunds`](Cis2ErrorRejectReason::InsufficientFunds):
+///   `-42000002`
 /// - [`Unauthorized`](Cis2ErrorRejectReason::Unauthorized): `-42000003`
 impl From<i32> for Cis2ErrorRejectReason {
     fn from(error_code: i32) -> Self {
@@ -207,9 +208,30 @@ impl From<i32> for Cis2ErrorRejectReason {
 
 /// Additional data which can be included for each transfer in the
 /// transfer parameter for the CIS2 contract function `transfer`.
-#[derive(Debug, Clone, From, AsRef)]
+/// Allows up to `u16::MAX` number of bytes.
+#[derive(Debug, Clone, AsRef)]
 pub struct AdditionalData {
-    pub data: Vec<u8>,
+    data: Vec<u8>,
+}
+
+/// Error for constructing a new [`AdditionalData`](AdditionalData).
+#[derive(Debug, PartialEq, Eq, Error)]
+#[error("Invalid byte length, must be withing a length of u16::MAX.")]
+pub struct NewAdditionalDataError;
+
+impl AdditionalData {
+    /// Construct a new AdditionalData.
+    /// Ensures the length of the provided bytes are within `u16::MAX`.
+    pub fn new(data: Vec<u8>) -> Result<Self, NewAdditionalDataError> {
+        if data.len() > u16::MAX.into() {
+            return Err(NewAdditionalDataError);
+        }
+        Ok(AdditionalData { data })
+    }
+
+    /// Construct a new AdditionalData.
+    /// Without ensuring the length of the provided bytes are within `u16::MAX`.
+    pub fn new_unchecked(data: Vec<u8>) -> Self { AdditionalData { data } }
 }
 
 /// Serialization for the additional data, serialized as according to the CIS2
@@ -222,14 +244,24 @@ impl Serial for AdditionalData {
     }
 }
 
+/// Error for constructing a [`AdditionalData`](AdditionalData) from a string.
+#[derive(Debug, Error)]
+pub enum FromStrAdditionalDataError {
+    /// Invalid hex string was provided.
+    #[error("Failed to parse hex encoding: {0}")]
+    InvalidHex(#[from] hex::FromHexError),
+    /// Unable to construct  [`AdditionalData`](AdditionalData).
+    #[error("Failed constructing data: {0}")]
+    InvalidData(#[from] NewAdditionalDataError),
+}
+
 /// Parse the additional data from a hex string.
 impl FromStr for AdditionalData {
-    type Err = hex::FromHexError;
+    type Err = FromStrAdditionalDataError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(AdditionalData {
-            data: hex::decode(s)?.to_vec(),
-        })
+        let data = hex::decode(s)?.to_vec();
+        Ok(AdditionalData::new(data)?)
     }
 }
 
@@ -285,9 +317,30 @@ impl Serial for Transfer {
     }
 }
 
+/// Error for constructing a new [`TransferParams`](TransferParams).
+#[derive(Debug, PartialEq, Eq, Error)]
+#[error("Invalid number of transfers, must be withing a length of u16::MAX.")]
+pub struct NewTransferParamsError;
+
 /// The parameter type for the NFT contract function `CIS2-NFT.transfer`.
-#[derive(Debug, AsRef, From)]
-pub struct TransferParams(pub Vec<Transfer>);
+#[derive(Debug, AsRef)]
+pub struct TransferParams(Vec<Transfer>);
+
+impl TransferParams {
+    /// Construct a new TransferParams.
+    /// Ensures the length of the provided transfers are within `u16::MAX`.
+    pub fn new(transfers: Vec<Transfer>) -> Result<Self, NewTransferParamsError> {
+        if transfers.len() > u16::MAX.into() {
+            return Err(NewTransferParamsError);
+        }
+        Ok(Self(transfers))
+    }
+
+    /// Construct a new TransferParams.
+    /// Without ensuring the length of the provided tranfers are within
+    /// `u16::MAX`.
+    pub fn new_unchecked(transfers: Vec<Transfer>) -> Self { Self(transfers) }
+}
 
 /// Serialization of the transfer parameter, according to the CIS2
 /// specification.
@@ -352,8 +405,29 @@ impl Serial for UpdateOperator {
 }
 
 /// The parameter type for the NFT contract function `CIS2-NFT.updateOperator`.
-#[derive(Debug, From, AsRef)]
-pub struct UpdateOperatorParams(pub Vec<UpdateOperator>);
+#[derive(Debug, AsRef)]
+pub struct UpdateOperatorParams(Vec<UpdateOperator>);
+
+/// Error for constructing a new [`UpdateOperatorParams`](UpdateOperatorParams).
+#[derive(Debug, PartialEq, Eq, Error)]
+#[error("Invalid number of operator updates, must be withing a length of u16::MAX.")]
+pub struct NewUpdateOperatorParamsError;
+
+impl UpdateOperatorParams {
+    /// Construct a new UpdateOperatorParams.
+    /// Ensures the length of the provided updates are within `u16::MAX`.
+    pub fn new(updates: Vec<UpdateOperator>) -> Result<Self, NewUpdateOperatorParamsError> {
+        if updates.len() > u16::MAX.into() {
+            return Err(NewUpdateOperatorParamsError);
+        }
+        Ok(Self(updates))
+    }
+
+    /// Construct a new UpdateOperatorParams.
+    /// Without ensuring the length of the provided updates are within
+    /// `u16::MAX`.
+    pub fn new_unchecked(updates: Vec<UpdateOperator>) -> Self { Self(updates) }
+}
 
 /// Serialization of the updateOperator parameter, according to the CIS2
 /// specification.
@@ -385,8 +459,29 @@ impl Serial for BalanceOfQuery {
 }
 
 /// The parameter type for the NFT contract function `CIS2-NFT.balanceOf`.
-#[derive(Debug, Clone, From, AsRef)]
-pub struct BalanceOfQueryParams(pub Vec<BalanceOfQuery>);
+#[derive(Debug, Clone, AsRef)]
+pub struct BalanceOfQueryParams(Vec<BalanceOfQuery>);
+
+/// Error for constructing a new [`BalanceOfQueryParams`](BalanceOfQueryParams).
+#[derive(Debug, PartialEq, Eq, Error)]
+#[error("Invalid number of queries, must be withing a length of u16::MAX.")]
+pub struct NewBalanceOfQueryParamsError;
+
+impl BalanceOfQueryParams {
+    /// Construct a new BalanceOfQueryParams.
+    /// Ensures the length of the provided queries are within `u16::MAX`.
+    pub fn new(queries: Vec<BalanceOfQuery>) -> Result<Self, NewBalanceOfQueryParamsError> {
+        if queries.len() > u16::MAX.into() {
+            return Err(NewBalanceOfQueryParamsError);
+        }
+        Ok(Self(queries))
+    }
+
+    /// Construct a new BalanceOfQueryParams.
+    /// Without ensuring the length of the provided queries are within
+    /// `u16::MAX`.
+    pub fn new_unchecked(queries: Vec<BalanceOfQuery>) -> Self { Self(queries) }
+}
 
 /// Serialization of the balanceOf parameter, according to the CIS2
 /// specification.
@@ -401,8 +496,30 @@ impl Serial for BalanceOfQueryParams {
 /// The response which is sent back when calling the contract function
 /// `balanceOf`.
 /// It consists of the list of token amounts in the same order as the queries.
-#[derive(Debug, From, AsRef)]
-pub struct BalanceOfQueryResponse(pub Vec<TokenAmount>);
+#[derive(Debug, PartialEq, Eq, AsRef)]
+pub struct BalanceOfQueryResponse(Vec<TokenAmount>);
+
+/// Error for constructing a new
+/// [`BalanceOfQueryResponse`](BalanceOfQueryResponse).
+#[derive(Debug, PartialEq, Eq, Error)]
+#[error("Invalid number of results, must be withing a length of u16::MAX.")]
+pub struct NewBalanceOfQueryResponseError;
+
+impl BalanceOfQueryResponse {
+    /// Construct a new BalanceOfQueryResponse.
+    /// Ensures the length of the provided results is within `u16::MAX`.
+    pub fn new(results: Vec<TokenAmount>) -> Result<Self, NewBalanceOfQueryResponseError> {
+        if results.len() > u16::MAX.into() {
+            return Err(NewBalanceOfQueryResponseError);
+        }
+        Ok(Self(results))
+    }
+
+    /// Construct a new BalanceOfQueryResponse.
+    /// Without ensuring the length of the provided results is within
+    /// `u16::MAX`.
+    pub fn new_unchecked(results: Vec<TokenAmount>) -> Self { Self(results) }
+}
 
 /// Deserialization for BalanceOfQueryResponse according to the CIS2
 /// specification.
@@ -413,7 +530,7 @@ impl Deserial for BalanceOfQueryResponse {
         for _ in 0..len {
             results.push(TokenAmount::deserial(source)?)
         }
-        Ok(BalanceOfQueryResponse(results))
+        Ok(BalanceOfQueryResponse::new_unchecked(results))
     }
 }
 
@@ -437,8 +554,30 @@ impl Serial for OperatorOfQuery {
 }
 
 /// The parameter type for the NFT contract function `CIS2-NFT.operatorOf`.
-#[derive(Debug, Clone, AsRef, From)]
-pub struct OperatorOfQueryParams(pub Vec<OperatorOfQuery>);
+#[derive(Debug, Clone, AsRef)]
+pub struct OperatorOfQueryParams(Vec<OperatorOfQuery>);
+
+/// Error for constructing a new
+/// [`OperatorOfQueryParams`](OperatorOfQueryParams).
+#[derive(Debug, PartialEq, Eq, Error)]
+#[error("Invalid number of queries, must be withing a length of u16::MAX.")]
+pub struct NewOperatorOfQueryParamsError;
+
+impl OperatorOfQueryParams {
+    /// Construct a new OperatorOfQueryParams.
+    /// Ensures the length of the provided queries are within `u16::MAX`.
+    pub fn new(queries: Vec<OperatorOfQuery>) -> Result<Self, NewOperatorOfQueryParamsError> {
+        if queries.len() > u16::MAX.into() {
+            return Err(NewOperatorOfQueryParamsError);
+        }
+        Ok(Self(queries))
+    }
+
+    /// Construct a new OperatorOfQueryParams.
+    /// Without ensuring the length of the provided queries are within
+    /// `u16::MAX`.
+    pub fn new_unchecked(queries: Vec<OperatorOfQuery>) -> Self { Self(queries) }
+}
 
 /// Serialization of the operatorOf parameter, according to the CIS2
 /// specification.
@@ -454,8 +593,30 @@ impl Serial for OperatorOfQueryParams {
 /// `operatorOf`.
 /// It consists of the list of results in the same order and length as the
 /// queries in the parameter.
-#[derive(Debug, Clone, From, AsRef)]
-pub struct OperatorOfQueryResponse(pub Vec<bool>);
+#[derive(Debug, Clone, AsRef)]
+pub struct OperatorOfQueryResponse(Vec<bool>);
+
+/// Error for constructing a new
+/// [`OperatorOfQueryResponse`](OperatorOfQueryResponse).
+#[derive(Debug, PartialEq, Eq, Error)]
+#[error("Invalid number of results, must be withing a length of u16::MAX.")]
+pub struct NewOperatorOfQueryResponseError;
+
+impl OperatorOfQueryResponse {
+    /// Construct a new OperatorOfQueryResponse.
+    /// Ensures the length of the provided results is within `u16::MAX`.
+    pub fn new(results: Vec<bool>) -> Result<Self, NewOperatorOfQueryResponseError> {
+        if results.len() > u16::MAX.into() {
+            return Err(NewOperatorOfQueryResponseError);
+        }
+        Ok(Self(results))
+    }
+
+    /// Construct a new OperatorOfQueryResponse.
+    /// Without ensuring the length of the provided results is within
+    /// `u16::MAX`.
+    pub fn new_unchecked(results: Vec<bool>) -> Self { Self(results) }
+}
 
 /// Deserialization for OperatorOfQueryResponse according to the CIS2
 /// specification.
@@ -466,13 +627,38 @@ impl Deserial for OperatorOfQueryResponse {
         for _ in 0..len {
             results.push(bool::deserial(source)?)
         }
-        Ok(OperatorOfQueryResponse::from(results))
+        Ok(OperatorOfQueryResponse::new_unchecked(results))
     }
 }
 
+/// A query for token metadata for a given token.
+pub type TokenMetadataQuery = TokenIdVec;
+
 /// The parameter type for the NFT contract function `CIS2-NFT.operatorOf`.
 #[derive(Debug, Clone, From, AsRef)]
-pub struct TokenMetadataQueryParams(Vec<TokenIdVec>);
+pub struct TokenMetadataQueryParams(Vec<TokenMetadataQuery>);
+
+/// Error for constructing a new
+/// [`TokenMetadataQueryParams`](TokenMetadataQueryParams).
+#[derive(Debug, PartialEq, Eq, Error)]
+#[error("Invalid number of queries, must be withing a length of u16::MAX.")]
+pub struct NewTokenMetadataQueryParamsError;
+
+impl TokenMetadataQueryParams {
+    /// Construct a new TokenMetadataQueryParams.
+    /// Ensures the length of the provided queries are within `u16::MAX`.
+    pub fn new(queries: Vec<TokenMetadataQuery>) -> Result<Self, NewTokenMetadataQueryParamsError> {
+        if queries.len() > u16::MAX.into() {
+            return Err(NewTokenMetadataQueryParamsError);
+        }
+        Ok(Self(queries))
+    }
+
+    /// Construct a new TokenMetadataQueryParams.
+    /// Without ensuring the length of the provided queries are within
+    /// `u16::MAX`.
+    pub fn new_unchecked(queries: Vec<TokenMetadataQuery>) -> Self { Self(queries) }
+}
 
 /// Serialization of the operatorOf parameter, according to the CIS2
 /// specification.
@@ -487,8 +673,30 @@ impl Serial for TokenMetadataQueryParams {
 /// The response which is sent back when calling the contract function
 /// `tokenMetadata`.
 /// It consists of the list of queries paired with their corresponding result.
-#[derive(Debug, Clone, From, AsRef)]
+#[derive(Debug, Clone, AsRef)]
 pub struct TokenMetadataQueryResponse(Vec<MetadataUrl>);
+
+/// Error for constructing a new
+/// [`TokenMetadataQueryResponse`](TokenMetadataQueryResponse).
+#[derive(Debug, PartialEq, Eq, Error)]
+#[error("Invalid number of results, must be withing a length of u16::MAX.")]
+pub struct NewTokenMetadataQueryResponseError;
+
+impl TokenMetadataQueryResponse {
+    /// Construct a new TokenMetadataQueryResponse.
+    /// Ensures the length of the provided results is within `u16::MAX`.
+    pub fn new(results: Vec<MetadataUrl>) -> Result<Self, NewTokenMetadataQueryResponseError> {
+        if results.len() > u16::MAX.into() {
+            return Err(NewTokenMetadataQueryResponseError);
+        }
+        Ok(Self(results))
+    }
+
+    /// Construct a new TokenMetadataQueryResponse.
+    /// Without ensuring the length of the provided results is within
+    /// `u16::MAX`.
+    pub fn new_unchecked(results: Vec<MetadataUrl>) -> Self { Self(results) }
+}
 
 /// Deserialization for TokenMetadataQueryResponse according to the CIS2
 /// specification.
@@ -499,17 +707,44 @@ impl Deserial for TokenMetadataQueryResponse {
         for _ in 0..len {
             results.push(MetadataUrl::deserial(source)?)
         }
-        Ok(TokenMetadataQueryResponse::from(results))
+        Ok(TokenMetadataQueryResponse::new_unchecked(results))
     }
 }
 
 /// A URL for the metadata.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MetadataUrl {
     /// The url encoded according to CIS2.
-    pub url:  String,
+    url:  String,
     /// An optional checksum of the content found at the URL.
-    pub hash: Option<Hash>,
+    hash: Option<Hash>,
+}
+
+/// Error for constructing a new
+/// [`MetadataUrl`](MetadataUrl).
+#[derive(Debug, PartialEq, Eq, Error)]
+#[error("Invalid number of results, must be withing a length of u16::MAX.")]
+pub struct NewMetadataUrlError;
+
+impl MetadataUrl {
+    /// Construct a new MetadataUrl.
+    /// Ensures the length of the url is within `u16::MAX`.
+    pub fn new(url: String, hash: Option<Hash>) -> Result<Self, NewMetadataUrlError> {
+        if url.len() > u16::MAX.into() {
+            return Err(NewMetadataUrlError);
+        }
+        Ok(Self { url, hash })
+    }
+
+    /// Construct a new MetadataUrl.
+    /// Without ensuring the length of the url is within `u16::MAX`.
+    pub fn new_unchecked(url: String, hash: Option<Hash>) -> Self { Self { url, hash } }
+
+    /// Get the metadata content url.
+    pub fn url(&self) -> &str { &self.url }
+
+    /// Get the metadata content hash.
+    pub fn hash(&self) -> Option<Hash> { self.hash }
 }
 
 /// Deserialization for MetadataUrl according to the CIS2 specification.
@@ -522,7 +757,7 @@ impl Deserial for MetadataUrl {
         }
         let url = String::from_utf8(bytes)?;
         let hash = Option::<[u8; 32]>::deserial(source)?.map(|b| b.into());
-        Ok(MetadataUrl { url, hash })
+        Ok(MetadataUrl::new_unchecked(url, hash))
     }
 }
 
@@ -533,8 +768,8 @@ pub enum Event {
     #[display(
         fmt = "Transferred token with ID {} from {} to {}",
         token_id,
-        "address_display(from)",
-        "address_display(to)"
+        "display_address(from)",
+        "display_address(to)"
     )]
     Transfer {
         token_id: TokenIdVec,
@@ -546,7 +781,7 @@ pub enum Event {
     #[display(
         fmt = "Minted token with ID {} for {}",
         token_id,
-        "address_display(owner)"
+        "display_address(owner)"
     )]
     Mint {
         token_id: TokenIdVec,
@@ -557,7 +792,7 @@ pub enum Event {
     #[display(
         fmt = "Burned token with ID {} for {}",
         token_id,
-        "address_display(owner)"
+        "display_address(owner)"
     )]
     Burn {
         token_id: TokenIdVec,
@@ -568,8 +803,8 @@ pub enum Event {
     #[display(
         fmt = "{} {} as operator for {}",
         update,
-        "address_display(operator)",
-        "address_display(owner)"
+        "display_address(operator)",
+        "display_address(owner)"
     )]
     UpdateOperator {
         update:   OperatorUpdate,
@@ -594,7 +829,7 @@ pub enum Event {
 
 fn display_hash(hash_opt: Option<Hash>) -> String {
     if let Some(hash) = hash_opt {
-        format!("with hash {}", hex::encode(hash))
+        format!("with hash {}", hash)
     } else {
         "without hash".to_string()
     }
@@ -637,7 +872,7 @@ impl Deserial for Event {
 
 /// Display the Address using either the display for account address or contract
 /// address.
-fn address_display(a: &Address) -> String {
+fn display_address(a: &Address) -> String {
     match a {
         Address::Account(addr) => format!("{}", addr),
         Address::Contract(addr) => format!("{}", addr),
