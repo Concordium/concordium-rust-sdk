@@ -24,7 +24,7 @@ anyhow = "1.0"
 rust_decimal = { version = "=1.19", features = ["serde-float", "serde-arbitrary-precision"]}
 ed25519-dalek = "1"
 sha2 = "0.9"
-rand = "0.7"
+rand = {version = "0.7", features = ["small_rng"]}
 num = "0.4"
 # Fix the transitive dependency of ed25519-dalek since version 1.4 does not work with
 # rust 1.53. Once we update to rust 1.59+ this should be removed.

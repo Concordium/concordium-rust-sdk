@@ -1,5 +1,5 @@
 //! This module contains types and their implementations related to the CIS-2
-//! Token standard.
+//! token standard.
 
 use crate::types::{
     hashes::Hash,
@@ -900,10 +900,38 @@ fn display_address(a: &Address) -> String {
 mod test {
     use super::*;
     use crate::types::smart_contracts::concordium_contracts_common::{from_bytes, to_bytes};
+    use rand::{rngs::SmallRng, RngCore, SeedableRng};
 
     #[test]
-    fn test_serialize_token_amount() {
-        for n in (0..1000).map(|i: u64| i.pow(3)) {
+    fn test_serialize_zero_token_amount() {
+        let amount = TokenAmount::from(0u64);
+        let bytes = to_bytes(&amount);
+        let new_amount = from_bytes(&bytes).expect("Failed to deserialize amount");
+        assert_eq!(amount, new_amount)
+    }
+
+    #[test]
+    fn test_serialize_u64max_token_amount() {
+        let amount = TokenAmount::from(u64::MAX);
+        let bytes = to_bytes(&amount);
+        let new_amount = from_bytes(&bytes).expect("Failed to deserialize amount");
+        assert_eq!(amount, new_amount)
+    }
+
+    #[test]
+    fn test_serialize_larger_than_u64max_token_amount() {
+        let amount = TokenAmount::from(u64::MAX) + TokenAmount::from(u64::MAX);
+        let bytes = to_bytes(&amount);
+        let new_amount = from_bytes(&bytes).expect("Failed to deserialize amount");
+        assert_eq!(amount, new_amount)
+    }
+
+    #[test]
+    fn test_serialize_random_token_amount() {
+        let seed = [1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+        let mut rng = SmallRng::from_seed(seed);
+
+        for n in (0..1000).map(|_| rng.next_u64()) {
             let amount = TokenAmount::from(n);
             let bytes = to_bytes(&amount);
             let new_amount = from_bytes(&bytes).expect("Failed to deserialize amount");
