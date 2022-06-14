@@ -1,6 +1,7 @@
 ## Unreleased changes
 
 - Expose helper methods to wait for new blocks or finalization.
+- Expose types and functions for interacting with CIS2 smart contracts.
 
 ## 1.0.2
 
