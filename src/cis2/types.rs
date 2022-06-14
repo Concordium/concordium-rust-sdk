@@ -308,7 +308,7 @@ impl Serial for Receiver {
 }
 
 /// A description of a transfer according to the CIS2 specification.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Transfer {
     /// The ID of the token type to transfer.
     pub token_id: TokenId,
@@ -340,7 +340,7 @@ impl Serial for Transfer {
 pub struct NewTransferParamsError;
 
 /// The parameter type for the NFT contract function `CIS2-NFT.transfer`.
-#[derive(Debug, AsRef)]
+#[derive(Debug, AsRef, Clone)]
 pub struct TransferParams(Vec<Transfer>);
 
 impl TransferParams {
@@ -422,7 +422,7 @@ impl Serial for UpdateOperator {
 }
 
 /// The parameter type for the NFT contract function `CIS2-NFT.updateOperator`.
-#[derive(Debug, AsRef)]
+#[derive(Debug, AsRef, Clone)]
 pub struct UpdateOperatorParams(Vec<UpdateOperator>);
 
 /// Error for constructing a new [`UpdateOperatorParams`](UpdateOperatorParams).
@@ -513,7 +513,7 @@ impl Serial for BalanceOfQueryParams {
 /// The response which is sent back when calling the contract function
 /// `balanceOf`.
 /// It consists of the list of token amounts in the same order as the queries.
-#[derive(Debug, PartialEq, Eq, AsRef)]
+#[derive(Debug, PartialEq, Eq, AsRef, Clone)]
 pub struct BalanceOfQueryResponse(Vec<TokenAmount>);
 
 /// Error for constructing a new
@@ -779,7 +779,7 @@ impl Deserial for MetadataUrl {
 }
 
 /// Smart contract logged event, part of the CIS2 specification.
-#[derive(Debug, Display)]
+#[derive(Debug, Display, Clone)]
 pub enum Event {
     /// Transfer of an amount of tokens
     #[display(
