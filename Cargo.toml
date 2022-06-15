@@ -42,13 +42,13 @@ concordium-contracts-common = { version = "*", path = "./concordium-contracts-co
 random_oracle = { version = "*", path = "./concordium-base/rust-src/random_oracle/" }
 schemars = {version = "0.8", features = ["rust_decimal", "chrono"]}
 jsonschema = "0.16.0"
+clap = "2.33.3"
+structopt = "0.3"
 
 [features]
 postgres = ["tokio-postgres"]
 
 [dev-dependencies]
-structopt = "0.3"
-clap = "2.33.3"
 csv = "1.1"
 warp = "*"
 tokio = { version = "*", features = ["full"] }

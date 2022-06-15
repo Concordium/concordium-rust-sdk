@@ -78,7 +78,7 @@ pub struct AccountReleaseSchedule {
 /// An individual release of a locked balance.
 pub struct Release {
     #[serde(with = "crate::internal::timestamp_millis")]
-    #[schemars(with = "i64")] // TODO: Consider making wrapper type.
+    #[schemars(with = "i64")]
     /// Effective time of release.
     pub timestamp:    chrono::DateTime<chrono::Utc>,
     /// Amount to be released.
