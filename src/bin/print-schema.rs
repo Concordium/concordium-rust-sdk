@@ -152,7 +152,7 @@ async fn crawl_and_validate_against_schemas(app: App) -> anyhow::Result<()> {
     let mut cb = app.start_block.unwrap_or(consensus_info.best_block);
     let mut rng = thread_rng();
     while cb != gb {
-        println!("{}", cb);
+        println!("Block: {}", cb);
 
         // Get block summary and write to a file.
         let bs = client
@@ -173,7 +173,7 @@ async fn crawl_and_validate_against_schemas(app: App) -> anyhow::Result<()> {
                 let cc = client.clone();
                 let trx_schema = Arc::clone(&schema_transaction_status);
                 handles.push(tokio::spawn(async move {
-                    println!("    {}", th);
+                    println!("    Transaction: {}", th);
                     let mut cc = cc;
                     let status = cc.get_transaction_status(&th).await?;
                     validate_and_print_errors(&trx_schema, &status);
@@ -181,24 +181,26 @@ async fn crawl_and_validate_against_schemas(app: App) -> anyhow::Result<()> {
                 }));
             }
             futures::future::join_all(handles).await;
-        }
 
-        // Validate 100 random account infos.
-        let accs = client.get_account_list(&cb).await?;
-        let accs = accs
-            .choose_multiple(&mut rng, 100)
-            .copied()
-            .collect::<Vec<_>>();
-        let mut handles = Vec::with_capacity(accs.len());
-        for acc in accs {
-            let cc = client.clone();
-            let acc_schema = Arc::clone(&schema_account_info);
-            handles.push(tokio::spawn(async move {
-                let mut cc = cc;
-                let acc_info = cc.get_account_info(acc, &cb).await?;
-                validate_and_print_errors(&acc_schema, &acc_info);
-                Ok::<_, QueryError>(())
-            }))
+            // Validate 100 random account infos.
+            let accs = client.get_account_list(&cb).await?;
+            let accs = accs
+                .choose_multiple(&mut rng, 10)
+                .copied()
+                .collect::<Vec<_>>();
+            let mut acc_handles = Vec::with_capacity(accs.len());
+            for acc in accs {
+                println!("    Account: {}", acc);
+                let cc = client.clone();
+                let acc_schema = Arc::clone(&schema_account_info);
+                acc_handles.push(tokio::spawn(async move {
+                    let mut cc = cc;
+                    let acc_info = cc.get_account_info(acc, &cb).await?;
+                    validate_and_print_errors(&acc_schema, &acc_info);
+                    Ok::<_, QueryError>(())
+                }))
+            }
+            futures::future::join_all(acc_handles).await;
         }
 
         // Find parent block hash
