@@ -6,7 +6,7 @@ use concordium_rust_sdk::{
     self,
     endpoints::{self, QueryError},
     types::{
-        hashes::TransactionHash,
+        hashes::{BlockMarker, HashBytes, TransactionHash},
         queries::*,
         smart_contracts::{InstanceInfo, ModuleRef},
         *,
@@ -15,7 +15,7 @@ use concordium_rust_sdk::{
 };
 use id::types::{AccountAddress, ArInfo, GlobalContext, IpInfo};
 use jsonschema::JSONSchema;
-use rand::{prelude::SliceRandom, thread_rng};
+use rand::{prelude::SliceRandom, SeedableRng};
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::{fs, sync::Arc};
@@ -46,6 +46,10 @@ async fn main() -> anyhow::Result<()> {
     crawl_and_validate_against_schemas(app).await?;
     // validate_all_schemas();
     Ok(())
+}
+
+async fn print_n(n: u64) {
+    println!("{}", n);
 }
 
 fn validate_all_schemas() {
@@ -121,25 +125,7 @@ fn write_schema_to_file<T: JsonSchema>(endpoint_name: &str) {
 }
 
 async fn crawl_and_validate_against_schemas(app: App) -> anyhow::Result<()> {
-    // Create schemas for block summary, trx_status, account_info, and?
-    // Compile the schemas
-    // Crawl chain
-    // For every block with trxs
-    //   Choose 100 random accounts and check their account infos against schema
-    //   Check all trxs against schema
-
-    fn validate_and_print_errors(schema: &JSONSchema, input: &impl Serialize) {
-        let json = serde_json::to_value(input).expect("Could not serialize into JSON value");
-        let validation_result = schema.validate(&json);
-        if let Err(errors) = validation_result {
-            for error in errors {
-                println!("Validation error: {}", error);
-                println!("Instance path: {}", error.instance_path);
-            }
-        }
-    }
-
-    let schema_block_summary = compile_schema::<BlockSummary>("BlockSummary");
+    let schema_block_summary = Arc::new(compile_schema::<BlockSummary>("BlockSummary"));
     let schema_account_info = Arc::new(compile_schema::<AccountInfo>("AccountInfo"));
     let schema_transaction_status =
         Arc::new(compile_schema::<TransactionStatus>("TransactionStatus"));
@@ -150,64 +136,102 @@ async fn crawl_and_validate_against_schemas(app: App) -> anyhow::Result<()> {
     let gb = consensus_info.genesis_block;
 
     let mut cb = app.start_block.unwrap_or(consensus_info.best_block);
-    let mut rng = thread_rng();
-    while cb != gb {
+
+    let rng = rand::rngs::SmallRng::from_entropy();
+    let mut x = 0;
+    while x < 1000 {
         println!("Block: {}", cb);
+        x += 1;
 
-        // Get block summary and write to a file.
-        let bs = client
-            .get_block_summary(&cb)
-            .await
-            .context("Could not get block summary.")?;
+        let cc = client.clone();
+        let mut rng = rng.clone();
+        let trx_schema = Arc::clone(&schema_transaction_status);
+        let acc_schema = Arc::clone(&schema_account_info);
+        let bs_schema = Arc::clone(&schema_block_summary);
 
-        // Validate block summary.
-        validate_and_print_errors(&schema_block_summary, &bs);
+        tokio::spawn(async move {
+            let mut cc = cc;
+            // Get block summary.
+            let bs = cc
+                .get_block_summary(&cb)
+                .await
+                .context("Could not get block summary.")?;
 
-        let trxs = bs.transaction_summaries();
+            let trxs = bs.transaction_summaries();
 
-        // Validate all transaction summaries.
-        if trxs.len() != 0 {
-            let mut handles = Vec::with_capacity(trxs.len());
-            for trx in trxs {
-                let th = trx.hash;
-                let cc = client.clone();
-                let trx_schema = Arc::clone(&schema_transaction_status);
-                handles.push(tokio::spawn(async move {
-                    println!("    Transaction: {}", th);
-                    let mut cc = cc;
-                    let status = cc.get_transaction_status(&th).await?;
-                    validate_and_print_errors(&trx_schema, &status);
-                    Ok::<_, QueryError>(())
-                }));
+            if trxs.len() != 0 {
+                validate_transaction_summaries(&cc, trxs, &trx_schema);
+                let accs = cc.get_account_list(&cb).await?;
+                validate_n_account_infos(&mut cc, cb, &accs, &acc_schema, &mut rng, 100);
             }
-            futures::future::join_all(handles).await;
 
-            // Validate 100 random account infos.
-            let accs = client.get_account_list(&cb).await?;
-            let accs = accs
-                .choose_multiple(&mut rng, 10)
-                .copied()
-                .collect::<Vec<_>>();
-            let mut acc_handles = Vec::with_capacity(accs.len());
-            for acc in accs {
-                println!("    Account: {}", acc);
-                let cc = client.clone();
-                let acc_schema = Arc::clone(&schema_account_info);
-                acc_handles.push(tokio::spawn(async move {
-                    let mut cc = cc;
-                    let acc_info = cc.get_account_info(acc, &cb).await?;
-                    validate_and_print_errors(&acc_schema, &acc_info);
-                    Ok::<_, QueryError>(())
-                }))
-            }
-            futures::future::join_all(acc_handles).await;
-        }
+            // Validate block summary.
+            validate_with_schema(&bs_schema, &bs);
+            Ok::<_, anyhow::Error>(())
+        });
 
         // Find parent block hash
         let bi = client.get_block_info(&cb).await?;
         cb = bi.block_parent;
     }
     Ok(())
+}
+
+/// Validate all transaction summaries given.
+fn validate_transaction_summaries(
+    cc: &endpoints::Client,
+    trxs: &[BlockItemSummary],
+    trx_schema: &Arc<JSONSchema>,
+) {
+    for trx in trxs {
+        let th = trx.hash;
+        let mut cc = cc.clone();
+        let trx_schema = Arc::clone(&trx_schema);
+        tokio::spawn(async move {
+            println!("    Transaction: {}", th);
+            let status = cc.get_transaction_status(&th).await?;
+            validate_with_schema(&trx_schema, &status);
+            Ok::<_, QueryError>(())
+        });
+    }
+}
+
+/// Validate n random account infos.
+fn validate_n_account_infos(
+    cc: &mut endpoints::Client,
+    cb: HashBytes<BlockMarker>,
+    accs: &[AccountAddress],
+    acc_schema: &Arc<JSONSchema>,
+    rng: &mut rand::rngs::SmallRng,
+    n: u32,
+) {
+    let accs = accs.choose_multiple(rng, 100).copied().collect::<Vec<_>>();
+    for acc in accs {
+        println!("    Account: {}", acc);
+        let cc = cc.clone();
+        let acc_schema = Arc::clone(&acc_schema);
+
+        tokio::spawn(async move {
+            let mut cc = cc;
+            let acc_info = cc.get_account_info(acc, &cb).await?;
+            validate_with_schema(&acc_schema, &acc_info);
+            Ok::<_, QueryError>(())
+        });
+    }
+}
+
+/// Validates the input with the schema and prints any errors to stdout.
+fn validate_with_schema(schema: &JSONSchema, input: &impl Serialize) {
+    let json = serde_json::to_value(input).expect("Could not serialize into JSON value");
+    let validation_result = schema.validate(&json);
+    // Used to link the error message to a block. Needed since errors are printed in
+    // parallel.
+    if let Err(errors) = validation_result {
+        for error in errors {
+            println!("Validation error: {}", error);
+            println!("Instance path: {}", error.instance_path);
+        }
+    }
 }
 
 fn validate_json() -> anyhow::Result<()> {
