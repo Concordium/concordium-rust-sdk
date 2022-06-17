@@ -1587,10 +1587,12 @@ pub enum UpdatePayload {
     #[serde(rename = "level1")]
     Level1(Level1Update),
     #[serde(rename = "addAnonymityRevoker")]
-    #[schemars(with = "id::types::ArInfo<wrappers::WrappedCurve>")] // TODO: Fix this
+    #[schemars(with = "id::types::ArInfo<wrappers::WrappedCurve>")]
+    // TODO: Use schemars(bound) when supported instead of wrappedcurve
     AddAnonymityRevoker(Box<id::types::ArInfo<id::constants::ArCurve>>),
     #[serde(rename = "addIdentityProvider")]
-    #[schemars(with = "id::types::IpInfo<wrappers::WrappedPairing>")] // TODO: Fix this
+    #[schemars(with = "id::types::IpInfo<wrappers::WrappedPairing>")]
+    // TODO: Use schemars(bound) when supported instead of wrappedcurve
     AddIdentityProvider(Box<id::types::IpInfo<id::constants::IpPairing>>),
     #[serde(rename = "cooldownParametersCPV1")]
     CooldownParametersCPV1(CooldownParameters),
@@ -1786,7 +1788,7 @@ pub struct ProtocolUpdate {
     pub specification_url: String,
     pub specification_hash: hashes::Hash,
     #[serde(with = "crate::internal::byte_array_hex")]
-    #[schemars(with = "crate::internal::HexSchema")] // TODO
+    #[schemars(with = "crate::internal::HexSchema")] // TODO Could be more precise.
     pub specification_auxiliary_data: Vec<u8>,
 }
 
@@ -2497,10 +2499,11 @@ pub struct PendingUpdatesV0 {
     pub transaction_fee_distribution: UpdateQueue<TransactionFeeDistribution>,
     pub gas_rewards:                  UpdateQueue<GASRewards>,
     pub baker_stake_threshold:        UpdateQueue<BakerParameters>,
-    #[schemars(with = "UpdateQueue<id::types::ArInfo<wrappers::WrappedCurve>>")] // TODO: Fix this
+    #[schemars(with = "UpdateQueue<id::types::ArInfo<wrappers::WrappedCurve>>")]
+    // TODO: Use schemars(bound) attribute instead of wrappedcurve when supported.
     pub add_anonymity_revoker:        UpdateQueue<id::types::ArInfo<id::constants::ArCurve>>,
     #[schemars(with = "UpdateQueue<id::types::IpInfo<wrappers::WrappedPairing>>")]
-    // TODO: Fix this
+    // TODO: Use schemars(bound) attribute instead of wrappedpairing when supported.
     pub add_identity_provider:        UpdateQueue<id::types::IpInfo<id::constants::IpPairing>>,
 }
 
@@ -2520,10 +2523,11 @@ pub struct PendingUpdatesV1 {
     pub transaction_fee_distribution: UpdateQueue<TransactionFeeDistribution>,
     pub gas_rewards:                  UpdateQueue<GASRewards>,
     pub pool_parameters:              UpdateQueue<PoolParameters>,
-    #[schemars(with = "UpdateQueue<id::types::ArInfo<wrappers::WrappedCurve>>")] // TODO: Fix this
+    #[schemars(with = "UpdateQueue<id::types::ArInfo<wrappers::WrappedCurve>>")]
+    // TODO: Use schemars(bound) attribute instead of wrappedcurve when supported.
     pub add_anonymity_revoker:        UpdateQueue<id::types::ArInfo<id::constants::ArCurve>>,
     #[schemars(with = "UpdateQueue<id::types::IpInfo<wrappers::WrappedPairing>>")]
-    // TODO: Fix this
+    // TODO: Use schemars(bound) attribute instead of wrappedpairing when supported.
     pub add_identity_provider:        UpdateQueue<id::types::IpInfo<id::constants::IpPairing>>,
     pub cooldown_parameters:          UpdateQueue<CooldownParameters>,
     pub time_parameters:              UpdateQueue<TimeParameters>,

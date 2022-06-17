@@ -89,7 +89,7 @@ pub struct ConsensusInfo {
     /// The number of completed finalizations.
     pub finalization_count:             u64,
     #[serde(with = "crate::internal::duration_millis")]
-    #[schemars(with = "i64")] // TODO: Not sure if this is correct.
+    #[schemars(with = "i64")]
     /// Duration of an epoch.
     pub epoch_duration:                 chrono::Duration,
     /// Number of blocks that arrived, i.e., were added to the tree. Note that

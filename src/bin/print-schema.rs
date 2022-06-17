@@ -114,6 +114,8 @@ fn generate_and_write_schemas() {
     // GetBannedPeers..DumpStop (Omitted)
     write_schema_to_file::<Vec<IpInfo<wrappers::WrappedPairing>>>("GetIdentityProviders");
     write_schema_to_file::<Vec<ArInfo<wrappers::WrappedCurve>>>("GetAnonymityRevokers");
+    // NOTE: The rust-sdk returns it without Version<T>, but the gRPC API includes
+    // the version wrapper.
     write_schema_to_file::<Versioned<GlobalContext<wrappers::WrappedCurve>>>(
         "GetCryptographicParameters",
     );
@@ -163,8 +165,10 @@ async fn crawl_and_validate_against_schemas(app: App) -> anyhow::Result<()> {
     let schema_anonymity_revokers = Arc::new(
         compile_schema::<Vec<ArInfo<wrappers::WrappedCurve>>>("GetAnonymityRevokers"),
     );
+    // NOTE: The rust-sdk returns it without Version<T>, but the gRPC API includes
+    // the version wrapper.
     let schema_cryptographic_parameters = Arc::new(compile_schema::<
-        Versioned<GlobalContext<wrappers::WrappedCurve>>,
+        GlobalContext<wrappers::WrappedCurve>,
     >("GetCryptographicParameters"));
 
     let mut client = Client::connect(app.endpoint, "rpcadmin").await?;
@@ -175,7 +179,7 @@ async fn crawl_and_validate_against_schemas(app: App) -> anyhow::Result<()> {
     let mut cb = app.start_block.unwrap_or(consensus_info.best_block);
 
     let mut rng = rand::rngs::SmallRng::from_entropy();
-    let r_range = Uniform::from(0u8..255);
+    let r_range = Uniform::from(u8::MIN..u8::MAX);
     while cb != gb {
         println!("Block: {}", cb);
         let cc = client.clone();
