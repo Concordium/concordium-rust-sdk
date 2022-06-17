@@ -54,10 +54,6 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn print_n(n: u64) {
-    println!("{}", n);
-}
-
 fn validate_all_schemas() {
     compile_schema::<TransactionStatusInBlock>("GetTransactionStatusInBlock");
     compile_schema::<TransactionStatus>("GetTransactionStatus");
@@ -132,6 +128,10 @@ fn write_schema_to_file<T: JsonSchema>(endpoint_name: &str) {
     fs::write(file_name, contents).expect("Unable to write file");
 }
 
+/// Crawl the chain from provided block back and back to genesis.
+/// The node being queried is the primary bottleneck, so giving it more cores to
+/// run on signicantly increases the speed of this function. Also make sure to
+/// build this binary in release mode.
 async fn crawl_and_validate_against_schemas(app: App) -> anyhow::Result<()> {
     let schema_transaction_status_in_block = Arc::new(compile_schema::<TransactionStatusInBlock>(
         "GetTransactionStatusInBlock",
