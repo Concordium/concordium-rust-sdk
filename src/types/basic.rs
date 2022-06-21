@@ -160,6 +160,10 @@ pub enum DelegationTarget {
     },
 }
 
+impl From<BakerId> for DelegationTarget {
+    fn from(baker_id: BakerId) -> Self { Self::Baker { baker_id } }
+}
+
 impl Serial for DelegationTarget {
     fn serial<B: Buffer>(&self, out: &mut B) {
         match self {
@@ -738,7 +742,7 @@ pub struct UpdateKeysIndex {
     pub index: u16,
 }
 
-#[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize)]
+#[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize, FromStr)]
 #[serde(transparent)]
 pub struct ElectionDifficulty {
     parts_per_hundred_thousands: PartsPerHundredThousands,
