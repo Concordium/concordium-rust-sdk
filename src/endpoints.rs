@@ -108,7 +108,7 @@ pub enum BlocksAtHeightInput {
     },
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 /// Client that can perform queries.
 /// All endpoints take a `&mut self` as an argument which means that a single
 /// instance cannot be used concurrently. However instead of putting the Client

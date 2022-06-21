@@ -4,6 +4,7 @@
 - Expose helper methods to wait for new blocks or finalization.
 - Add some helper methods to `InstanceInfo`, `ElectionDifficulty` and
   `DelegationTarget` types.
+- Expose types and functions for interacting with CIS2 smart contracts.
 
 ## 1.0.2
 
