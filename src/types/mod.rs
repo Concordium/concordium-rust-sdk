@@ -128,6 +128,16 @@ pub enum AccountStakingInfo {
     },
 }
 
+impl AccountStakingInfo {
+    /// Return the amount that is staked, either as a baker or delegator.
+    pub fn staked_amount(&self) -> Amount {
+        match self {
+            AccountStakingInfo::Baker { staked_amount, .. } => *staked_amount,
+            AccountStakingInfo::Delegated { staked_amount, .. } => *staked_amount,
+        }
+    }
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// Account information exposed via the node's API. This is always the state of
@@ -1904,6 +1914,7 @@ pub enum RootUpdate {
     RootKeysUpdate(HigherLevelAccessStructure<RootKeysKind>),
     Level1KeysUpdate(HigherLevelAccessStructure<Level1KeysKind>),
     Level2KeysUpdate(Box<Authorizations<ChainParameterVersion0>>),
+    Level2KeysUpdateV1(Box<Authorizations<ChainParameterVersion1>>),
 }
 
 impl Serial for RootUpdate {
@@ -1921,6 +1932,10 @@ impl Serial for RootUpdate {
                 2u8.serial(out);
                 l2k.serial(out)
             }
+            RootUpdate::Level2KeysUpdateV1(l2k) => {
+                3u8.serial(out);
+                l2k.serial(out)
+            }
         }
     }
 }
@@ -1931,6 +1946,7 @@ impl Deserial for RootUpdate {
             0u8 => Ok(RootUpdate::RootKeysUpdate(source.get()?)),
             1u8 => Ok(RootUpdate::Level1KeysUpdate(source.get()?)),
             2u8 => Ok(RootUpdate::Level2KeysUpdate(source.get()?)),
+            3u8 => Ok(RootUpdate::Level2KeysUpdateV1(source.get()?)),
             tag => anyhow::bail!("Unknown RootUpdate tag {}", tag),
         }
     }
@@ -1945,6 +1961,7 @@ impl Deserial for RootUpdate {
 pub enum Level1Update {
     Level1KeysUpdate(HigherLevelAccessStructure<Level1KeysKind>),
     Level2KeysUpdate(Box<Authorizations<ChainParameterVersion0>>),
+    Level2KeysUpdateV1(Box<Authorizations<ChainParameterVersion1>>),
 }
 
 impl Serial for Level1Update {
@@ -1958,6 +1975,10 @@ impl Serial for Level1Update {
                 1u8.serial(out);
                 l2k.serial(out)
             }
+            Level1Update::Level2KeysUpdateV1(l2k) => {
+                2u8.serial(out);
+                l2k.serial(out)
+            }
         }
     }
 }
@@ -1967,6 +1988,7 @@ impl Deserial for Level1Update {
         match u8::deserial(source)? {
             0u8 => Ok(Level1Update::Level1KeysUpdate(source.get()?)),
             1u8 => Ok(Level1Update::Level2KeysUpdate(source.get()?)),
+            2u8 => Ok(Level1Update::Level2KeysUpdateV1(source.get()?)),
             tag => anyhow::bail!("Unknown Level1Update tag {}", tag),
         }
     }

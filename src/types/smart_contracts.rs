@@ -100,6 +100,42 @@ impl schemars::JsonSchema for InstanceInfo {
     }
 }
 
+impl InstanceInfo {
+    /// The amount of CCD owned by the instance.
+    pub fn amount(&self) -> Amount {
+        match self {
+            InstanceInfo::V0 { amount, .. } => *amount,
+            InstanceInfo::V1 { amount, .. } => *amount,
+        }
+    }
+
+    /// The source module of the instance.
+    pub fn source_module(&self) -> ModuleRef {
+        match self {
+            InstanceInfo::V0 { source_module, .. } => *source_module,
+            InstanceInfo::V1 { source_module, .. } => *source_module,
+        }
+    }
+
+    /// Entrypoints supported by the instance. This returns the full name of the
+    /// function that is suitable for inclusion in a transaction.
+    pub fn entrypoints(&self) -> &std::collections::BTreeSet<ReceiveName> {
+        match self {
+            InstanceInfo::V0 { methods, .. } => methods,
+            InstanceInfo::V1 { methods, .. } => methods,
+        }
+    }
+
+    /// Get the name of the contract, i.e., the name of the init function that
+    /// was used to create the instance.
+    pub fn name(&self) -> &InitName {
+        match self {
+            InstanceInfo::V0 { name, .. } => name,
+            InstanceInfo::V1 { name, .. } => name,
+        }
+    }
+}
+
 mod instance_parser {
     use super::*;
     #[derive(SerdeSerialize, SerdeDeserialize, Debug, schemars::JsonSchema)]
@@ -418,6 +454,12 @@ pub struct ContractContext {
 }
 
 pub const DEFAULT_INVOKE_ENERGY: Energy = Energy { energy: 10_000_000 };
+
+/// The highest amount of energy allowed when invoking a smart contract endpoint
+/// with a concordium node.
+pub const MAX_ALLOWED_INVOKE_ENERGY: Energy = Energy {
+    energy: 100_000_000_000,
+};
 
 impl ContractContext {
     /// Construct a minimal context with defaults for omitted values. The

@@ -38,9 +38,7 @@ struct AccountData {
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
     let app = {
-        let app = App::clap()
-            // .setting(AppSettings::ArgRequiredElseHelp)
-            .global_setting(AppSettings::ColoredHelp);
+        let app = App::clap().global_setting(AppSettings::ColoredHelp);
         let matches = app.get_matches();
         App::from_clap(&matches)
     };
