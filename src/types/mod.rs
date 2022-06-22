@@ -1613,7 +1613,7 @@ pub mod wrappers {
     #[derive(JsonSchema)]
     #[schemars(transparent)]
     pub struct WrappedCurve {
-        #[schemars(with = "crate::internal::HexSchema")]
+        #[schemars(with = "crypto_common::HexSchema")]
         // TODO: This is not as precise as it could be.
         inner: id::constants::ArCurve,
     }
@@ -1621,7 +1621,7 @@ pub mod wrappers {
     #[derive(Clone, Debug, JsonSchema)]
     #[schemars(transparent)]
     pub struct WrappedPairing {
-        #[schemars(with = "crate::internal::HexSchema")]
+        #[schemars(with = "crypto_common::HexSchema")]
         // TODO: This is no as precise as it could be.
         inner: id::constants::IpPairing,
     }
@@ -1788,7 +1788,7 @@ pub struct ProtocolUpdate {
     pub specification_url: String,
     pub specification_hash: hashes::Hash,
     #[serde(with = "crate::internal::byte_array_hex")]
-    #[schemars(with = "crate::internal::HexSchema")] // TODO Could be more precise.
+    #[schemars(with = "crypto_common::HexSchema")] // TODO Could be more precise.
     pub specification_auxiliary_data: Vec<u8>,
 }
 
@@ -2191,9 +2191,12 @@ impl schemars::JsonSchema for RegisteredData {
             instance_type: Some(InstanceType::String.into()),
             string: Some(
                 StringValidation {
-                    max_length: Some(MAX_REGISTERED_DATA_SIZE as u32),
+                    max_length: Some(MAX_REGISTERED_DATA_SIZE as u32), /* TODO: Should this be
+                                                                        * 2x, as it counts the
+                                                                        * hex instead of the
+                                                                        * bytes? */
                     min_length: Some(0),
-                    pattern:    Some("^([0-9]?[a-f]?)*$".into()),
+                    pattern:    Some(crypto_common::REGEX_HEX.into()),
                 }
                 .into(),
             ),
@@ -2259,6 +2262,7 @@ pub struct Memo {
     bytes: Vec<u8>,
 }
 
+// Manual implementation is needed to use max size constant.
 impl schemars::JsonSchema for Memo {
     fn schema_name() -> String { "Memo".into() }
 
@@ -2270,7 +2274,7 @@ impl schemars::JsonSchema for Memo {
                 StringValidation {
                     max_length: Some(MAX_MEMO_SIZE as u32),
                     min_length: Some(0),
-                    pattern:    Some("^([0-9]?[a-f]?)*$".into()),
+                    pattern:    Some(crypto_common::REGEX_HEX.into()),
                 }
                 .into(),
             ),

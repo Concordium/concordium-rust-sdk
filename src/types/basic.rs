@@ -596,7 +596,7 @@ impl schemars::JsonSchema for BakerAggregationVerifyKey {
                 StringValidation {
                     max_length: Some(192),
                     min_length: Some(192),
-                    pattern:    Some("^([0-9]?[a-f]?)*$".into()),
+                    pattern:    Some(crypto_common::REGEX_HEX.into()),
                 }
                 .into(),
             ),
@@ -644,7 +644,7 @@ impl schemars::JsonSchema for BakerSignatureVerifyKey {
                 StringValidation {
                     max_length: Some(64),
                     min_length: Some(64),
-                    pattern:    Some("^([0-9]?[a-f]?)*$".into()),
+                    pattern:    Some(crypto_common::REGEX_HEX.into()),
                 }
                 .into(),
             ),
@@ -692,7 +692,7 @@ impl schemars::JsonSchema for BakerElectionVerifyKey {
                 StringValidation {
                     max_length: Some(64),
                     min_length: Some(64),
-                    pattern:    Some("^([0-9]?[a-f]?)*$".into()),
+                    pattern:    Some(crypto_common::REGEX_HEX.into()),
                 }
                 .into(),
             ),
@@ -786,7 +786,7 @@ impl schemars::JsonSchema for CredentialRegistrationID {
                 StringValidation {
                     max_length: Some(96),
                     min_length: Some(96),
-                    pattern:    Some("^([0-9]?[a-f]?)*$".into()),
+                    pattern:    Some(crypto_common::REGEX_HEX.into()),
                 }
                 .into(),
             ),

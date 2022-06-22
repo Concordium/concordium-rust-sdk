@@ -81,6 +81,7 @@ fn validate_all_schemas() {
     compile_schema::<Versioned<GlobalContext<wrappers::WrappedCurve>>>(
         "GetCryptographicParameters",
     );
+    println!("All schemas follow the JSON Schema Draft 7 specification.")
 }
 
 fn generate_and_write_schemas() {

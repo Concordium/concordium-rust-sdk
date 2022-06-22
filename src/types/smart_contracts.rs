@@ -277,6 +277,7 @@ pub struct Parameter {
     bytes: Vec<u8>,
 }
 
+// Manual implementation is needed to use the max constant.
 impl schemars::JsonSchema for Parameter {
     fn schema_name() -> String { "Parameter".into() }
 
@@ -288,10 +289,7 @@ impl schemars::JsonSchema for Parameter {
                 StringValidation {
                     max_length: Some(MAX_PARAMETER_LEN as u32),
                     min_length: Some(0),
-                    pattern:    Some("^([0-9]?[a-f]?)*$".into()), /* TODO: This is not
-                                                                   * completely precise.
-                                                                   * Should ensure even
-                                                                   * length as well. */
+                    pattern:    Some(crypto_common::REGEX_HEX.into()),
                 }
                 .into(),
             ),

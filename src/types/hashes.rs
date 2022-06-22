@@ -230,6 +230,7 @@ impl<Purpose> fmt::Display for HashBytes<Purpose> {
     }
 }
 
+// Manual implementation needed due to generic parameter.
 impl<Purpose> schemars::JsonSchema for HashBytes<Purpose> {
     fn schema_name() -> String { "SHA256Hash".into() }
 
@@ -241,7 +242,7 @@ impl<Purpose> schemars::JsonSchema for HashBytes<Purpose> {
                 StringValidation {
                     max_length: Some(64),
                     min_length: Some(64),
-                    pattern:    Some("^([0-9]?[a-f]?)*".into()),
+                    pattern:    Some(crypto_common::REGEX_HEX.into()),
                 }
                 .into(),
             ),
