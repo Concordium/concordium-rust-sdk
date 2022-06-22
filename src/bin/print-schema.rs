@@ -221,7 +221,8 @@ async fn crawl_and_validate_against_schemas(app: App) -> anyhow::Result<()> {
                 validate_transaction_summaries(&cc, trxs, &schema_transaction_status);
 
                 // Check a trx in cb and gb. Only once.
-                // A potential race condition is fine since it will just be checked ~twice.
+                // A potential race condition is fine. The worst that can happen is that it is
+                // checked ~twice.
                 unsafe {
                     if !TRX_IN_BLOCK_CHECKED {
                         let th = trxs[0].hash;
@@ -273,7 +274,8 @@ async fn crawl_and_validate_against_schemas(app: App) -> anyhow::Result<()> {
             validate_with_schema(&schema_block_summary, &bs, format!("BlockSummary {}", cb));
 
             // Validate these once.
-            // A potential race condition is ok, since it will just validate these ~twice.
+            // A potential race condition is fine. The worst that can happen is that it is
+            // checked ~twice.
             unsafe {
                 if !ONE_OFF_VALIDATION_CHECKED {
                     validate_birk_parameters(&cc, &cb, schema_birk_parameters);
