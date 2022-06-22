@@ -30,14 +30,33 @@ static mut TRX_IN_BLOCK_CHECKED: bool = false;
 static mut ONE_OFF_VALIDATION_CHECKED: bool = false;
 
 #[derive(StructOpt)]
-struct App {
+enum App {
+    #[structopt(
+        name = "crawl",
+        about = "Crawl the chain from the best/provided block backwards to genesis."
+    )]
+    Crawl(CrawlOptions),
+    #[structopt(
+        name = "validate",
+        about = "Validate all the schemas against the JSON Schema Draft 7 standard"
+    )]
+    ValidateSchemas,
+    #[structopt(
+        name = "generate",
+        about = "Generate and write the schemas to the `./schemas` folder."
+    )]
+    GenerateAndWriteSchemas,
+}
+
+#[derive(StructOpt)]
+struct CrawlOptions {
     #[structopt(
         long = "node",
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
     endpoint:    tonic::transport::Endpoint,
-    #[structopt(long = "block")]
+    #[structopt(long = "block", about = "The starting block used for crawling.")]
     start_block: Option<types::hashes::BlockHash>,
 }
 
@@ -48,9 +67,13 @@ async fn main() -> anyhow::Result<()> {
         let matches = app.get_matches();
         App::from_clap(&matches)
     };
-    // generate_and_write_schemas();
-    crawl_and_validate_against_schemas(app).await?;
-    // validate_all_schemas();
+    match app {
+        App::Crawl(crawl_options) => {
+            crawl_and_validate_against_schemas(crawl_options).await?;
+        }
+        App::ValidateSchemas => validate_all_schemas(),
+        App::GenerateAndWriteSchemas => generate_and_write_schemas(),
+    }
     Ok(())
 }
 
@@ -133,7 +156,7 @@ fn write_schema_to_file<T: JsonSchema>(endpoint_name: &str) {
 /// The node being queried is the primary bottleneck, so giving it more cores to
 /// run on signicantly increases the speed of this function. Also make sure to
 /// build this binary in release mode.
-async fn crawl_and_validate_against_schemas(app: App) -> anyhow::Result<()> {
+async fn crawl_and_validate_against_schemas(options: CrawlOptions) -> anyhow::Result<()> {
     let schema_transaction_status_in_block = Arc::new(compile_schema::<TransactionStatusInBlock>(
         "GetTransactionStatusInBlock",
     ));
@@ -172,12 +195,12 @@ async fn crawl_and_validate_against_schemas(app: App) -> anyhow::Result<()> {
         GlobalContext<wrappers::WrappedCurve>,
     >("GetCryptographicParameters"));
 
-    let mut client = Client::connect(app.endpoint, "rpcadmin").await?;
+    let mut client = Client::connect(options.endpoint, "rpcadmin").await?;
 
     let consensus_info = client.get_consensus_status().await?;
     let gb = consensus_info.genesis_block;
 
-    let mut cb = app.start_block.unwrap_or(consensus_info.best_block);
+    let mut cb = options.start_block.unwrap_or(consensus_info.best_block);
 
     let mut rng = rand::rngs::SmallRng::from_entropy();
     let r_range = Uniform::from(u8::MIN..u8::MAX);
