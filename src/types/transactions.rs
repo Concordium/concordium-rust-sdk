@@ -390,17 +390,17 @@ impl ConfigureBakerPayload {
     }
 
     pub fn set_capital(&mut self, amount: Amount) -> &mut Self {
-        self.capital.insert(amount);
+        self.capital = Some(amount);
         self
     }
 
     pub fn set_restake_earnings(&mut self, restake_earnings: bool) -> &mut Self {
-        self.restake_earnings.insert(restake_earnings);
+        self.restake_earnings = Some(restake_earnings);
         self
     }
 
     pub fn set_open_for_delegation(&mut self, open_for_delegation: OpenStatus) -> &mut Self {
-        self.open_for_delegation.insert(open_for_delegation);
+        self.open_for_delegation = Some(open_for_delegation);
         self
     }
 
@@ -414,12 +414,12 @@ impl ConfigureBakerPayload {
     ) -> &mut Self {
         let keys_with_proofs =
             BakerKeysPayload::new_payload(baker_keys, sender, b"configureBaker", csprng);
-        self.keys_with_proofs.insert(keys_with_proofs);
+        self.keys_with_proofs = Some(keys_with_proofs);
         self
     }
 
     pub fn set_metadata_url(&mut self, metadata_url: UrlText) -> &mut Self {
-        self.metadata_url.insert(metadata_url);
+        self.metadata_url = Some(metadata_url);
         self
     }
 
@@ -427,8 +427,7 @@ impl ConfigureBakerPayload {
         &mut self,
         transaction_fee_commission: AmountFraction,
     ) -> &mut Self {
-        self.transaction_fee_commission
-            .insert(transaction_fee_commission);
+        self.transaction_fee_commission = Some(transaction_fee_commission);
         self
     }
 
@@ -436,8 +435,7 @@ impl ConfigureBakerPayload {
         &mut self,
         baking_reward_commission: AmountFraction,
     ) -> &mut Self {
-        self.baking_reward_commission
-            .insert(baking_reward_commission);
+        self.baking_reward_commission = Some(baking_reward_commission);
         self
     }
 
@@ -445,8 +443,7 @@ impl ConfigureBakerPayload {
         &mut self,
         finalization_reward_commission: AmountFraction,
     ) -> &mut Self {
-        self.finalization_reward_commission
-            .insert(finalization_reward_commission);
+        self.finalization_reward_commission = Some(finalization_reward_commission);
         self
     }
 }
@@ -477,17 +474,17 @@ impl ConfigureDelegationPayload {
     }
 
     pub fn set_capital(&mut self, amount: Amount) -> &mut Self {
-        self.capital.insert(amount);
+        self.capital = Some(amount);
         self
     }
 
     pub fn set_restake_earnings(&mut self, restake_earnings: bool) -> &mut Self {
-        self.restake_earnings.insert(restake_earnings);
+        self.restake_earnings = Some(restake_earnings);
         self
     }
 
     pub fn set_delegation_target(&mut self, target: DelegationTarget) -> &mut Self {
-        self.delegation_target.insert(target);
+        self.delegation_target = Some(target);
         self
     }
 }
@@ -965,13 +962,13 @@ impl Deserial for Payload {
                 let mut baking_reward_commission = None;
                 let mut finalization_reward_commission = None;
                 if bitmap & 1 != 0 {
-                    capital.insert(source.get()?);
+                    capital = Some(source.get()?);
                 }
                 if bitmap & (1 << 1) != 0 {
-                    restake_earnings.insert(source.get()?);
+                    restake_earnings = Some(source.get()?);
                 }
                 if bitmap & (1 << 2) != 0 {
-                    open_for_delegation.insert(source.get()?);
+                    open_for_delegation = Some(source.get()?);
                 }
                 if bitmap & (1 << 3) != 0 {
                     // this is serialized manually since the serialization in Haskell is not
@@ -983,7 +980,7 @@ impl Deserial for Payload {
                     let proof_sig = source.get()?;
                     let aggregation_verify_key = source.get()?;
                     let proof_aggregation = source.get()?;
-                    keys_with_proofs.insert(BakerKeysPayload {
+                    keys_with_proofs = Some(BakerKeysPayload {
                         phantom: PhantomData,
                         election_verify_key,
                         signature_verify_key,
@@ -994,16 +991,16 @@ impl Deserial for Payload {
                     });
                 }
                 if bitmap & (1 << 4) != 0 {
-                    metadata_url.insert(source.get()?);
+                    metadata_url = Some(source.get()?);
                 }
                 if bitmap & (1 << 5) != 0 {
-                    transaction_fee_commission.insert(source.get()?);
+                    transaction_fee_commission = Some(source.get()?);
                 }
                 if bitmap & (1 << 6) != 0 {
-                    baking_reward_commission.insert(source.get()?);
+                    baking_reward_commission = Some(source.get()?);
                 }
                 if bitmap & (1 << 7) != 0 {
-                    finalization_reward_commission.insert(source.get()?);
+                    finalization_reward_commission = Some(source.get()?);
                 }
                 let data = Box::new(ConfigureBakerPayload {
                     capital,
@@ -1025,13 +1022,13 @@ impl Deserial for Payload {
                     "Incorrect bitmap for configure delegation."
                 );
                 if bitmap & 1 != 0 {
-                    data.capital.insert(source.get()?);
+                    data.capital = Some(source.get()?);
                 }
                 if bitmap & (1 << 1) != 0 {
-                    data.restake_earnings.insert(source.get()?);
+                    data.restake_earnings = Some(source.get()?);
                 }
                 if bitmap & (1 << 2) != 0 {
-                    data.delegation_target.insert(source.get()?);
+                    data.delegation_target = Some(source.get()?);
                 }
                 Ok(Payload::ConfigureDelegation { data })
             }
@@ -1220,7 +1217,7 @@ pub fn verify_signature_transaction_sign_hash(
             }
             for (&ki, sig) in cred_sigs {
                 if let Some(pk) = cred_keys.get(ki) {
-                    if !pk.verify(hash, &sig) {
+                    if !pk.verify(hash, sig) {
                         return false;
                     }
                 } else {

@@ -140,7 +140,7 @@ impl<Purpose> Deref for HashBytes<Purpose> {
 }
 
 impl<Purpose> AsRef<[u8]> for HashBytes<Purpose> {
-    fn as_ref(&self) -> &[u8] { &self }
+    fn as_ref(&self) -> &[u8] { self }
 }
 
 impl<Purpose> FromStr for HashBytes<Purpose> {

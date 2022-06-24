@@ -1,5 +1,11 @@
 ## Unreleased changes
 
+## 1.1.0
+
+Bump minimum supported Rust version to 1.56.
+
+## 1.0.3
+
 - Add V1 variant of root and level 1 key updates.
 - Expose helper methods to wait for new blocks or finalization.
 - Add some helper methods to `InstanceInfo`, `ElectionDifficulty` and

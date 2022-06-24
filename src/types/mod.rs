@@ -720,7 +720,7 @@ pub struct BlockSummaryData<Upd> {
     pub finalization_data:     Option<FinalizationSummary>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
 // serialize as untagged, deserialization is custom, looking at the protocol version.
 #[serde(untagged, try_from = "block_summary_parser::BlockSummaryRaw")]
 /// Summary of transactions, protocol generated transfers, and chain parameters

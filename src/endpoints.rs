@@ -21,7 +21,11 @@ use id::{
 };
 use sha2::Digest;
 use std::{
-    borrow::Borrow, collections::BTreeMap, convert::TryInto, net::IpAddr, sync::Arc,
+    borrow::Borrow,
+    collections::BTreeMap,
+    convert::{TryFrom, TryInto},
+    net::IpAddr,
+    sync::Arc,
     time::UNIX_EPOCH,
 };
 use thiserror::Error;
@@ -124,7 +128,7 @@ impl Client {
     /// request.
     fn construct_request<T>(&self, message: T) -> RPCResult<tonic::Request<T>> {
         let mut req = tonic::Request::new(message);
-        let mv = MetadataValue::from_str(self.token.as_str())?;
+        let mv = MetadataValue::try_from(self.token.as_str())?;
         req.metadata_mut().insert("authentication", mv);
         Ok(req)
     }

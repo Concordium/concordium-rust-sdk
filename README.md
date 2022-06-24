@@ -5,6 +5,11 @@
 The SDK has support for constructing and sending transactions, and for querying
 various aspects of the chain and the node itself.
 
+## Minimum supported Rust version
+
+The current minimal version is 1.56. A MSRV bump will be accompanied by a minor
+version bump of the SDK.
+
 ## Add it to your project
 
 Until the SDK is published on [crates.io](crates.io) the recommended way to use it is to add this repository as a git submodule to your project and then add a dependency to your Cargo.toml
