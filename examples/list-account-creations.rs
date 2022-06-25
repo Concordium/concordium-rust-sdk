@@ -80,7 +80,7 @@ async fn main() -> anyhow::Result<()> {
                     .get_blocks_at_height(h.into())
                     .await
                     .context("Blocks at height.")?;
-                if blocks.len() == 0 {
+                if blocks.is_empty() {
                     return Ok::<Option<(BlockInfo, Option<BlockSummary>)>, anyhow::Error>(None);
                 }
                 let bi = cc.get_block_info(&blocks[0]).await.context("Block info.")?;
