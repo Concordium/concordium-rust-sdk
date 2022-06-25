@@ -450,7 +450,7 @@ pub enum CredentialType {
     Normal,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy, PartialEq, Eq, Hash, Display)]
 #[serde(rename_all = "camelCase")]
 // Since all variants are fieldless, the default JSON serialization will convert
 // all the variants to simple strings.
@@ -823,8 +823,25 @@ impl BlockSummary {
         }
     }
 
+    /// Return whether the block is a payday block. This is always false for
+    /// protocol versions before P4. In protocol version 4 and up this is the
+    /// block where all the rewards are paid out.
+    pub fn is_payday_block(&self) -> bool {
+        match self {
+            BlockSummary::V0 { .. } => false,
+            BlockSummary::V1 { data, .. } => data.special_events.iter().any(|ev| {
+                matches!(
+                    ev,
+                    SpecialTransactionOutcome::PaydayFoundationReward { .. }
+                        | SpecialTransactionOutcome::PaydayAccountReward { .. }
+                        | SpecialTransactionOutcome::PaydayPoolReward { .. }
+                )
+            }),
+        }
+    }
+
     /// If the block contains a finalization record this contains its
-    /// summary. Otherwise [None].
+    /// summary. Otherwise [`None`].
     pub fn finalization_data(&self) -> Option<&FinalizationSummary> {
         match self {
             BlockSummary::V0 { data, .. } => data.finalization_data.as_ref(),

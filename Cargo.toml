@@ -42,7 +42,6 @@ random_oracle = { version = "*", path = "./concordium-base/rust-src/random_oracl
 num-bigint = "0.4"
 num-traits = "0.2"
 
-
 [features]
 postgres = ["tokio-postgres"]
 
@@ -50,7 +49,6 @@ postgres = ["tokio-postgres"]
 structopt = "0.3"
 clap = "2.34"
 csv = "1.1"
-warp = "*"
 tokio = { version = "*", features = ["full"] }
 
 [[example]]

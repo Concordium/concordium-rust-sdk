@@ -148,3 +148,15 @@ affected account.
 ## Documentation
 
 The rendered documentation is available at http://developer.concordium.software/concordium-rust-sdk/
+
+## Examples
+
+A number of examples of usage are available in the [examples](./examples)
+directory. They can be compiled with
+
+```shell
+cargo build --release --example $NAME
+```
+
+where `$NAME` is the name of the file (without the `.rs` extension). The name of
+the file, and its header should briefly explain what the example does
