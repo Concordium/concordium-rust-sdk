@@ -22,10 +22,13 @@ use rand::{
 };
 use schemars::JsonSchema;
 use serde::Serialize;
-use std::{fs, sync::Arc};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use structopt::StructOpt;
 
-const SCHEMA_FOLDER: &str = "schemas";
 static mut TRX_IN_BLOCK_CHECKED: bool = false;
 static mut ONE_OFF_VALIDATION_CHECKED: bool = false;
 
@@ -45,7 +48,10 @@ enum App {
         name = "generate",
         about = "Generate and write the schemas to the `./schemas` folder."
     )]
-    GenerateAndWriteSchemas,
+    GenerateAndWriteSchemas {
+        #[structopt(long = "output_folder", short = "o", default_value = "schemas")]
+        output_folder: PathBuf,
+    },
 }
 
 #[derive(StructOpt)]
@@ -72,7 +78,9 @@ async fn main() -> anyhow::Result<()> {
             crawl_and_validate_against_schemas(crawl_options).await?;
         }
         App::ValidateSchemas => validate_all_schemas(),
-        App::GenerateAndWriteSchemas => generate_and_write_schemas(),
+        App::GenerateAndWriteSchemas { output_folder } => {
+            generate_and_write_schemas(&output_folder)
+        }
     }
     Ok(())
 }
@@ -107,43 +115,55 @@ fn validate_all_schemas() {
     println!("All schemas follow the JSON Schema Draft 7 specification.")
 }
 
-fn generate_and_write_schemas() {
+fn generate_and_write_schemas(output_folder: &Path) {
     // Ensure the schema folder exists.
-    fs::create_dir_all(SCHEMA_FOLDER).expect("Could not create schema folder");
+    fs::create_dir_all(output_folder).expect("Could not create schema folder");
 
-    write_schema_to_file::<TransactionStatusInBlock>("GetTransactionStatusInBlock");
-    write_schema_to_file::<TransactionStatus>("GetTransactionStatus");
-    write_schema_to_file::<ConsensusInfo>("GetConsensusInfo");
-    write_schema_to_file::<BlockInfo>("GetBlockInfo");
-    write_schema_to_file::<BlockSummary>("GetBlockSummary");
+    write_schema_to_file::<TransactionStatusInBlock>("GetTransactionStatusInBlock", output_folder);
+    write_schema_to_file::<TransactionStatus>("GetTransactionStatus", output_folder);
+    write_schema_to_file::<ConsensusInfo>("GetConsensusInfo", output_folder);
+    write_schema_to_file::<BlockInfo>("GetBlockInfo", output_folder);
+    write_schema_to_file::<BlockSummary>("GetBlockSummary", output_folder);
     // GetBlocksAtHeight (Omitted)
-    write_schema_to_file::<Vec<AccountAddress>>("GetAccountList");
-    write_schema_to_file::<Vec<ContractAddress>>("GetInstances");
-    write_schema_to_file::<AccountInfo>("GetAccountInfo");
-    write_schema_to_file::<Vec<TransactionHash>>("GetAccountNonFinalized");
-    write_schema_to_file::<AccountNonceResponse>("GetNextAccountNonce");
-    write_schema_to_file::<InstanceInfo>("GetInstanceInfo");
+    write_schema_to_file::<Vec<AccountAddress>>("GetAccountList", output_folder);
+    write_schema_to_file::<Vec<ContractAddress>>("GetInstances", output_folder);
+    write_schema_to_file::<AccountInfo>("GetAccountInfo", output_folder);
+    write_schema_to_file::<Vec<TransactionHash>>("GetAccountNonFinalized", output_folder);
+    write_schema_to_file::<AccountNonceResponse>("GetNextAccountNonce", output_folder);
+    write_schema_to_file::<InstanceInfo>("GetInstanceInfo", output_folder);
     // InvokeContract (Omitted)
-    write_schema_to_file::<PoolStatus>("GetPoolStatus");
-    write_schema_to_file::<Vec<BakerId>>("GetBakerList");
-    write_schema_to_file::<RewardsOverview>("GetRewardStatus");
-    write_schema_to_file::<BirkParameters>("GetBirkParameters");
-    write_schema_to_file::<Vec<ModuleRef>>("GetModuleList");
+    write_schema_to_file::<PoolStatus>("GetPoolStatus", output_folder);
+    write_schema_to_file::<Vec<BakerId>>("GetBakerList", output_folder);
+    write_schema_to_file::<RewardsOverview>("GetRewardStatus", output_folder);
+    write_schema_to_file::<BirkParameters>("GetBirkParameters", output_folder);
+    write_schema_to_file::<Vec<ModuleRef>>("GetModuleList", output_folder);
     // GetNodeInfo..GetAncestors (Omitted)
-    write_schema_to_file::<Branch>("GetBranches");
+    write_schema_to_file::<Branch>("GetBranches", output_folder);
     // GetBannedPeers..DumpStop (Omitted)
-    write_schema_to_file::<Vec<IpInfo<wrappers::WrappedPairing>>>("GetIdentityProviders");
-    write_schema_to_file::<Vec<ArInfo<wrappers::WrappedCurve>>>("GetAnonymityRevokers");
+    write_schema_to_file::<Vec<IpInfo<wrappers::WrappedPairing>>>(
+        "GetIdentityProviders",
+        output_folder,
+    );
+    write_schema_to_file::<Vec<ArInfo<wrappers::WrappedCurve>>>(
+        "GetAnonymityRevokers",
+        output_folder,
+    );
     // NOTE: The rust-sdk returns it without Version<T>, but the gRPC API includes
     // the version wrapper.
     write_schema_to_file::<Versioned<GlobalContext<wrappers::WrappedCurve>>>(
         "GetCryptographicParameters",
+        output_folder,
     );
 }
 
-fn write_schema_to_file<T: JsonSchema>(endpoint_name: &str) {
-    let file_name = format!("{}/{}.json", SCHEMA_FOLDER, endpoint_name);
-    println!("Writing {}", file_name);
+fn write_schema_to_file<T: JsonSchema>(endpoint_name: &str, output_folder: &Path) {
+    let file_name = {
+        let mut o = output_folder.to_path_buf();
+        o.push(endpoint_name);
+        o.set_extension("json");
+        o
+    };
+    println!("Writing {}", file_name.to_string_lossy());
     let schema = schemars::schema_for!(T);
     let contents = format!(
         "{}",
