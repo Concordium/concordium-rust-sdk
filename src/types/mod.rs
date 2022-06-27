@@ -2213,10 +2213,9 @@ impl schemars::JsonSchema for RegisteredData {
             instance_type: Some(InstanceType::String.into()),
             string: Some(
                 StringValidation {
-                    max_length: Some(MAX_REGISTERED_DATA_SIZE as u32), /* TODO: Should this be
-                                                                        * 2x, as it counts the
-                                                                        * hex instead of the
-                                                                        * bytes? */
+                    // The length is measured in chars, but the size limit is in bytes and each
+                    // byte is two chars. Thus the doubling.
+                    max_length: Some(MAX_REGISTERED_DATA_SIZE as u32 * 2),
                     min_length: Some(0),
                     pattern:    Some(crypto_common::REGEX_HEX.into()),
                 }
@@ -2294,7 +2293,9 @@ impl schemars::JsonSchema for Memo {
             instance_type: Some(InstanceType::String.into()),
             string: Some(
                 StringValidation {
-                    max_length: Some(MAX_MEMO_SIZE as u32),
+                    // The length is measured in chars, but the size limit is in bytes and each
+                    // byte is two chars. Thus the doubling.
+                    max_length: Some(MAX_MEMO_SIZE as u32 * 2),
                     min_length: Some(0),
                     pattern:    Some(crypto_common::REGEX_HEX.into()),
                 }

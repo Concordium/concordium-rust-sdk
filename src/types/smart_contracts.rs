@@ -323,7 +323,9 @@ impl schemars::JsonSchema for Parameter {
             instance_type: Some(InstanceType::String.into()),
             string: Some(
                 StringValidation {
-                    max_length: Some(MAX_PARAMETER_LEN as u32),
+                    // The length is measured in chars, but the size limit is in bytes and each
+                    // byte is two chars. Thus the doubling.
+                    max_length: Some(MAX_PARAMETER_LEN as u32 * 2),
                     min_length: Some(0),
                     pattern:    Some(crypto_common::REGEX_HEX.into()),
                 }
