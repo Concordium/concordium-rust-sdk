@@ -431,7 +431,7 @@ impl WasmModule {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Clone, schemars::JsonSchema)]
 /// Data needed to invoke the contract.
 pub struct ContractContext {
     /// Invoker of the contract. If this is not supplied then the contract will

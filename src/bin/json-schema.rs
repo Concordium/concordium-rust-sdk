@@ -8,7 +8,7 @@ use concordium_rust_sdk::{
     types::{
         hashes::{BlockHash, TransactionHash},
         queries::*,
-        smart_contracts::{InstanceInfo, ModuleRef},
+        smart_contracts::{ContractContext, InstanceInfo, ModuleRef},
         *,
     },
     *,
@@ -131,7 +131,9 @@ fn generate_and_write_schemas(output_folder: &Path) {
     write_schema_to_file::<Vec<TransactionHash>>("GetAccountNonFinalized", output_folder);
     write_schema_to_file::<AccountNonceResponse>("GetNextAccountNonce", output_folder);
     write_schema_to_file::<InstanceInfo>("GetInstanceInfo", output_folder);
-    // InvokeContract (Omitted)
+    // write_schema_to_file::<InvokeContractResult>("InvokeContract",
+    // output_folder); TODO: Derive the schema.
+    write_schema_to_file::<ContractContext>("ContractContext", output_folder);
     write_schema_to_file::<PoolStatus>("GetPoolStatus", output_folder);
     write_schema_to_file::<Vec<BakerId>>("GetBakerList", output_folder);
     write_schema_to_file::<RewardsOverview>("GetRewardStatus", output_folder);
