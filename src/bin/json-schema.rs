@@ -8,7 +8,7 @@ use concordium_rust_sdk::{
     types::{
         hashes::{BlockHash, TransactionHash},
         queries::*,
-        smart_contracts::{ContractContext, InstanceInfo, ModuleRef},
+        smart_contracts::{ContractContext, InstanceInfo, InvokeContractResult, ModuleRef},
         *,
     },
     *,
@@ -40,13 +40,9 @@ enum App {
     )]
     Crawl(CrawlOptions),
     #[structopt(
-        name = "validate",
-        about = "Validate all the schemas against the JSON Schema Draft 7 standard"
-    )]
-    ValidateSchemas,
-    #[structopt(
         name = "generate",
-        about = "Generate and write the schemas to the `./schemas` folder."
+        about = "Generate, validate, and write the schemas to the output_folder (`./schema` by \
+                 default) folder."
     )]
     GenerateAndWriteSchemas {
         #[structopt(long = "output_folder", short = "o", default_value = "schemas")]
@@ -77,42 +73,11 @@ async fn main() -> anyhow::Result<()> {
         App::Crawl(crawl_options) => {
             crawl_and_validate_against_schemas(crawl_options).await?;
         }
-        App::ValidateSchemas => validate_all_schemas(),
         App::GenerateAndWriteSchemas { output_folder } => {
             generate_and_write_schemas(&output_folder)
         }
     }
     Ok(())
-}
-
-fn validate_all_schemas() {
-    compile_schema::<TransactionStatusInBlock>("GetTransactionStatusInBlock");
-    compile_schema::<TransactionStatus>("GetTransactionStatus");
-    compile_schema::<ConsensusInfo>("GetConsensusInfo");
-    compile_schema::<BlockInfo>("GetBlockInfo");
-    compile_schema::<BlockSummary>("GetBlockSummary");
-    // GetBlocksAtHeight (Omitted)
-    compile_schema::<Vec<AccountAddress>>("GetAccountList");
-    compile_schema::<Vec<ContractAddress>>("GetInstances");
-    compile_schema::<AccountInfo>("GetAccountInfo");
-    compile_schema::<Vec<TransactionHash>>("GetAccountNonFinalized");
-    compile_schema::<AccountNonceResponse>("GetNextAccountNonce");
-    compile_schema::<InstanceInfo>("GetInstanceInfo");
-    // InvokeContract (Omitted)
-    compile_schema::<PoolStatus>("GetPoolStatus");
-    compile_schema::<Vec<BakerId>>("GetBakerList");
-    compile_schema::<RewardsOverview>("GetRewardStatus");
-    compile_schema::<BirkParameters>("GetBirkParameters");
-    compile_schema::<Vec<ModuleRef>>("GetModuleList");
-    // GetNodeInfo..GetAncestors (Omitted)
-    compile_schema::<Branch>("GetBranches");
-    // GetBannedPeers..DumpStop (Omitted)
-    compile_schema::<Vec<IpInfo<wrappers::WrappedPairing>>>("GetIdentityProviders");
-    compile_schema::<Vec<ArInfo<wrappers::WrappedCurve>>>("GetAnonymityRevokers");
-    compile_schema::<Versioned<GlobalContext<wrappers::WrappedCurve>>>(
-        "GetCryptographicParameters",
-    );
-    println!("All schemas follow the JSON Schema Draft 7 specification.")
 }
 
 fn generate_and_write_schemas(output_folder: &Path) {
@@ -124,22 +89,22 @@ fn generate_and_write_schemas(output_folder: &Path) {
     write_schema_to_file::<ConsensusInfo>("GetConsensusInfo", output_folder);
     write_schema_to_file::<BlockInfo>("GetBlockInfo", output_folder);
     write_schema_to_file::<BlockSummary>("GetBlockSummary", output_folder);
-    // GetBlocksAtHeight (Omitted)
+    write_schema_to_file::<Vec<BlockHash>>("GetBlocksAtHeight", output_folder);
     write_schema_to_file::<Vec<AccountAddress>>("GetAccountList", output_folder);
     write_schema_to_file::<Vec<ContractAddress>>("GetInstances", output_folder);
     write_schema_to_file::<AccountInfo>("GetAccountInfo", output_folder);
     write_schema_to_file::<Vec<TransactionHash>>("GetAccountNonFinalized", output_folder);
     write_schema_to_file::<AccountNonceResponse>("GetNextAccountNonce", output_folder);
     write_schema_to_file::<InstanceInfo>("GetInstanceInfo", output_folder);
-    // write_schema_to_file::<InvokeContractResult>("InvokeContract",
-    // output_folder); TODO: Derive the schema.
+    write_schema_to_file::<InvokeContractResult>("InvokeContract", output_folder);
     write_schema_to_file::<ContractContext>("ContractContext", output_folder);
     write_schema_to_file::<PoolStatus>("GetPoolStatus", output_folder);
     write_schema_to_file::<Vec<BakerId>>("GetBakerList", output_folder);
     write_schema_to_file::<RewardsOverview>("GetRewardStatus", output_folder);
     write_schema_to_file::<BirkParameters>("GetBirkParameters", output_folder);
     write_schema_to_file::<Vec<ModuleRef>>("GetModuleList", output_folder);
-    // GetNodeInfo..GetAncestors (Omitted)
+    // GetNodeInfo..LeaveNetwork (Omitted)
+    write_schema_to_file::<Vec<BlockHash>>("GetAncestors", output_folder);
     write_schema_to_file::<Branch>("GetBranches", output_folder);
     // GetBannedPeers..DumpStop (Omitted)
     write_schema_to_file::<Vec<IpInfo<wrappers::WrappedPairing>>>(
@@ -158,6 +123,8 @@ fn generate_and_write_schemas(output_folder: &Path) {
     );
 }
 
+/// Generates the schemas, validates it, and writes the schema to the file
+/// `<output_folder>/<endpoint_name>.json`.
 fn write_schema_to_file<T: JsonSchema>(endpoint_name: &str, output_folder: &Path) {
     let file_name = {
         let mut o = output_folder.to_path_buf();
@@ -167,6 +134,10 @@ fn write_schema_to_file<T: JsonSchema>(endpoint_name: &str, output_folder: &Path
     };
     println!("Writing {}", file_name.to_string_lossy());
     let schema = schemars::schema_for!(T);
+
+    // Also validate the schema
+    let _ = compile_schema::<T>(endpoint_name);
+
     let contents = format!(
         "{}",
         serde_json::to_string_pretty(&schema).expect("Unable to pretty print JSON schema")

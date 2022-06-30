@@ -487,14 +487,15 @@ impl ContractContext {
 fn return_zero_amount() -> Amount { Amount::from_micro_ccd(0) }
 fn return_default_invoke_energy() -> Energy { DEFAULT_INVOKE_ENERGY }
 
-#[derive(SerdeDeserialize, SerdeSerialize, Debug, Clone, Into)]
+#[derive(SerdeDeserialize, SerdeSerialize, Debug, Clone, Into, schemars::JsonSchema)]
 #[serde(transparent)]
 pub struct ReturnValue {
     #[serde(with = "crate::internal::byte_array_hex")]
+    #[schemars(with = "crypto_common::HexSchema")]
     pub value: Vec<u8>,
 }
 
-#[derive(Debug, Clone, SerdeDeserialize)]
+#[derive(Debug, Clone, SerdeDeserialize, schemars::JsonSchema)]
 #[serde(tag = "tag")]
 pub enum InvokeContractResult {
     #[serde(rename = "success", rename_all = "camelCase")]
