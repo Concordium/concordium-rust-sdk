@@ -373,10 +373,10 @@ impl schemars::JsonSchema for ContractEvent {
             instance_type: Some(InstanceType::String.into()),
             string: Some(
                 StringValidation {
-                    max_length: None,
-                    min_length: Some(0),
-                    pattern:    Some("^([0-9]?[a-f]?)*$".into()), /* TODO: Does not ensure even
-                                                                   * length */
+                    max_length: Some(1024), /* The limit is 512 bytes, which is represented as
+                                             * 1024 chars in the string. */
+                    min_length: None,
+                    pattern:    Some(crypto_common::REGEX_HEX.into()),
                 }
                 .into(),
             ),
