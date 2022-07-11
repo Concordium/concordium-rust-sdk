@@ -84,40 +84,43 @@ fn generate_and_write_schemas(output_folder: &Path) {
     // Ensure the schema folder exists.
     fs::create_dir_all(output_folder).expect("Could not create schema folder");
 
-    write_schema_to_file::<TransactionStatusInBlock>("GetTransactionStatusInBlock", output_folder);
-    write_schema_to_file::<TransactionStatus>("GetTransactionStatus", output_folder);
+    write_schema_to_file::<Option<TransactionStatusInBlock>>(
+        "GetTransactionStatusInBlock",
+        output_folder,
+    );
+    write_schema_to_file::<Option<TransactionStatus>>("GetTransactionStatus", output_folder);
     write_schema_to_file::<ConsensusInfo>("GetConsensusInfo", output_folder);
-    write_schema_to_file::<BlockInfo>("GetBlockInfo", output_folder);
-    write_schema_to_file::<BlockSummary>("GetBlockSummary", output_folder);
+    write_schema_to_file::<Option<BlockInfo>>("GetBlockInfo", output_folder);
+    write_schema_to_file::<Option<BlockSummary>>("GetBlockSummary", output_folder);
     write_schema_to_file::<Vec<BlockHash>>("GetBlocksAtHeight", output_folder);
-    write_schema_to_file::<Vec<AccountAddress>>("GetAccountList", output_folder);
-    write_schema_to_file::<Vec<ContractAddress>>("GetInstances", output_folder);
-    write_schema_to_file::<AccountInfo>("GetAccountInfo", output_folder);
-    write_schema_to_file::<Vec<TransactionHash>>("GetAccountNonFinalized", output_folder);
-    write_schema_to_file::<AccountNonceResponse>("GetNextAccountNonce", output_folder);
-    write_schema_to_file::<InstanceInfo>("GetInstanceInfo", output_folder);
-    write_schema_to_file::<InvokeContractResult>("InvokeContract", output_folder);
+    write_schema_to_file::<Option<Vec<AccountAddress>>>("GetAccountList", output_folder);
+    write_schema_to_file::<Option<Vec<ContractAddress>>>("GetInstances", output_folder);
+    write_schema_to_file::<Option<AccountInfo>>("GetAccountInfo", output_folder);
+    write_schema_to_file::<Option<Vec<TransactionHash>>>("GetAccountNonFinalized", output_folder);
+    write_schema_to_file::<Option<AccountNonceResponse>>("GetNextAccountNonce", output_folder);
+    write_schema_to_file::<Option<InstanceInfo>>("GetInstanceInfo", output_folder);
+    write_schema_to_file::<Option<InvokeContractResult>>("InvokeContract", output_folder);
     write_schema_to_file::<ContractContext>("ContractContext", output_folder);
-    write_schema_to_file::<PoolStatus>("GetPoolStatus", output_folder);
-    write_schema_to_file::<Vec<BakerId>>("GetBakerList", output_folder);
-    write_schema_to_file::<RewardsOverview>("GetRewardStatus", output_folder);
-    write_schema_to_file::<BirkParameters>("GetBirkParameters", output_folder);
-    write_schema_to_file::<Vec<ModuleRef>>("GetModuleList", output_folder);
+    write_schema_to_file::<Option<PoolStatus>>("GetPoolStatus", output_folder);
+    write_schema_to_file::<Option<Vec<BakerId>>>("GetBakerList", output_folder);
+    write_schema_to_file::<Option<RewardsOverview>>("GetRewardStatus", output_folder);
+    write_schema_to_file::<Option<BirkParameters>>("GetBirkParameters", output_folder);
+    write_schema_to_file::<Option<Vec<ModuleRef>>>("GetModuleList", output_folder);
     // GetNodeInfo..LeaveNetwork (Omitted)
-    write_schema_to_file::<Vec<BlockHash>>("GetAncestors", output_folder);
+    write_schema_to_file::<Option<Vec<BlockHash>>>("GetAncestors", output_folder);
     write_schema_to_file::<Branch>("GetBranches", output_folder);
     // GetBannedPeers..DumpStop (Omitted)
-    write_schema_to_file::<Vec<IpInfo<wrappers::WrappedPairing>>>(
+    write_schema_to_file::<Option<Vec<IpInfo<wrappers::WrappedPairing>>>>(
         "GetIdentityProviders",
         output_folder,
     );
-    write_schema_to_file::<Vec<ArInfo<wrappers::WrappedCurve>>>(
+    write_schema_to_file::<Option<Vec<ArInfo<wrappers::WrappedCurve>>>>(
         "GetAnonymityRevokers",
         output_folder,
     );
     // NOTE: The rust-sdk returns it without Version<T>, but the gRPC API includes
     // the version wrapper.
-    write_schema_to_file::<Versioned<GlobalContext<wrappers::WrappedCurve>>>(
+    write_schema_to_file::<Option<Versioned<GlobalContext<wrappers::WrappedCurve>>>>(
         "GetCryptographicParameters",
         output_folder,
     );
