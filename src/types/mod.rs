@@ -176,8 +176,8 @@ pub struct AccountInfo {
     /// account is a baker. Hence it is exposed here as well.
     pub account_index:            AccountIndex,
     #[serde(default)]
-    /// `Some` if and only if the account is a baker or delegator. In that case
-    /// it is the information about the baker or delegator.
+    /// `Some` (non-null) if and only if the account is a baker or delegator. In
+    /// that case it is the information about the baker or delegator.
     // this is a bit of a hacky way of JSON parsing, and **relies** on
     // the account staking info serde instance being "untagged"
     #[serde(rename = "accountBaker", alias = "accountDelegation")]

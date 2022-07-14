@@ -435,7 +435,7 @@ impl WasmModule {
 /// Data needed to invoke the contract.
 pub struct ContractContext {
     /// Invoker of the contract. If this is not supplied then the contract will
-    /// be invoked, by an account with address 0, no credentials and
+    /// be invoked by an account with address 0, no credentials and
     /// sufficient amount of CCD to cover the transfer amount. If given, the
     /// relevant address must exist in the blockstate.
     pub invoker:   Option<Address>,
@@ -446,12 +446,13 @@ pub struct ContractContext {
     pub amount:    Amount,
     /// Which entrypoint to invoke.
     pub method:    ReceiveName,
-    /// And with what parameter.
+    /// Parameter to invoke with.
     #[serde(default)]
     pub parameter: Parameter,
-    /// And what amount of energy to allow for execution. This should be small
+    /// The amount of energy to allow for execution. This should be small
     /// enough so that it can be converted to interpreter energy.
     #[serde(default = "return_default_invoke_energy")]
+    #[schemars(range(min = 0, max = 100_000_000_000u64))]
     pub energy:    Energy,
 }
 
