@@ -37,7 +37,7 @@ ecvrf = { version = "*", path = "./concordium-base/rust-src/ecvrf" }
 aggregate_sig = { version = "*", path = "./concordium-base/rust-src/aggregate_sig" }
 encrypted_transfers = { version = "*", path = "./concordium-base/rust-src/encrypted_transfers" }
 eddsa_ed25519 = { version = "*", path = "./concordium-base/rust-src/eddsa_ed25519/" }
-concordium-contracts-common = { version = "*", path = "./concordium-contracts-common/", features = ["derive-serde"]}
+concordium-contracts-common = { version = "*", path = "./concordium-contracts-common/concordium-contracts-common", features = ["derive-serde", "sdk"]}
 random_oracle = { version = "*", path = "./concordium-base/rust-src/random_oracle/" }
 num-bigint = "0.4"
 num-traits = "0.2"
