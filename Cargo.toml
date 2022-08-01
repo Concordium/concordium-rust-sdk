@@ -44,6 +44,7 @@ num-traits = "0.2"
 
 [features]
 postgres = ["tokio-postgres"]
+derive = ["concordium-contracts-common/derive"]
 
 [dev-dependencies]
 structopt = "0.3"
