@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+- Expose macros for deriving `Serial` and `Deserial` from `concordium-contracts-common`.
+
 ## 1.1.0
 
 Bump minimum supported Rust version to 1.56.
