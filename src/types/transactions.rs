@@ -220,7 +220,7 @@ pub enum ConfigureBakerKeysMarker {}
 /// markers: `AddBakerKeysMarker` and `UpdateBakerKeysMarker`.
 pub struct BakerKeysPayload<V> {
     #[serde(skip)] // use default when deserializing
-    phantom:                    PhantomData<V>,
+    phantom: PhantomData<V>,
     /// New public key for participating in the election lottery.
     pub election_verify_key:    BakerElectionVerifyKey,
     /// New public key for verifying this baker's signatures.
@@ -333,7 +333,7 @@ pub struct InitContractPayload {
     /// Reference to the module from which to initialize the instance.
     pub mod_ref:   smart_contracts::ModuleRef,
     /// Name of the contract in the module.
-    pub init_name: smart_contracts::InitName,
+    pub init_name: smart_contracts::OwnedContractName,
     /// Message to invoke the initialization method with.
     pub param:     smart_contracts::Parameter,
 }
@@ -348,7 +348,7 @@ pub struct UpdateContractPayload {
     /// Address of the contract instance to invoke.
     pub address:      ContractAddress,
     /// Name of the method to invoke on the contract.
-    pub receive_name: smart_contracts::ReceiveName,
+    pub receive_name: smart_contracts::OwnedReceiveName,
     /// Message to send to the contract instance.
     pub message:      smart_contracts::Parameter,
 }
