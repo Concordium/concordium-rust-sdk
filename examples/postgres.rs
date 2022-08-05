@@ -44,11 +44,9 @@ async fn main() -> anyhow::Result<()> {
     .await;
 
     let rows = db
-        .query_contract(
-            ContractAddress::new(0.into(), 0.into()),
-            20,
-            QueryOrder::Ascending { start: None },
-        )
+        .query_contract(ContractAddress::new(0, 0), 20, QueryOrder::Ascending {
+            start: None,
+        })
         .await?;
     rows.for_each(|entry| async move {
         println!("{:?}", entry);
@@ -64,11 +62,9 @@ async fn main() -> anyhow::Result<()> {
     .await;
 
     let rows = db
-        .query_contract(
-            ContractAddress::new(0.into(), 0.into()),
-            20,
-            QueryOrder::Descending { start: None },
-        )
+        .query_contract(ContractAddress::new(0, 0), 20, QueryOrder::Descending {
+            start: None,
+        })
         .await?;
     rows.for_each(|entry| async move {
         println!("{:?}", entry);

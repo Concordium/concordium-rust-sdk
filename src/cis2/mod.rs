@@ -262,7 +262,7 @@ impl Cis2Contract {
         let contract_context = smart_contracts::ContractContext {
             invoker:   None,
             contract:  self.address,
-            amount:    common::types::Amount::from(0),
+            amount:    common::types::Amount::from_micro_ccd(0),
             method:    receive_name,
             parameter: smart_contracts::Parameter::from(bytes),
             energy:    smart_contracts::MAX_ALLOWED_INVOKE_ENERGY,
@@ -310,7 +310,7 @@ impl Cis2Contract {
         let contract_context = smart_contracts::ContractContext {
             invoker:   None,
             contract:  self.address,
-            amount:    common::types::Amount::from(0),
+            amount:    common::types::Amount::from_micro_ccd(0),
             method:    receive_name,
             parameter: smart_contracts::Parameter::from(bytes),
             energy:    smart_contracts::MAX_ALLOWED_INVOKE_ENERGY,
@@ -358,7 +358,7 @@ impl Cis2Contract {
         let contract_context = smart_contracts::ContractContext {
             invoker:   None,
             contract:  self.address,
-            amount:    common::types::Amount::from(0),
+            amount:    common::types::Amount::from_micro_ccd(0),
             method:    receive_name,
             parameter: smart_contracts::Parameter::from(bytes),
             energy:    smart_contracts::MAX_ALLOWED_INVOKE_ENERGY,
