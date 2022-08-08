@@ -107,11 +107,11 @@ async fn main() -> anyhow::Result<()> {
                 match account_stake {
                     AccountStakingInfo::Baker { staked_amount, .. } => {
                         num_bakers += 1;
-                        total_staked_amount = total_staked_amount + staked_amount;
+                        total_staked_amount += staked_amount;
                         true
                     }
                     AccountStakingInfo::Delegated { staked_amount, .. } => {
-                        total_delegated_amount = total_delegated_amount + staked_amount;
+                        total_delegated_amount += staked_amount;
 
                         false
                     }
@@ -120,7 +120,7 @@ async fn main() -> anyhow::Result<()> {
                 false
             };
 
-            total_amount = total_amount + info.account_amount;
+            total_amount += info.account_amount;
 
             let acc_type =
                 info.account_credentials

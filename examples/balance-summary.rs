@@ -135,13 +135,10 @@ async fn main() -> anyhow::Result<()> {
     while let Some(res) = receiver.recv().await {
         let (acc, additional_stake, additional_amount, additional_scheduled, additional_liquid) =
             res?;
-        staked_amount = staked_amount + additional_stake;
-
-        total_amount = total_amount + additional_amount;
-
-        locked_amount = locked_amount + additional_scheduled;
-
-        liquid_amount = liquid_amount + additional_liquid;
+        staked_amount += additional_stake;
+        total_amount += additional_amount;
+        locked_amount += additional_scheduled;
+        liquid_amount += additional_liquid;
 
         out.push((acc, additional_liquid, additional_amount));
     }
@@ -178,7 +175,7 @@ async fn main() -> anyhow::Result<()> {
         }
         for res in futures::future::join_all(handles).await {
             let (addr, info) = res??;
-            total_contract_amount = total_contract_amount + info.amount();
+            total_contract_amount += info.amount();
 
             cout.push((addr, info));
         }
@@ -188,7 +185,7 @@ async fn main() -> anyhow::Result<()> {
     for (addr, info) in cout.iter().take(20) {
         println!(
             "{}: at <{}, {}> owns {}",
-            <&str as From<_>>::from(info.name()),
+            info.name().as_contract_name().get_chain_name(),
             addr.index,
             addr.subindex,
             info.amount()

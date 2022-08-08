@@ -751,7 +751,7 @@ mod block_summary_parser {
         protocol_version: super::ProtocolVersion,
         #[serde(flatten)]
         // parse first into a value
-        data: super::BlockSummaryData<serde_json::Value>,
+        data:             super::BlockSummaryData<serde_json::Value>,
     }
 
     impl std::convert::TryFrom<BlockSummaryRaw> for super::BlockSummary {
@@ -1889,7 +1889,7 @@ pub struct HigherLevelAccessStructure<Kind> {
     pub keys:      Vec<UpdatePublicKey>,
     pub threshold: UpdateKeysThreshold,
     #[serde(skip)] // use default when deserializing
-    pub _phantom: PhantomData<Kind>,
+    pub _phantom:  PhantomData<Kind>,
 }
 
 impl<Kind> Deserial for HigherLevelAccessStructure<Kind> {
