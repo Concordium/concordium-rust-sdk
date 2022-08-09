@@ -74,3 +74,5 @@ pub use eddsa_ed25519;
 
 /// Re-export the VRF function implementation.
 pub use ecvrf;
+
+pub mod v2;
