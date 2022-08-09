@@ -905,6 +905,26 @@ pub struct BlockItemSummary {
 }
 
 impl BlockItemSummary {
+    /// Return whether the transaction was successful, i.e., the intended effect
+    /// happened.
+    pub fn is_success(&self) -> bool {
+        match &self.details {
+            BlockItemSummaryDetails::AccountTransaction(ad) => ad.is_rejected().is_none(),
+            BlockItemSummaryDetails::AccountCreation(_) => true,
+            BlockItemSummaryDetails::Update(_) => true,
+        }
+    }
+
+    /// Return whether the transaction has failed to achieve the intended
+    /// effects.
+    pub fn is_reject(&self) -> bool {
+        match &self.details {
+            BlockItemSummaryDetails::AccountTransaction(ad) => ad.is_rejected().is_some(),
+            BlockItemSummaryDetails::AccountCreation(_) => false,
+            BlockItemSummaryDetails::Update(_) => false,
+        }
+    }
+
     pub fn sender_account(&self) -> Option<AccountAddress> {
         match &self.details {
             BlockItemSummaryDetails::AccountTransaction(at) => Some(at.sender),
@@ -2459,8 +2479,6 @@ pub enum RejectReason {
         receive_name:     smart_contracts::OwnedReceiveName,
         parameter:        smart_contracts::Parameter,
     },
-    /// Reward account desired by the baker does not exist.
-    NonExistentRewardAccount { contents: AccountAddress },
     /// Proof that the baker owns relevant private keys is not valid.
     InvalidProof,
     /// Tried to add baker for an account that already has a baker
