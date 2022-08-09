@@ -4,10 +4,10 @@
 - Address method `is_alias_of` is now `is_alias`.
 - Replaced `ReceiveName` and `InitName` with `OwnedReceiveName` and `OwnedContractName` from `concordium-contracts-common`.
 - Remove `ContractAddress` and `Address` in favor of their equivalents in `concordium-contracts-common`.
-- `AccountAddress::new` is renamed to `account_address_from_registration_id`.
-- `Amount` now have a field `micro_ccd` instead of `microgtu`.
+- `AccountAddress::new` is replaced by a function called `account_address_from_registration_id`.
+- `Amount` now has a field `micro_ccd` instead of `microgtu`.
 - The default arithmetic (operator syntax, such as `+`, `-`, `*`) with `Amount` is now unchecked.
-- There are no longer implementations of `From<u64> for Amount` and `From<Amount> for u64` as the behavior of these are not obvious.
+- There are no longer implementations of `From<u64> for Amount` and `From<Amount> for u64` as the behavior of these is not obvious.
   Instead, the functions `Amount::from_micro_ccd` or `Amount::from_ccd` and the getter `micro_ccd` should be used instead.
 
 ## 1.1.0
