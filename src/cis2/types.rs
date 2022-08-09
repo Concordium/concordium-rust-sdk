@@ -226,7 +226,7 @@ impl From<i32> for Cis2ErrorRejectReason {
 /// Additional data which can be included for each transfer in the
 /// transfer parameter for the CIS2 contract function `transfer`.
 /// Allows up to `u16::MAX` number of bytes.
-#[derive(Debug, Clone, AsRef)]
+#[derive(Default, Debug, Clone, AsRef)]
 pub struct AdditionalData {
     data: Vec<u8>,
 }
