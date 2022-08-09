@@ -9,6 +9,9 @@
 - The default arithmetic (operator syntax, such as `+`, `-`, `*`) with `Amount` is now unchecked.
 - There are no longer implementations of `From<u64> for Amount` and `From<Amount> for u64` as the behavior of these is not obvious.
   Instead, the functions `Amount::from_micro_ccd` or `Amount::from_ccd` and the getter `micro_ccd` should be used instead.
+- Implement `Display` and `FromStr` for `ContractAddress` formatted as `<index, subindex>`, E.g `<145,0>`.
+- Implement `Display` and `FromStr` for `Address`. The latter attempts to parse a contract address. If this fails it will attempt to parse an `AccountAddress`.
+- Implement `FromStr` for `OwnedReceiveName`.
 
 ## 1.1.0
 
