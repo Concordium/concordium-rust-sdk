@@ -7,6 +7,7 @@
 //! - difference between receive and slot times
 //! - difference between arrive and slot times
 //! - whether the block contains a finalization record
+//! - the number of transactions included in the block
 use anyhow::Context;
 use chrono::Utc;
 use clap::AppSettings;
@@ -122,7 +123,7 @@ async fn main() -> anyhow::Result<()> {
                     .sum::<u32>();
                 h = h.next();
                 println!(
-                    "{}, {}, {}, {}, {}ms, {}ms, {}, {}",
+                    "{}, {}, {}, {}, {}ms, {}ms, {}, {}, {}",
                     bi.block_hash,
                     bi.block_slot_time.format("%H:%M:%S%.3f"),
                     bi.block_receive_time.format("%H:%M:%S%.3f"),
@@ -134,7 +135,8 @@ async fn main() -> anyhow::Result<()> {
                         .signed_duration_since(bi.block_slot_time)
                         .num_milliseconds(),
                     payday_block,
-                    summary.finalization_data().is_some()
+                    summary.finalization_data().is_some(),
+                    bi.transaction_count
                 );
                 if summary.finalization_data().is_some() {
                     finalization_count += 1
