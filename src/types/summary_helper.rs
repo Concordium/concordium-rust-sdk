@@ -738,7 +738,7 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
             }) => BlockItemSummary {
                 sender:       None,
                 hash:         bi.hash,
-                cost:         0.into(),
+                cost:         Amount::zero(),
                 energy_cost:  bi.energy_cost,
                 summary_type: BlockItemType::CredentialDeployment(credential_type),
                 result:       BlockItemResult::Success {
@@ -758,7 +758,7 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
             }) => BlockItemSummary {
                 sender:       None,
                 hash:         bi.hash,
-                cost:         0.into(),
+                cost:         Amount::zero(),
                 energy_cost:  bi.energy_cost,
                 summary_type: BlockItemType::Update(payload.update_type()),
                 result:       BlockItemResult::Success {

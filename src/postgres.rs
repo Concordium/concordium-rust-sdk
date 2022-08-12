@@ -313,12 +313,7 @@ impl DatabaseClient {
             ),
         };
 
-        let params: [i64; 4] = [
-            u64::from(c.index) as i64,
-            u64::from(c.subindex) as i64,
-            start,
-            limit,
-        ];
+        let params: [i64; 4] = [c.index as i64, c.subindex as i64, start, limit];
 
         let rows = self.query(statement, &params).await?;
         Ok(rows.filter_map(|row_or_err| async move { construct_row(row_or_err) }))

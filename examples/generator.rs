@@ -1,7 +1,10 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize},
+    common::{
+        types::{Amount, TransactionTime},
+        SerdeDeserialize, SerdeSerialize,
+    },
     endpoints,
     id::types::{AccountAddress, AccountKeys},
     types::{
@@ -90,7 +93,7 @@ async fn main() -> anyhow::Result<()> {
                 nonce,
                 expiry,
                 accounts[count % accounts.len()],
-                0.into(),
+                Amount::zero(),
             );
             nonce.next_mut();
             count += 1;

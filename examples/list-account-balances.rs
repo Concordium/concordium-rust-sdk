@@ -83,9 +83,9 @@ async fn main() -> anyhow::Result<()> {
     let total_accounts = accounts.len();
     let mut num_bakers = 0;
     let mut num_initial = 0;
-    let mut total_staked_amount: Amount = 0.into();
-    let mut total_delegated_amount: Amount = 0.into();
-    let mut total_amount: Amount = 0.into();
+    let mut total_staked_amount = Amount::zero();
+    let mut total_delegated_amount = Amount::zero();
+    let mut total_amount = Amount::zero();
 
     let mut acc_balances = Vec::with_capacity(accounts.len());
     for accs in accounts.chunks(app.num).map(Vec::from) {
@@ -107,13 +107,12 @@ async fn main() -> anyhow::Result<()> {
                 match account_stake {
                     AccountStakingInfo::Baker { staked_amount, .. } => {
                         num_bakers += 1;
-                        total_staked_amount = (total_staked_amount + staked_amount)
-                            .context("Total staked amount exceeds u64. This should not happen.")?;
+                        total_staked_amount += staked_amount;
                         true
                     }
                     AccountStakingInfo::Delegated { staked_amount, .. } => {
-                        total_delegated_amount = (total_delegated_amount + staked_amount)
-                            .context("Total staked amount exceeds u64. This should not happen.")?;
+                        total_delegated_amount += staked_amount;
+
                         false
                     }
                 }
@@ -121,8 +120,7 @@ async fn main() -> anyhow::Result<()> {
                 false
             };
 
-            total_amount = (total_amount + info.account_amount)
-                .context("Total amount exceeds u64. This should not happen.")?;
+            total_amount += info.account_amount;
 
             let acc_type =
                 info.account_credentials
@@ -168,12 +166,12 @@ async fn main() -> anyhow::Result<()> {
     println!(
         "Total amount of staked CCD is {}, which amounts to {:.2}%.",
         total_staked_amount,
-        (u64::from(total_staked_amount) as f64 / u64::from(total_amount) as f64) * 100f64
+        (total_staked_amount.micro_ccd() as f64 / total_amount.micro_ccd() as f64) * 100f64
     );
     println!(
         "Total amount of delegated CCD is {}, which amounts to {:.2}%.",
         total_delegated_amount,
-        (u64::from(total_delegated_amount) as f64 / u64::from(total_amount) as f64) * 100f64
+        (total_delegated_amount.micro_ccd() as f64 / total_amount.micro_ccd() as f64) * 100f64
     );
 
     Ok(())

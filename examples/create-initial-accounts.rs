@@ -14,16 +14,18 @@ use concordium_rust_sdk::{
         curve_arithmetic::Curve,
         dodis_yampolskiy_prf::SecretKey,
         types::{
-            AccountAddress, AccountCredential, AccountCredentialMessage, AccountKeys,
-            AttributeList, CredentialData, CredentialPublicKeys, IpData, PublicCredentialData,
+            AccountCredential, AccountCredentialMessage, AccountKeys, AttributeList,
+            CredentialData, CredentialPublicKeys, IpData, PublicCredentialData,
             PublicInformationForIp, SignatureThreshold, YearMonth,
         },
     },
     types::transactions::{BlockItem, Payload},
 };
 use id::{
-    constants::AttributeKind, curve_arithmetic::Value, pedersen_commitment::Randomness,
-    types::AttributeTag,
+    constants::AttributeKind,
+    curve_arithmetic::Value,
+    pedersen_commitment::Randomness,
+    types::{account_address_from_registration_id, AttributeTag},
 };
 use rand::thread_rng;
 use std::path::PathBuf;
@@ -127,7 +129,7 @@ async fn main() -> anyhow::Result<()> {
                         threshold: cdata.get_threshold(),
                     },
                 };
-                let address = AccountAddress::new(&pub_info_for_ip.reg_id);
+                let address = account_address_from_registration_id(&pub_info_for_ip.reg_id);
                 let icdi = id::identity_provider::create_initial_cdi(
                     &ip_data.public_ip_info,
                     pub_info_for_ip,
