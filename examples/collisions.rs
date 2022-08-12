@@ -31,8 +31,11 @@ async fn main() -> anyhow::Result<()> {
     println!("There are {} accounts.", bi.len());
     for i in 0..32 {
         let mut tmp = bi.clone();
-        let compare =
-            |l: &AccountAddress, r: &AccountAddress| l.as_ref()[0..i].cmp(&r.as_ref()[0..i]);
+        let compare = |l: &AccountAddress, r: &AccountAddress| {
+            let l_bytes: &[u8] = l.as_ref();
+            let r_bytes: &[u8] = r.as_ref();
+            l_bytes[0..i].cmp(&r_bytes[0..i])
+        };
         tmp.sort_by(compare);
         tmp.dedup_by(|l, r| compare(l, r).is_eq());
         if tmp.len() < bi.len() {

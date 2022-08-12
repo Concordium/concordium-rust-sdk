@@ -53,9 +53,9 @@ async fn main() -> anyhow::Result<()> {
         } = pool
         {
             active_bakers += 1;
-            equity += u64::from(current_payday_status.baker_equity_capital);
-            delegated += u64::from(current_payday_status.delegated_capital);
-            effective += u64::from(current_payday_status.effective_stake);
+            equity += current_payday_status.baker_equity_capital.micro_ccd();
+            delegated += current_payday_status.delegated_capital.micro_ccd();
+            effective += current_payday_status.effective_stake.micro_ccd();
         }
     }
     println!("There are {} bakers.", active_bakers);
@@ -67,7 +67,10 @@ async fn main() -> anyhow::Result<()> {
         "Total equity capital is {} CCD",
         Amount::from_micro_ccd(equity)
     );
-    println!("Total delegated stake is {} CCD", Amount::from(delegated));
+    println!(
+        "Total delegated stake is {} CCD",
+        Amount::from_micro_ccd(delegated)
+    );
 
     Ok(())
 }

@@ -1,3 +1,4 @@
+pub use concordium_contracts_common::{Address, ContractAddress, ContractIndex, ContractSubIndex};
 use crypto_common::{
     derive::{SerdeBase16Serialize, Serial, Serialize},
     deserial_string,
@@ -418,51 +419,6 @@ pub struct AccountIndex {
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into, Add)]
 pub struct Energy {
     pub energy: u64,
-}
-
-#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
-#[serde(transparent)]
-#[derive(
-    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into, Default, Hash,
-)]
-/// Contract index. The default implementation produces contract index 0.
-pub struct ContractIndex {
-    pub index: u64,
-}
-
-#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
-#[serde(transparent)]
-#[derive(
-    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into, Default, Hash,
-)]
-/// Contract subindex. The default implementation produces contract index 0.
-pub struct ContractSubIndex {
-    pub sub_index: u64,
-}
-
-#[derive(SerdeSerialize, SerdeDeserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub struct ContractAddress {
-    pub index:    ContractIndex,
-    pub subindex: ContractSubIndex,
-}
-
-impl ContractAddress {
-    pub fn new(index: ContractIndex, subindex: ContractSubIndex) -> Self {
-        Self { index, subindex }
-    }
-}
-
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(tag = "type", content = "address")]
-/// Either an account or contract address. Some operations are allowed on both
-/// types of items, hence the need for this type.
-pub enum Address {
-    #[serde(rename = "AddressAccount")]
-    Account(id::types::AccountAddress),
-    #[serde(rename = "AddressContract")]
-    Contract(ContractAddress),
 }
 
 /// Position of the transaction in a block.

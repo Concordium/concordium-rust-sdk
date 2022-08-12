@@ -1,6 +1,17 @@
 ## Unreleased changes
 
 - Expose macros for deriving `Serial` and `Deserial` from `concordium-contracts-common`.
+- Address method `is_alias_of` is now `is_alias`.
+- Replaced `ReceiveName` and `InitName` with `OwnedReceiveName` and `OwnedContractName` from `concordium-contracts-common`.
+- Remove `ContractAddress` and `Address` in favor of their equivalents in `concordium-contracts-common`.
+- `AccountAddress::new` is replaced by a function called `account_address_from_registration_id`.
+- `Amount` now has a field `micro_ccd` instead of `microgtu`.
+- The default arithmetic (operator syntax, such as `+`, `-`, `*`) with `Amount` is now unchecked.
+- There are no longer implementations of `From<u64> for Amount` and `From<Amount> for u64` as the behavior of these is not obvious.
+  Instead, the functions `Amount::from_micro_ccd` or `Amount::from_ccd` and the getter `micro_ccd` should be used instead.
+- Implement `Display` and `FromStr` for `ContractAddress` formatted as `<index, subindex>`, E.g `<145,0>`.
+- Implement `Display` and `FromStr` for `Address`. The latter attempts to parse a contract address. If this fails it will attempt to parse an `AccountAddress`.
+- Implement `FromStr` for `OwnedReceiveName`.
 
 ## 1.1.0
 

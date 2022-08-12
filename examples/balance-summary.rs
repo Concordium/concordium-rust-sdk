@@ -1,7 +1,6 @@
 //! List accounts with the most liquid balance, and total stake, total amount,
 //! and total liquid amount of accounts. Additionally list contracts with at
 //! most CCD owned.
-use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{endpoints, types::hashes::BlockHash};
 use crypto_common::types::Amount;
@@ -110,20 +109,17 @@ async fn main() -> anyhow::Result<()> {
                 let info = client.get_account_info(acc, &block).await?;
                 let additional_stake = info
                     .account_stake
-                    .map_or(Amount::from(0), |baker_delegator| {
+                    .map_or(Amount::zero(), |baker_delegator| {
                         baker_delegator.staked_amount()
                     });
-                let additional_liquid_amount = info.account_amount.microccd
-                    - std::cmp::max(
-                        additional_stake.microccd,
-                        info.account_release_schedule.total.microccd,
-                    );
+                let additional_liquid_amount = info.account_amount
+                    - std::cmp::max(additional_stake, info.account_release_schedule.total);
                 Ok::<_, anyhow::Error>((
                     acc,
                     additional_stake,
                     info.account_amount,
                     info.account_release_schedule.total,
-                    Amount::from(additional_liquid_amount),
+                    additional_liquid_amount,
                 ))
             }
         },
@@ -131,22 +127,19 @@ async fn main() -> anyhow::Result<()> {
     )
     .await;
     let mut out = Vec::new();
-    let mut staked_amount: Amount = 0.into();
-    let mut total_amount: Amount = 0.into();
-    let mut locked_amount: Amount = 0.into();
-    let mut liquid_amount: Amount = 0.into();
+    let mut staked_amount = Amount::zero();
+    let mut total_amount = Amount::zero();
+    let mut locked_amount = Amount::zero();
+    let mut liquid_amount = Amount::zero();
 
     while let Some(res) = receiver.recv().await {
         let (acc, additional_stake, additional_amount, additional_scheduled, additional_liquid) =
             res?;
-        staked_amount = (staked_amount + additional_stake)
-            .context("Total staked amount exceeds u64. This should not happen.")?;
-        total_amount = (total_amount + additional_amount)
-            .context("Total amount exceeds u64. This should not happen.")?;
-        locked_amount = (locked_amount + additional_scheduled)
-            .context("Total amount exceeds u64. This should not happen.")?;
-        liquid_amount = (liquid_amount + additional_liquid)
-            .context("Total amount exceeds u64. This should not happen.")?;
+        staked_amount += additional_stake;
+        total_amount += additional_amount;
+        locked_amount += additional_scheduled;
+        liquid_amount += additional_liquid;
+
         out.push((acc, additional_liquid, additional_amount));
     }
 
@@ -168,7 +161,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Now also handle contracts.
-    let mut total_contract_amount = Amount::from(0);
+    let mut total_contract_amount = Amount::zero();
     let contracts = client.get_instances(&block).await?;
     let mut cout = Vec::new();
     for ccs in contracts.chunks(app.num).map(Vec::from) {
@@ -182,8 +175,8 @@ async fn main() -> anyhow::Result<()> {
         }
         for res in futures::future::join_all(handles).await {
             let (addr, info) = res??;
-            total_contract_amount = (total_contract_amount + info.amount())
-                .context("Total amount exceeds u64. This should not happen.")?;
+            total_contract_amount += info.amount();
+
             cout.push((addr, info));
         }
     }
@@ -192,7 +185,7 @@ async fn main() -> anyhow::Result<()> {
     for (addr, info) in cout.iter().take(20) {
         println!(
             "{}: at <{}, {}> owns {}",
-            <&str as From<_>>::from(info.name()),
+            info.name().as_contract_name().get_chain_name(),
             addr.index,
             addr.subindex,
             info.amount()

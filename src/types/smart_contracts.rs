@@ -4,7 +4,9 @@ use super::{hashes, Address, ContractAddress, ContractTraceElement, Energy, Reje
 use crate::constants::*;
 /// Re-export of common helper functionality for smart contract, such as types
 /// and serialization specific for smart contracts.
-pub use concordium_contracts_common;
+pub use concordium_contracts_common::{
+    self, ContractName, OwnedContractName, OwnedReceiveName, ReceiveName,
+};
 use crypto_common::{
     derive,
     derive::{Serial, Serialize},
@@ -71,15 +73,15 @@ pub enum InstanceInfo {
         model:         Vec<u8>,
         owner:         AccountAddress,
         amount:        Amount,
-        methods:       std::collections::BTreeSet<ReceiveName>,
-        name:          InitName,
+        methods:       std::collections::BTreeSet<OwnedReceiveName>,
+        name:          OwnedContractName,
         source_module: ModuleRef,
     },
     V1 {
         owner:         AccountAddress,
         amount:        Amount,
-        methods:       std::collections::BTreeSet<ReceiveName>,
-        name:          InitName,
+        methods:       std::collections::BTreeSet<OwnedReceiveName>,
+        name:          OwnedContractName,
         source_module: ModuleRef,
     },
 }
@@ -103,7 +105,7 @@ impl InstanceInfo {
 
     /// Entrypoints supported by the instance. This returns the full name of the
     /// function that is suitable for inclusion in a transaction.
-    pub fn entrypoints(&self) -> &std::collections::BTreeSet<ReceiveName> {
+    pub fn entrypoints(&self) -> &std::collections::BTreeSet<OwnedReceiveName> {
         match self {
             InstanceInfo::V0 { methods, .. } => methods,
             InstanceInfo::V1 { methods, .. } => methods,
@@ -112,7 +114,7 @@ impl InstanceInfo {
 
     /// Get the name of the contract, i.e., the name of the init function that
     /// was used to create the instance.
-    pub fn name(&self) -> &InitName {
+    pub fn name(&self) -> &OwnedContractName {
         match self {
             InstanceInfo::V0 { name, .. } => name,
             InstanceInfo::V1 { name, .. } => name,
@@ -131,8 +133,8 @@ mod instance_parser {
         model:         Option<String>,
         owner:         AccountAddress,
         amount:        Amount,
-        methods:       std::collections::BTreeSet<ReceiveName>,
-        name:          InitName,
+        methods:       std::collections::BTreeSet<OwnedReceiveName>,
+        name:          OwnedContractName,
         source_module: ModuleRef,
     }
 
@@ -203,80 +205,6 @@ mod instance_parser {
                 }),
             }
         }
-    }
-}
-
-#[derive(
-    SerdeSerialize, SerdeDeserialize, Serial, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Clone,
-)]
-#[serde(into = "String", try_from = "String")]
-/// FIXME: Add structure.
-pub struct ReceiveName {
-    #[string_size_length = 2]
-    pub name: String,
-}
-
-impl From<ReceiveName> for String {
-    fn from(n: ReceiveName) -> Self { n.name }
-}
-
-impl<'a> From<&'a ReceiveName> for &'a str {
-    fn from(n: &'a ReceiveName) -> Self { n.name.as_str() }
-}
-
-impl TryFrom<String> for ReceiveName {
-    type Error = concordium_contracts_common::NewReceiveNameError;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        concordium_contracts_common::ReceiveName::is_valid_receive_name(value.as_str())?;
-        Ok(ReceiveName { name: value })
-    }
-}
-
-impl Deserial for ReceiveName {
-    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
-        let len: u16 = source.get()?;
-        let name = crypto_common::deserial_string(source, len.into())?;
-        concordium_contracts_common::ReceiveName::is_valid_receive_name(name.as_str())
-            .map_err(|x| anyhow::anyhow!(x))?;
-        Ok(ReceiveName { name })
-    }
-}
-
-#[derive(
-    SerdeSerialize, SerdeDeserialize, Eq, PartialEq, Ord, PartialOrd, Hash, Serial, Debug, Clone,
-)]
-#[serde(into = "String", try_from = "String")]
-/// FIXME: Add structure.
-pub struct InitName {
-    #[string_size_length = 2]
-    name: String,
-}
-
-impl From<InitName> for String {
-    fn from(n: InitName) -> Self { n.name }
-}
-
-impl<'a> From<&'a InitName> for &'a str {
-    fn from(n: &'a InitName) -> Self { n.name.as_str() }
-}
-
-impl TryFrom<String> for InitName {
-    type Error = concordium_contracts_common::NewContractNameError;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        concordium_contracts_common::ContractName::is_valid_contract_name(value.as_str())?;
-        Ok(InitName { name: value })
-    }
-}
-
-impl Deserial for InitName {
-    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
-        let len: u16 = source.get()?;
-        let name = crypto_common::deserial_string(source, len.into())?;
-        concordium_contracts_common::ContractName::is_valid_contract_name(name.as_str())
-            .map_err(|x| anyhow::anyhow!(x))?;
-        Ok(InitName { name })
     }
 }
 
@@ -380,7 +308,7 @@ pub struct ContractContext {
     #[serde(default = "return_zero_amount")]
     pub amount:    Amount,
     /// Which entrypoint to invoke.
-    pub method:    ReceiveName,
+    pub method:    OwnedReceiveName,
     /// And with what parameter.
     #[serde(default)]
     pub parameter: Parameter,
@@ -407,11 +335,11 @@ impl ContractContext {
     ///   parameter
     /// - the [`energy`](ContractContext::energy) is set to
     ///   [`DEFAULT_INVOKE_ENERGY`]
-    pub fn new(contract: ContractAddress, method: ReceiveName) -> Self {
+    pub fn new(contract: ContractAddress, method: OwnedReceiveName) -> Self {
         Self {
             invoker: None,
             contract,
-            amount: Amount::from_micro_ccd(0),
+            amount: Amount::zero(),
             method,
             parameter: Parameter::default(),
             energy: DEFAULT_INVOKE_ENERGY,

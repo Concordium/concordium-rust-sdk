@@ -18,12 +18,7 @@ fn main() -> anyhow::Result<()> {
 
     if let Some((head, rest)) = app.addresses.split_first() {
         for addr in rest {
-            anyhow::ensure!(
-                addr.is_alias_of(head),
-                "{} is not an alias of {}.",
-                addr,
-                head
-            );
+            anyhow::ensure!(addr.is_alias(head), "{} is not an alias of {}.", addr, head);
         }
     }
 

@@ -64,7 +64,7 @@ impl From<concordium_contracts_common::NewReceiveNameError> for Cis2TransactionE
 pub enum Cis2QueryError {
     /// The smart contract receive name is invalid.
     #[error("Invalid receive name: {0}")]
-    InvalidReceiveName(concordium_contracts_common::NewReceiveNameError),
+    InvalidReceiveName(#[from] concordium_contracts_common::NewReceiveNameError),
 
     /// The parameter for `balanceOf` is invalid.
     #[error("Invalid balanceOf parameter: {0}")]
@@ -84,26 +84,11 @@ pub enum Cis2QueryError {
 
     /// The returned bytes from invoking the smart contract could not be parsed.
     #[error("Failed parsing the response.")]
-    ResponseParseError(concordium_contracts_common::ParseError),
+    ResponseParseError(#[from] concordium_contracts_common::ParseError),
 
     /// The node rejected the invocation.
     #[error("Rejected by the node.")]
     NodeRejected(sdk_types::RejectReason),
-}
-
-// This is implemented manually, since deriving it using thiserror requires
-// `concordium_contracts_common::NewReceiveNameError` to implement
-// std::error::Error.
-impl From<concordium_contracts_common::NewReceiveNameError> for Cis2QueryError {
-    fn from(err: concordium_contracts_common::NewReceiveNameError) -> Self {
-        Self::InvalidReceiveName(err)
-    }
-}
-
-// This is implemented manually, since deriving it using thiserror requires
-// `concordium_contracts_common::ParseError` to implement std::error::Error.
-impl From<concordium_contracts_common::ParseError> for Cis2QueryError {
-    fn from(err: concordium_contracts_common::ParseError) -> Self { Self::ResponseParseError(err) }
 }
 
 // This is implemented manually, since deriving it using thiserror requires
@@ -169,7 +154,7 @@ impl Cis2Contract {
         let bytes = concordium_contracts_common::to_bytes(&parameter);
         let contract_name = self.contract_name.as_contract_name().contract_name();
         let receive_name =
-            smart_contracts::ReceiveName::try_from(format!("{}.transfer", contract_name))?;
+            smart_contracts::OwnedReceiveName::try_from(format!("{}.transfer", contract_name))?;
 
         let payload = transactions::Payload::Update {
             payload: transactions::UpdateContractPayload {
@@ -214,8 +199,10 @@ impl Cis2Contract {
         let bytes = concordium_contracts_common::to_bytes(&parameter);
         let contract_name = self.contract_name.as_contract_name().contract_name();
 
-        let receive_name =
-            smart_contracts::ReceiveName::try_from(format!("{}.updateOperator", contract_name))?;
+        let receive_name = smart_contracts::OwnedReceiveName::try_from(format!(
+            "{}.updateOperator",
+            contract_name
+        ))?;
 
         let payload = transactions::Payload::Update {
             payload: transactions::UpdateContractPayload {
@@ -257,12 +244,12 @@ impl Cis2Contract {
         let bytes = concordium_contracts_common::to_bytes(&parameter);
         let contract_name = self.contract_name.as_contract_name().contract_name();
         let receive_name =
-            smart_contracts::ReceiveName::try_from(format!("{}.balanceOf", contract_name))?;
+            smart_contracts::OwnedReceiveName::try_from(format!("{}.balanceOf", contract_name))?;
 
         let contract_context = smart_contracts::ContractContext {
             invoker:   None,
             contract:  self.address,
-            amount:    common::types::Amount::from(0),
+            amount:    common::types::Amount::from_micro_ccd(0),
             method:    receive_name,
             parameter: smart_contracts::Parameter::from(bytes),
             energy:    smart_contracts::MAX_ALLOWED_INVOKE_ENERGY,
@@ -305,12 +292,12 @@ impl Cis2Contract {
         let bytes = concordium_contracts_common::to_bytes(&parameter);
         let contract_name = self.contract_name.as_contract_name().contract_name();
         let receive_name =
-            smart_contracts::ReceiveName::try_from(format!("{}.operatorOf", contract_name))?;
+            smart_contracts::OwnedReceiveName::try_from(format!("{}.operatorOf", contract_name))?;
 
         let contract_context = smart_contracts::ContractContext {
             invoker:   None,
             contract:  self.address,
-            amount:    common::types::Amount::from(0),
+            amount:    common::types::Amount::from_micro_ccd(0),
             method:    receive_name,
             parameter: smart_contracts::Parameter::from(bytes),
             energy:    smart_contracts::MAX_ALLOWED_INVOKE_ENERGY,
@@ -352,13 +339,15 @@ impl Cis2Contract {
         let parameter = TokenMetadataQueryParams::new(queries)?;
         let bytes = concordium_contracts_common::to_bytes(&parameter);
         let contract_name = self.contract_name.as_contract_name().contract_name();
-        let receive_name =
-            smart_contracts::ReceiveName::try_from(format!("{}.tokenMetadata", contract_name))?;
+        let receive_name = smart_contracts::OwnedReceiveName::try_from(format!(
+            "{}.tokenMetadata",
+            contract_name
+        ))?;
 
         let contract_context = smart_contracts::ContractContext {
             invoker:   None,
             contract:  self.address,
-            amount:    common::types::Amount::from(0),
+            amount:    common::types::Amount::from_micro_ccd(0),
             method:    receive_name,
             parameter: smart_contracts::Parameter::from(bytes),
             energy:    smart_contracts::MAX_ALLOWED_INVOKE_ENERGY,
