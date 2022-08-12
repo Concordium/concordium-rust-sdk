@@ -634,7 +634,7 @@ impl Client {
     ) -> QueryResult<types::PoolStatus> {
         let request = self.construct_request(GetPoolStatusRequest {
             block_hash: bh.to_string(),
-            l_pool: baker_id.is_none(),
+            passive_delegation: baker_id.is_none(),
             baker_id: baker_id.map_or(0, |bi| u64::from(AccountIndex::from(bi))), // not used if baker_id is none.
         })?;
         let response = self.client.get_pool_status(request).await?;

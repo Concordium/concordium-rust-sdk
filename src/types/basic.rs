@@ -643,7 +643,7 @@ impl UpdateKeyPair {
     }
 }
 
-impl<'a> From<&UpdateKeyPair> for UpdatePublicKey {
+impl From<&UpdateKeyPair> for UpdatePublicKey {
     fn from(kp: &UpdateKeyPair) -> Self { kp.public.clone() }
 }
 

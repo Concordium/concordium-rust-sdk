@@ -112,7 +112,7 @@ pub enum AccountStakingInfo {
         staked_amount:    Amount,
         restake_earnings: bool,
         #[serde(flatten)]
-        baker_info:       BakerInfo,
+        baker_info:       Box<BakerInfo>,
         pending_change:   Option<StakePendingChange>,
         pool_info:        Option<BakerPoolInfo>,
     },

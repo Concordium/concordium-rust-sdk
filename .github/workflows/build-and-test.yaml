@@ -15,7 +15,7 @@ on:
   workflow_dispatch: # allows manual trigger
 
 env:
-  RUST_FMT: nightly-2021-06-09-x86_64-unknown-linux-gnu
+  RUST_FMT: nightly-2022-06-09-x86_64-unknown-linux-gnu
   RUST_VERSION: 1.56
 
 jobs:
@@ -44,6 +44,10 @@ jobs:
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     steps:
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install protobuf-compiler
       - name: Checkout
         uses: actions/checkout@v2
         with:
@@ -65,6 +69,10 @@ jobs:
     needs:
       - lint_clippy
     steps:
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install protobuf-compiler
       - name: Checkout
         uses: actions/checkout@v2
         with:
