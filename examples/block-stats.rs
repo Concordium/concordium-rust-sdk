@@ -6,6 +6,7 @@
 //! - arrive time of the block at the given node
 //! - difference between receive and slot times
 //! - difference between arrive and slot times
+//! - number of events associated with payday
 //! - whether the block contains a finalization record
 //! - the number of transactions included in the block
 use anyhow::Context;
