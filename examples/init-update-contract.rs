@@ -19,6 +19,7 @@ use concordium_rust_sdk::{
 };
 use std::path::PathBuf;
 use structopt::*;
+use thiserror::Error;
 
 #[derive(StructOpt)]
 struct App {
@@ -72,18 +73,9 @@ enum Weather {
     Sunny,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
+#[error("invalid weather variant; expected \"rainy\" or \"sunny\", but got \"{0}\"")]
 struct WeatherError(String);
-
-impl std::fmt::Display for WeatherError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "invalid weather variant; expected \"rainy\" or \"sunny\", but got \"{}\"",
-            self.0
-        )
-    }
-}
 
 impl std::str::FromStr for Weather {
     type Err = WeatherError;
@@ -143,7 +135,7 @@ async fn main() -> anyhow::Result<()> {
                 nonce,
                 expiry,
                 payload,
-                Energy { energy: 10000 },
+                10000u64.into(),
             )
         }
         Action::Update { weather, address } => {
@@ -161,7 +153,7 @@ async fn main() -> anyhow::Result<()> {
                 nonce,
                 expiry,
                 payload,
-                Energy { energy: 10000 },
+                10000u64.into(),
             )
         }
     };
