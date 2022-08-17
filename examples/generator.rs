@@ -29,6 +29,12 @@ struct App {
     receivers: Option<PathBuf>,
     #[structopt(long = "tps")]
     tps:       u16,
+    #[structopt(
+        long = "amount",
+        help = "CCD amount to send in each transaction",
+        default_value = "0"
+    )]
+    amount:    Amount,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize)]
@@ -79,6 +85,8 @@ async fn main() -> anyhow::Result<()> {
     // Create a channel between the task signing and the task sending transactions.
     let (sender, mut rx) = tokio::sync::mpsc::channel(100);
 
+    let transfer_amount = app.amount;
+
     // A task that will generate and sign transactions. Transactions are sent in a
     // round-robin fashion to all accounts in the list of receivers.
     let generator = async move {
@@ -93,7 +101,7 @@ async fn main() -> anyhow::Result<()> {
                 nonce,
                 expiry,
                 accounts[count % accounts.len()],
-                Amount::zero(),
+                transfer_amount,
             );
             nonce.next_mut();
             count += 1;
