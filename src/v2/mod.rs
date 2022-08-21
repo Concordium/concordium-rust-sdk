@@ -1,42 +1,14 @@
 use crate::{
     endpoints,
-    types::{hashes::BlockHash, AbsoluteBlockHeight},
+    types::{
+        self, hashes, hashes::BlockHash, AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID,
+    },
 };
 use concordium_contracts_common::AccountAddress;
 use futures::{Stream, StreamExt};
 use tonic::IntoRequest;
 
-mod generated {
-    tonic::include_proto!("concordium.v2");
-
-    impl TryFrom<AccountAddress> for super::AccountAddress {
-        type Error = tonic::Status;
-
-        fn try_from(value: AccountAddress) -> Result<Self, Self::Error> {
-            match value.value.try_into() {
-                Ok(addr) => Ok(Self(addr)),
-                Err(_) => Err(tonic::Status::internal(
-                    "Unexpected account address format.",
-                )),
-            }
-        }
-    }
-
-    impl TryFrom<BlockHash> for super::BlockHash {
-        type Error = tonic::Status;
-
-        fn try_from(value: BlockHash) -> Result<Self, Self::Error> {
-            match value.value.try_into() {
-                Ok(hash) => Ok(Self::new(hash)),
-                Err(_) => Err(tonic::Status::internal("Unexpected block hash format.")),
-            }
-        }
-    }
-
-    impl From<AbsoluteBlockHeight> for super::AbsoluteBlockHeight {
-        fn from(abh: AbsoluteBlockHeight) -> Self { Self { height: abh.value } }
-    }
-}
+mod generated;
 
 #[derive(Clone, Debug)]
 /// Client that can perform queries.
@@ -56,7 +28,7 @@ pub struct QueryResponse<A> {
 }
 
 /// A block identifier used in queries.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, derive_more::From)]
 pub enum BlockIdentifier {
     /// Query in the context of the best block.
     Best,
@@ -67,15 +39,25 @@ pub enum BlockIdentifier {
     Given(BlockHash),
 }
 
+#[derive(Copy, Clone, Debug, derive_more::From)]
+pub enum AccountIdentifier {
+    /// Identify an account by an address.
+    Address(AccountAddress),
+    /// Identify an account by the credential registration id.
+    CredId(CredentialRegistrationID),
+    /// Identify an account by its account index.
+    Index(crate::types::AccountIndex),
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct FinalizedBlockInfo {
     pub block_hash: BlockHash,
     pub height:     AbsoluteBlockHeight,
 }
 
-impl IntoRequest<generated::BlockHashInput> for &BlockIdentifier {
-    fn into_request(self) -> tonic::Request<generated::BlockHashInput> {
-        let block_hash_input = match self {
+impl From<&BlockIdentifier> for generated::BlockHashInput {
+    fn from(bi: &BlockIdentifier) -> Self {
+        let block_hash_input = match bi {
             BlockIdentifier::Best => {
                 generated::block_hash_input::BlockHashInput::Best(Default::default())
             }
@@ -88,10 +70,45 @@ impl IntoRequest<generated::BlockHashInput> for &BlockIdentifier {
                 })
             }
         };
-        let v = generated::BlockHashInput {
+        generated::BlockHashInput {
             block_hash_input: Some(block_hash_input),
+        }
+    }
+}
+
+impl IntoRequest<generated::BlockHashInput> for &BlockIdentifier {
+    fn into_request(self) -> tonic::Request<generated::BlockHashInput> {
+        tonic::Request::new(self.into())
+    }
+}
+
+impl From<&AccountIdentifier> for generated::account_info_request::AccountIdentifier {
+    fn from(ai: &AccountIdentifier) -> Self {
+        match ai {
+            AccountIdentifier::Address(addr) => {
+                let addr = generated::AccountAddress {
+                    value: crypto_common::to_bytes(addr),
+                };
+                Self::Address(addr)
+            }
+            AccountIdentifier::CredId(credid) => {
+                let credid = generated::CredentialRegistrationId {
+                    value: crypto_common::to_bytes(credid),
+                };
+                Self::CredId(credid)
+            }
+            AccountIdentifier::Index(index) => Self::AccountIndex((*index).into()),
+        }
+    }
+}
+
+impl IntoRequest<generated::AccountInfoRequest> for (&AccountIdentifier, &BlockIdentifier) {
+    fn into_request(self) -> tonic::Request<generated::AccountInfoRequest> {
+        let ai = generated::AccountInfoRequest {
+            block_hash:         Some(self.1.into()),
+            account_identifier: Some(self.0.into()),
         };
-        tonic::Request::new(v)
+        tonic::Request::new(ai)
     }
 }
 
@@ -101,6 +118,20 @@ impl Client {
     ) -> Result<Self, tonic::transport::Error> {
         let client = generated::queries_client::QueriesClient::connect(endpoint).await?;
         Ok(Self { client })
+    }
+
+    pub async fn get_account_info(
+        &mut self,
+        acc: &AccountIdentifier,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<AccountInfo>> {
+        let response = self.client.get_account_info((acc, bi)).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = AccountInfo::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
     }
 
     pub async fn get_account_list(
@@ -178,14 +209,14 @@ impl<A> Require<tonic::Status> for Option<A> {
     fn require(&self) -> Result<&Self::A, tonic::Status> {
         match self {
             Some(v) => Ok(v),
-            None => Err(tonic::Status::invalid_argument("missing field")),
+            None => Err(tonic::Status::invalid_argument("missing field in response")),
         }
     }
 
     fn require_owned(self) -> Result<Self::A, tonic::Status> {
         match self {
             Some(v) => Ok(v),
-            None => Err(tonic::Status::invalid_argument("missing field")),
+            None => Err(tonic::Status::invalid_argument("missing field in response")),
         }
     }
 }

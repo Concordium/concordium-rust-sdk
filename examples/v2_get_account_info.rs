@@ -1,10 +1,7 @@
 /// Test the `GetAccountInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{
-    id::types::AccountAddress,
-    v2::{block_hash_input, BlockHashInput},
-};
+use concordium_rust_sdk::id::types::AccountAddress;
 use structopt::StructOpt;
 
 use concordium_rust_sdk::v2;
@@ -29,39 +26,21 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
-    let mut client = concordium_rust_sdk::v2::queries_client::QueriesClient::connect(app.endpoint)
+    let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
 
     {
-        let mut request = v2::AccountInfoRequest::default();
-        let addr = v2::AccountAddress {
-            value: app.address.0.to_vec(),
-        };
-        let ai = v2::account_info_request::AccountIdentifier::Address(addr);
-        request.account_identifier = Some(ai);
-        request.block_hash = Some(BlockHashInput {
-            block_hash_input: Some(block_hash_input::BlockHashInput::LastFinal(
-                Default::default(),
-            )),
-        });
-
-        let ai = client.get_account_info(request).await?;
+        let ai = client
+            .get_account_info(&app.address.into(), &v2::BlockIdentifier::Best)
+            .await?;
         println!("{:#?}", ai);
     }
 
     {
-        let mut request = v2::AccountInfoRequest::default();
-        let addr = v2::AccountAddress {
-            value: app.address.0.to_vec(),
-        };
-        let ai = v2::account_info_request::AccountIdentifier::Address(addr);
-        request.account_identifier = Some(ai);
-        request.block_hash = Some(BlockHashInput {
-            block_hash_input: Some(block_hash_input::BlockHashInput::Best(Default::default())),
-        });
-
-        let ai = client.get_account_info(request).await?;
+        let ai = client
+            .get_account_info(&app.address.into(), &v2::BlockIdentifier::LastFinal)
+            .await?;
         println!("{:#?}", ai);
     }
 

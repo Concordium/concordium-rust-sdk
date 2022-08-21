@@ -587,7 +587,7 @@ impl BakerCredentials {
 }
 
 /// FIXME: Move to somewhere else in the dependency. This belongs to rust-src.
-#[derive(SerdeBase16Serialize, Serialize, Debug, Clone)]
+#[derive(SerdeBase16Serialize, Serialize, Debug, Clone, Copy)]
 pub struct CredentialRegistrationID(id::constants::ArCurve);
 
 impl fmt::Display for CredentialRegistrationID {
