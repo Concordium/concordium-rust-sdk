@@ -1,7 +1,8 @@
 use crate::{
     endpoints,
     types::{
-        self, hashes, hashes::BlockHash, AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID,
+        self, hashes, hashes::BlockHash, smart_contracts::ModuleRef, AbsoluteBlockHeight,
+        AccountInfo, CredentialRegistrationID,
     },
 };
 use concordium_contracts_common::AccountAddress;
@@ -141,6 +142,20 @@ impl Client {
         QueryResponse<impl Stream<Item = Result<AccountAddress, tonic::Status>>>,
     > {
         let response = self.client.get_account_list(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|x| x.and_then(TryFrom::try_from));
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_module_list(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<impl Stream<Item = Result<ModuleRef, tonic::Status>>>>
+    {
+        let response = self.client.get_module_list(bi).await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|x| x.and_then(TryFrom::try_from));
         Ok(QueryResponse {

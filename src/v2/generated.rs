@@ -35,6 +35,19 @@ impl TryFrom<AccountAddress> for super::AccountAddress {
     }
 }
 
+impl TryFrom<ModuleReference> for super::ModuleRef {
+    type Error = tonic::Status;
+
+    fn try_from(value: ModuleReference) -> Result<Self, Self::Error> {
+        match value.value.try_into() {
+            Ok(mod_ref) => Ok(Self::new(mod_ref)),
+            Err(_) => Err(tonic::Status::internal(
+                "Unexpected module reference format.",
+            )),
+        }
+    }
+}
+
 impl TryFrom<BlockHash> for super::BlockHash {
     type Error = tonic::Status;
 
