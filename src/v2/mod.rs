@@ -113,6 +113,16 @@ impl IntoRequest<generated::AccountInfoRequest> for (&AccountIdentifier, &BlockI
     }
 }
 
+impl IntoRequest<generated::AncestorsRequest> for (&BlockIdentifier, u64) {
+    fn into_request(self) -> tonic::Request<generated::AncestorsRequest> {
+        let ar = generated::AncestorsRequest {
+            block_hash: Some(self.0.into()),
+            amount:     self.1,
+        };
+        tonic::Request::new(ar)
+    }
+}
+
 impl Client {
     pub async fn new<E: Into<tonic::transport::Endpoint>>(
         endpoint: E,
@@ -156,6 +166,21 @@ impl Client {
     ) -> endpoints::QueryResult<QueryResponse<impl Stream<Item = Result<ModuleRef, tonic::Status>>>>
     {
         let response = self.client.get_module_list(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|x| x.and_then(TryFrom::try_from));
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_ancestors(
+        &mut self,
+        bi: &BlockIdentifier,
+        amount: u64,
+    ) -> endpoints::QueryResult<QueryResponse<impl Stream<Item = Result<BlockHash, tonic::Status>>>>
+    {
+        let response = self.client.get_ancestors((bi, amount)).await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|x| x.and_then(TryFrom::try_from));
         Ok(QueryResponse {
