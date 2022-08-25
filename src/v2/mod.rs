@@ -1,11 +1,13 @@
 use crate::{
     endpoints,
     types::{
-        self, hashes, hashes::BlockHash, smart_contracts::ModuleRef, AbsoluteBlockHeight,
-        AccountInfo, CredentialRegistrationID,
+        self, hashes,
+        hashes::BlockHash,
+        smart_contracts::{ModuleRef, ModuleSource},
+        AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID,
     },
 };
-use concordium_contracts_common::AccountAddress;
+use concordium_contracts_common::{AccountAddress, ContractAddress};
 use futures::{Stream, StreamExt};
 use tonic::IntoRequest;
 
@@ -103,6 +105,10 @@ impl From<&AccountIdentifier> for generated::account_info_request::AccountIdenti
     }
 }
 
+impl From<&ModuleRef> for generated::ModuleRef {
+    fn from(mr: &ModuleRef) -> Self { generated::ModuleRef { value: mr.to_vec() } }
+}
+
 impl IntoRequest<generated::AccountInfoRequest> for (&AccountIdentifier, &BlockIdentifier) {
     fn into_request(self) -> tonic::Request<generated::AccountInfoRequest> {
         let ai = generated::AccountInfoRequest {
@@ -120,6 +126,16 @@ impl IntoRequest<generated::AncestorsRequest> for (&BlockIdentifier, u64) {
             amount:     self.1,
         };
         tonic::Request::new(ar)
+    }
+}
+
+impl IntoRequest<generated::ModuleSourceRequest> for (&ModuleRef, &BlockIdentifier) {
+    fn into_request(self) -> tonic::Request<generated::ModuleSourceRequest> {
+        let ai = generated::ModuleSourceRequest {
+            block_hash: Some(self.1.into()),
+            module_ref: Some(self.0.into()),
+        };
+        tonic::Request::new(ai)
     }
 }
 
@@ -168,6 +184,35 @@ impl Client {
         let response = self.client.get_module_list(bi).await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|x| x.and_then(TryFrom::try_from));
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_module_source(
+        &mut self,
+        module_ref: &ModuleRef,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<ModuleSource>> {
+        let response = self.client.get_module_source((module_ref, bi)).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = ModuleSource::from(response.into_inner());
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_instance_list(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<ContractAddress, tonic::Status>>>,
+    > {
+        let response = self.client.get_instance_list(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|x| x.map(From::from));
         Ok(QueryResponse {
             block_hash,
             response: stream,

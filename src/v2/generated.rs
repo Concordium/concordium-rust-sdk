@@ -35,10 +35,10 @@ impl TryFrom<AccountAddress> for super::AccountAddress {
     }
 }
 
-impl TryFrom<ModuleReference> for super::ModuleRef {
+impl TryFrom<ModuleRef> for super::ModuleRef {
     type Error = tonic::Status;
 
-    fn try_from(value: ModuleReference) -> Result<Self, Self::Error> {
+    fn try_from(value: ModuleRef) -> Result<Self, Self::Error> {
         match value.value.try_into() {
             Ok(mod_ref) => Ok(Self::new(mod_ref)),
             Err(_) => Err(tonic::Status::internal(
@@ -46,6 +46,16 @@ impl TryFrom<ModuleReference> for super::ModuleRef {
             )),
         }
     }
+}
+
+impl From<ContractAddress> for super::ContractAddress {
+    fn from(value: ContractAddress) -> Self {
+        super::ContractAddress::new(value.index, value.subindex)
+    }
+}
+
+impl From<ModuleSource> for super::ModuleSource {
+    fn from(value: ModuleSource) -> Self { value.value.into() }
 }
 
 impl TryFrom<BlockHash> for super::BlockHash {

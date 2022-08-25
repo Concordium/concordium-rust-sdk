@@ -1,4 +1,4 @@
-/// Test the `GetModuleList` endpoint.
+/// Test the `GetInstanceList` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::v2;
@@ -26,11 +26,11 @@ async fn main() -> anyhow::Result<()> {
     let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
-    let mut al = client
-        .get_module_list(&v2::BlockIdentifier::LastFinal)
+    let mut res = client
+        .get_instance_list(&v2::BlockIdentifier::LastFinal)
         .await?;
-    println!("Blockhash: {}", al.block_hash);
-    while let Some(a) = al.response.next().await {
+    println!("Blockhash: {}", res.block_hash);
+    while let Some(a) = res.response.next().await {
         println!("{}", a?);
     }
     Ok(())

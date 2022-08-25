@@ -1,9 +1,10 @@
-/// Test the `GetModuleList` endpoint.
+/// Test the `GetModuleSource` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::v2;
-use futures::StreamExt;
+use concordium_rust_sdk::types::smart_contracts::ModuleRef;
 use structopt::StructOpt;
+
+use concordium_rust_sdk::v2;
 
 #[derive(StructOpt)]
 struct App {
@@ -13,6 +14,8 @@ struct App {
         default_value = "http://localhost:10001"
     )]
     endpoint: tonic::transport::Endpoint,
+    #[structopt(long = "module", help = "Module reference to query.")]
+    module:   ModuleRef,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -26,12 +29,12 @@ async fn main() -> anyhow::Result<()> {
     let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
-    let mut al = client
-        .get_module_list(&v2::BlockIdentifier::LastFinal)
+
+    let res = client
+        .get_module_source(&app.module.into(), &v2::BlockIdentifier::LastFinal)
         .await?;
-    println!("Blockhash: {}", al.block_hash);
-    while let Some(a) = al.response.next().await {
-        println!("{}", a?);
-    }
+    // TODO: Print in binary so you can pipe to file, or make user provide file.
+    println!("{:#?}", res);
+
     Ok(())
 }
