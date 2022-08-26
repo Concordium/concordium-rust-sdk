@@ -58,6 +58,60 @@ impl From<ModuleSource> for super::ModuleSource {
     fn from(value: ModuleSource) -> Self { value.value.into() }
 }
 
+impl TryFrom<InstanceInfo> for super::InstanceInfo {
+    type Error = tonic::Status;
+
+    fn try_from(value: InstanceInfo) -> Result<Self, Self::Error> {
+        match value.version.require_owned()? {
+            instance_info::Version::V0(v0) => Ok(Self::V0 {
+                model:         v0.model.require_owned()?.value,
+                owner:         v0.owner.require_owned()?.try_into()?,
+                amount:        v0.amount.require_owned()?.into(),
+                methods:       v0
+                    .methods
+                    .into_iter()
+                    .map(TryFrom::try_from)
+                    .collect::<Result<_, tonic::Status>>()?,
+                name:          v0.name.require_owned()?.try_into()?,
+                source_module: v0.source_module.require_owned()?.try_into()?,
+            }),
+            instance_info::Version::V1(v1) => Ok(Self::V1 {
+                owner:         v1.owner.require_owned()?.try_into()?,
+                amount:        v1.amount.require_owned()?.into(),
+                methods:       v1
+                    .methods
+                    .into_iter()
+                    .map(TryFrom::try_from)
+                    .collect::<Result<_, tonic::Status>>()?,
+                name:          v1.name.require_owned()?.try_into()?,
+                source_module: v1.source_module.require_owned()?.try_into()?,
+            }),
+        }
+    }
+}
+
+impl TryFrom<ReceiveName> for concordium_contracts_common::OwnedReceiveName {
+    type Error = tonic::Status;
+
+    fn try_from(value: ReceiveName) -> Result<Self, Self::Error> {
+        match Self::new(value.value) {
+            Ok(rn) => Ok(rn),
+            Err(_) => Err(tonic::Status::internal("Unexpected receive name format.")),
+        }
+    }
+}
+
+impl TryFrom<InitName> for concordium_contracts_common::OwnedContractName {
+    type Error = tonic::Status;
+
+    fn try_from(value: InitName) -> Result<Self, Self::Error> {
+        match Self::new(value.value) {
+            Ok(cn) => Ok(cn),
+            Err(_) => Err(tonic::Status::internal("Unexpected contract name format.")),
+        }
+    }
+}
+
 impl TryFrom<BlockHash> for super::BlockHash {
     type Error = tonic::Status;
 
