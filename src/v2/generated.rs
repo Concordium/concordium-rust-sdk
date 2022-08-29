@@ -457,7 +457,9 @@ impl TryFrom<Policy> for id::types::Policy<ArCurve, AttributeKind> {
                         k.try_into()
                             .map_err(|_| tonic::Status::internal("Unexpected attribute tag."))?,
                     );
-                    let v = consume(&v)?;
+                    let v = AttributeKind(String::from_utf8(v).map_err(|_| {
+                        tonic::Status::internal("Invalid attribute value. Expected UTF8 encoding")
+                    })?);
                     Ok((k, v))
                 })
                 .collect::<Result<_, tonic::Status>>()?,
