@@ -1,5 +1,7 @@
 tonic::include_proto!("concordium.v2");
 
+use std::collections::BTreeMap;
+
 use crypto_common::{Deserial, Versioned, VERSION_0};
 use id::{
     constants::{ArCurve, AttributeKind},
@@ -621,5 +623,32 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             account_stake,
             account_address,
         })
+    }
+}
+
+impl TryFrom<TransactionStatus> for super::types::TransactionStatus {
+    type Error = tonic::Status;
+
+    fn try_from(value: TransactionStatus) -> Result<Self, Self::Error> {
+        match value.status.require_owned()? {
+            transaction_status::Status::Received(_) => {
+                Ok(super::types::TransactionStatus::Received)
+            }
+            transaction_status::Status::Committed(m) => {
+                let mut summaries: BTreeMap<super::BlockHash, super::types::BlockItemSummary> =
+                    BTreeMap::new();
+                for o in m.outcomes {
+                    let k = o.block_hash.require_owned()?.into();
+                    let v = o
+                        .outcome
+                        .require_owned()?
+                        .try_into()?
+                        .map_err(|_| tonic::Status::internal("Invalid transaction summary"));
+                    summaries.insert(k, v);
+                }
+                Ok(super::types::TransactionStatus::Committed(summaries))
+            }
+            transaction_status::Status::Finalized(_) => todo!(),
+        }
     }
 }

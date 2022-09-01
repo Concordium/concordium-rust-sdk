@@ -2,9 +2,9 @@ use crate::{
     endpoints,
     types::{
         self, hashes,
-        hashes::BlockHash,
+        hashes::{BlockHash, TransactionHash},
         smart_contracts::{ModuleRef, ModuleSource},
-        AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID,
+        AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, TransactionStatus,
     },
 };
 use concordium_contracts_common::{AccountAddress, ContractAddress};
@@ -109,6 +109,10 @@ impl From<&ModuleRef> for generated::ModuleRef {
     fn from(mr: &ModuleRef) -> Self { generated::ModuleRef { value: mr.to_vec() } }
 }
 
+impl From<&TransactionHash> for generated::TransactionHash {
+    fn from(th: &TransactionHash) -> Self { generated::TransactionHash { value: th.to_vec() } }
+}
+
 impl IntoRequest<generated::AccountInfoRequest> for (&AccountIdentifier, &BlockIdentifier) {
     fn into_request(self) -> tonic::Request<generated::AccountInfoRequest> {
         let ai = generated::AccountInfoRequest {
@@ -136,6 +140,12 @@ impl IntoRequest<generated::ModuleSourceRequest> for (&ModuleRef, &BlockIdentifi
             module_ref: Some(self.0.into()),
         };
         tonic::Request::new(ai)
+    }
+}
+
+impl IntoRequest<generated::TransactionHash> for &TransactionHash {
+    fn into_request(self) -> tonic::Request<generated::TransactionHash> {
+        tonic::Request::new(self.into())
     }
 }
 
@@ -250,6 +260,15 @@ impl Client {
             Err(x) => Err(x),
         });
         Ok(stream)
+    }
+
+    pub async fn get_transaction_status(
+        &mut self,
+        th: &TransactionHash,
+    ) -> endpoints::QueryResult<TransactionStatus> {
+        let response = self.client.get_transaction_status(th).await?;
+        let response = TransactionStatus::try_from(response.into_inner())?;
+        Ok(response)
     }
 }
 
