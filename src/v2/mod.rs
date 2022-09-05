@@ -85,22 +85,29 @@ impl IntoRequest<generated::BlockHashInput> for &BlockIdentifier {
     }
 }
 
-impl From<&AccountIdentifier> for generated::account_info_request::AccountIdentifier {
+impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
     fn from(ai: &AccountIdentifier) -> Self {
-        match ai {
+        let account_identifier_input = match ai {
             AccountIdentifier::Address(addr) => {
                 let addr = generated::AccountAddress {
                     value: crypto_common::to_bytes(addr),
                 };
-                Self::Address(addr)
+                generated::account_identifier_input::AccountIdentifierInput::Address(addr)
             }
             AccountIdentifier::CredId(credid) => {
                 let credid = generated::CredentialRegistrationId {
                     value: crypto_common::to_bytes(credid),
                 };
-                Self::CredId(credid)
+                generated::account_identifier_input::AccountIdentifierInput::CredId(credid)
             }
-            AccountIdentifier::Index(index) => Self::AccountIndex((*index).into()),
+            AccountIdentifier::Index(index) => {
+                generated::account_identifier_input::AccountIdentifierInput::AccountIndex(
+                    (*index).into(),
+                )
+            }
+        };
+        generated::AccountIdentifierInput {
+            account_identifier_input: Some(account_identifier_input),
         }
     }
 }
@@ -139,6 +146,12 @@ impl IntoRequest<generated::ModuleSourceRequest> for (&ModuleRef, &BlockIdentifi
     }
 }
 
+impl IntoRequest<generated::AccountIdentifierInput> for &AccountIdentifier {
+    fn into_request(self) -> tonic::Request<generated::AccountIdentifierInput> {
+        tonic::Request::new(self.into())
+    }
+}
+
 impl Client {
     pub async fn new<E: Into<tonic::transport::Endpoint>>(
         endpoint: E,
@@ -159,6 +172,18 @@ impl Client {
             block_hash,
             response,
         })
+    }
+
+    pub async fn get_next_account_nonce(
+        &mut self,
+        account_identifier: &AccountIdentifier,
+    ) -> endpoints::QueryResult<types::queries::AccountNonceResponse> {
+        let response = self
+            .client
+            .get_next_account_nonce(account_identifier)
+            .await?;
+        let response = types::queries::AccountNonceResponse::try_from(response.into_inner())?;
+        Ok(response)
     }
 
     pub async fn get_account_list(

@@ -9,6 +9,8 @@ use id::{
     },
 };
 
+use crate::types;
+
 use super::Require;
 
 fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
@@ -620,6 +622,17 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             account_index,
             account_stake,
             account_address,
+        })
+    }
+}
+
+impl TryFrom<NextAccountNonce> for types::queries::AccountNonceResponse {
+    type Error = tonic::Status;
+
+    fn try_from(value: NextAccountNonce) -> Result<Self, Self::Error> {
+        Ok(Self {
+            nonce:     value.nonce.require_owned()?.into(),
+            all_final: value.all_final,
         })
     }
 }
