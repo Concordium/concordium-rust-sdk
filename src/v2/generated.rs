@@ -2,6 +2,7 @@ tonic::include_proto!("concordium.v2");
 
 use std::collections::BTreeMap;
 
+use super::Require;
 use crypto_common::{Deserial, Versioned, VERSION_0};
 use id::{
     constants::{ArCurve, AttributeKind},
@@ -10,8 +11,6 @@ use id::{
         InitialCredentialDeploymentValues,
     },
 };
-
-use super::Require;
 
 fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
     let mut cursor = std::io::Cursor::new(bytes);
@@ -688,21 +687,64 @@ impl TryFrom<TransactionStatus> for super::types::TransactionStatus {
             transaction_status::Status::Received(_) => {
                 Ok(super::types::TransactionStatus::Received)
             }
-            transaction_status::Status::Committed(m) => {
+            transaction_status::Status::Finalized(f) => {
                 let mut summaries: BTreeMap<super::BlockHash, super::types::BlockItemSummary> =
                     BTreeMap::new();
-                for o in m.outcomes {
-                    let k = o.block_hash.require_owned()?.into();
-                    let v = o
-                        .outcome
-                        .require_owned()?
-                        .try_into()?
-                        .map_err(|_| tonic::Status::internal("Invalid transaction summary"));
-                    summaries.insert(k, v);
-                }
-                Ok(super::types::TransactionStatus::Committed(summaries))
+                let o = f.outcome.require_owned()?;
+                let k = o.block_hash.require_owned()?.try_into()?;
+                let v = o.outcome.require_owned()?.try_into()?;
+                summaries.insert(k, v);
+                Ok(super::types::TransactionStatus::Finalized(summaries))
             }
-            transaction_status::Status::Finalized(_) => todo!(),
+            transaction_status::Status::Committed(_) => todo!(),
+        }
+    }
+}
+
+impl TryFrom<BlockItemSummary> for super::types::BlockItemSummary {
+    type Error = tonic::Status;
+
+    fn try_from(value: BlockItemSummary) -> Result<Self, Self::Error> {
+        Ok(Self {
+            index:       value.index.require_owned()?.into(),
+            energy_cost: value.energy_cost.require_owned()?.into(),
+            hash:        value.hash.require_owned()?.try_into()?,
+            details:     match value.details.require_owned()? {
+                block_item_summary::Details::AccountTransaction(acc_trx) => {
+                    super::types::BlockItemSummaryDetails::AccountTransaction(
+                        super::types::AccountTransactionDetails {
+                            cost:    acc_trx.cost.require_owned()?.into(),
+                            sender:  acc_trx.sender.require_owned()?.try_into()?,
+                            effects: acc_trx.effects.require_owned()?.try_into()?,
+                        },
+                    )
+                }
+            },
+        })
+    }
+}
+
+impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffects {
+    type Error = tonic::Status;
+
+    fn try_from(value: AccountTransactionEffects) -> Result<Self, Self::Error> {
+        match value.effect.require_owned()? {
+            account_transaction_effects::Effect::AccountTransfer(at) => Ok(Self::AccountTransfer {
+                amount: at.amount.require_owned()?.into(),
+                to:     at.to.require_owned()?.try_into()?,
+            }),
+        }
+    }
+}
+
+impl From<block_item_summary::TransactionIndex> for super::types::TransactionIndex {
+    fn from(value: block_item_summary::TransactionIndex) -> Self { Self { index: value.value } }
+}
+
+impl From<Energy> for super::types::Energy {
+    fn from(value: Energy) -> Self {
+        Self {
+            energy: value.value,
         }
     }
 }

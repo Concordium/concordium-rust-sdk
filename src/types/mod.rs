@@ -525,7 +525,8 @@ pub enum TransactionStatus {
     /// Transaction is finalized in the given block, with the given summary.
     /// If the finalization committee is not corrupt then this will always
     /// be a singleton map.
-    Finalized(BTreeMap<hashes::BlockHash, BlockItemSummary>),
+    Finalized(BTreeMap<hashes::BlockHash, BlockItemSummary>), /* TODO: Change to tuple instead
+                                                               * of map? */
     /// Transaction is committed to one or more blocks. The outcomes are listed
     /// for each block. Note that in the vast majority of cases the outcome of a
     /// transaction should not be dependent on the block it is in, but this
