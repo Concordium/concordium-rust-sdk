@@ -186,6 +186,17 @@ impl Client {
         Ok(response)
     }
 
+    pub async fn get_consensus_info(
+        &mut self,
+    ) -> endpoints::QueryResult<types::queries::ConsensusInfo> {
+        let response = self
+            .client
+            .get_consensus_info(generated::Empty::default())
+            .await?;
+        let response = types::queries::ConsensusInfo::try_from(response.into_inner())?;
+        Ok(response)
+    }
+
     pub async fn get_account_list(
         &mut self,
         bi: &BlockIdentifier,

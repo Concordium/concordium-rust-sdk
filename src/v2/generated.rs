@@ -200,6 +200,40 @@ impl TryFrom<EncryptedBalance> for super::types::AccountEncryptedAmount {
     }
 }
 
+impl From<Timestamp> for chrono::DateTime<chrono::Utc> {
+    fn from(value: Timestamp) -> Self {
+        chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
+            + chrono::Duration::milliseconds(value.value as i64)
+    }
+}
+
+impl From<Duration> for chrono::Duration {
+    fn from(value: Duration) -> Self { chrono::Duration::milliseconds(value.value as i64) }
+}
+
+impl From<Duration> for super::types::SlotDuration {
+    fn from(value: Duration) -> Self {
+        super::types::SlotDuration {
+            millis: value.value,
+        }
+    }
+}
+
+impl From<GenesisIndex> for super::types::GenesisIndex {
+    fn from(value: GenesisIndex) -> Self { value.value.into() }
+}
+
+impl From<ProtocolVersion> for super::types::ProtocolVersion {
+    fn from(value: ProtocolVersion) -> Self {
+        match value {
+            ProtocolVersion::ProtocolVersion1 => super::types::ProtocolVersion::P1,
+            ProtocolVersion::ProtocolVersion2 => super::types::ProtocolVersion::P2,
+            ProtocolVersion::ProtocolVersion3 => super::types::ProtocolVersion::P3,
+            ProtocolVersion::ProtocolVersion4 => super::types::ProtocolVersion::P4,
+        }
+    }
+}
+
 impl TryFrom<StakePendingChange> for super::types::StakePendingChange {
     type Error = tonic::Status;
 
@@ -633,6 +667,56 @@ impl TryFrom<NextAccountNonce> for types::queries::AccountNonceResponse {
         Ok(Self {
             nonce:     value.nonce.require_owned()?.into(),
             all_final: value.all_final,
+        })
+    }
+}
+
+impl TryFrom<ConsensusInfo> for types::queries::ConsensusInfo {
+    type Error = tonic::Status;
+
+    fn try_from(value: ConsensusInfo) -> Result<Self, Self::Error> {
+        Ok(Self {
+            last_finalized_block_height:    value
+                .last_finalized_block_height
+                .require_owned()?
+                .into(),
+            block_arrive_latency_e_m_s_d:   value.block_arrive_latency_emsd,
+            block_receive_latency_e_m_s_d:  value.block_receive_latency_emsd,
+            last_finalized_block:           value
+                .last_finalized_block
+                .require_owned()?
+                .try_into()?,
+            block_receive_period_e_m_s_d:   value.block_receive_period_emsd,
+            block_arrive_period_e_m_s_d:    value.block_arrive_period_emsd,
+            blocks_received_count:          value.blocks_received_count.into(),
+            transactions_per_block_e_m_s_d: value.transactions_per_block_emsd,
+            finalization_period_e_m_a:      value.finalization_period_ema,
+            best_block_height:              value.best_block_height.require_owned()?.into(),
+            last_finalized_time:            value.last_finalized_time.map(|v| v.into()),
+            finalization_count:             value.finalization_count.into(),
+            epoch_duration:                 value.epoch_duration.require_owned()?.into(),
+            blocks_verified_count:          value.blocks_verified_count.into(),
+            slot_duration:                  value.slot_duration.require_owned()?.into(),
+            genesis_time:                   value.genesis_time.require_owned()?.into(),
+            finalization_period_e_m_s_d:    value.finalization_period_emsd,
+            transactions_per_block_e_m_a:   value.transactions_per_block_ema,
+            block_arrive_latency_e_m_a:     value.block_arrive_latency_ema,
+            block_receive_latency_e_m_a:    value.block_receive_latency_ema,
+            block_arrive_period_e_m_a:      value.block_arrive_period_ema,
+            block_receive_period_e_m_a:     value.block_receive_period_ema,
+            block_last_arrived_time:        value.block_last_arrived_time.map(|v| v.into()),
+            best_block:                     value.best_block.require_owned()?.try_into()?,
+            genesis_block:                  value.genesis_block.require_owned()?.try_into()?,
+            block_last_received_time:       value.block_last_received_time.map(|v| v.into()),
+            protocol_version:               ProtocolVersion::from_i32(value.protocol_version)
+                .ok_or_else(|| tonic::Status::internal("Unknown protocol version"))?
+                .into(),
+            genesis_index:                  value.genesis_index.require_owned()?.into(),
+            current_era_genesis_block:      value
+                .current_era_genesis_block
+                .require_owned()?
+                .try_into()?,
+            current_era_genesis_time:       value.current_era_genesis_time.require_owned()?.into(),
         })
     }
 }
