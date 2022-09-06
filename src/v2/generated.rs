@@ -1,7 +1,5 @@
 tonic::include_proto!("concordium.v2");
 
-use std::collections::BTreeMap;
-
 use super::Require;
 use crypto_common::{Deserial, Versioned, VERSION_0};
 use id::{
@@ -11,6 +9,7 @@ use id::{
         InitialCredentialDeploymentValues,
     },
 };
+use std::collections::BTreeMap;
 
 fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
     let mut cursor = std::io::Cursor::new(bytes);
@@ -36,6 +35,17 @@ impl TryFrom<AccountAddress> for super::AccountAddress {
     }
 }
 
+impl TryFrom<Address> for super::types::Address {
+    type Error = tonic::Status;
+
+    fn try_from(value: Address) -> Result<Self, Self::Error> {
+        match value.r#type.require_owned()? {
+            address::Type::Account(acc) => Ok(Self::Account(acc.try_into()?)),
+            address::Type::Contract(contr) => Ok(Self::Contract(contr.into())),
+        }
+    }
+}
+
 impl TryFrom<ModuleRef> for super::ModuleRef {
     type Error = tonic::Status;
 
@@ -57,6 +67,10 @@ impl From<ContractAddress> for super::ContractAddress {
 
 impl From<ModuleSource> for super::ModuleSource {
     fn from(value: ModuleSource) -> Self { value.value.into() }
+}
+
+impl From<Parameter> for super::types::smart_contracts::Parameter {
+    fn from(value: Parameter) -> Self { value.value.into() }
 }
 
 impl TryFrom<InstanceInfo> for super::InstanceInfo {
@@ -729,11 +743,217 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
 
     fn try_from(value: AccountTransactionEffects) -> Result<Self, Self::Error> {
         match value.effect.require_owned()? {
+            account_transaction_effects::Effect::None(n) => Ok(Self::None {
+                transaction_type: {
+                    match n.transaction_type {
+                        None => None,
+                        Some(tt) => Some(tt.try_into()?),
+                    }
+                },
+                reject_reason:    n.reject_reason.require_owned()?.try_into()?,
+            }),
             account_transaction_effects::Effect::AccountTransfer(at) => Ok(Self::AccountTransfer {
                 amount: at.amount.require_owned()?.into(),
                 to:     at.to.require_owned()?.try_into()?,
             }),
         }
+    }
+}
+
+impl TryFrom<RejectReason> for super::types::RejectReason {
+    type Error = tonic::Status;
+
+    fn try_from(value: RejectReason) -> Result<Self, Self::Error> {
+        Ok(match value.reason.require_owned()? {
+            reject_reason::Reason::ModuleNotWf(_) => Self::ModuleNotWF,
+            reject_reason::Reason::ModuleHashAlreadyExists(v) => Self::ModuleHashAlreadyExists {
+                contents: v.contents.require_owned()?.try_into()?,
+            },
+            reject_reason::Reason::InvalidAccountReference(v) => Self::InvalidAccountReference {
+                contents: v.contents.require_owned()?.try_into()?,
+            },
+            reject_reason::Reason::InvalidInitMethod(v) => Self::InvalidInitMethod {
+                contents: (
+                    v.module_ref.require_owned()?.try_into()?,
+                    v.init_name.require_owned()?.try_into()?,
+                ),
+            },
+            reject_reason::Reason::InvalidReceiveMethod(v) => Self::InvalidReceiveMethod {
+                contents: (
+                    v.module_ref.require_owned()?.try_into()?,
+                    v.receive_name.require_owned()?.try_into()?,
+                ),
+            },
+            reject_reason::Reason::InvalidModuleReference(v) => Self::InvalidModuleReference {
+                contents: v.contents.require_owned()?.try_into()?,
+            },
+            reject_reason::Reason::InvalidContractAddress(v) => Self::InvalidContractAddress {
+                contents: v.contents.require_owned()?.into(),
+            },
+            reject_reason::Reason::RuntimeFailure(_) => Self::RuntimeFailure,
+            reject_reason::Reason::AmountTooLarge(v) => Self::AmountTooLarge {
+                contents: (
+                    v.address.require_owned()?.try_into()?,
+                    v.amount.require_owned()?.into(),
+                ),
+            },
+            reject_reason::Reason::SerializationFailure(_) => Self::SerializationFailure,
+            reject_reason::Reason::OutOfEnergy(_) => Self::OutOfEnergy,
+            reject_reason::Reason::RejectedInit(v) => Self::RejectedInit {
+                reject_reason: v.reject_reason,
+            },
+            reject_reason::Reason::RejectedReceive(v) => Self::RejectedReceive {
+                reject_reason:    v.reject_reason,
+                contract_address: v.contract_address.require_owned()?.into(),
+                receive_name:     v.receive_name.require_owned()?.try_into()?,
+                parameter:        v.parameter.require_owned()?.into(),
+            },
+            reject_reason::Reason::InvalidProof(_) => Self::InvalidProof,
+            reject_reason::Reason::AlreadyABaker(v) => Self::AlreadyABaker {
+                contents: v.contents.require_owned()?.into(),
+            },
+            reject_reason::Reason::NotABaker(v) => Self::NotABaker {
+                contents: v.contents.require_owned()?.try_into()?,
+            },
+            reject_reason::Reason::InsufficientBalanceForBakerStake(_) => {
+                Self::InsufficientBalanceForBakerStake
+            }
+            reject_reason::Reason::StakeUnderMinimumThresholdForBaking(_) => {
+                Self::StakeUnderMinimumThresholdForBaking
+            }
+            reject_reason::Reason::BakerInCooldown(_) => Self::BakerInCooldown,
+            reject_reason::Reason::DuplicateAggregationKey(v) => Self::DuplicateAggregationKey {
+                contents: Box::new(v.contents.require_owned()?.try_into()?),
+            },
+            reject_reason::Reason::NonExistentCredentialId(_) => Self::NonExistentCredentialID,
+            reject_reason::Reason::KeyIndexAlreadyInUse(_) => Self::KeyIndexAlreadyInUse,
+            reject_reason::Reason::InvalidAccountThreshold(_) => Self::InvalidAccountThreshold,
+            reject_reason::Reason::InvalidCredentialKeySignThreshold(_) => {
+                Self::InvalidCredentialKeySignThreshold
+            }
+            reject_reason::Reason::InvalidEncryptedAmountTransferProof(_) => {
+                Self::InvalidEncryptedAmountTransferProof
+            }
+            reject_reason::Reason::InvalidTransferToPublicProof(_) => {
+                Self::InvalidTransferToPublicProof
+            }
+            reject_reason::Reason::EncryptedAmountSelfTransfer(v) => {
+                Self::EncryptedAmountSelfTransfer {
+                    contents: v.contents.require_owned()?.try_into()?,
+                }
+            }
+            reject_reason::Reason::InvalidIndexOnEncryptedTransfer(_) => {
+                Self::InvalidIndexOnEncryptedTransfer
+            }
+            reject_reason::Reason::ZeroScheduledAmount(_) => Self::ZeroScheduledAmount,
+            reject_reason::Reason::NonIncreasingSchedule(_) => Self::NonIncreasingSchedule,
+            reject_reason::Reason::FirstScheduledReleaseExpired(_) => {
+                Self::FirstScheduledReleaseExpired
+            }
+            reject_reason::Reason::ScheduledSelfTransfer(v) => Self::ScheduledSelfTransfer {
+                contents: v.contents.require_owned()?.try_into()?,
+            },
+            reject_reason::Reason::InvalidCredentials(_) => Self::InvalidCredentials,
+            reject_reason::Reason::DuplicateCredIds(v) => Self::DuplicateCredIDs {
+                contents: v
+                    .contents
+                    .into_iter()
+                    .map(TryFrom::try_from)
+                    .collect::<Result<_, tonic::Status>>()?,
+            },
+            reject_reason::Reason::NonExistentCredIds(v) => Self::NonExistentCredIDs {
+                contents: v
+                    .contents
+                    .into_iter()
+                    .map(TryFrom::try_from)
+                    .collect::<Result<_, tonic::Status>>()?,
+            },
+            reject_reason::Reason::RemoveFirstCredential(_) => Self::RemoveFirstCredential,
+            reject_reason::Reason::CredentialHolderDidNotSign(_) => {
+                Self::CredentialHolderDidNotSign
+            }
+            reject_reason::Reason::NotAllowedMultipleCredentials(_) => {
+                Self::NotAllowedMultipleCredentials
+            }
+            reject_reason::Reason::NotAllowedToReceiveEncrypted(_) => {
+                Self::NotAllowedToReceiveEncrypted
+            }
+            reject_reason::Reason::NotAllowedToHandleEncrypted(_) => {
+                Self::NotAllowedToHandleEncrypted
+            }
+            reject_reason::Reason::MissingBakerAddParameters(_) => Self::MissingBakerAddParameters,
+            reject_reason::Reason::FinalizationRewardCommissionNotInRange(_) => {
+                Self::FinalizationRewardCommissionNotInRange
+            }
+            reject_reason::Reason::BakingRewardCommissionNotInRange(_) => {
+                Self::BakingRewardCommissionNotInRange
+            }
+            reject_reason::Reason::TransactionFeeCommissionNotInRange(_) => {
+                Self::TransactionFeeCommissionNotInRange
+            }
+            reject_reason::Reason::AlreadyADelegator(_) => Self::AlreadyADelegator,
+            reject_reason::Reason::InsufficientBalanceForDelegationStake(_) => {
+                Self::InsufficientBalanceForDelegationStake
+            }
+            reject_reason::Reason::MissingDelegationAddParameters(_) => {
+                Self::MissingDelegationAddParameters
+            }
+            reject_reason::Reason::InsufficientDelegationStake(_) => {
+                Self::InsufficientDelegationStake
+            }
+            reject_reason::Reason::DelegatorInCooldown(_) => Self::DelegatorInCooldown,
+            reject_reason::Reason::NotADelegator(v) => Self::NotADelegator {
+                address: v.contents.require_owned()?.try_into()?,
+            },
+            reject_reason::Reason::DelegationTargetNotABaker(v) => {
+                Self::DelegationTargetNotABaker {
+                    target: v.contents.require_owned()?.into(),
+                }
+            }
+            reject_reason::Reason::StakeOverMaximumThresholdForPool(_) => {
+                Self::StakeOverMaximumThresholdForPool
+            }
+            reject_reason::Reason::PoolWouldBecomeOverDelegated(_) => {
+                Self::PoolWouldBecomeOverDelegated
+            }
+            reject_reason::Reason::PoolClosed(_) => Self::PoolClosed,
+        })
+    }
+}
+
+impl TryFrom<i32> for super::types::TransactionType {
+    type Error = tonic::Status;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        Ok(match value {
+            0 => Self::DeployModule,
+            1 => Self::InitContract,
+            2 => Self::Update,
+            3 => Self::Transfer,
+            4 => Self::AddBaker,
+            5 => Self::RemoveBaker,
+            6 => Self::UpdateBakerStake,
+            7 => Self::UpdateBakerRestakeEarnings,
+            8 => Self::UpdateBakerKeys,
+            9 => Self::UpdateCredentialKeys,
+            10 => Self::EncryptedAmountTransfer,
+            11 => Self::TransferToEncrypted,
+            12 => Self::TransferToPublic,
+            13 => Self::TransferWithSchedule,
+            14 => Self::UpdateCredentials,
+            15 => Self::RegisterData,
+            16 => Self::TransferWithMemo,
+            17 => Self::EncryptedAmountTransferWithMemo,
+            18 => Self::TransferWithScheduleAndMemo,
+            19 => Self::ConfigureBaker,
+            20 => Self::ConfigureDelegation,
+            n => {
+                return Err(tonic::Status::invalid_argument(format!(
+                    "{} is not a valid index for a TransactionType",
+                    n
+                )))
+            }
+        })
     }
 }
 
