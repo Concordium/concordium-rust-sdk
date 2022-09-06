@@ -158,8 +158,8 @@ impl Client {
             .await?;
         let stream = response.into_inner().map(|x| match x {
             Ok(v) => {
-                let block_hash = v.hash.require_owned().and_then(TryFrom::try_from)?;
-                let height = v.height.require_owned()?.into();
+                let block_hash = v.hash.require().and_then(TryFrom::try_from)?;
+                let height = v.height.require()?.into();
                 Ok(FinalizedBlockInfo { block_hash, height })
             }
             Err(x) => Err(x),
@@ -174,7 +174,7 @@ fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<Bl
             let bytes = bytes.as_bytes();
             if bytes.len() == 64 {
                 let mut hash = [0u8; 32];
-                if let Err(_) = hex::decode_to_slice(bytes, &mut hash) {
+                if hex::decode_to_slice(bytes, &mut hash).is_err() {
                     tonic::Status::unknown("Response does correctly encode the block hash.");
                 }
                 Ok(hash.into())
@@ -199,21 +199,13 @@ fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<Bl
 /// so it is up to the application to validate inputs if they are required.
 trait Require<E> {
     type A;
-    fn require(&self) -> Result<&Self::A, E>;
-    fn require_owned(self) -> Result<Self::A, E>;
+    fn require(self) -> Result<Self::A, E>;
 }
 
 impl<A> Require<tonic::Status> for Option<A> {
     type A = A;
 
-    fn require(&self) -> Result<&Self::A, tonic::Status> {
-        match self {
-            Some(v) => Ok(v),
-            None => Err(tonic::Status::invalid_argument("missing field in response")),
-        }
-    }
-
-    fn require_owned(self) -> Result<Self::A, tonic::Status> {
+    fn require(self) -> Result<Self::A, tonic::Status> {
         match self {
             Some(v) => Ok(v),
             None => Err(tonic::Status::invalid_argument("missing field in response")),

@@ -65,8 +65,8 @@ impl From<BlockHeight> for super::types::BlockHeight {
     fn from(bh: BlockHeight) -> Self { Self { height: bh.value } }
 }
 
-impl From<Nonce> for super::types::Nonce {
-    fn from(n: Nonce) -> Self { Self { nonce: n.value } }
+impl From<SequenceNumber> for super::types::Nonce {
+    fn from(n: SequenceNumber) -> Self { Self { nonce: n.value } }
 }
 
 impl From<Amount> for super::super::common::types::Amount {
@@ -89,7 +89,7 @@ impl TryFrom<DelegationTarget> for super::types::DelegationTarget {
     type Error = tonic::Status;
 
     fn try_from(dt: DelegationTarget) -> Result<Self, Self::Error> {
-        match dt.target.require_owned()? {
+        match dt.target.require()? {
             delegation_target::Target::Passive(_) => Ok(Self::Passive),
             delegation_target::Target::Baker(bid) => Ok(Self::Baker {
                 baker_id: bid.into(),
@@ -150,8 +150,8 @@ impl TryFrom<EncryptedBalance> for super::types::AccountEncryptedAmount {
     type Error = tonic::Status;
 
     fn try_from(value: EncryptedBalance) -> Result<Self, Self::Error> {
-        let self_amount = value.self_amount.require_owned()?.try_into()?;
-        let start_index = value.start_index.into();
+        let self_amount = value.self_amount.require()?.try_into()?;
+        let start_index = value.start_index;
         let aggregated_amount = match (value.aggregated_amount, value.num_aggregated) {
             (Some(aa), Some(si)) => Some((aa.try_into()?, si)),
             (None, None) => None,
@@ -179,19 +179,17 @@ impl TryFrom<StakePendingChange> for super::types::StakePendingChange {
     type Error = tonic::Status;
 
     fn try_from(value: StakePendingChange) -> Result<Self, Self::Error> {
-        match value.change.require_owned()? {
+        match value.change.require()? {
             stake_pending_change::Change::Reduce(rs) => {
-                let new_stake = rs.new_stake.require_owned()?.into();
-                let effective_time = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
-                    + chrono::Duration::milliseconds(rs.effective_time as i64);
+                let new_stake = rs.new_stake.require()?.into();
+                let effective_time = rs.effective_time.require()?.into();
                 Ok(Self::ReduceStake {
                     new_stake,
                     effective_time,
                 })
             }
             stake_pending_change::Change::Remove(rs) => {
-                let effective_time = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
-                    + chrono::Duration::milliseconds(rs as i64);
+                let effective_time = rs.into();
                 Ok(Self::RemoveStake { effective_time })
             }
         }
@@ -203,10 +201,10 @@ impl TryFrom<BakerInfo> for super::types::BakerInfo {
 
     fn try_from(value: BakerInfo) -> Result<Self, Self::Error> {
         Ok(Self {
-            baker_id:                     value.baker_id.require_owned()?.into(),
-            baker_election_verify_key:    value.election_key.require_owned()?.try_into()?,
-            baker_signature_verify_key:   value.signature_key.require_owned()?.try_into()?,
-            baker_aggregation_verify_key: value.aggregation_key.require_owned()?.try_into()?,
+            baker_id:                     value.baker_id.require()?.into(),
+            baker_election_verify_key:    value.election_key.require()?.try_into()?,
+            baker_signature_verify_key:   value.signature_key.require()?.try_into()?,
+            baker_aggregation_verify_key: value.aggregation_key.require()?.try_into()?,
         })
     }
 }
@@ -214,9 +212,9 @@ impl TryFrom<BakerInfo> for super::types::BakerInfo {
 impl From<OpenStatus> for super::types::OpenStatus {
     fn from(os: OpenStatus) -> Self {
         match os {
-            OpenStatus::Openforall => Self::OpenForAll,
-            OpenStatus::Closedfornew => Self::ClosedForNew,
-            OpenStatus::Closedforall => Self::ClosedForAll,
+            OpenStatus::OpenForAll => Self::OpenForAll,
+            OpenStatus::ClosedForNew => Self::ClosedForNew,
+            OpenStatus::ClosedForAll => Self::ClosedForAll,
         }
     }
 }
@@ -225,7 +223,7 @@ impl From<AmountFraction> for super::types::AmountFraction {
     fn from(af: AmountFraction) -> Self {
         Self {
             parts_per_hundred_thousands: crate::types::PartsPerHundredThousands {
-                parts: af.parts_per_hundred_thousand.into(),
+                parts: af.parts_per_hundred_thousand,
             },
         }
     }
@@ -236,9 +234,9 @@ impl TryFrom<CommissionRates> for super::types::CommissionRates {
 
     fn try_from(value: CommissionRates) -> Result<Self, Self::Error> {
         Ok(Self {
-            finalization: value.finalization.require_owned()?.into(),
-            baking:       value.baking.require_owned()?.into(),
-            transaction:  value.transaction.require_owned()?.into(),
+            finalization: value.finalization.require()?.into(),
+            baking:       value.baking.require()?.into(),
+            transaction:  value.transaction.require()?.into(),
         })
     }
 }
@@ -252,7 +250,7 @@ impl TryFrom<BakerPoolInfo> for super::types::BakerPoolInfo {
             .url
             .try_into()
             .map_err(|_| tonic::Status::internal("Unexpected metadata length."))?;
-        let commission_rates = value.commission_rates.require_owned()?.try_into()?;
+        let commission_rates = value.commission_rates.require()?.try_into()?;
         Ok(Self {
             open_status,
             metadata_url,
@@ -265,11 +263,11 @@ impl TryFrom<AccountStakingInfo> for super::types::AccountStakingInfo {
     type Error = tonic::Status;
 
     fn try_from(value: AccountStakingInfo) -> Result<Self, Self::Error> {
-        match value.staking_info.require_owned()? {
+        match value.staking_info.require()? {
             account_staking_info::StakingInfo::Baker(bsi) => {
-                let staked_amount = bsi.staked_amount.require_owned()?.into();
+                let staked_amount = bsi.staked_amount.require()?.into();
                 let restake_earnings = bsi.restake_earnings;
-                let baker_info = bsi.baker_info.require_owned()?.try_into()?;
+                let baker_info = bsi.baker_info.require()?.try_into()?;
                 let pending_change = match bsi.pending_change {
                     None => None,
                     Some(pc) => Some(pc.try_into()?),
@@ -286,10 +284,10 @@ impl TryFrom<AccountStakingInfo> for super::types::AccountStakingInfo {
                     pool_info,
                 })
             }
-            account_staking_info::StakingInfo::Delegate(dsi) => {
-                let staked_amount = dsi.staked_amount.require_owned()?.into();
+            account_staking_info::StakingInfo::Delegator(dsi) => {
+                let staked_amount = dsi.staked_amount.require()?.into();
                 let restake_earnings = dsi.restake_earnings;
-                let delegation_target = dsi.target.require_owned()?.try_into()?;
+                let delegation_target = dsi.target.require()?.try_into()?;
                 let pending_change = match dsi.pending_change {
                     None => None,
                     Some(pc) => Some(pc.try_into()?),
@@ -309,11 +307,10 @@ impl TryFrom<Release> for super::types::Release {
     type Error = tonic::Status;
 
     fn try_from(value: Release) -> Result<Self, Self::Error> {
-        let timestamp = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
-            + chrono::Duration::milliseconds(value.timestamp as i64);
+        let timestamp = value.timestamp.require()?.into();
         Ok(Self {
             timestamp,
-            amount: value.amount.require_owned()?.into(),
+            amount: value.amount.require()?.into(),
             transactions: value
                 .transactions
                 .into_iter()
@@ -328,7 +325,7 @@ impl TryFrom<ReleaseSchedule> for super::types::AccountReleaseSchedule {
 
     fn try_from(value: ReleaseSchedule) -> Result<Self, Self::Error> {
         Ok(Self {
-            total:    value.total.require_owned()?.into(),
+            total:    value.total.require()?.into(),
             schedule: value
                 .schedules
                 .into_iter()
@@ -342,7 +339,7 @@ impl TryFrom<AccountVerifyKey> for id::types::VerifyKey {
     type Error = tonic::Status;
 
     fn try_from(value: AccountVerifyKey) -> Result<Self, Self::Error> {
-        match value.key.require_owned()? {
+        match value.key.require()? {
             account_verify_key::Key::Ed25519Key(v) => Ok(Self::Ed25519VerifyKey(consume(&v)?)),
         }
     }
@@ -400,7 +397,7 @@ impl TryFrom<CredentialPublicKeys> for id::types::CredentialPublicKeys {
                     }
                 })
                 .collect::<Result<_, tonic::Status>>()?,
-            threshold: value.threshold.require_owned()?.try_into()?,
+            threshold: value.threshold.require()?.try_into()?,
         })
     }
 }
@@ -447,8 +444,8 @@ impl TryFrom<Policy> for id::types::Policy<ArCurve, AttributeKind> {
 
     fn try_from(value: Policy) -> Result<Self, Self::Error> {
         Ok(Self {
-            valid_to:   value.valid_to.require_owned()?.try_into()?,
-            created_at: value.created_at.require_owned()?.try_into()?,
+            valid_to:   value.valid_to.require()?.try_into()?,
+            created_at: value.created_at.require()?.try_into()?,
             policy_vec: value
                 .attributes
                 .into_iter()
@@ -487,9 +484,9 @@ impl TryFrom<CredentialCommitments> for id::types::CredentialDeploymentCommitmen
 
     fn try_from(value: CredentialCommitments) -> Result<Self, Self::Error> {
         Ok(Self {
-            cmm_prf: value.prf.require_owned()?.try_into()?,
-            cmm_cred_counter: value.cred_counter.require_owned()?.try_into()?,
-            cmm_max_accounts: value.max_accounts.require_owned()?.try_into()?,
+            cmm_prf: value.prf.require()?.try_into()?,
+            cmm_cred_counter: value.cred_counter.require()?.try_into()?,
+            cmm_max_accounts: value.max_accounts.require()?.try_into()?,
             cmm_attributes: value
                 .attributes
                 .into_iter()
@@ -515,22 +512,22 @@ impl TryFrom<AccountCredential> for AccountCredentialWithoutProofs<ArCurve, Attr
     type Error = tonic::Status;
 
     fn try_from(value: AccountCredential) -> Result<Self, Self::Error> {
-        match value.credential_values.require_owned()? {
+        match value.credential_values.require()? {
             account_credential::CredentialValues::Initial(ic) => {
                 let icdv = InitialCredentialDeploymentValues {
-                    cred_account: ic.keys.require_owned()?.try_into()?,
-                    reg_id:       ic.cred_id.require_owned()?.try_into()?,
-                    ip_identity:  ic.ip_id.require_owned()?.into(),
-                    policy:       ic.policy.require_owned()?.try_into()?,
+                    cred_account: ic.keys.require()?.try_into()?,
+                    reg_id:       ic.cred_id.require()?.try_into()?,
+                    ip_identity:  ic.ip_id.require()?.into(),
+                    policy:       ic.policy.require()?.try_into()?,
                 };
                 Ok(Self::Initial { icdv })
             }
             account_credential::CredentialValues::Normal(nc) => {
                 let cdv = CredentialDeploymentValues {
-                    cred_key_info: nc.keys.require_owned()?.try_into()?,
-                    cred_id:       nc.cred_id.require_owned()?.try_into()?,
-                    ip_identity:   nc.ip_id.require_owned()?.into(),
-                    threshold:     nc.ar_threshold.require_owned()?.try_into()?,
+                    cred_key_info: nc.keys.require()?.try_into()?,
+                    cred_id:       nc.cred_id.require()?.try_into()?,
+                    ip_identity:   nc.ip_id.require()?.into(),
+                    threshold:     nc.ar_threshold.require()?.try_into()?,
                     ar_data:       nc
                         .ar_data
                         .into_iter()
@@ -542,12 +539,23 @@ impl TryFrom<AccountCredential> for AccountCredentialWithoutProofs<ArCurve, Attr
                             Ok((k, v))
                         })
                         .collect::<Result<_, tonic::Status>>()?,
-                    policy:        nc.policy.require_owned()?.try_into()?,
+                    policy:        nc.policy.require()?.try_into()?,
                 };
-                let commitments = nc.commitments.require_owned()?.try_into()?;
+                let commitments = nc.commitments.require()?.try_into()?;
                 Ok(Self::Normal { cdv, commitments })
             }
         }
+    }
+}
+
+impl From<Timestamp> for crypto_common::types::Timestamp {
+    fn from(value: Timestamp) -> Self { value.value.into() }
+}
+
+impl From<Timestamp> for chrono::DateTime<chrono::Utc> {
+    fn from(value: Timestamp) -> Self {
+        chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
+            + chrono::Duration::milliseconds(value.value as i64)
     }
 }
 
@@ -556,7 +564,7 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
 
     fn try_from(value: AccountInfo) -> Result<Self, Self::Error> {
         let AccountInfo {
-            nonce,
+            sequence_number,
             amount,
             schedule,
             creds,
@@ -567,18 +575,18 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             stake,
             address,
         } = value;
-        let account_nonce = nonce.require_owned()?.into();
-        let account_amount = amount.require_owned()?.into();
-        let account_release_schedule = schedule.require_owned()?.try_into()?;
-        let account_threshold = threshold.require_owned()?.try_into()?;
-        let account_encrypted_amount = encrypted_balance.require_owned()?.try_into()?;
-        let account_encryption_key = encryption_key.require_owned()?.try_into()?;
-        let account_index = index.require_owned()?.into();
+        let account_nonce = sequence_number.require()?.into();
+        let account_amount = amount.require()?.into();
+        let account_release_schedule = schedule.require()?.try_into()?;
+        let account_threshold = threshold.require()?.try_into()?;
+        let account_encrypted_amount = encrypted_balance.require()?.try_into()?;
+        let account_encryption_key = encryption_key.require()?.try_into()?;
+        let account_index = index.require()?.into();
         let account_stake = match stake {
             Some(stake) => Some(stake.try_into()?),
             None => None,
         };
-        let account_address = address.require_owned()?.try_into()?;
+        let account_address = address.require()?.try_into()?;
         Ok(Self {
             account_nonce,
             account_amount,
