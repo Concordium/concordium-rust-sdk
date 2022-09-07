@@ -1126,7 +1126,7 @@ impl AccountTransactionEffects {
 pub enum ContractTraceElement {
     /// A contract instance was updated.
     Updated { data: InstanceUpdatedEvent },
-    /// A contract transferred am amount to the account,
+    /// A contract transferred an amount to the account.
     Transferred {
         /// Sender contract.
         from:   ContractAddress,
