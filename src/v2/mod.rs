@@ -174,13 +174,13 @@ impl Client {
         })
     }
 
-    pub async fn get_next_account_nonce(
+    pub async fn get_next_account_sequence_number(
         &mut self,
         account_identifier: &AccountIdentifier,
     ) -> endpoints::QueryResult<types::queries::AccountNonceResponse> {
         let response = self
             .client
-            .get_next_account_nonce(account_identifier)
+            .get_next_account_sequence_number(account_identifier)
             .await?;
         let response = types::queries::AccountNonceResponse::try_from(response.into_inner())?;
         Ok(response)

@@ -90,8 +90,8 @@ impl From<BlockHeight> for super::types::BlockHeight {
     fn from(bh: BlockHeight) -> Self { Self { height: bh.value } }
 }
 
-impl From<Nonce> for super::types::Nonce {
-    fn from(n: Nonce) -> Self { Self { nonce: n.value } }
+impl From<SequenceNumber> for super::types::Nonce {
+    fn from(n: SequenceNumber) -> Self { Self { nonce: n.value } }
 }
 
 impl From<Amount> for super::super::common::types::Amount {
@@ -176,7 +176,7 @@ impl TryFrom<EncryptedBalance> for super::types::AccountEncryptedAmount {
 
     fn try_from(value: EncryptedBalance) -> Result<Self, Self::Error> {
         let self_amount = value.self_amount.require_owned()?.try_into()?;
-        let start_index = value.start_index.into();
+        let start_index = value.start_index;
         let aggregated_amount = match (value.aggregated_amount, value.num_aggregated) {
             (Some(aa), Some(si)) => Some((aa.try_into()?, si)),
             (None, None) => None,
@@ -241,18 +241,15 @@ impl TryFrom<StakePendingChange> for super::types::StakePendingChange {
         match value.change.require_owned()? {
             stake_pending_change::Change::Reduce(rs) => {
                 let new_stake = rs.new_stake.require_owned()?.into();
-                let effective_time = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
-                    + chrono::Duration::milliseconds(rs.effective_time as i64);
+
                 Ok(Self::ReduceStake {
                     new_stake,
-                    effective_time,
+                    effective_time: rs.effective_time.require_owned()?.into(),
                 })
             }
-            stake_pending_change::Change::Remove(rs) => {
-                let effective_time = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
-                    + chrono::Duration::milliseconds(rs as i64);
-                Ok(Self::RemoveStake { effective_time })
-            }
+            stake_pending_change::Change::Remove(rs) => Ok(Self::RemoveStake {
+                effective_time: rs.into(),
+            }),
         }
     }
 }
@@ -273,9 +270,9 @@ impl TryFrom<BakerInfo> for super::types::BakerInfo {
 impl From<OpenStatus> for super::types::OpenStatus {
     fn from(os: OpenStatus) -> Self {
         match os {
-            OpenStatus::Openforall => Self::OpenForAll,
-            OpenStatus::Closedfornew => Self::ClosedForNew,
-            OpenStatus::Closedforall => Self::ClosedForAll,
+            OpenStatus::OpenForAll => Self::OpenForAll,
+            OpenStatus::ClosedForNew => Self::ClosedForNew,
+            OpenStatus::ClosedForAll => Self::ClosedForAll,
         }
     }
 }
@@ -284,7 +281,7 @@ impl From<AmountFraction> for super::types::AmountFraction {
     fn from(af: AmountFraction) -> Self {
         Self {
             parts_per_hundred_thousands: crate::types::PartsPerHundredThousands {
-                parts: af.parts_per_hundred_thousand.into(),
+                parts: af.parts_per_hundred_thousand,
             },
         }
     }
@@ -345,7 +342,7 @@ impl TryFrom<AccountStakingInfo> for super::types::AccountStakingInfo {
                     pool_info,
                 })
             }
-            account_staking_info::StakingInfo::Delegate(dsi) => {
+            account_staking_info::StakingInfo::Delegator(dsi) => {
                 let staked_amount = dsi.staked_amount.require_owned()?.into();
                 let restake_earnings = dsi.restake_earnings;
                 let delegation_target = dsi.target.require_owned()?.try_into()?;
@@ -368,11 +365,9 @@ impl TryFrom<Release> for super::types::Release {
     type Error = tonic::Status;
 
     fn try_from(value: Release) -> Result<Self, Self::Error> {
-        let timestamp = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
-            + chrono::Duration::milliseconds(value.timestamp as i64);
         Ok(Self {
-            timestamp,
-            amount: value.amount.require_owned()?.into(),
+            timestamp:    value.timestamp.require_owned()?.into(),
+            amount:       value.amount.require_owned()?.into(),
             transactions: value
                 .transactions
                 .into_iter()
@@ -613,7 +608,7 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
 
     fn try_from(value: AccountInfo) -> Result<Self, Self::Error> {
         let AccountInfo {
-            nonce,
+            sequence_number,
             amount,
             schedule,
             creds,
@@ -624,7 +619,7 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             stake,
             address,
         } = value;
-        let account_nonce = nonce.require_owned()?.into();
+        let account_nonce = sequence_number.require_owned()?.into();
         let account_amount = amount.require_owned()?.into();
         let account_release_schedule = schedule.require_owned()?.try_into()?;
         let account_threshold = threshold.require_owned()?.try_into()?;
@@ -660,12 +655,12 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
     }
 }
 
-impl TryFrom<NextAccountNonce> for types::queries::AccountNonceResponse {
+impl TryFrom<NextAccountSequenceNumber> for types::queries::AccountNonceResponse {
     type Error = tonic::Status;
 
-    fn try_from(value: NextAccountNonce) -> Result<Self, Self::Error> {
+    fn try_from(value: NextAccountSequenceNumber) -> Result<Self, Self::Error> {
         Ok(Self {
-            nonce:     value.nonce.require_owned()?.into(),
+            nonce:     value.sequence_number.require_owned()?.into(),
             all_final: value.all_final,
         })
     }
