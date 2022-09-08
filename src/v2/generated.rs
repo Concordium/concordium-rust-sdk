@@ -715,3 +715,22 @@ impl TryFrom<ConsensusInfo> for types::queries::ConsensusInfo {
         })
     }
 }
+
+impl TryFrom<CryptographicParameters> for types::queries::CryptographicParameters {
+    type Error = tonic::Status;
+
+    fn try_from(value: CryptographicParameters) -> Result<Self, Self::Error> {
+        Ok(Self {
+            genesis_string:          value.genesis_string,
+            on_chain_commitment_key: crypto_common::from_bytes(&mut std::io::Cursor::new(
+                &value.on_chain_commitment_key,
+            ))
+            .map_err(|_| tonic::Status::internal("Invalid on_chain_commitment_key received"))?,
+
+            bulletproof_generators: crypto_common::from_bytes(&mut std::io::Cursor::new(
+                &value.bulletproof_generators,
+            ))
+            .map_err(|_| tonic::Status::internal("Invalid bulletproof_generators received"))?,
+        })
+    }
+}

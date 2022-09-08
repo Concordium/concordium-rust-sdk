@@ -197,6 +197,19 @@ impl Client {
         Ok(response)
     }
 
+    pub async fn get_cryptographic_parameters(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::queries::CryptographicParameters>> {
+        let response = self.client.get_cryptographic_parameters(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::queries::CryptographicParameters::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
     pub async fn get_account_list(
         &mut self,
         bi: &BlockIdentifier,
