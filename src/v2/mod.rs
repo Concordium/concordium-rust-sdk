@@ -1,10 +1,8 @@
 use crate::{
     endpoints,
     types::{
-        self, hashes,
-        hashes::BlockHash,
-        smart_contracts::{ModuleRef, ModuleSource},
-        AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID,
+        self, hashes, hashes::BlockHash, smart_contracts::ModuleRef, AbsoluteBlockHeight,
+        AccountInfo, CredentialRegistrationID,
     },
 };
 use concordium_contracts_common::{AccountAddress, ContractAddress};
@@ -230,10 +228,10 @@ impl Client {
         &mut self,
         module_ref: &ModuleRef,
         bi: &BlockIdentifier,
-    ) -> endpoints::QueryResult<QueryResponse<ModuleSource>> {
+    ) -> endpoints::QueryResult<QueryResponse<types::smart_contracts::WasmModule>> {
         let response = self.client.get_module_source((module_ref, bi)).await?;
         let block_hash = extract_metadata(&response)?;
-        let response = ModuleSource::from(response.into_inner());
+        let response = types::smart_contracts::WasmModule::try_from(response.into_inner())?;
         Ok(QueryResponse {
             block_hash,
             response,
