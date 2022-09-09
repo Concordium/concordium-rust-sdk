@@ -83,14 +83,19 @@ impl IntoRequest<generated::BlockHashInput> for &BlockIdentifier {
     }
 }
 
+impl From<&AccountAddress> for generated::AccountAddress {
+    fn from(addr: &AccountAddress) -> Self {
+        generated::AccountAddress {
+            value: crypto_common::to_bytes(addr),
+        }
+    }
+}
+
 impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
     fn from(ai: &AccountIdentifier) -> Self {
         let account_identifier_input = match ai {
             AccountIdentifier::Address(addr) => {
-                let addr = generated::AccountAddress {
-                    value: crypto_common::to_bytes(addr),
-                };
-                generated::account_identifier_input::AccountIdentifierInput::Address(addr)
+                generated::account_identifier_input::AccountIdentifierInput::Address(addr.into())
             }
             AccountIdentifier::CredId(credid) => {
                 let credid = generated::CredentialRegistrationId {
@@ -150,6 +155,12 @@ impl IntoRequest<generated::AccountIdentifierInput> for &AccountIdentifier {
     }
 }
 
+impl IntoRequest<generated::AccountAddress> for &AccountAddress {
+    fn into_request(self) -> tonic::Request<generated::AccountAddress> {
+        tonic::Request::new(self.into())
+    }
+}
+
 impl Client {
     pub async fn new<E: Into<tonic::transport::Endpoint>>(
         endpoint: E,
@@ -174,11 +185,11 @@ impl Client {
 
     pub async fn get_next_account_sequence_number(
         &mut self,
-        account_identifier: &AccountIdentifier,
+        account_address: &AccountAddress,
     ) -> endpoints::QueryResult<types::queries::AccountNonceResponse> {
         let response = self
             .client
-            .get_next_account_sequence_number(account_identifier)
+            .get_next_account_sequence_number(account_address)
             .await?;
         let response = types::queries::AccountNonceResponse::try_from(response.into_inner())?;
         Ok(response)
