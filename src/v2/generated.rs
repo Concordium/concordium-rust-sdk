@@ -56,6 +56,18 @@ impl From<ContractAddress> for super::ContractAddress {
     }
 }
 
+impl From<Energy> for super::types::Energy {
+    fn from(value: Energy) -> Self {
+        super::types::Energy {
+            energy: value.value,
+        }
+    }
+}
+
+impl From<Slot> for super::types::Slot {
+    fn from(value: Slot) -> Self { super::types::Slot { slot: value.value } }
+}
+
 impl TryFrom<VersionedModuleSource> for types::smart_contracts::WasmModule {
     type Error = tonic::Status;
 
@@ -96,6 +108,17 @@ impl TryFrom<TransactionHash> for super::hashes::TransactionHash {
         match value.value.try_into() {
             Ok(hash) => Ok(Self::new(hash)),
             Err(_) => Err(tonic::Status::internal("Unexpected block hash format.")),
+        }
+    }
+}
+
+impl TryFrom<StateHash> for super::hashes::StateHash {
+    type Error = tonic::Status;
+
+    fn try_from(value: StateHash) -> Result<Self, Self::Error> {
+        match value.value.try_into() {
+            Ok(hash) => Ok(Self::new(hash)),
+            Err(_) => Err(tonic::Status::internal("Unexpected state hash format.")),
         }
     }
 }
@@ -749,6 +772,31 @@ impl TryFrom<CryptographicParameters> for types::queries::CryptographicParameter
                 &value.bulletproof_generators,
             ))
             .map_err(|_| tonic::Status::internal("Invalid bulletproof_generators received"))?,
+        })
+    }
+}
+
+impl TryFrom<BlockInfo> for types::queries::BlockInfo {
+    type Error = tonic::Status;
+
+    fn try_from(value: BlockInfo) -> Result<Self, Self::Error> {
+        Ok(Self {
+            transactions_size:       value.transactions_size.into(),
+            block_parent:            value.parent_block.require_owned()?.try_into()?,
+            block_hash:              value.hash.require_owned()?.try_into()?,
+            finalized:               value.finalized,
+            block_state_hash:        value.state_hash.require_owned()?.try_into()?,
+            block_arrive_time:       value.arrive_time.require_owned()?.into(),
+            block_receive_time:      value.receive_time.require_owned()?.into(),
+            transaction_count:       value.transaction_count.into(),
+            transaction_energy_cost: value.transactions_energy_cost.require_owned()?.into(),
+            block_slot:              value.slot_number.require_owned()?.into(),
+            block_last_finalized:    value.last_finalized_block.require_owned()?.try_into()?,
+            block_slot_time:         value.slot_time.require_owned()?.into(),
+            block_height:            value.height.require_owned()?.into(),
+            era_block_height:        value.era_block_height.require_owned()?.into(),
+            genesis_index:           value.genesis_index.require_owned()?.into(),
+            block_baker:             value.baker.map(|b| b.into()),
         })
     }
 }

@@ -309,6 +309,19 @@ impl Client {
         });
         Ok(stream)
     }
+
+    pub async fn get_block_info(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::queries::BlockInfo>> {
+        let response = self.client.get_block_info(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::queries::BlockInfo::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
 }
 
 fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<BlockHash> {
