@@ -56,8 +56,26 @@ impl From<ContractAddress> for super::ContractAddress {
     }
 }
 
-impl From<ModuleSource> for super::ModuleSource {
-    fn from(value: ModuleSource) -> Self { value.value.into() }
+impl TryFrom<VersionedModuleSource> for types::smart_contracts::WasmModule {
+    type Error = tonic::Status;
+
+    fn try_from(versioned_module: VersionedModuleSource) -> Result<Self, Self::Error> {
+        let module = match versioned_module.module.require_owned()? {
+            versioned_module_source::Module::V0(versioned_module_source::ModuleSourceV0 {
+                value,
+            }) => types::smart_contracts::WasmModule {
+                version: types::smart_contracts::WasmVersion::V0,
+                source:  value.into(),
+            },
+            versioned_module_source::Module::V1(versioned_module_source::ModuleSourceV1 {
+                value,
+            }) => types::smart_contracts::WasmModule {
+                version: types::smart_contracts::WasmVersion::V1,
+                source:  value.into(),
+            },
+        };
+        Ok(module)
+    }
 }
 
 impl TryFrom<BlockHash> for super::BlockHash {

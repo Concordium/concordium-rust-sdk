@@ -31,10 +31,10 @@ async fn main() -> anyhow::Result<()> {
         .context("Cannot connect.")?;
 
     let res = client
-        .get_module_source(&app.module.into(), &v2::BlockIdentifier::LastFinal)
+        .get_module_source(&app.module, &v2::BlockIdentifier::LastFinal)
         .await?;
     // TODO: Print in binary so you can pipe to file, or make user provide file.
-    println!("{:#?}", res);
+    println!("{:?}", res);
 
     Ok(())
 }
