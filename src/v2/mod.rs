@@ -322,6 +322,21 @@ impl Client {
             response,
         })
     }
+
+    pub async fn get_baker_list(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::BakerId, tonic::Status>>>,
+    > {
+        let response = self.client.get_baker_list(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|x| x.map(From::from));
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
 }
 
 fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<BlockHash> {
