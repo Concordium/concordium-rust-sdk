@@ -3,7 +3,7 @@ use crate::{
     types::{
         self, hashes,
         hashes::{BlockHash, TransactionHash},
-        smart_contracts::{InstanceInfo, ModuleRef, ModuleSource},
+        smart_contracts::{InstanceInfo, ModuleRef},
         AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, TransactionStatus,
     },
 };
@@ -85,22 +85,34 @@ impl IntoRequest<generated::BlockHashInput> for &BlockIdentifier {
     }
 }
 
-impl From<&AccountIdentifier> for generated::account_info_request::AccountIdentifier {
+impl From<&AccountAddress> for generated::AccountAddress {
+    fn from(addr: &AccountAddress) -> Self {
+        generated::AccountAddress {
+            value: crypto_common::to_bytes(addr),
+        }
+    }
+}
+
+impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
     fn from(ai: &AccountIdentifier) -> Self {
-        match ai {
+        let account_identifier_input = match ai {
             AccountIdentifier::Address(addr) => {
-                let addr = generated::AccountAddress {
-                    value: crypto_common::to_bytes(addr),
-                };
-                Self::Address(addr)
+                generated::account_identifier_input::AccountIdentifierInput::Address(addr.into())
             }
             AccountIdentifier::CredId(credid) => {
                 let credid = generated::CredentialRegistrationId {
                     value: crypto_common::to_bytes(credid),
                 };
-                Self::CredId(credid)
+                generated::account_identifier_input::AccountIdentifierInput::CredId(credid)
             }
-            AccountIdentifier::Index(index) => Self::AccountIndex((*index).into()),
+            AccountIdentifier::Index(index) => {
+                generated::account_identifier_input::AccountIdentifierInput::AccountIndex(
+                    (*index).into(),
+                )
+            }
+        };
+        generated::AccountIdentifierInput {
+            account_identifier_input: Some(account_identifier_input),
         }
     }
 }
@@ -168,6 +180,18 @@ impl IntoRequest<generated::TransactionHash> for &TransactionHash {
     }
 }
 
+impl IntoRequest<generated::AccountIdentifierInput> for &AccountIdentifier {
+    fn into_request(self) -> tonic::Request<generated::AccountIdentifierInput> {
+        tonic::Request::new(self.into())
+    }
+}
+
+impl IntoRequest<generated::AccountAddress> for &AccountAddress {
+    fn into_request(self) -> tonic::Request<generated::AccountAddress> {
+        tonic::Request::new(self.into())
+    }
+}
+
 impl Client {
     pub async fn new<E: Into<tonic::transport::Endpoint>>(
         endpoint: E,
@@ -188,6 +212,29 @@ impl Client {
             block_hash,
             response,
         })
+    }
+
+    pub async fn get_next_account_sequence_number(
+        &mut self,
+        account_address: &AccountAddress,
+    ) -> endpoints::QueryResult<types::queries::AccountNonceResponse> {
+        let response = self
+            .client
+            .get_next_account_sequence_number(account_address)
+            .await?;
+        let response = types::queries::AccountNonceResponse::try_from(response.into_inner())?;
+        Ok(response)
+    }
+
+    pub async fn get_consensus_info(
+        &mut self,
+    ) -> endpoints::QueryResult<types::queries::ConsensusInfo> {
+        let response = self
+            .client
+            .get_consensus_info(generated::Empty::default())
+            .await?;
+        let response = types::queries::ConsensusInfo::try_from(response.into_inner())?;
+        Ok(response)
     }
 
     pub async fn get_account_list(
@@ -223,10 +270,10 @@ impl Client {
         &mut self,
         module_ref: &ModuleRef,
         bi: &BlockIdentifier,
-    ) -> endpoints::QueryResult<QueryResponse<ModuleSource>> {
+    ) -> endpoints::QueryResult<QueryResponse<types::smart_contracts::WasmModule>> {
         let response = self.client.get_module_source((module_ref, bi)).await?;
         let block_hash = extract_metadata(&response)?;
-        let response = ModuleSource::from(response.into_inner());
+        let response = types::smart_contracts::WasmModule::try_from(response.into_inner())?;
         Ok(QueryResponse {
             block_hash,
             response,

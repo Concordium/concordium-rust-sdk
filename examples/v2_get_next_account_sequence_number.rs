@@ -1,10 +1,9 @@
-/// Test the `GetModuleSource` endpoint.
+/// Test the `GetAccountInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::types::smart_contracts::ModuleRef;
-use structopt::StructOpt;
-
 use concordium_rust_sdk::v2;
+use futures::StreamExt;
+use structopt::StructOpt;
 
 #[derive(StructOpt)]
 struct App {
@@ -14,8 +13,6 @@ struct App {
         default_value = "http://localhost:10001"
     )]
     endpoint: tonic::transport::Endpoint,
-    #[structopt(long = "module", help = "Module reference to query.")]
-    module:   ModuleRef,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -30,11 +27,17 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect.")?;
 
-    let res = client
-        .get_module_source(&app.module, &v2::BlockIdentifier::LastFinal)
-        .await?;
-    // TODO: Print in binary so you can pipe to file, or make user provide file.
-    println!("{:?}", res);
+    let mut accounts = client.get_account_list(&v2::BlockIdentifier::Best).await?;
+    while let Some(account) = accounts.response.next().await {
+        let account = account?;
+        let next_nonce = client
+            .get_next_account_sequence_number(&account.into())
+            .await?;
+        println!(
+            "{}: nonce {}, all_final {:?}",
+            account, next_nonce.nonce, next_nonce.all_final
+        );
+    }
 
     Ok(())
 }

@@ -1,7 +1,7 @@
 /// Test the `TransactionStatus` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::types::{hashes::TransactionHash, smart_contracts::ModuleRef};
+use concordium_rust_sdk::types::hashes::TransactionHash;
 use structopt::StructOpt;
 
 use concordium_rust_sdk::v2;

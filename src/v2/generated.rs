@@ -1,6 +1,7 @@
 tonic::include_proto!("concordium.v2");
 
 use super::Require;
+use crate::types;
 use crypto_common::{Deserial, Versioned, VERSION_0};
 use id::{
     constants::{ArCurve, AttributeKind},
@@ -65,8 +66,26 @@ impl From<ContractAddress> for super::ContractAddress {
     }
 }
 
-impl From<ModuleSource> for super::ModuleSource {
-    fn from(value: ModuleSource) -> Self { value.value.into() }
+impl TryFrom<VersionedModuleSource> for types::smart_contracts::WasmModule {
+    type Error = tonic::Status;
+
+    fn try_from(versioned_module: VersionedModuleSource) -> Result<Self, Self::Error> {
+        let module = match versioned_module.module.require_owned()? {
+            versioned_module_source::Module::V0(versioned_module_source::ModuleSourceV0 {
+                value,
+            }) => types::smart_contracts::WasmModule {
+                version: types::smart_contracts::WasmVersion::V0,
+                source:  value.into(),
+            },
+            versioned_module_source::Module::V1(versioned_module_source::ModuleSourceV1 {
+                value,
+            }) => types::smart_contracts::WasmModule {
+                version: types::smart_contracts::WasmVersion::V1,
+                source:  value.into(),
+            },
+        };
+        Ok(module)
+    }
 }
 
 impl From<Parameter> for super::types::smart_contracts::Parameter {
@@ -157,8 +176,8 @@ impl From<BlockHeight> for super::types::BlockHeight {
     fn from(bh: BlockHeight) -> Self { Self { height: bh.value } }
 }
 
-impl From<Nonce> for super::types::Nonce {
-    fn from(n: Nonce) -> Self { Self { nonce: n.value } }
+impl From<SequenceNumber> for super::types::Nonce {
+    fn from(n: SequenceNumber) -> Self { Self { nonce: n.value } }
 }
 
 impl From<Amount> for super::super::common::types::Amount {
@@ -243,7 +262,7 @@ impl TryFrom<EncryptedBalance> for super::types::AccountEncryptedAmount {
 
     fn try_from(value: EncryptedBalance) -> Result<Self, Self::Error> {
         let self_amount = value.self_amount.require_owned()?.try_into()?;
-        let start_index = value.start_index.into();
+        let start_index = value.start_index;
         let aggregated_amount = match (value.aggregated_amount, value.num_aggregated) {
             (Some(aa), Some(si)) => Some((aa.try_into()?, si)),
             (None, None) => None,
@@ -267,6 +286,40 @@ impl TryFrom<EncryptedBalance> for super::types::AccountEncryptedAmount {
     }
 }
 
+impl From<Timestamp> for chrono::DateTime<chrono::Utc> {
+    fn from(value: Timestamp) -> Self {
+        chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
+            + chrono::Duration::milliseconds(value.value as i64)
+    }
+}
+
+impl From<Duration> for chrono::Duration {
+    fn from(value: Duration) -> Self { chrono::Duration::milliseconds(value.value as i64) }
+}
+
+impl From<Duration> for super::types::SlotDuration {
+    fn from(value: Duration) -> Self {
+        super::types::SlotDuration {
+            millis: value.value,
+        }
+    }
+}
+
+impl From<GenesisIndex> for super::types::GenesisIndex {
+    fn from(value: GenesisIndex) -> Self { value.value.into() }
+}
+
+impl From<ProtocolVersion> for super::types::ProtocolVersion {
+    fn from(value: ProtocolVersion) -> Self {
+        match value {
+            ProtocolVersion::ProtocolVersion1 => super::types::ProtocolVersion::P1,
+            ProtocolVersion::ProtocolVersion2 => super::types::ProtocolVersion::P2,
+            ProtocolVersion::ProtocolVersion3 => super::types::ProtocolVersion::P3,
+            ProtocolVersion::ProtocolVersion4 => super::types::ProtocolVersion::P4,
+        }
+    }
+}
+
 impl TryFrom<StakePendingChange> for super::types::StakePendingChange {
     type Error = tonic::Status;
 
@@ -274,18 +327,15 @@ impl TryFrom<StakePendingChange> for super::types::StakePendingChange {
         match value.change.require_owned()? {
             stake_pending_change::Change::Reduce(rs) => {
                 let new_stake = rs.new_stake.require_owned()?.into();
-                let effective_time = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
-                    + chrono::Duration::milliseconds(rs.effective_time as i64);
+
                 Ok(Self::ReduceStake {
                     new_stake,
-                    effective_time,
+                    effective_time: rs.effective_time.require_owned()?.into(),
                 })
             }
-            stake_pending_change::Change::Remove(rs) => {
-                let effective_time = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
-                    + chrono::Duration::milliseconds(rs as i64);
-                Ok(Self::RemoveStake { effective_time })
-            }
+            stake_pending_change::Change::Remove(rs) => Ok(Self::RemoveStake {
+                effective_time: rs.into(),
+            }),
         }
     }
 }
@@ -306,9 +356,9 @@ impl TryFrom<BakerInfo> for super::types::BakerInfo {
 impl From<OpenStatus> for super::types::OpenStatus {
     fn from(os: OpenStatus) -> Self {
         match os {
-            OpenStatus::Openforall => Self::OpenForAll,
-            OpenStatus::Closedfornew => Self::ClosedForNew,
-            OpenStatus::Closedforall => Self::ClosedForAll,
+            OpenStatus::OpenForAll => Self::OpenForAll,
+            OpenStatus::ClosedForNew => Self::ClosedForNew,
+            OpenStatus::ClosedForAll => Self::ClosedForAll,
         }
     }
 }
@@ -317,7 +367,7 @@ impl From<AmountFraction> for super::types::AmountFraction {
     fn from(af: AmountFraction) -> Self {
         Self {
             parts_per_hundred_thousands: crate::types::PartsPerHundredThousands {
-                parts: af.parts_per_hundred_thousand.into(),
+                parts: af.parts_per_hundred_thousand,
             },
         }
     }
@@ -378,7 +428,7 @@ impl TryFrom<AccountStakingInfo> for super::types::AccountStakingInfo {
                     pool_info,
                 })
             }
-            account_staking_info::StakingInfo::Delegate(dsi) => {
+            account_staking_info::StakingInfo::Delegator(dsi) => {
                 let staked_amount = dsi.staked_amount.require_owned()?.into();
                 let restake_earnings = dsi.restake_earnings;
                 let delegation_target = dsi.target.require_owned()?.try_into()?;
@@ -401,11 +451,9 @@ impl TryFrom<Release> for super::types::Release {
     type Error = tonic::Status;
 
     fn try_from(value: Release) -> Result<Self, Self::Error> {
-        let timestamp = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
-            + chrono::Duration::milliseconds(value.timestamp as i64);
         Ok(Self {
-            timestamp,
-            amount: value.amount.require_owned()?.into(),
+            timestamp:    value.timestamp.require_owned()?.into(),
+            amount:       value.amount.require_owned()?.into(),
             transactions: value
                 .transactions
                 .into_iter()
@@ -646,7 +694,7 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
 
     fn try_from(value: AccountInfo) -> Result<Self, Self::Error> {
         let AccountInfo {
-            nonce,
+            sequence_number,
             amount,
             schedule,
             creds,
@@ -657,7 +705,7 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             stake,
             address,
         } = value;
-        let account_nonce = nonce.require_owned()?.into();
+        let account_nonce = sequence_number.require_owned()?.into();
         let account_amount = amount.require_owned()?.into();
         let account_release_schedule = schedule.require_owned()?.try_into()?;
         let account_threshold = threshold.require_owned()?.try_into()?;
@@ -733,6 +781,7 @@ impl TryFrom<BlockItemSummary> for super::types::BlockItemSummary {
                         },
                     )
                 }
+                _ => todo!(),
             },
         })
     }
@@ -756,6 +805,7 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                 amount: at.amount.require_owned()?.into(),
                 to:     at.to.require_owned()?.try_into()?,
             }),
+            _ => todo!(),
         }
     }
 }
@@ -921,6 +971,17 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
     }
 }
 
+impl TryFrom<NextAccountSequenceNumber> for types::queries::AccountNonceResponse {
+    type Error = tonic::Status;
+
+    fn try_from(value: NextAccountSequenceNumber) -> Result<Self, Self::Error> {
+        Ok(Self {
+            nonce:     value.sequence_number.require_owned()?.into(),
+            all_final: value.all_final,
+        })
+    }
+}
+
 impl TryFrom<i32> for super::types::TransactionType {
     type Error = tonic::Status;
 
@@ -966,5 +1027,54 @@ impl From<Energy> for super::types::Energy {
         Self {
             energy: value.value,
         }
+    }
+}
+impl TryFrom<ConsensusInfo> for types::queries::ConsensusInfo {
+    type Error = tonic::Status;
+
+    fn try_from(value: ConsensusInfo) -> Result<Self, Self::Error> {
+        Ok(Self {
+            last_finalized_block_height:    value
+                .last_finalized_block_height
+                .require_owned()?
+                .into(),
+            block_arrive_latency_e_m_s_d:   value.block_arrive_latency_emsd,
+            block_receive_latency_e_m_s_d:  value.block_receive_latency_emsd,
+            last_finalized_block:           value
+                .last_finalized_block
+                .require_owned()?
+                .try_into()?,
+            block_receive_period_e_m_s_d:   value.block_receive_period_emsd,
+            block_arrive_period_e_m_s_d:    value.block_arrive_period_emsd,
+            blocks_received_count:          value.blocks_received_count.into(),
+            transactions_per_block_e_m_s_d: value.transactions_per_block_emsd,
+            finalization_period_e_m_a:      value.finalization_period_ema,
+            best_block_height:              value.best_block_height.require_owned()?.into(),
+            last_finalized_time:            value.last_finalized_time.map(|v| v.into()),
+            finalization_count:             value.finalization_count.into(),
+            epoch_duration:                 value.epoch_duration.require_owned()?.into(),
+            blocks_verified_count:          value.blocks_verified_count.into(),
+            slot_duration:                  value.slot_duration.require_owned()?.into(),
+            genesis_time:                   value.genesis_time.require_owned()?.into(),
+            finalization_period_e_m_s_d:    value.finalization_period_emsd,
+            transactions_per_block_e_m_a:   value.transactions_per_block_ema,
+            block_arrive_latency_e_m_a:     value.block_arrive_latency_ema,
+            block_receive_latency_e_m_a:    value.block_receive_latency_ema,
+            block_arrive_period_e_m_a:      value.block_arrive_period_ema,
+            block_receive_period_e_m_a:     value.block_receive_period_ema,
+            block_last_arrived_time:        value.block_last_arrived_time.map(|v| v.into()),
+            best_block:                     value.best_block.require_owned()?.try_into()?,
+            genesis_block:                  value.genesis_block.require_owned()?.try_into()?,
+            block_last_received_time:       value.block_last_received_time.map(|v| v.into()),
+            protocol_version:               ProtocolVersion::from_i32(value.protocol_version)
+                .ok_or_else(|| tonic::Status::internal("Unknown protocol version"))?
+                .into(),
+            genesis_index:                  value.genesis_index.require_owned()?.into(),
+            current_era_genesis_block:      value
+                .current_era_genesis_block
+                .require_owned()?
+                .try_into()?,
+            current_era_genesis_time:       value.current_era_genesis_time.require_owned()?.into(),
+        })
     }
 }
