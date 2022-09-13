@@ -10,7 +10,7 @@ use id::{
         InitialCredentialDeploymentValues,
     },
 };
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, marker::PhantomData};
 
 fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
     let mut cursor = std::io::Cursor::new(bytes);
@@ -163,7 +163,20 @@ impl TryFrom<TransactionHash> for super::hashes::TransactionHash {
     fn try_from(value: TransactionHash) -> Result<Self, Self::Error> {
         match value.value.try_into() {
             Ok(hash) => Ok(Self::new(hash)),
-            Err(_) => Err(tonic::Status::internal("Unexpected block hash format.")),
+            Err(_) => Err(tonic::Status::internal(
+                "Unexpected transaction hash format.",
+            )),
+        }
+    }
+}
+
+impl TryFrom<Sha256Hash> for super::hashes::Hash {
+    type Error = tonic::Status;
+
+    fn try_from(value: Sha256Hash) -> Result<Self, Self::Error> {
+        match value.value.try_into() {
+            Ok(hash) => Ok(Self::new(hash)),
+            Err(_) => Err(tonic::Status::internal("Unexpected hash format.")),
         }
     }
 }
@@ -213,6 +226,12 @@ impl TryFrom<EncryptionKey> for id::elgamal::PublicKey<ArCurve> {
     type Error = tonic::Status;
 
     fn try_from(value: EncryptionKey) -> Result<Self, Self::Error> { consume(&value.value) }
+}
+
+impl TryFrom<ar_info::ArPublicKey> for id::elgamal::PublicKey<ArCurve> {
+    type Error = tonic::Status;
+
+    fn try_from(value: ar_info::ArPublicKey) -> Result<Self, Self::Error> { consume(&value.value) }
 }
 
 impl TryFrom<AccountThreshold> for super::types::AccountThreshold {
@@ -488,6 +507,16 @@ impl TryFrom<AccountVerifyKey> for id::types::VerifyKey {
     }
 }
 
+impl TryFrom<UpdatePublicKey> for super::types::UpdatePublicKey {
+    type Error = tonic::Status;
+
+    fn try_from(value: UpdatePublicKey) -> Result<Self, Self::Error> {
+        Ok(super::types::UpdatePublicKey {
+            public: id::types::VerifyKey::Ed25519VerifyKey(consume(&value.value)?),
+        })
+    }
+}
+
 impl TryFrom<SignatureThreshold> for id::types::SignatureThreshold {
     type Error = tonic::Status;
 
@@ -758,7 +787,16 @@ impl TryFrom<TransactionStatus> for super::types::TransactionStatus {
                 summaries.insert(k, v);
                 Ok(super::types::TransactionStatus::Finalized(summaries))
             }
-            transaction_status::Status::Committed(_) => todo!(),
+            transaction_status::Status::Committed(cs) => {
+                let mut summaries: BTreeMap<super::BlockHash, super::types::BlockItemSummary> =
+                    BTreeMap::new();
+                for o in cs.outcomes {
+                    let k = o.block_hash.require_owned()?.try_into()?;
+                    let v = o.outcome.require_owned()?.try_into()?;
+                    summaries.insert(k, v);
+                }
+                Ok(super::types::TransactionStatus::Committed(summaries))
+            }
         }
     }
 }
@@ -772,18 +810,326 @@ impl TryFrom<BlockItemSummary> for super::types::BlockItemSummary {
             energy_cost: value.energy_cost.require_owned()?.into(),
             hash:        value.hash.require_owned()?.try_into()?,
             details:     match value.details.require_owned()? {
-                block_item_summary::Details::AccountTransaction(acc_trx) => {
+                block_item_summary::Details::AccountTransaction(v) => {
                     super::types::BlockItemSummaryDetails::AccountTransaction(
                         super::types::AccountTransactionDetails {
-                            cost:    acc_trx.cost.require_owned()?.into(),
-                            sender:  acc_trx.sender.require_owned()?.try_into()?,
-                            effects: acc_trx.effects.require_owned()?.try_into()?,
+                            cost:    v.cost.require_owned()?.into(),
+                            sender:  v.sender.require_owned()?.try_into()?,
+                            effects: v.effects.require_owned()?.try_into()?,
                         },
                     )
                 }
-                _ => todo!(),
+                block_item_summary::Details::AccountCreation(v) => {
+                    super::types::BlockItemSummaryDetails::AccountCreation(
+                        super::types::AccountCreationDetails {
+                            credential_type: v.credential_type().into(),
+                            address:         v.address.require_owned()?.try_into()?,
+                            reg_id:          v.reg_id.require_owned()?.try_into()?,
+                        },
+                    )
+                }
+                block_item_summary::Details::Update(v) => {
+                    super::types::BlockItemSummaryDetails::Update(super::types::UpdateDetails {
+                        effective_time: v.effective_time.require_owned()?.into(),
+                        payload:        v.payload.require_owned()?.try_into()?,
+                    })
+                }
             },
         })
+    }
+}
+
+impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
+    type Error = tonic::Status;
+
+    fn try_from(value: UpdatePayload) -> Result<Self, Self::Error> {
+        Ok(match value.payload.require_owned()? {
+            update_payload::Payload::ProtocolUpdate(v) => {
+                Self::Protocol(super::types::ProtocolUpdate {
+                    message: v.message,
+                    specification_url: v.specification_url,
+                    specification_hash: v.specification_hash.require_owned()?.try_into()?,
+                    specification_auxiliary_data: v.specification_auxiliary_data,
+                })
+            }
+            update_payload::Payload::ElectionDifficultyUpdate(v) => {
+                Self::ElectionDifficulty(super::types::ElectionDifficulty {
+                    parts_per_hundred_thousands: types::PartsPerHundredThousands::new(
+                        v.value.require_owned()?.parts_per_hundred_thousand,
+                    )
+                    .ok_or(tonic::Status::internal(
+                        "Invalid election difficulty. Above 100_000 parts per hundres thousands.",
+                    ))?,
+                })
+            }
+            update_payload::Payload::EuroPerEnergyUpdate(v) => {
+                let value = v.value.require_owned()?;
+                Self::EuroPerEnergy(super::types::ExchangeRate {
+                    numerator:   value.numerator,
+                    denominator: value.denominator,
+                })
+            }
+            update_payload::Payload::MicroCcdPerEuroUpdate(v) => {
+                let value = v.value.require_owned()?;
+                Self::MicroGTUPerEuro(super::types::ExchangeRate {
+                    numerator:   value.numerator,
+                    denominator: value.denominator,
+                })
+            }
+            update_payload::Payload::FoundationAccountUpdate(v) => {
+                Self::FoundationAccount(v.try_into()?)
+            }
+            update_payload::Payload::MintDistributionUpdate(v) => {
+                Self::MintDistribution(super::types::MintDistributionV0 {
+                    mint_per_slot:       v.mint_distribution.require_owned()?.try_into()?,
+                    baking_reward:       v.baking_reward.require_owned()?.into(),
+                    finalization_reward: v.finalization_reward.require_owned()?.into(),
+                })
+            }
+            update_payload::Payload::TransactionFeeDistributionUpdate(v) => {
+                Self::TransactionFeeDistribution(super::types::TransactionFeeDistribution {
+                    baker:       v.baker.require_owned()?.into(),
+                    gas_account: v.gas_account.require_owned()?.into(),
+                })
+            }
+            update_payload::Payload::GasRewardsUpdate(v) => {
+                Self::GASRewards(super::types::GASRewards {
+                    baker:              v.baker.require_owned()?.into(),
+                    finalization_proof: v.finalization_proof.require_owned()?.into(),
+                    account_creation:   v.account_creation.require_owned()?.into(),
+                    chain_update:       v.chain_update.require_owned()?.into(),
+                })
+            }
+            update_payload::Payload::BakerStakeThresholdUpdate(v) => {
+                Self::BakerStakeThreshold(super::types::BakerParameters {
+                    minimum_threshold_for_baking: v.baker_stake_threshold.require_owned()?.into(),
+                })
+            }
+            update_payload::Payload::RootUpdate(v) => {
+                Self::Root(match v.update_type.require_owned()? {
+                    update_payload::root_update_payload::UpdateType::RootKeysUpdate(u) => {
+                        super::types::RootUpdate::RootKeysUpdate(
+                            super::types::HigherLevelAccessStructure {
+                                keys:      u
+                                    .keys
+                                    .into_iter()
+                                    .map(TryInto::try_into)
+                                    .collect::<Result<_, tonic::Status>>()?,
+                                threshold: u.threshold.require_owned()?.try_into()?,
+                                _phantom:  PhantomData,
+                            },
+                        )
+                    }
+                    update_payload::root_update_payload::UpdateType::Level1KeysUpdate(u) => {
+                        super::types::RootUpdate::Level1KeysUpdate(
+                            super::types::HigherLevelAccessStructure {
+                                keys:      u
+                                    .keys
+                                    .into_iter()
+                                    .map(TryInto::try_into)
+                                    .collect::<Result<_, tonic::Status>>()?,
+                                threshold: u.threshold.require_owned()?.try_into()?,
+                                _phantom:  PhantomData,
+                            },
+                        )
+                    }
+                    update_payload::root_update_payload::UpdateType::Level2KeysUpdateV0(u) => {
+                        super::types::RootUpdate::Level2KeysUpdate(Box::new(u.try_into()?))
+                    }
+                    update_payload::root_update_payload::UpdateType::Level2KeysUpdateV1(u) => {
+                        super::types::RootUpdate::Level2KeysUpdateV1(Box::new(u.try_into()?))
+                    }
+                })
+            }
+            update_payload::Payload::Level1RootUpdate(v) => {
+                Self::Level1(match v.update_type.require_owned()? {
+                    update_payload::level1_update_payload::UpdateType::Level1KeysUpdate(u) => {
+                        super::types::Level1Update::Level1KeysUpdate(
+                            super::types::HigherLevelAccessStructure {
+                                keys:      u
+                                    .keys
+                                    .into_iter()
+                                    .map(TryInto::try_into)
+                                    .collect::<Result<_, tonic::Status>>()?,
+                                threshold: u.threshold.require_owned()?.try_into()?,
+                                _phantom:  PhantomData,
+                            },
+                        )
+                    }
+                    update_payload::level1_update_payload::UpdateType::Level2KeysUpdateV0(_) => {
+                        todo!()
+                        // super::types::Level1Update::Level2KeysUpdate(Box::
+                        // new(u.try_into()?))
+                    }
+                    update_payload::level1_update_payload::UpdateType::Level2KeysUpdateV1(_) => {
+                        todo!()
+                        // super::types::Level1Update::Level2KeysUpdate(Box::
+                        // new(u.try_into()?))
+                    }
+                })
+            }
+            update_payload::Payload::AddAnonymityRevokerUpdate(v) => {
+                Self::AddAnonymityRevoker(Box::new(v.try_into()?))
+            }
+            update_payload::Payload::AddIdentityProviderUpdate(_) => todo!(),
+            update_payload::Payload::CooldownParametersCpv1Update(_) => todo!(),
+            update_payload::Payload::PoolParametersCpv1Update(_) => todo!(),
+            update_payload::Payload::TimeParametersCpv1Update(_) => todo!(),
+            update_payload::Payload::MintDistributionCpv1Update(_) => todo!(),
+        })
+    }
+}
+
+impl TryFrom<ArInfo> for id::types::ArInfo<ArCurve> {
+    type Error = tonic::Status;
+
+    fn try_from(value: ArInfo) -> Result<Self, Self::Error> {
+        Ok(Self {
+            ar_identity:    id::types::ArIdentity::try_from(value.identity.require_owned()?.value)
+                .map_err(|e| tonic::Status::internal(e))?,
+            ar_description: value.description.require_owned()?.into(),
+            ar_public_key:  value.public_key.require_owned()?.try_into()?,
+        })
+    }
+}
+
+impl From<Description> for id::types::Description {
+    fn from(value: Description) -> Self {
+        Self {
+            name:        value.name,
+            url:         value.url,
+            description: value.description,
+        }
+    }
+}
+
+impl TryFrom<AuthorizationsV0> for super::types::AuthorizationsV0 {
+    type Error = tonic::Status;
+
+    fn try_from(value: AuthorizationsV0) -> Result<Self, Self::Error> {
+        Ok(Self {
+            keys: value
+                .keys
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<_, tonic::Status>>()?,
+            emergency: value.emergency.require_owned()?.try_into()?,
+            protocol: value.protocol.require_owned()?.try_into()?,
+            election_difficulty: value
+                .parameter_election_difficulty
+                .require_owned()?
+                .try_into()?,
+            euro_per_energy: value
+                .parameter_euro_per_energy
+                .require_owned()?
+                .try_into()?,
+            micro_gtu_per_euro: value
+                .parameter_micro_ccd_per_euro
+                .require_owned()?
+                .try_into()?,
+            foundation_account: value
+                .parameter_foundation_account
+                .require_owned()?
+                .try_into()?,
+            mint_distribution: value
+                .parameter_mint_distribution
+                .require_owned()?
+                .try_into()?,
+            transaction_fee_distribution: value
+                .parameter_transaction_fee_distribution
+                .require_owned()?
+                .try_into()?,
+            param_gas_rewards: value.parameter_gas_rewards.require_owned()?.try_into()?,
+            pool_parameters: value.pool_parameters.require_owned()?.try_into()?,
+            add_anonymity_revoker: value.add_anonymity_revoker.require_owned()?.try_into()?,
+            add_identity_provider: value.add_identity_provider.require_owned()?.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<AuthorizationsV1> for super::types::AuthorizationsV1 {
+    type Error = tonic::Status;
+
+    fn try_from(value: AuthorizationsV1) -> Result<Self, Self::Error> {
+        Ok(Self {
+            v0:                  value.v0.require_owned()?.try_into()?,
+            cooldown_parameters: value.parameter_cooldown.require_owned()?.try_into()?,
+            time_parameters:     value.parameter_time.require_owned()?.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<AccessStructure> for super::types::AccessStructure {
+    type Error = tonic::Status;
+
+    fn try_from(value: AccessStructure) -> Result<Self, Self::Error> {
+        let authorized_keys = value
+            .access_public_keys
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<_, tonic::Status>>()?;
+        let threshold = value.access_threshold.require_owned()?.try_into()?;
+        Ok(Self {
+            authorized_keys,
+            threshold,
+        })
+    }
+}
+
+impl TryFrom<UpdateKeysIndex> for super::types::UpdateKeysIndex {
+    type Error = tonic::Status;
+
+    fn try_from(value: UpdateKeysIndex) -> Result<Self, Self::Error> {
+        Ok(Self {
+            index: value.value.try_into().map_err(|_| {
+                tonic::Status::internal("Invalid update keys index: could not fit into a u16.")
+            })?,
+        })
+    }
+}
+
+impl TryFrom<UpdateKeysThreshold> for super::types::UpdateKeysThreshold {
+    type Error = tonic::Status;
+
+    fn try_from(value: UpdateKeysThreshold) -> Result<Self, Self::Error> {
+        Ok(Self {
+            threshold: value
+                .value
+                .try_into()
+                .map_err(|_| tonic::Status::internal("Threshold could not fit into a u16."))?,
+        })
+    }
+}
+
+impl TryFrom<MintRate> for super::types::MintRate {
+    type Error = tonic::Status;
+
+    fn try_from(value: MintRate) -> Result<Self, Self::Error> {
+        Ok(Self {
+            mantissa: value.mantissa,
+            exponent: value.exponent.try_into().map_err(|_| {
+                tonic::Status::internal(
+                    "Invalid exponent value. Could not be represented in an u8.",
+                )
+            })?,
+        })
+    }
+}
+
+impl From<TransactionTime> for super::super::common::types::TransactionTime {
+    fn from(value: TransactionTime) -> Self {
+        Self {
+            seconds: value.value,
+        }
+    }
+}
+
+impl From<CredentialType> for super::types::CredentialType {
+    fn from(value: CredentialType) -> Self {
+        match value {
+            CredentialType::Initial => Self::Initial,
+            CredentialType::Normal => Self::Normal,
+        }
     }
 }
 
@@ -801,13 +1147,418 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                 },
                 reject_reason:    n.reject_reason.require_owned()?.try_into()?,
             }),
-            account_transaction_effects::Effect::AccountTransfer(at) => Ok(Self::AccountTransfer {
-                amount: at.amount.require_owned()?.into(),
-                to:     at.to.require_owned()?.try_into()?,
+            account_transaction_effects::Effect::AccountTransfer(at) => {
+                let amount = at.amount.require_owned()?.into();
+                let to = at.to.require_owned()?.try_into()?;
+                match at.memo {
+                    None => Ok(Self::AccountTransfer { amount, to }),
+                    Some(memo) => Ok(Self::AccountTransferWithMemo {
+                        amount,
+                        to,
+                        memo: memo.try_into()?,
+                    }),
+                }
+            }
+            account_transaction_effects::Effect::ModuleDeployed(module_ref) => {
+                Ok(Self::ModuleDeployed {
+                    module_ref: module_ref.try_into()?,
+                })
+            }
+            account_transaction_effects::Effect::ContractInitialized(cie) => {
+                Ok(Self::ContractInitialized {
+                    data: super::types::ContractInitializedEvent {
+                        contract_version: cie.contract_version().into(),
+                        origin_ref:       cie.origin_ref.require_owned()?.try_into()?,
+                        address:          cie.address.require_owned()?.into(),
+                        amount:           cie.amount.require_owned()?.into(),
+                        init_name:        cie.init_name.require_owned()?.try_into()?,
+                        events:           cie.events.into_iter().map(Into::into).collect(),
+                    },
+                })
+            }
+            account_transaction_effects::Effect::ContractUpdateIssued(cui) => {
+                let effects = cui
+                    .effects
+                    .into_iter()
+                    .map(|e| {
+                        Ok(match e.element.require_owned()? {
+                            contract_trace_element::Element::Updated(u) => {
+                                super::types::ContractTraceElement::Updated {
+                                    data: u.try_into()?,
+                                }
+                            }
+                            contract_trace_element::Element::Transferred(t) => {
+                                super::types::ContractTraceElement::Transferred {
+                                    from:   t.from.require_owned()?.into(),
+                                    amount: t.amount.require_owned()?.into(),
+                                    to:     t.to.require_owned()?.try_into()?,
+                                }
+                            }
+                            contract_trace_element::Element::Interrupted(i) => {
+                                super::types::ContractTraceElement::Interrupted {
+                                    address: i.address.require_owned()?.into(),
+                                    events:  i.events.into_iter().map(Into::into).collect(),
+                                }
+                            }
+                            contract_trace_element::Element::Resumed(r) => {
+                                super::types::ContractTraceElement::Resumed {
+                                    address: r.address.require_owned()?.into(),
+                                    success: r.success,
+                                }
+                            }
+                        })
+                    })
+                    .collect::<Result<_, tonic::Status>>()?;
+                Ok(Self::ContractUpdateIssued { effects })
+            }
+            account_transaction_effects::Effect::BakerAdded(ba) => {
+                let baker_added_event = super::types::BakerAddedEvent {
+                    keys_event:       ba.keys_event.require_owned()?.try_into()?,
+                    stake:            ba.stake.require_owned()?.into(),
+                    restake_earnings: ba.restake_earnings,
+                };
+                Ok(Self::BakerAdded {
+                    data: Box::new(baker_added_event),
+                })
+            }
+            account_transaction_effects::Effect::BakerRemoved(baker_id) => Ok(Self::BakerRemoved {
+                baker_id: baker_id.into(),
             }),
-            _ => todo!(),
+            account_transaction_effects::Effect::BakerStakeUpdated(bsu) => {
+                let data = match bsu.contents {
+                    None => None,
+                    Some(d) => Some(super::types::BakerStakeUpdatedData {
+                        baker_id:  d.baker_id.require_owned()?.into(),
+                        new_stake: d.new_stake.require_owned()?.into(),
+                        increased: d.increased,
+                    }),
+                };
+                Ok(Self::BakerStakeUpdated { data })
+            }
+            account_transaction_effects::Effect::BakerRestakeEarningsUpdated(breu) => {
+                Ok(Self::BakerRestakeEarningsUpdated {
+                    baker_id:         breu.baker_id.require_owned()?.into(),
+                    restake_earnings: breu.restake_earnings,
+                })
+            }
+            account_transaction_effects::Effect::BakerKeysUpdated(keys_event) => {
+                Ok(Self::BakerKeysUpdated {
+                    data: Box::new(keys_event.try_into()?),
+                })
+            }
+            account_transaction_effects::Effect::EncryptedAmountTransferred(eat) => {
+                let removed = Box::new(eat.removed.require_owned()?.try_into()?);
+                let added = Box::new(eat.added.require_owned()?.try_into()?);
+                match eat.memo {
+                    None => Ok(Self::EncryptedAmountTransferred { removed, added }),
+                    Some(memo) => Ok(Self::EncryptedAmountTransferredWithMemo {
+                        removed,
+                        added,
+                        memo: memo.try_into()?,
+                    }),
+                }
+            }
+            account_transaction_effects::Effect::TransferredToEncrypted(esaae) => {
+                Ok(Self::TransferredToEncrypted {
+                    data: Box::new(types::EncryptedSelfAmountAddedEvent {
+                        account:    esaae.account.require_owned()?.try_into()?,
+                        new_amount: esaae.new_amount.require_owned()?.try_into()?,
+                        amount:     esaae.amount.require_owned()?.into(),
+                    }),
+                })
+            }
+            account_transaction_effects::Effect::TransferredToPublic(ttp) => {
+                Ok(Self::TransferredToPublic {
+                    removed: Box::new(ttp.removed.require_owned()?.try_into()?),
+                    amount:  ttp.amount.require_owned()?.into(),
+                })
+            }
+            account_transaction_effects::Effect::TransferredWithSchedule(tws) => {
+                let to = tws.to.require_owned()?.try_into()?;
+                let amount = tws
+                    .amount
+                    .into_iter()
+                    .map(TryInto::try_into)
+                    .collect::<Result<_, tonic::Status>>()?;
+                match tws.memo {
+                    None => Ok(Self::TransferredWithSchedule { to, amount }),
+                    Some(memo) => Ok(Self::TransferredWithScheduleAndMemo {
+                        to,
+                        amount,
+                        memo: memo.try_into()?,
+                    }),
+                }
+            }
+            account_transaction_effects::Effect::CredentialKeysUpdated(cri) => {
+                Ok(Self::CredentialKeysUpdated {
+                    cred_id: cri.try_into()?,
+                })
+            }
+            account_transaction_effects::Effect::CredentialsUpdated(cu) => {
+                Ok(Self::CredentialsUpdated {
+                    new_cred_ids:     cu
+                        .new_cred_ids
+                        .into_iter()
+                        .map(TryInto::try_into)
+                        .collect::<Result<_, tonic::Status>>()?,
+                    removed_cred_ids: cu
+                        .removed_cred_ids
+                        .into_iter()
+                        .map(TryInto::try_into)
+                        .collect::<Result<_, tonic::Status>>()?,
+                    new_threshold:    cu.new_threshold.require_owned()?.try_into()?,
+                })
+            }
+            account_transaction_effects::Effect::DataRegistered(rd) => Ok(Self::DataRegistered {
+                data: rd.try_into()?,
+            }),
+            account_transaction_effects::Effect::BakerConfigured(bc) => Ok(Self::BakerConfigured {
+                data: bc
+                    .contents
+                    .into_iter()
+                    .map(TryInto::try_into)
+                    .collect::<Result<_, tonic::Status>>()?,
+            }),
+            account_transaction_effects::Effect::DelegationConfigured(dc) => {
+                Ok(Self::DelegationConfigured {
+                    data: dc
+                        .contents
+                        .into_iter()
+                        .map(TryInto::try_into)
+                        .collect::<Result<_, tonic::Status>>()?,
+                })
+            }
         }
     }
+}
+
+impl TryFrom<DelegationEvent> for super::types::DelegationEvent {
+    type Error = tonic::Status;
+
+    fn try_from(value: DelegationEvent) -> Result<Self, Self::Error> {
+        Ok(match value.event.require_owned()? {
+            delegation_event::Event::DelegationStakeIncreased(v) => {
+                Self::DelegationStakeIncreased {
+                    delegator_id: v.delegator_id.require_owned()?.try_into()?,
+                    new_stake:    v.new_stake.require_owned()?.into(),
+                }
+            }
+            delegation_event::Event::DelegationStakeDecreased(v) => {
+                Self::DelegationStakeDecreased {
+                    delegator_id: v.delegator_id.require_owned()?.try_into()?,
+                    new_stake:    v.new_stake.require_owned()?.into(),
+                }
+            }
+            delegation_event::Event::DelegationSetRestakeEarnings(v) => {
+                Self::DelegationSetRestakeEarnings {
+                    delegator_id:     v.delegator_id.require_owned()?.try_into()?,
+                    restake_earnings: v.restake_earnings,
+                }
+            }
+            delegation_event::Event::DelegationSetDelegationTarget(v) => {
+                Self::DelegationSetDelegationTarget {
+                    delegator_id:      v.delegator_id.require_owned()?.try_into()?,
+                    delegation_target: v.delegation_target.require_owned()?.try_into()?,
+                }
+            }
+            delegation_event::Event::DelegationAdded(v) => Self::DelegationAdded {
+                delegator_id: v.try_into()?,
+            },
+            delegation_event::Event::DelegationRemoved(v) => Self::DelegationRemoved {
+                delegator_id: v.try_into()?,
+            },
+        })
+    }
+}
+
+impl TryFrom<DelegatorId> for super::types::DelegatorId {
+    type Error = tonic::Status;
+
+    fn try_from(value: DelegatorId) -> Result<Self, Self::Error> {
+        Ok(Self {
+            id: value.id.require_owned()?.into(),
+        })
+    }
+}
+
+impl TryFrom<BakerEvent> for super::types::BakerEvent {
+    type Error = tonic::Status;
+
+    fn try_from(value: BakerEvent) -> Result<Self, Self::Error> {
+        Ok(match value.event.require_owned()? {
+            baker_event::Event::BakerAdded(v) => Self::BakerAdded {
+                data: Box::new(types::BakerAddedEvent {
+                    keys_event:       v.keys_event.require_owned()?.try_into()?,
+                    stake:            v.stake.require_owned()?.into(),
+                    restake_earnings: v.restake_earnings,
+                }),
+            },
+            baker_event::Event::BakerRemoved(v) => Self::BakerRemoved { baker_id: v.into() },
+            baker_event::Event::BakerStakeIncreased(v) => Self::BakerStakeIncreased {
+                baker_id:  v.baker_id.require_owned()?.into(),
+                new_stake: v.new_stake.require_owned()?.into(),
+            },
+            baker_event::Event::BakerStakeDecreased(v) => Self::BakerStakeDecreased {
+                baker_id:  v.baker_id.require_owned()?.into(),
+                new_stake: v.new_stake.require_owned()?.into(),
+            },
+            baker_event::Event::BakerRestakeEarningsUpdated(v) => {
+                Self::BakerRestakeEarningsUpdated {
+                    baker_id:         v.baker_id.require_owned()?.into(),
+                    restake_earnings: v.restake_earnings,
+                }
+            }
+            baker_event::Event::BakerKeysUpdated(v) => Self::BakerKeysUpdated {
+                data: Box::new(v.try_into()?),
+            },
+            baker_event::Event::BakerSetOpenStatus(v) => {
+                let open_status = v.open_status().into();
+                Self::BakerSetOpenStatus {
+                    baker_id: v.baker_id.require_owned()?.into(),
+                    open_status,
+                }
+            }
+            baker_event::Event::BakerSetMetadataUrl(v) => Self::BakerSetMetadataURL {
+                baker_id:     v.baker_id.require_owned()?.into(),
+                metadata_url: v.url.try_into().map_err(|e| {
+                    tonic::Status::invalid_argument(format!("Invalid argument: {}", e))
+                })?,
+            },
+            baker_event::Event::BakerSetTransactionFeeCommission(v) => {
+                Self::BakerSetTransactionFeeCommission {
+                    baker_id:                   v.baker_id.require_owned()?.into(),
+                    transaction_fee_commission: v
+                        .transaction_fee_commission
+                        .require_owned()?
+                        .into(),
+                }
+            }
+            baker_event::Event::BakerSetBakingRewardCommission(v) => {
+                Self::BakerSetBakingRewardCommission {
+                    baker_id:                 v.baker_id.require_owned()?.into(),
+                    baking_reward_commission: v.baking_reward_commission.require_owned()?.into(),
+                }
+            }
+            baker_event::Event::BakerSetFinalizationRewardCommission(v) => {
+                Self::BakerSetFinalizationRewardCommission {
+                    baker_id: v.baker_id.require_owned()?.into(),
+                    finalization_reward_commission: v
+                        .finalization_reward_commission
+                        .require_owned()?
+                        .into(),
+                }
+            }
+        })
+    }
+}
+
+impl TryFrom<RegisteredData> for super::types::RegisteredData {
+    type Error = tonic::Status;
+
+    fn try_from(value: RegisteredData) -> Result<Self, Self::Error> {
+        Ok(value
+            .value
+            .try_into()
+            .map_err(|e| tonic::Status::invalid_argument(format!("{}", e)))?)
+    }
+}
+
+impl TryFrom<NewRelease>
+    for (
+        super::super::common::types::Timestamp,
+        super::super::common::types::Amount,
+    )
+{
+    type Error = tonic::Status;
+
+    fn try_from(value: NewRelease) -> Result<Self, Self::Error> {
+        let timestamp = super::super::common::types::Timestamp {
+            millis: value.timestamp,
+        };
+        Ok((timestamp, value.amount.require_owned()?.into()))
+    }
+}
+
+impl TryFrom<EncryptedAmountRemovedEvent> for super::types::EncryptedAmountRemovedEvent {
+    type Error = tonic::Status;
+
+    fn try_from(value: EncryptedAmountRemovedEvent) -> Result<Self, Self::Error> {
+        Ok(Self {
+            account:      value.account.require_owned()?.try_into()?,
+            new_amount:   value.new_amount.require_owned()?.try_into()?,
+            input_amount: value.input_amount.require_owned()?.try_into()?,
+            up_to_index:  encrypted_transfers::types::EncryptedAmountAggIndex {
+                index: value.up_to_index,
+            },
+        })
+    }
+}
+
+impl TryFrom<NewEncryptedAmountEvent> for super::types::NewEncryptedAmountEvent {
+    type Error = tonic::Status;
+
+    fn try_from(value: NewEncryptedAmountEvent) -> Result<Self, Self::Error> {
+        Ok(Self {
+            receiver:         value.receiver.require_owned()?.try_into()?,
+            new_index:        encrypted_transfers::types::EncryptedAmountIndex {
+                index: value.new_index,
+            },
+            encrypted_amount: value.encrypted_amount.require_owned()?.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<Memo> for super::types::Memo {
+    type Error = tonic::Status;
+
+    fn try_from(value: Memo) -> Result<Self, Self::Error> {
+        value
+            .value
+            .try_into()
+            .map_err(|_| tonic::Status::invalid_argument("Memo is invalid because it is too big."))
+    }
+}
+impl TryFrom<BakerKeysEvent> for super::types::BakerKeysEvent {
+    type Error = tonic::Status;
+
+    fn try_from(value: BakerKeysEvent) -> Result<Self, Self::Error> {
+        Ok(Self {
+            baker_id:        value.baker_id.require_owned()?.into(),
+            account:         value.account.require_owned()?.try_into()?,
+            sign_key:        value.sign_key.require_owned()?.try_into()?,
+            election_key:    value.election_key.require_owned()?.try_into()?,
+            aggregation_key: value.aggregation_key.require_owned()?.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<InstanceUpdatedEvent> for super::types::InstanceUpdatedEvent {
+    type Error = tonic::Status;
+
+    fn try_from(value: InstanceUpdatedEvent) -> Result<Self, Self::Error> {
+        Ok(Self {
+            contract_version: value.contract_version().into(),
+            address:          value.address.require_owned()?.into(),
+            instigator:       value.instigator.require_owned()?.try_into()?,
+            amount:           value.amount.require_owned()?.into(),
+            message:          value.parameter.require_owned()?.into(),
+            receive_name:     value.receive_name.require_owned()?.try_into()?,
+            events:           value.events.into_iter().map(Into::into).collect(),
+        })
+    }
+}
+
+impl From<ContractVersion> for super::types::smart_contracts::WasmVersion {
+    fn from(value: ContractVersion) -> Self {
+        match value {
+            ContractVersion::V0 => Self::V0,
+            ContractVersion::V1 => Self::V1,
+        }
+    }
+}
+
+impl From<ContractEvent> for super::types::smart_contracts::ContractEvent {
+    fn from(value: ContractEvent) -> Self { value.value.into() }
 }
 
 impl TryFrom<RejectReason> for super::types::RejectReason {

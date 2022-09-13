@@ -526,7 +526,8 @@ pub enum TransactionStatus {
     /// If the finalization committee is not corrupt then this will always
     /// be a singleton map.
     Finalized(BTreeMap<hashes::BlockHash, BlockItemSummary>), /* TODO: Change to tuple instead
-                                                               * of map? */
+                                                               * of map when deprecating use of
+                                                               * gRPC v1. */
     /// Transaction is committed to one or more blocks. The outcomes are listed
     /// for each block. Note that in the vast majority of cases the outcome of a
     /// transaction should not be dependent on the block it is in, but this
@@ -1198,6 +1199,8 @@ pub enum AccountTransactionEffects {
     /// [`TransferWithMemo`](transactions::Payload::TransferWithMemo)
     /// transaction.
     AccountTransferWithMemo {
+        // TODO: Consider combining this with the non-memo version when we move to gRPC v2 and have
+        // Option<Memo>.
         /// Amount that was transferred.
         amount: Amount,
         /// Receiver account.
@@ -1244,7 +1247,8 @@ pub enum AccountTransactionEffects {
     /// result of a successful [`EncryptedAmountTransferWithMemo`](
     ///   transactions::Payload::EncryptedAmountTransferWithMemo) transaction.
     EncryptedAmountTransferredWithMemo {
-        // FIXME: It would be better to only have one pointer
+        // TODO: Consider combining this with the non-memo version when we move to gRPC v2 and have
+        // Option<Memo>. FIXME: It would be better to only have one pointer
         removed: Box<EncryptedAmountRemovedEvent>,
         added:   Box<NewEncryptedAmountEvent>,
         memo:    Memo,
@@ -1280,6 +1284,8 @@ pub enum AccountTransactionEffects {
     ///
     /// [link]: transactions::Payload::TransferWithScheduleAndMemo
     TransferredWithScheduleAndMemo {
+        // TODO: Consider combining this with the non-memo version when we move to gRPC v2 and have
+        // Option<Memo>.
         /// Receiver account.
         to:     AccountAddress,
         /// The list of releases. Ordered by increasing timestamp.
@@ -1581,7 +1587,7 @@ pub enum UpdatePayload {
     #[serde(rename = "euroPerEnergy")]
     EuroPerEnergy(ExchangeRate),
     #[serde(rename = "microGTUPerEuro")]
-    MicroGTUPerEuro(ExchangeRate),
+    MicroGTUPerEuro(ExchangeRate), // TODO: Rename to CCD when switching to gRPC v2.
     #[serde(rename = "foundationAccount")]
     FoundationAccount(AccountAddress),
     #[serde(rename = "mintDistribution")]
@@ -1678,7 +1684,7 @@ impl UpdatePayload {
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct BakerParameters {
-    minimum_threshold_for_baking: Amount,
+    pub(crate) minimum_threshold_for_baking: Amount,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]

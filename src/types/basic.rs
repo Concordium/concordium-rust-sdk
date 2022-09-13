@@ -701,7 +701,7 @@ pub struct UpdateKeysIndex {
 #[derive(Debug, Clone, Copy, SerdeSerialize, SerdeDeserialize, Serialize, FromStr)]
 #[serde(transparent)]
 pub struct ElectionDifficulty {
-    parts_per_hundred_thousands: PartsPerHundredThousands,
+    pub(crate) parts_per_hundred_thousands: PartsPerHundredThousands,
 }
 
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Into)]
@@ -889,16 +889,16 @@ impl Deserial for LeverageFactor {
 #[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct MintDistributionV0 {
-    mint_per_slot:       MintRate,
-    baking_reward:       AmountFraction,
-    finalization_reward: AmountFraction,
+    pub(crate) mint_per_slot:       MintRate,
+    pub(crate) baking_reward:       AmountFraction,
+    pub(crate) finalization_reward: AmountFraction,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct MintDistributionV1 {
-    baking_reward:       AmountFraction,
-    finalization_reward: AmountFraction,
+    pub(crate) baking_reward:       AmountFraction,
+    pub(crate) finalization_reward: AmountFraction,
 }
 
 impl Deserial for MintDistributionV0 {
