@@ -151,6 +151,10 @@ impl From<BakerId> for super::types::BakerId {
     fn from(n: BakerId) -> Self { Self { id: n.value.into() } }
 }
 
+impl From<super::types::BakerId> for BakerId {
+    fn from(n: super::types::BakerId) -> Self { Self { value: n.id.into() } }
+}
+
 impl TryFrom<DelegationTarget> for super::types::DelegationTarget {
     type Error = tonic::Status;
 
@@ -797,6 +801,84 @@ impl TryFrom<BlockInfo> for types::queries::BlockInfo {
             era_block_height:        value.era_block_height.require_owned()?.into(),
             genesis_index:           value.genesis_index.require_owned()?.into(),
             block_baker:             value.baker.map(|b| b.into()),
+        })
+    }
+}
+
+impl TryFrom<PoolStatus> for types::BakerPoolStatus {
+    type Error = tonic::Status;
+
+    fn try_from(value: PoolStatus) -> Result<Self, Self::Error> {
+        Ok(Self {
+            baker_id:                   value.baker.require_owned()?.into(),
+            baker_address:              value.address.require_owned()?.try_into()?,
+            baker_equity_capital:       value.equity_capital.require_owned()?.into(),
+            delegated_capital:          value.delegated_capital.require_owned()?.into(),
+            delegated_capital_cap:      value.delegated_capital_cap.require_owned()?.into(),
+            pool_info:                  value.pool_info.require_owned()?.try_into()?,
+            baker_stake_pending_change: value.equity_pending_change.try_into()?,
+            current_payday_status:      if let Some(v) = value.current_payday_status {
+                Some(v.try_into()?)
+            } else {
+                None
+            },
+            all_pool_total_capital:     value.all_pool_total_capital.require_owned()?.into(),
+        })
+    }
+}
+
+impl TryFrom<Option<PoolPendingChange>> for super::types::PoolPendingChange {
+    type Error = tonic::Status;
+
+    fn try_from(value: Option<PoolPendingChange>) -> Result<Self, Self::Error> {
+        if let Some(value) = value {
+            match value.change.require_owned()? {
+                pool_pending_change::Change::Reduce(rs) => Ok(Self::ReduceBakerCapital {
+                    baker_equity_capital: rs.reduced_equity_capital.require_owned()?.into(),
+                    effective_time:       rs.effective_time.require_owned()?.into(),
+                }),
+                pool_pending_change::Change::Remove(rs) => Ok(Self::RemovePool {
+                    effective_time: rs.effective_time.require_owned()?.into(),
+                }),
+            }
+        } else {
+            Ok(Self::NoChange)
+        }
+    }
+}
+
+impl TryFrom<PoolCurrentPaydayStatus> for super::types::CurrentPaydayBakerPoolStatus {
+    type Error = tonic::Status;
+
+    fn try_from(value: PoolCurrentPaydayStatus) -> Result<Self, Self::Error> {
+        Ok(Self {
+            blocks_baked:            value.blocks_baked,
+            finalization_live:       value.finalization_live,
+            transaction_fees_earned: value.transaction_fees_earned.require_owned()?.into(),
+            effective_stake:         value.effective_stake.require_owned()?.into(),
+            lottery_power:           value.lottery_power,
+            baker_equity_capital:    value.baker_equity_capital.require_owned()?.into(),
+            delegated_capital:       value.delegated_capital.require_owned()?.into(),
+        })
+    }
+}
+
+impl TryFrom<PassiveDelegationStatus> for super::types::PassiveDelegationStatus {
+    type Error = tonic::Status;
+
+    fn try_from(value: PassiveDelegationStatus) -> Result<Self, Self::Error> {
+        Ok(Self {
+            delegated_capital: value.delegated_capital.require_owned()?.into(),
+            commission_rates: value.commission_rates.require_owned()?.try_into()?,
+            current_payday_transaction_fees_earned: value
+                .current_payday_transaction_fees_earned
+                .require_owned()?
+                .into(),
+            current_payday_delegated_capital: value
+                .current_payday_delegated_capital
+                .require_owned()?
+                .into(),
+            all_pool_total_capital: value.all_pool_total_capital.require_owned()?.into(),
         })
     }
 }

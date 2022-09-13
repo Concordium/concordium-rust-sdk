@@ -161,6 +161,16 @@ impl IntoRequest<generated::AccountAddress> for &AccountAddress {
     }
 }
 
+impl IntoRequest<generated::PoolStatusRequest> for (&BlockIdentifier, types::BakerId) {
+    fn into_request(self) -> tonic::Request<generated::PoolStatusRequest> {
+        let req = generated::PoolStatusRequest {
+            block_hash: Some(self.0.into()),
+            baker:      Some(self.1.into()),
+        };
+        tonic::Request::new(req)
+    }
+}
+
 impl Client {
     pub async fn new<E: Into<tonic::transport::Endpoint>>(
         endpoint: E,
@@ -335,6 +345,33 @@ impl Client {
         Ok(QueryResponse {
             block_hash,
             response: stream,
+        })
+    }
+
+    pub async fn get_pool_status(
+        &mut self,
+        block_id: &BlockIdentifier,
+        baker_id: types::BakerId,
+    ) -> endpoints::QueryResult<QueryResponse<types::BakerPoolStatus>> {
+        let response = self.client.get_pool_status((block_id, baker_id)).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::BakerPoolStatus::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_passive_delegation_status(
+        &mut self,
+        block_id: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::PassiveDelegationStatus>> {
+        let response = self.client.get_passive_delegation_status(block_id).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::PassiveDelegationStatus::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
         })
     }
 }
