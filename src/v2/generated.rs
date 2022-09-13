@@ -131,6 +131,14 @@ impl From<BlockHeight> for super::types::BlockHeight {
     fn from(bh: BlockHeight) -> Self { Self { height: bh.value } }
 }
 
+impl From<super::AbsoluteBlockHeight> for AbsoluteBlockHeight {
+    fn from(abh: super::AbsoluteBlockHeight) -> Self { Self { value: abh.height } }
+}
+
+impl From<super::types::BlockHeight> for BlockHeight {
+    fn from(bh: super::types::BlockHeight) -> Self { Self { value: bh.height } }
+}
+
 impl From<SequenceNumber> for super::types::Nonce {
     fn from(n: SequenceNumber) -> Self { Self { nonce: n.value } }
 }
@@ -266,6 +274,14 @@ impl From<Duration> for super::types::SlotDuration {
 
 impl From<GenesisIndex> for super::types::GenesisIndex {
     fn from(value: GenesisIndex) -> Self { value.value.into() }
+}
+
+impl From<super::types::GenesisIndex> for GenesisIndex {
+    fn from(value: super::types::GenesisIndex) -> Self {
+        GenesisIndex {
+            value: value.into(),
+        }
+    }
 }
 
 impl From<ProtocolVersion> for super::types::ProtocolVersion {
@@ -880,5 +896,34 @@ impl TryFrom<PassiveDelegationStatus> for super::types::PassiveDelegationStatus 
                 .into(),
             all_pool_total_capital: value.all_pool_total_capital.require_owned()?.into(),
         })
+    }
+}
+
+impl From<&super::endpoints::BlocksAtHeightInput> for BlocksAtHeightRequest {
+    fn from(&input: &super::endpoints::BlocksAtHeightInput) -> Self {
+        let blocks_at_height = match input {
+            super::endpoints::BlocksAtHeightInput::Absolute { height } => {
+                blocks_at_height_request::BlocksAtHeight::Absolute(
+                    blocks_at_height_request::Absolute {
+                        height: Some(height.into()),
+                    },
+                )
+            }
+
+            super::endpoints::BlocksAtHeightInput::Relative {
+                height,
+                genesis_index,
+                restrict,
+            } => blocks_at_height_request::BlocksAtHeight::Relative(
+                blocks_at_height_request::Relative {
+                    height: Some(height.into()),
+                    genesis_index: Some(genesis_index.into()),
+                    restrict,
+                },
+            ),
+        };
+        BlocksAtHeightRequest {
+            blocks_at_height: Some(blocks_at_height),
+        }
     }
 }

@@ -171,6 +171,12 @@ impl IntoRequest<generated::PoolStatusRequest> for (&BlockIdentifier, types::Bak
     }
 }
 
+impl IntoRequest<generated::BlocksAtHeightRequest> for &endpoints::BlocksAtHeightInput {
+    fn into_request(self) -> tonic::Request<generated::BlocksAtHeightRequest> {
+        tonic::Request::new(self.into())
+    }
+}
+
 impl Client {
     pub async fn new<E: Into<tonic::transport::Endpoint>>(
         endpoint: E,
@@ -373,6 +379,18 @@ impl Client {
             block_hash,
             response,
         })
+    }
+
+    pub async fn get_blocks_at_height(
+        &mut self,
+        blocks_at_height_input: &endpoints::BlocksAtHeightInput,
+    ) -> endpoints::QueryResult<impl Stream<Item = Result<BlockHash, tonic::Status>>> {
+        let response = self
+            .client
+            .get_blocks_at_height(blocks_at_height_input)
+            .await?;
+        let stream = response.into_inner().map(|x| x.and_then(TryFrom::try_from));
+        Ok(stream)
     }
 }
 
