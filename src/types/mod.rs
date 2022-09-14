@@ -2245,7 +2245,7 @@ pub struct CooldownParameters {
 )]
 #[serde(transparent)]
 pub struct RewardPeriodLength {
-    reward_period_epochs: Epoch,
+    pub(crate) reward_period_epochs: Epoch,
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, Serialize, Copy, Clone)]

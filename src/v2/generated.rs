@@ -1,10 +1,9 @@
 tonic::include_proto!("concordium.v2");
 
 use super::Require;
-use crate::types;
 use crypto_common::{Deserial, Versioned, VERSION_0};
 use id::{
-    constants::{ArCurve, AttributeKind},
+    constants::{ArCurve, AttributeKind, IpPairing},
     types::{
         AccountCredentialWithoutProofs, CredentialDeploymentValues,
         InitialCredentialDeploymentValues,
@@ -66,21 +65,21 @@ impl From<ContractAddress> for super::ContractAddress {
     }
 }
 
-impl TryFrom<VersionedModuleSource> for types::smart_contracts::WasmModule {
+impl TryFrom<VersionedModuleSource> for super::types::smart_contracts::WasmModule {
     type Error = tonic::Status;
 
     fn try_from(versioned_module: VersionedModuleSource) -> Result<Self, Self::Error> {
         let module = match versioned_module.module.require_owned()? {
             versioned_module_source::Module::V0(versioned_module_source::ModuleSourceV0 {
                 value,
-            }) => types::smart_contracts::WasmModule {
-                version: types::smart_contracts::WasmVersion::V0,
+            }) => super::types::smart_contracts::WasmModule {
+                version: super::types::smart_contracts::WasmVersion::V0,
                 source:  value.into(),
             },
             versioned_module_source::Module::V1(versioned_module_source::ModuleSourceV1 {
                 value,
-            }) => types::smart_contracts::WasmModule {
-                version: types::smart_contracts::WasmVersion::V1,
+            }) => super::types::smart_contracts::WasmModule {
+                version: super::types::smart_contracts::WasmVersion::V1,
                 source:  value.into(),
             },
         };
@@ -507,6 +506,22 @@ impl TryFrom<AccountVerifyKey> for id::types::VerifyKey {
     }
 }
 
+impl TryFrom<ip_info::IpCdiVerifyKey> for ed25519_dalek::PublicKey {
+    type Error = tonic::Status;
+
+    fn try_from(value: ip_info::IpCdiVerifyKey) -> Result<Self, Self::Error> {
+        Ok(consume(&value.value)?)
+    }
+}
+
+impl TryFrom<ip_info::IpVerifyKey> for id::ps_sig::PublicKey<IpPairing> {
+    type Error = tonic::Status;
+
+    fn try_from(value: ip_info::IpVerifyKey) -> Result<Self, Self::Error> {
+        Ok(consume(&value.value)?)
+    }
+}
+
 impl TryFrom<UpdatePublicKey> for super::types::UpdatePublicKey {
     type Error = tonic::Status;
 
@@ -854,7 +869,7 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
             }
             update_payload::Payload::ElectionDifficultyUpdate(v) => {
                 Self::ElectionDifficulty(super::types::ElectionDifficulty {
-                    parts_per_hundred_thousands: types::PartsPerHundredThousands::new(
+                    parts_per_hundred_thousands: super::types::PartsPerHundredThousands::new(
                         v.value.require_owned()?.parts_per_hundred_thousand,
                     )
                     .ok_or(tonic::Status::internal(
@@ -956,26 +971,123 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
                             },
                         )
                     }
-                    update_payload::level1_update_payload::UpdateType::Level2KeysUpdateV0(_) => {
-                        todo!()
-                        // super::types::Level1Update::Level2KeysUpdate(Box::
-                        // new(u.try_into()?))
+                    update_payload::level1_update_payload::UpdateType::Level2KeysUpdateV0(u) => {
+                        super::types::Level1Update::Level2KeysUpdate(Box::new(u.try_into()?))
                     }
-                    update_payload::level1_update_payload::UpdateType::Level2KeysUpdateV1(_) => {
-                        todo!()
-                        // super::types::Level1Update::Level2KeysUpdate(Box::
-                        // new(u.try_into()?))
+                    update_payload::level1_update_payload::UpdateType::Level2KeysUpdateV1(u) => {
+                        super::types::Level1Update::Level2KeysUpdateV1(Box::new(u.try_into()?))
                     }
                 })
             }
             update_payload::Payload::AddAnonymityRevokerUpdate(v) => {
                 Self::AddAnonymityRevoker(Box::new(v.try_into()?))
             }
-            update_payload::Payload::AddIdentityProviderUpdate(_) => todo!(),
-            update_payload::Payload::CooldownParametersCpv1Update(_) => todo!(),
-            update_payload::Payload::PoolParametersCpv1Update(_) => todo!(),
-            update_payload::Payload::TimeParametersCpv1Update(_) => todo!(),
-            update_payload::Payload::MintDistributionCpv1Update(_) => todo!(),
+            update_payload::Payload::AddIdentityProviderUpdate(v) => {
+                Self::AddIdentityProvider(Box::new(v.try_into()?))
+            }
+            update_payload::Payload::CooldownParametersCpv1Update(v) => {
+                Self::CooldownParametersCPV1(super::types::CooldownParameters {
+                    pool_owner_cooldown: v.pool_owner_cooldown.require_owned()?.into(),
+                    delegator_cooldown:  v.delegator_cooldown.require_owned()?.into(),
+                })
+            }
+            update_payload::Payload::PoolParametersCpv1Update(v) => {
+                let commission_bounds = v.commission_bounds.require_owned()?;
+                let leverage_bound = v.leverage_bound.require_owned()?.value.require_owned()?;
+                Self::PoolParametersCPV1(super::types::PoolParameters {
+                    passive_finalization_commission: v
+                        .passive_finalization_commission
+                        .require_owned()?
+                        .into(),
+                    passive_baking_commission:       v
+                        .passive_baking_commission
+                        .require_owned()?
+                        .into(),
+                    passive_transaction_commission:  v
+                        .passive_transaction_commission
+                        .require_owned()?
+                        .into(),
+                    commission_bounds:               super::types::CommissionRanges {
+                        finalization: commission_bounds.finalization.require_owned()?.try_into()?,
+                        baking:       commission_bounds.baking.require_owned()?.try_into()?,
+                        transaction:  commission_bounds.transaction.require_owned()?.try_into()?,
+                    },
+                    minimum_equity_capital:          v
+                        .minimum_equity_capital
+                        .require_owned()?
+                        .into(),
+                    capital_bound:                   v.capital_bound.require_owned()?.try_into()?,
+                    leverage_bound:                  super::types::LeverageFactor {
+                        numerator:   leverage_bound.numerator,
+                        denominator: leverage_bound.denominator,
+                    },
+                })
+            }
+            update_payload::Payload::TimeParametersCpv1Update(v) => {
+                Self::TimeParametersCPV1(super::types::TimeParameters {
+                    reward_period_length: super::types::RewardPeriodLength {
+                        reward_period_epochs: super::types::Epoch {
+                            epoch: v
+                                .reward_period_length
+                                .require_owned()?
+                                .value
+                                .require_owned()?
+                                .value,
+                        },
+                    },
+                    mint_per_payday:      v.mint_per_payday.require_owned()?.try_into()?,
+                })
+            }
+            update_payload::Payload::MintDistributionCpv1Update(v) => {
+                Self::MintDistributionCPV1(super::types::MintDistributionV1 {
+                    baking_reward:       v.baking_reward.require_owned()?.into(),
+                    finalization_reward: v.finalization_reward.require_owned()?.into(),
+                })
+            }
+        })
+    }
+}
+
+impl TryFrom<CapitalBound> for super::types::CapitalBound {
+    type Error = tonic::Status;
+
+    fn try_from(value: CapitalBound) -> Result<Self, Self::Error> {
+        Ok(Self {
+            bound: value.value.require_owned()?.into(),
+        })
+    }
+}
+
+impl TryFrom<InclusiveRangeAmountFraction>
+    for super::types::InclusiveRange<super::types::AmountFraction>
+{
+    type Error = tonic::Status;
+
+    fn try_from(value: InclusiveRangeAmountFraction) -> Result<Self, Self::Error> {
+        Ok(Self {
+            min: value.min.require_owned()?.into(),
+            max: value.max.require_owned()?.into(),
+        })
+    }
+}
+
+impl From<DurationSeconds> for super::types::DurationSeconds {
+    fn from(value: DurationSeconds) -> Self {
+        Self {
+            seconds: value.value,
+        }
+    }
+}
+
+impl TryFrom<IpInfo> for id::types::IpInfo<IpPairing> {
+    type Error = tonic::Status;
+
+    fn try_from(value: IpInfo) -> Result<Self, Self::Error> {
+        Ok(Self {
+            ip_identity:       id::types::IpIdentity(value.identity.require_owned()?.value),
+            ip_description:    value.description.require_owned()?.into(),
+            ip_verify_key:     value.verify_key.require_owned()?.try_into()?,
+            ip_cdi_verify_key: value.cdi_verify_key.require_owned()?.try_into()?,
         })
     }
 }
@@ -1260,7 +1372,7 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
             }
             account_transaction_effects::Effect::TransferredToEncrypted(esaae) => {
                 Ok(Self::TransferredToEncrypted {
-                    data: Box::new(types::EncryptedSelfAmountAddedEvent {
+                    data: Box::new(super::types::EncryptedSelfAmountAddedEvent {
                         account:    esaae.account.require_owned()?.try_into()?,
                         new_amount: esaae.new_amount.require_owned()?.try_into()?,
                         amount:     esaae.amount.require_owned()?.into(),
@@ -1387,7 +1499,7 @@ impl TryFrom<BakerEvent> for super::types::BakerEvent {
     fn try_from(value: BakerEvent) -> Result<Self, Self::Error> {
         Ok(match value.event.require_owned()? {
             baker_event::Event::BakerAdded(v) => Self::BakerAdded {
-                data: Box::new(types::BakerAddedEvent {
+                data: Box::new(super::types::BakerAddedEvent {
                     keys_event:       v.keys_event.require_owned()?.try_into()?,
                     stake:            v.stake.require_owned()?.into(),
                     restake_earnings: v.restake_earnings,
@@ -1722,7 +1834,7 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
     }
 }
 
-impl TryFrom<NextAccountSequenceNumber> for types::queries::AccountNonceResponse {
+impl TryFrom<NextAccountSequenceNumber> for super::types::queries::AccountNonceResponse {
     type Error = tonic::Status;
 
     fn try_from(value: NextAccountSequenceNumber) -> Result<Self, Self::Error> {
@@ -1780,7 +1892,7 @@ impl From<Energy> for super::types::Energy {
         }
     }
 }
-impl TryFrom<ConsensusInfo> for types::queries::ConsensusInfo {
+impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
     type Error = tonic::Status;
 
     fn try_from(value: ConsensusInfo) -> Result<Self, Self::Error> {
