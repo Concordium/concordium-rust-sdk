@@ -392,6 +392,19 @@ impl Client {
         let stream = response.into_inner().map(|x| x.and_then(TryFrom::try_from));
         Ok(stream)
     }
+
+    pub async fn get_tokenomics_status(
+        &mut self,
+        block_id: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::RewardsOverview>> {
+        let response = self.client.get_tokenomics_status(block_id).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::RewardsOverview::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
 }
 
 fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<BlockHash> {

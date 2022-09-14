@@ -338,6 +338,20 @@ impl From<OpenStatus> for super::types::OpenStatus {
     }
 }
 
+impl TryFrom<MintRate> for super::types::MintRate {
+    type Error = tonic::Status;
+
+    fn try_from(value: MintRate) -> Result<Self, Self::Error> {
+        Ok(Self {
+            mantissa: value.mantissa,
+            exponent: value
+                .exponent
+                .try_into()
+                .map_err(|_| tonic::Status::internal("Invalid mint rate exponent"))?,
+        })
+    }
+}
+
 impl From<AmountFraction> for super::types::AmountFraction {
     fn from(af: AmountFraction) -> Self {
         Self {
@@ -924,6 +938,64 @@ impl From<&super::endpoints::BlocksAtHeightInput> for BlocksAtHeightRequest {
         };
         BlocksAtHeightRequest {
             blocks_at_height: Some(blocks_at_height),
+        }
+    }
+}
+
+impl TryFrom<TokenomicsStatus> for super::types::RewardsOverview {
+    type Error = tonic::Status;
+
+    fn try_from(value: TokenomicsStatus) -> Result<Self, Self::Error> {
+        match value.tokenomics.require_owned()? {
+            tokenomics_status::Tokenomics::V0(value) => Ok(Self::V0 {
+                data: super::types::CommonRewardData {
+                    protocol_version:            ProtocolVersion::from_i32(value.protocol_version)
+                        .require_owned()?
+                        .into(),
+                    total_amount:                value.total_amount.require_owned()?.into(),
+                    total_encrypted_amount:      value
+                        .total_encrypted_amount
+                        .require_owned()?
+                        .into(),
+                    baking_reward_account:       value
+                        .baking_reward_account
+                        .require_owned()?
+                        .into(),
+                    finalization_reward_account: value
+                        .finalization_reward_account
+                        .require_owned()?
+                        .into(),
+                    gas_account:                 value.gas_account.require_owned()?.into(),
+                },
+            }),
+            tokenomics_status::Tokenomics::V1(value) => Ok(Self::V1 {
+                common: super::types::CommonRewardData {
+                    protocol_version:            ProtocolVersion::from_i32(value.protocol_version)
+                        .require_owned()?
+                        .into(),
+                    total_amount:                value.total_amount.require_owned()?.into(),
+                    total_encrypted_amount:      value
+                        .total_encrypted_amount
+                        .require_owned()?
+                        .into(),
+                    baking_reward_account:       value
+                        .baking_reward_account
+                        .require_owned()?
+                        .into(),
+                    finalization_reward_account: value
+                        .finalization_reward_account
+                        .require_owned()?
+                        .into(),
+                    gas_account:                 value.gas_account.require_owned()?.into(),
+                },
+                foundation_transaction_rewards: value
+                    .foundation_transaction_rewards
+                    .require_owned()?
+                    .into(),
+                next_payday_time: value.next_payday_time.require_owned()?.into(),
+                next_payday_mint_rate: value.next_payday_mint_rate.require_owned()?.try_into()?,
+                total_staked_capital: value.total_staked_capital.require_owned()?.into(),
+            }),
         }
     }
 }
