@@ -1261,7 +1261,7 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
             }),
             account_transaction_effects::Effect::AccountTransfer(at) => {
                 let amount = at.amount.require_owned()?.into();
-                let to = at.to.require_owned()?.try_into()?;
+                let to = at.receiver.require_owned()?.try_into()?;
                 match at.memo {
                     None => Ok(Self::AccountTransfer { amount, to }),
                     Some(memo) => Ok(Self::AccountTransferWithMemo {
@@ -1301,9 +1301,9 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                             }
                             contract_trace_element::Element::Transferred(t) => {
                                 super::types::ContractTraceElement::Transferred {
-                                    from:   t.from.require_owned()?.into(),
+                                    from:   t.sender.require_owned()?.into(),
                                     amount: t.amount.require_owned()?.into(),
-                                    to:     t.to.require_owned()?.try_into()?,
+                                    to:     t.receiver.require_owned()?.try_into()?,
                                 }
                             }
                             contract_trace_element::Element::Interrupted(i) => {
@@ -1337,7 +1337,7 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                 baker_id: baker_id.into(),
             }),
             account_transaction_effects::Effect::BakerStakeUpdated(bsu) => {
-                let data = match bsu.contents {
+                let data = match bsu.update {
                     None => None,
                     Some(d) => Some(super::types::BakerStakeUpdatedData {
                         baker_id:  d.baker_id.require_owned()?.into(),
@@ -1386,7 +1386,7 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                 })
             }
             account_transaction_effects::Effect::TransferredWithSchedule(tws) => {
-                let to = tws.to.require_owned()?.try_into()?;
+                let to = tws.receiver.require_owned()?.try_into()?;
                 let amount = tws
                     .amount
                     .into_iter()
@@ -1426,7 +1426,7 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
             }),
             account_transaction_effects::Effect::BakerConfigured(bc) => Ok(Self::BakerConfigured {
                 data: bc
-                    .contents
+                    .events
                     .into_iter()
                     .map(TryInto::try_into)
                     .collect::<Result<_, tonic::Status>>()?,
@@ -1434,7 +1434,7 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
             account_transaction_effects::Effect::DelegationConfigured(dc) => {
                 Ok(Self::DelegationConfigured {
                     data: dc
-                        .contents
+                        .events
                         .into_iter()
                         .map(TryInto::try_into)
                         .collect::<Result<_, tonic::Status>>()?,
@@ -1585,7 +1585,7 @@ impl TryFrom<NewRelease>
 
     fn try_from(value: NewRelease) -> Result<Self, Self::Error> {
         let timestamp = super::super::common::types::Timestamp {
-            millis: value.timestamp,
+            millis: value.timestamp.require_owned()?.value,
         };
         Ok((timestamp, value.amount.require_owned()?.into()))
     }
@@ -1680,10 +1680,10 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
         Ok(match value.reason.require_owned()? {
             reject_reason::Reason::ModuleNotWf(_) => Self::ModuleNotWF,
             reject_reason::Reason::ModuleHashAlreadyExists(v) => Self::ModuleHashAlreadyExists {
-                contents: v.contents.require_owned()?.try_into()?,
+                contents: v.try_into()?,
             },
             reject_reason::Reason::InvalidAccountReference(v) => Self::InvalidAccountReference {
-                contents: v.contents.require_owned()?.try_into()?,
+                contents: v.try_into()?,
             },
             reject_reason::Reason::InvalidInitMethod(v) => Self::InvalidInitMethod {
                 contents: (
@@ -1698,11 +1698,11 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
                 ),
             },
             reject_reason::Reason::InvalidModuleReference(v) => Self::InvalidModuleReference {
-                contents: v.contents.require_owned()?.try_into()?,
+                contents: v.try_into()?,
             },
-            reject_reason::Reason::InvalidContractAddress(v) => Self::InvalidContractAddress {
-                contents: v.contents.require_owned()?.into(),
-            },
+            reject_reason::Reason::InvalidContractAddress(v) => {
+                Self::InvalidContractAddress { contents: v.into() }
+            }
             reject_reason::Reason::RuntimeFailure(_) => Self::RuntimeFailure,
             reject_reason::Reason::AmountTooLarge(v) => Self::AmountTooLarge {
                 contents: (
@@ -1722,11 +1722,9 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
                 parameter:        v.parameter.require_owned()?.into(),
             },
             reject_reason::Reason::InvalidProof(_) => Self::InvalidProof,
-            reject_reason::Reason::AlreadyABaker(v) => Self::AlreadyABaker {
-                contents: v.contents.require_owned()?.into(),
-            },
+            reject_reason::Reason::AlreadyABaker(v) => Self::AlreadyABaker { contents: v.into() },
             reject_reason::Reason::NotABaker(v) => Self::NotABaker {
-                contents: v.contents.require_owned()?.try_into()?,
+                contents: v.try_into()?,
             },
             reject_reason::Reason::InsufficientBalanceForBakerStake(_) => {
                 Self::InsufficientBalanceForBakerStake
@@ -1736,7 +1734,7 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
             }
             reject_reason::Reason::BakerInCooldown(_) => Self::BakerInCooldown,
             reject_reason::Reason::DuplicateAggregationKey(v) => Self::DuplicateAggregationKey {
-                contents: Box::new(v.contents.require_owned()?.try_into()?),
+                contents: Box::new(v.try_into()?),
             },
             reject_reason::Reason::NonExistentCredentialId(_) => Self::NonExistentCredentialID,
             reject_reason::Reason::KeyIndexAlreadyInUse(_) => Self::KeyIndexAlreadyInUse,
@@ -1752,7 +1750,7 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
             }
             reject_reason::Reason::EncryptedAmountSelfTransfer(v) => {
                 Self::EncryptedAmountSelfTransfer {
-                    contents: v.contents.require_owned()?.try_into()?,
+                    contents: v.try_into()?,
                 }
             }
             reject_reason::Reason::InvalidIndexOnEncryptedTransfer(_) => {
@@ -1764,19 +1762,19 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
                 Self::FirstScheduledReleaseExpired
             }
             reject_reason::Reason::ScheduledSelfTransfer(v) => Self::ScheduledSelfTransfer {
-                contents: v.contents.require_owned()?.try_into()?,
+                contents: v.try_into()?,
             },
             reject_reason::Reason::InvalidCredentials(_) => Self::InvalidCredentials,
             reject_reason::Reason::DuplicateCredIds(v) => Self::DuplicateCredIDs {
                 contents: v
-                    .contents
+                    .ids
                     .into_iter()
                     .map(TryFrom::try_from)
                     .collect::<Result<_, tonic::Status>>()?,
             },
             reject_reason::Reason::NonExistentCredIds(v) => Self::NonExistentCredIDs {
                 contents: v
-                    .contents
+                    .ids
                     .into_iter()
                     .map(TryFrom::try_from)
                     .collect::<Result<_, tonic::Status>>()?,
@@ -1816,12 +1814,10 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
             }
             reject_reason::Reason::DelegatorInCooldown(_) => Self::DelegatorInCooldown,
             reject_reason::Reason::NotADelegator(v) => Self::NotADelegator {
-                address: v.contents.require_owned()?.try_into()?,
+                address: v.try_into()?,
             },
             reject_reason::Reason::DelegationTargetNotABaker(v) => {
-                Self::DelegationTargetNotABaker {
-                    target: v.contents.require_owned()?.into(),
-                }
+                Self::DelegationTargetNotABaker { target: v.into() }
             }
             reject_reason::Reason::StakeOverMaximumThresholdForPool(_) => {
                 Self::StakeOverMaximumThresholdForPool
