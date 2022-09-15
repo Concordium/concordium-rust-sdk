@@ -342,11 +342,11 @@ impl Client {
         Ok(stream)
     }
 
-    pub async fn get_transaction_status(
+    pub async fn get_block_item_status(
         &mut self,
         th: &TransactionHash,
     ) -> endpoints::QueryResult<TransactionStatus> {
-        let response = self.client.get_transaction_status(th).await?;
+        let response = self.client.get_block_item_status(th).await?;
         let response = TransactionStatus::try_from(response.into_inner())?;
         Ok(response)
     }

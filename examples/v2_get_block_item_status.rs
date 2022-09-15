@@ -1,4 +1,4 @@
-/// Test the `TransactionStatus` endpoint.
+/// Test the `BlockItemStatus` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::types::hashes::TransactionHash;
@@ -30,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect.")?;
 
-    let res = client.get_transaction_status(&app.transaction).await?;
+    let res = client.get_block_item_status(&app.transaction).await?;
     println!("{:#?}", res);
 
     Ok(())

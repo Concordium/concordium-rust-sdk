@@ -785,15 +785,13 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
     }
 }
 
-impl TryFrom<TransactionStatus> for super::types::TransactionStatus {
+impl TryFrom<BlockItemStatus> for super::types::TransactionStatus {
     type Error = tonic::Status;
 
-    fn try_from(value: TransactionStatus) -> Result<Self, Self::Error> {
+    fn try_from(value: BlockItemStatus) -> Result<Self, Self::Error> {
         match value.status.require_owned()? {
-            transaction_status::Status::Received(_) => {
-                Ok(super::types::TransactionStatus::Received)
-            }
-            transaction_status::Status::Finalized(f) => {
+            block_item_status::Status::Received(_) => Ok(super::types::TransactionStatus::Received),
+            block_item_status::Status::Finalized(f) => {
                 let mut summaries: BTreeMap<super::BlockHash, super::types::BlockItemSummary> =
                     BTreeMap::new();
                 let o = f.outcome.require_owned()?;
@@ -802,7 +800,7 @@ impl TryFrom<TransactionStatus> for super::types::TransactionStatus {
                 summaries.insert(k, v);
                 Ok(super::types::TransactionStatus::Finalized(summaries))
             }
-            transaction_status::Status::Committed(cs) => {
+            block_item_status::Status::Committed(cs) => {
                 let mut summaries: BTreeMap<super::BlockHash, super::types::BlockItemSummary> =
                     BTreeMap::new();
                 for o in cs.outcomes {
@@ -956,7 +954,7 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
                     }
                 })
             }
-            update_payload::Payload::Level1RootUpdate(v) => {
+            update_payload::Payload::Level1Update(v) => {
                 Self::Level1(match v.update_type.require_owned()? {
                     update_payload::level1_update_payload::UpdateType::Level1KeysUpdate(u) => {
                         super::types::Level1Update::Level1KeysUpdate(

@@ -59,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
                 let hash = trx.hash.clone();
                 tokio::spawn(async move {
                     let res = cc2
-                        .get_transaction_status(&hash)
+                        .get_block_item_status(&hash)
                         .await
                         .expect(&format!("Failed to process transaction: {}", hash));
                     println!("{:#?}", res);
