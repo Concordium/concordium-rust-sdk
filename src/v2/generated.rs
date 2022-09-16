@@ -1290,34 +1290,7 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                 let effects = cui
                     .effects
                     .into_iter()
-                    .map(|e| {
-                        Ok(match e.element.require_owned()? {
-                            contract_trace_element::Element::Updated(u) => {
-                                super::types::ContractTraceElement::Updated {
-                                    data: u.try_into()?,
-                                }
-                            }
-                            contract_trace_element::Element::Transferred(t) => {
-                                super::types::ContractTraceElement::Transferred {
-                                    from:   t.sender.require_owned()?.into(),
-                                    amount: t.amount.require_owned()?.into(),
-                                    to:     t.receiver.require_owned()?.try_into()?,
-                                }
-                            }
-                            contract_trace_element::Element::Interrupted(i) => {
-                                super::types::ContractTraceElement::Interrupted {
-                                    address: i.address.require_owned()?.into(),
-                                    events:  i.events.into_iter().map(Into::into).collect(),
-                                }
-                            }
-                            contract_trace_element::Element::Resumed(r) => {
-                                super::types::ContractTraceElement::Resumed {
-                                    address: r.address.require_owned()?.into(),
-                                    success: r.success,
-                                }
-                            }
-                        })
-                    })
+                    .map(TryFrom::try_from)
                     .collect::<Result<_, tonic::Status>>()?;
                 Ok(Self::ContractUpdateIssued { effects })
             }
@@ -1439,6 +1412,39 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                 })
             }
         }
+    }
+}
+
+impl TryFrom<ContractTraceElement> for super::types::ContractTraceElement {
+    type Error = tonic::Status;
+
+    fn try_from(e: ContractTraceElement) -> Result<Self, Self::Error> {
+        Ok(match e.element.require_owned()? {
+            contract_trace_element::Element::Updated(u) => {
+                super::types::ContractTraceElement::Updated {
+                    data: u.try_into()?,
+                }
+            }
+            contract_trace_element::Element::Transferred(t) => {
+                super::types::ContractTraceElement::Transferred {
+                    from:   t.sender.require_owned()?.into(),
+                    amount: t.amount.require_owned()?.into(),
+                    to:     t.receiver.require_owned()?.try_into()?,
+                }
+            }
+            contract_trace_element::Element::Interrupted(i) => {
+                super::types::ContractTraceElement::Interrupted {
+                    address: i.address.require_owned()?.into(),
+                    events:  i.events.into_iter().map(Into::into).collect(),
+                }
+            }
+            contract_trace_element::Element::Resumed(r) => {
+                super::types::ContractTraceElement::Resumed {
+                    address: r.address.require_owned()?.into(),
+                    success: r.success,
+                }
+            }
+        })
     }
 }
 
@@ -1886,6 +1892,7 @@ impl From<Energy> for super::types::Energy {
         }
     }
 }
+
 impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
     type Error = tonic::Status;
 
@@ -1933,5 +1940,30 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
                 .try_into()?,
             current_era_genesis_time:       value.current_era_genesis_time.require_owned()?.into(),
         })
+    }
+}
+
+impl TryFrom<InvokeContractResponse> for super::types::smart_contracts::InvokeContractResult {
+    type Error = tonic::Status;
+
+    fn try_from(response: InvokeContractResponse) -> Result<Self, Self::Error> {
+        use super::types::smart_contracts::{InvokeContractResult, ReturnValue};
+        let result = match response.result.require_owned()? {
+            invoke_contract_response::Result::Failure(value) => InvokeContractResult::Failure {
+                return_value: value.return_value.map(|b| ReturnValue { value: b }),
+                reason:       value.reason.require_owned()?.try_into()?,
+                used_energy:  value.used_energy.require_owned()?.into(),
+            },
+            invoke_contract_response::Result::Success(value) => InvokeContractResult::Success {
+                return_value: value.return_value.map(|b| ReturnValue { value: b }),
+                events:       value
+                    .effects
+                    .into_iter()
+                    .map(TryFrom::try_from)
+                    .collect::<Result<_, tonic::Status>>()?,
+                used_energy:  value.used_energy.require_owned()?.into(),
+            },
+        };
+        Ok(result)
     }
 }

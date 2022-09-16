@@ -3,11 +3,11 @@ use crate::{
     types::{
         self, hashes,
         hashes::{BlockHash, TransactionHash},
-        smart_contracts::{InstanceInfo, ModuleRef},
+        smart_contracts::{ContractContext, InstanceInfo, InvokeContractResult, ModuleRef},
         AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, TransactionStatus,
     },
 };
-use concordium_contracts_common::{AccountAddress, ContractAddress};
+use concordium_contracts_common::{AccountAddress, Amount, ContractAddress, ReceiveName};
 use futures::{Stream, StreamExt};
 use tonic::IntoRequest;
 
@@ -93,6 +93,20 @@ impl From<&AccountAddress> for generated::AccountAddress {
     }
 }
 
+impl From<&super::types::Address> for generated::Address {
+    fn from(addr: &super::types::Address) -> Self {
+        let ty = match addr {
+            super::types::Address::Account(account) => {
+                generated::address::Type::Account(account.into())
+            }
+            super::types::Address::Contract(contract) => {
+                generated::address::Type::Contract(contract.into())
+            }
+        };
+        generated::Address { r#type: Some(ty) }
+    }
+}
+
 impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
     fn from(ai: &AccountIdentifier) -> Self {
         let account_identifier_input = match ai {
@@ -119,6 +133,30 @@ impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
 
 impl From<&ModuleRef> for generated::ModuleRef {
     fn from(mr: &ModuleRef) -> Self { generated::ModuleRef { value: mr.to_vec() } }
+}
+
+impl From<Amount> for generated::Amount {
+    fn from(a: Amount) -> Self {
+        generated::Amount {
+            value: a.micro_ccd(),
+        }
+    }
+}
+
+impl<'a> From<ReceiveName<'a>> for generated::ReceiveName {
+    fn from(a: ReceiveName<'a>) -> Self {
+        generated::ReceiveName {
+            value: a.get_chain_name().to_string(),
+        }
+    }
+}
+
+impl From<&[u8]> for generated::Parameter {
+    fn from(a: &[u8]) -> Self { generated::Parameter { value: a.to_vec() } }
+}
+
+impl From<types::Energy> for generated::Energy {
+    fn from(a: types::Energy) -> Self { generated::Energy { value: a.into() } }
 }
 
 impl From<&TransactionHash> for generated::TransactionHash {
@@ -189,6 +227,21 @@ impl IntoRequest<generated::AccountIdentifierInput> for &AccountIdentifier {
 impl IntoRequest<generated::AccountAddress> for &AccountAddress {
     fn into_request(self) -> tonic::Request<generated::AccountAddress> {
         tonic::Request::new(self.into())
+    }
+}
+
+impl IntoRequest<generated::InvokeContractRequest> for (&BlockIdentifier, &ContractContext) {
+    fn into_request(self) -> tonic::Request<generated::InvokeContractRequest> {
+        let (block, context) = self;
+        tonic::Request::new(generated::InvokeContractRequest {
+            block_hash: Some(block.into()),
+            invoker:    context.invoker.as_ref().map(|a| a.into()),
+            contract:   Some((&context.contract).into()),
+            amount:     Some(context.amount.into()),
+            entrypoint: Some(context.method.as_receive_name().into()),
+            parameter:  Some(context.parameter.as_ref().as_slice().into()),
+            energy:     Some(context.energy.into()),
+        })
     }
 }
 
@@ -349,6 +402,20 @@ impl Client {
         let response = self.client.get_block_item_status(th).await?;
         let response = TransactionStatus::try_from(response.into_inner())?;
         Ok(response)
+    }
+
+    pub async fn invoke_contract(
+        &mut self,
+        bi: &BlockIdentifier,
+        context: &ContractContext,
+    ) -> endpoints::QueryResult<QueryResponse<InvokeContractResult>> {
+        let response = self.client.invoke_contract((bi, context)).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = InvokeContractResult::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
     }
 }
 
