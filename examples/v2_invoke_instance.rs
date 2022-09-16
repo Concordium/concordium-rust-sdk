@@ -1,4 +1,4 @@
-/// Test the `InvokeContract` endpoint.
+/// Test the `InvokeInstance` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_contracts_common::{Amount, ContractAddress, OwnedReceiveName};
@@ -44,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let info = client
-        .invoke_contract(&BlockIdentifier::Best, &context)
+        .invoke_instance(&BlockIdentifier::Best, &context)
         .await?;
     println!("{:#?}", info);
 

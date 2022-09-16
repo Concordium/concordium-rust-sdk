@@ -1978,18 +1978,18 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
     }
 }
 
-impl TryFrom<InvokeContractResponse> for super::types::smart_contracts::InvokeContractResult {
+impl TryFrom<InvokeInstanceResponse> for super::types::smart_contracts::InvokeContractResult {
     type Error = tonic::Status;
 
-    fn try_from(response: InvokeContractResponse) -> Result<Self, Self::Error> {
+    fn try_from(response: InvokeInstanceResponse) -> Result<Self, Self::Error> {
         use super::types::smart_contracts::{InvokeContractResult, ReturnValue};
         let result = match response.result.require_owned()? {
-            invoke_contract_response::Result::Failure(value) => InvokeContractResult::Failure {
+            invoke_instance_response::Result::Failure(value) => InvokeContractResult::Failure {
                 return_value: value.return_value.map(|b| ReturnValue { value: b }),
                 reason:       value.reason.require_owned()?.try_into()?,
                 used_energy:  value.used_energy.require_owned()?.into(),
             },
-            invoke_contract_response::Result::Success(value) => InvokeContractResult::Success {
+            invoke_instance_response::Result::Success(value) => InvokeContractResult::Success {
                 return_value: value.return_value.map(|b| ReturnValue { value: b }),
                 events:       value
                     .effects

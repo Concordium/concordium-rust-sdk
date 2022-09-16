@@ -230,14 +230,13 @@ impl IntoRequest<generated::AccountAddress> for &AccountAddress {
     }
 }
 
-
-impl IntoRequest<generated::InvokeContractRequest> for (&BlockIdentifier, &ContractContext) {
-    fn into_request(self) -> tonic::Request<generated::InvokeContractRequest> {
+impl IntoRequest<generated::InvokeInstanceRequest> for (&BlockIdentifier, &ContractContext) {
+    fn into_request(self) -> tonic::Request<generated::InvokeInstanceRequest> {
         let (block, context) = self;
-        tonic::Request::new(generated::InvokeContractRequest {
+        tonic::Request::new(generated::InvokeInstanceRequest {
             block_hash: Some(block.into()),
             invoker:    context.invoker.as_ref().map(|a| a.into()),
-            contract:   Some((&context.contract).into()),
+            instance:   Some((&context.contract).into()),
             amount:     Some(context.amount.into()),
             entrypoint: Some(context.method.as_receive_name().into()),
             parameter:  Some(context.parameter.as_ref().as_slice().into()),
@@ -434,12 +433,12 @@ impl Client {
         Ok(response)
     }
 
-    pub async fn invoke_contract(
+    pub async fn invoke_instance(
         &mut self,
         bi: &BlockIdentifier,
         context: &ContractContext,
     ) -> endpoints::QueryResult<QueryResponse<InvokeContractResult>> {
-        let response = self.client.invoke_contract((bi, context)).await?;
+        let response = self.client.invoke_instance((bi, context)).await?;
         let block_hash = extract_metadata(&response)?;
         let response = InvokeContractResult::try_from(response.into_inner())?;
         Ok(QueryResponse {
