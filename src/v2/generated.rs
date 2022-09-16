@@ -35,6 +35,24 @@ impl TryFrom<AccountAddress> for super::AccountAddress {
     }
 }
 
+impl From<ContractAddress> for super::ContractAddress {
+    fn from(value: ContractAddress) -> Self {
+        Self {
+            index:    value.index,
+            subindex: value.subindex,
+        }
+    }
+}
+
+impl From<super::ContractAddress> for ContractAddress {
+    fn from(value: super::ContractAddress) -> Self {
+        Self {
+            index:    value.index,
+            subindex: value.subindex,
+        }
+    }
+}
+
 impl TryFrom<BlockHash> for super::BlockHash {
     type Error = tonic::Status;
 

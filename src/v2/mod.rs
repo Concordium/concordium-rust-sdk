@@ -4,7 +4,7 @@ use crate::{
         self, hashes, hashes::BlockHash, AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID,
     },
 };
-use concordium_contracts_common::AccountAddress;
+use concordium_contracts_common::{AccountAddress, ContractAddress};
 use futures::{Stream, StreamExt};
 use tonic::IntoRequest;
 
@@ -82,7 +82,7 @@ impl IntoRequest<generated::BlockHashInput> for &BlockIdentifier {
     }
 }
 
-impl From<&AccountIdentifier> for generated::account_info_request::AccountIdentifier {
+impl From<&AccountIdentifier> for generated::account_identifier_input::AccountIdentifierInput {
     fn from(ai: &AccountIdentifier) -> Self {
         match ai {
             AccountIdentifier::Address(addr) => {
@@ -102,11 +102,29 @@ impl From<&AccountIdentifier> for generated::account_info_request::AccountIdenti
     }
 }
 
+impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
+    fn from(ai: &AccountIdentifier) -> Self {
+        Self {
+            account_identifier_input: Some(ai.into()),
+        }
+    }
+}
+
 impl IntoRequest<generated::AccountInfoRequest> for (&AccountIdentifier, &BlockIdentifier) {
     fn into_request(self) -> tonic::Request<generated::AccountInfoRequest> {
         let ai = generated::AccountInfoRequest {
             block_hash:         Some(self.1.into()),
             account_identifier: Some(self.0.into()),
+        };
+        tonic::Request::new(ai)
+    }
+}
+
+impl IntoRequest<generated::InstanceInfoRequest> for (ContractAddress, &BlockIdentifier) {
+    fn into_request(self) -> tonic::Request<generated::InstanceInfoRequest> {
+        let ai = generated::InstanceInfoRequest {
+            block_hash:         Some(self.1.into()),
+            address: Some(self.0.into()),
         };
         tonic::Request::new(ai)
     }
@@ -165,6 +183,29 @@ impl Client {
             Err(x) => Err(x),
         });
         Ok(stream)
+    }
+
+    pub async fn get_instance_state(
+        &mut self,
+        ca: ContractAddress,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<(Vec<u8>, Vec<u8>), tonic::Status>>>,
+    > {
+        let response = self.client.get_instance_state((ca, bi)).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|x| match x {
+            Ok(v) => {
+                let key = v.key;
+                let value = v.value;
+                Ok((key, value))
+            }
+            Err(x) => Err(x),
+        });
+        Ok(QueryResponse{
+            block_hash,
+            response: stream
+        })
     }
 }
 
