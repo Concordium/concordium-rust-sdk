@@ -9,8 +9,6 @@ use id::{
     },
 };
 
-use crate::types;
-
 use super::Require;
 
 fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
@@ -56,21 +54,22 @@ impl From<ContractAddress> for super::ContractAddress {
     }
 }
 
-impl TryFrom<VersionedModuleSource> for types::smart_contracts::WasmModule {
+impl TryFrom<VersionedModuleSource> for super::types::smart_contracts::WasmModule {
     type Error = tonic::Status;
 
     fn try_from(versioned_module: VersionedModuleSource) -> Result<Self, Self::Error> {
+        use super::types::smart_contracts::WasmVersion;
         let module = match versioned_module.module.require()? {
             versioned_module_source::Module::V0(versioned_module_source::ModuleSourceV0 {
                 value,
-            }) => types::smart_contracts::WasmModule {
-                version: types::smart_contracts::WasmVersion::V0,
+            }) => Self {
+                version: WasmVersion::V0,
                 source:  value.into(),
             },
             versioned_module_source::Module::V1(versioned_module_source::ModuleSourceV1 {
                 value,
-            }) => types::smart_contracts::WasmModule {
-                version: types::smart_contracts::WasmVersion::V1,
+            }) => Self {
+                version: WasmVersion::V1,
                 source:  value.into(),
             },
         };
@@ -676,7 +675,7 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
     }
 }
 
-impl TryFrom<NextAccountSequenceNumber> for types::queries::AccountNonceResponse {
+impl TryFrom<NextAccountSequenceNumber> for super::types::queries::AccountNonceResponse {
     type Error = tonic::Status;
 
     fn try_from(value: NextAccountSequenceNumber) -> Result<Self, Self::Error> {
@@ -687,7 +686,7 @@ impl TryFrom<NextAccountSequenceNumber> for types::queries::AccountNonceResponse
     }
 }
 
-impl TryFrom<ConsensusInfo> for types::queries::ConsensusInfo {
+impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
     type Error = tonic::Status;
 
     fn try_from(value: ConsensusInfo) -> Result<Self, Self::Error> {
