@@ -1,4 +1,4 @@
-/// Test the `GetAccountInfo` endpoint.
+/// Test the `GetNextAccountSequenceNumber` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::v2;
@@ -30,9 +30,7 @@ async fn main() -> anyhow::Result<()> {
     let mut accounts = client.get_account_list(&v2::BlockIdentifier::Best).await?;
     while let Some(account) = accounts.response.next().await {
         let account = account?;
-        let next_nonce = client
-            .get_next_account_sequence_number(&account.into())
-            .await?;
+        let next_nonce = client.get_next_account_sequence_number(&account).await?;
         println!(
             "{}: nonce {}, all_final {:?}",
             account, next_nonce.nonce, next_nonce.all_final

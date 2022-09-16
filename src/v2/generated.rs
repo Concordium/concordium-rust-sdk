@@ -9,8 +9,6 @@ use id::{
     },
 };
 
-use crate::types;
-
 use super::Require;
 
 fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
@@ -68,21 +66,22 @@ impl From<Slot> for super::types::Slot {
     fn from(value: Slot) -> Self { super::types::Slot { slot: value.value } }
 }
 
-impl TryFrom<VersionedModuleSource> for types::smart_contracts::WasmModule {
+impl TryFrom<VersionedModuleSource> for super::types::smart_contracts::WasmModule {
     type Error = tonic::Status;
 
     fn try_from(versioned_module: VersionedModuleSource) -> Result<Self, Self::Error> {
-        let module = match versioned_module.module.require_owned()? {
+        use super::types::smart_contracts::WasmVersion;
+        let module = match versioned_module.module.require()? {
             versioned_module_source::Module::V0(versioned_module_source::ModuleSourceV0 {
                 value,
-            }) => types::smart_contracts::WasmModule {
-                version: types::smart_contracts::WasmVersion::V0,
+            }) => Self {
+                version: WasmVersion::V0,
                 source:  value.into(),
             },
             versioned_module_source::Module::V1(versioned_module_source::ModuleSourceV1 {
                 value,
-            }) => types::smart_contracts::WasmModule {
-                version: types::smart_contracts::WasmVersion::V1,
+            }) => Self {
+                version: WasmVersion::V1,
                 source:  value.into(),
             },
         };
@@ -167,7 +166,7 @@ impl TryFrom<DelegationTarget> for super::types::DelegationTarget {
     type Error = tonic::Status;
 
     fn try_from(dt: DelegationTarget) -> Result<Self, Self::Error> {
-        match dt.target.require_owned()? {
+        match dt.target.require()? {
             delegation_target::Target::Passive(_) => Ok(Self::Passive),
             delegation_target::Target::Baker(bid) => Ok(Self::Baker {
                 baker_id: bid.into(),
@@ -228,7 +227,7 @@ impl TryFrom<EncryptedBalance> for super::types::AccountEncryptedAmount {
     type Error = tonic::Status;
 
     fn try_from(value: EncryptedBalance) -> Result<Self, Self::Error> {
-        let self_amount = value.self_amount.require_owned()?.try_into()?;
+        let self_amount = value.self_amount.require()?.try_into()?;
         let start_index = value.start_index;
         let aggregated_amount = match (value.aggregated_amount, value.num_aggregated) {
             (Some(aa), Some(si)) => Some((aa.try_into()?, si)),
@@ -250,13 +249,6 @@ impl TryFrom<EncryptedBalance> for super::types::AccountEncryptedAmount {
             aggregated_amount,
             incoming_amounts,
         })
-    }
-}
-
-impl From<Timestamp> for chrono::DateTime<chrono::Utc> {
-    fn from(value: Timestamp) -> Self {
-        chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
-            + chrono::Duration::milliseconds(value.value as i64)
     }
 }
 
@@ -299,18 +291,15 @@ impl TryFrom<StakePendingChange> for super::types::StakePendingChange {
     type Error = tonic::Status;
 
     fn try_from(value: StakePendingChange) -> Result<Self, Self::Error> {
-        match value.change.require_owned()? {
-            stake_pending_change::Change::Reduce(rs) => {
-                let new_stake = rs.new_stake.require_owned()?.into();
-
-                Ok(Self::ReduceStake {
-                    new_stake,
-                    effective_time: rs.effective_time.require_owned()?.into(),
-                })
-            }
-            stake_pending_change::Change::Remove(rs) => Ok(Self::RemoveStake {
-                effective_time: rs.into(),
+        match value.change.require()? {
+            stake_pending_change::Change::Reduce(rs) => Ok(Self::ReduceStake {
+                new_stake:      rs.new_stake.require()?.into(),
+                effective_time: rs.effective_time.require()?.into(),
             }),
+            stake_pending_change::Change::Remove(rs) => {
+                let effective_time = rs.into();
+                Ok(Self::RemoveStake { effective_time })
+            }
         }
     }
 }
@@ -320,10 +309,10 @@ impl TryFrom<BakerInfo> for super::types::BakerInfo {
 
     fn try_from(value: BakerInfo) -> Result<Self, Self::Error> {
         Ok(Self {
-            baker_id:                     value.baker_id.require_owned()?.into(),
-            baker_election_verify_key:    value.election_key.require_owned()?.try_into()?,
-            baker_signature_verify_key:   value.signature_key.require_owned()?.try_into()?,
-            baker_aggregation_verify_key: value.aggregation_key.require_owned()?.try_into()?,
+            baker_id:                     value.baker_id.require()?.into(),
+            baker_election_verify_key:    value.election_key.require()?.try_into()?,
+            baker_signature_verify_key:   value.signature_key.require()?.try_into()?,
+            baker_aggregation_verify_key: value.aggregation_key.require()?.try_into()?,
         })
     }
 }
@@ -367,9 +356,9 @@ impl TryFrom<CommissionRates> for super::types::CommissionRates {
 
     fn try_from(value: CommissionRates) -> Result<Self, Self::Error> {
         Ok(Self {
-            finalization: value.finalization.require_owned()?.into(),
-            baking:       value.baking.require_owned()?.into(),
-            transaction:  value.transaction.require_owned()?.into(),
+            finalization: value.finalization.require()?.into(),
+            baking:       value.baking.require()?.into(),
+            transaction:  value.transaction.require()?.into(),
         })
     }
 }
@@ -383,7 +372,7 @@ impl TryFrom<BakerPoolInfo> for super::types::BakerPoolInfo {
             .url
             .try_into()
             .map_err(|_| tonic::Status::internal("Unexpected metadata length."))?;
-        let commission_rates = value.commission_rates.require_owned()?.try_into()?;
+        let commission_rates = value.commission_rates.require()?.try_into()?;
         Ok(Self {
             open_status,
             metadata_url,
@@ -396,11 +385,11 @@ impl TryFrom<AccountStakingInfo> for super::types::AccountStakingInfo {
     type Error = tonic::Status;
 
     fn try_from(value: AccountStakingInfo) -> Result<Self, Self::Error> {
-        match value.staking_info.require_owned()? {
+        match value.staking_info.require()? {
             account_staking_info::StakingInfo::Baker(bsi) => {
-                let staked_amount = bsi.staked_amount.require_owned()?.into();
+                let staked_amount = bsi.staked_amount.require()?.into();
                 let restake_earnings = bsi.restake_earnings;
-                let baker_info = bsi.baker_info.require_owned()?.try_into()?;
+                let baker_info = bsi.baker_info.require()?.try_into()?;
                 let pending_change = match bsi.pending_change {
                     None => None,
                     Some(pc) => Some(pc.try_into()?),
@@ -418,9 +407,9 @@ impl TryFrom<AccountStakingInfo> for super::types::AccountStakingInfo {
                 })
             }
             account_staking_info::StakingInfo::Delegator(dsi) => {
-                let staked_amount = dsi.staked_amount.require_owned()?.into();
+                let staked_amount = dsi.staked_amount.require()?.into();
                 let restake_earnings = dsi.restake_earnings;
-                let delegation_target = dsi.target.require_owned()?.try_into()?;
+                let delegation_target = dsi.target.require()?.try_into()?;
                 let pending_change = match dsi.pending_change {
                     None => None,
                     Some(pc) => Some(pc.try_into()?),
@@ -441,8 +430,8 @@ impl TryFrom<Release> for super::types::Release {
 
     fn try_from(value: Release) -> Result<Self, Self::Error> {
         Ok(Self {
-            timestamp:    value.timestamp.require_owned()?.into(),
-            amount:       value.amount.require_owned()?.into(),
+            timestamp:    value.timestamp.require()?.into(),
+            amount:       value.amount.require()?.into(),
             transactions: value
                 .transactions
                 .into_iter()
@@ -457,7 +446,7 @@ impl TryFrom<ReleaseSchedule> for super::types::AccountReleaseSchedule {
 
     fn try_from(value: ReleaseSchedule) -> Result<Self, Self::Error> {
         Ok(Self {
-            total:    value.total.require_owned()?.into(),
+            total:    value.total.require()?.into(),
             schedule: value
                 .schedules
                 .into_iter()
@@ -471,7 +460,7 @@ impl TryFrom<AccountVerifyKey> for id::types::VerifyKey {
     type Error = tonic::Status;
 
     fn try_from(value: AccountVerifyKey) -> Result<Self, Self::Error> {
-        match value.key.require_owned()? {
+        match value.key.require()? {
             account_verify_key::Key::Ed25519Key(v) => Ok(Self::Ed25519VerifyKey(consume(&v)?)),
         }
     }
@@ -529,7 +518,7 @@ impl TryFrom<CredentialPublicKeys> for id::types::CredentialPublicKeys {
                     }
                 })
                 .collect::<Result<_, tonic::Status>>()?,
-            threshold: value.threshold.require_owned()?.try_into()?,
+            threshold: value.threshold.require()?.try_into()?,
         })
     }
 }
@@ -576,8 +565,8 @@ impl TryFrom<Policy> for id::types::Policy<ArCurve, AttributeKind> {
 
     fn try_from(value: Policy) -> Result<Self, Self::Error> {
         Ok(Self {
-            valid_to:   value.valid_to.require_owned()?.try_into()?,
-            created_at: value.created_at.require_owned()?.try_into()?,
+            valid_to:   value.valid_to.require()?.try_into()?,
+            created_at: value.created_at.require()?.try_into()?,
             policy_vec: value
                 .attributes
                 .into_iter()
@@ -586,7 +575,9 @@ impl TryFrom<Policy> for id::types::Policy<ArCurve, AttributeKind> {
                         k.try_into()
                             .map_err(|_| tonic::Status::internal("Unexpected attribute tag."))?,
                     );
-                    let v = consume(&v)?;
+                    let v = AttributeKind(String::from_utf8(v).map_err(|_| {
+                        tonic::Status::internal("Invalid attribute value. Expected UTF8 encoding")
+                    })?);
                     Ok((k, v))
                 })
                 .collect::<Result<_, tonic::Status>>()?,
@@ -614,9 +605,9 @@ impl TryFrom<CredentialCommitments> for id::types::CredentialDeploymentCommitmen
 
     fn try_from(value: CredentialCommitments) -> Result<Self, Self::Error> {
         Ok(Self {
-            cmm_prf: value.prf.require_owned()?.try_into()?,
-            cmm_cred_counter: value.cred_counter.require_owned()?.try_into()?,
-            cmm_max_accounts: value.max_accounts.require_owned()?.try_into()?,
+            cmm_prf: value.prf.require()?.try_into()?,
+            cmm_cred_counter: value.cred_counter.require()?.try_into()?,
+            cmm_max_accounts: value.max_accounts.require()?.try_into()?,
             cmm_attributes: value
                 .attributes
                 .into_iter()
@@ -642,22 +633,22 @@ impl TryFrom<AccountCredential> for AccountCredentialWithoutProofs<ArCurve, Attr
     type Error = tonic::Status;
 
     fn try_from(value: AccountCredential) -> Result<Self, Self::Error> {
-        match value.credential_values.require_owned()? {
+        match value.credential_values.require()? {
             account_credential::CredentialValues::Initial(ic) => {
                 let icdv = InitialCredentialDeploymentValues {
-                    cred_account: ic.keys.require_owned()?.try_into()?,
-                    reg_id:       ic.cred_id.require_owned()?.try_into()?,
-                    ip_identity:  ic.ip_id.require_owned()?.into(),
-                    policy:       ic.policy.require_owned()?.try_into()?,
+                    cred_account: ic.keys.require()?.try_into()?,
+                    reg_id:       ic.cred_id.require()?.try_into()?,
+                    ip_identity:  ic.ip_id.require()?.into(),
+                    policy:       ic.policy.require()?.try_into()?,
                 };
                 Ok(Self::Initial { icdv })
             }
             account_credential::CredentialValues::Normal(nc) => {
                 let cdv = CredentialDeploymentValues {
-                    cred_key_info: nc.keys.require_owned()?.try_into()?,
-                    cred_id:       nc.cred_id.require_owned()?.try_into()?,
-                    ip_identity:   nc.ip_id.require_owned()?.into(),
-                    threshold:     nc.ar_threshold.require_owned()?.try_into()?,
+                    cred_key_info: nc.keys.require()?.try_into()?,
+                    cred_id:       nc.cred_id.require()?.try_into()?,
+                    ip_identity:   nc.ip_id.require()?.into(),
+                    threshold:     nc.ar_threshold.require()?.try_into()?,
                     ar_data:       nc
                         .ar_data
                         .into_iter()
@@ -669,12 +660,23 @@ impl TryFrom<AccountCredential> for AccountCredentialWithoutProofs<ArCurve, Attr
                             Ok((k, v))
                         })
                         .collect::<Result<_, tonic::Status>>()?,
-                    policy:        nc.policy.require_owned()?.try_into()?,
+                    policy:        nc.policy.require()?.try_into()?,
                 };
-                let commitments = nc.commitments.require_owned()?.try_into()?;
+                let commitments = nc.commitments.require()?.try_into()?;
                 Ok(Self::Normal { cdv, commitments })
             }
         }
+    }
+}
+
+impl From<Timestamp> for crypto_common::types::Timestamp {
+    fn from(value: Timestamp) -> Self { value.value.into() }
+}
+
+impl From<Timestamp> for chrono::DateTime<chrono::Utc> {
+    fn from(value: Timestamp) -> Self {
+        chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
+            + chrono::Duration::milliseconds(value.value as i64)
     }
 }
 
@@ -694,18 +696,18 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             stake,
             address,
         } = value;
-        let account_nonce = sequence_number.require_owned()?.into();
-        let account_amount = amount.require_owned()?.into();
-        let account_release_schedule = schedule.require_owned()?.try_into()?;
-        let account_threshold = threshold.require_owned()?.try_into()?;
-        let account_encrypted_amount = encrypted_balance.require_owned()?.try_into()?;
-        let account_encryption_key = encryption_key.require_owned()?.try_into()?;
-        let account_index = index.require_owned()?.into();
+        let account_nonce = sequence_number.require()?.into();
+        let account_amount = amount.require()?.into();
+        let account_release_schedule = schedule.require()?.try_into()?;
+        let account_threshold = threshold.require()?.try_into()?;
+        let account_encrypted_amount = encrypted_balance.require()?.try_into()?;
+        let account_encryption_key = encryption_key.require()?.try_into()?;
+        let account_index = index.require()?.into();
         let account_stake = match stake {
             Some(stake) => Some(stake.try_into()?),
             None => None,
         };
-        let account_address = address.require_owned()?.try_into()?;
+        let account_address = address.require()?.try_into()?;
         Ok(Self {
             account_nonce,
             account_amount,
@@ -730,44 +732,38 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
     }
 }
 
-impl TryFrom<NextAccountSequenceNumber> for types::queries::AccountNonceResponse {
+impl TryFrom<NextAccountSequenceNumber> for super::types::queries::AccountNonceResponse {
     type Error = tonic::Status;
 
     fn try_from(value: NextAccountSequenceNumber) -> Result<Self, Self::Error> {
         Ok(Self {
-            nonce:     value.sequence_number.require_owned()?.into(),
+            nonce:     value.sequence_number.require()?.into(),
             all_final: value.all_final,
         })
     }
 }
 
-impl TryFrom<ConsensusInfo> for types::queries::ConsensusInfo {
+impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
     type Error = tonic::Status;
 
     fn try_from(value: ConsensusInfo) -> Result<Self, Self::Error> {
         Ok(Self {
-            last_finalized_block_height:    value
-                .last_finalized_block_height
-                .require_owned()?
-                .into(),
+            last_finalized_block_height:    value.last_finalized_block_height.require()?.into(),
             block_arrive_latency_e_m_s_d:   value.block_arrive_latency_emsd,
             block_receive_latency_e_m_s_d:  value.block_receive_latency_emsd,
-            last_finalized_block:           value
-                .last_finalized_block
-                .require_owned()?
-                .try_into()?,
+            last_finalized_block:           value.last_finalized_block.require()?.try_into()?,
             block_receive_period_e_m_s_d:   value.block_receive_period_emsd,
             block_arrive_period_e_m_s_d:    value.block_arrive_period_emsd,
             blocks_received_count:          value.blocks_received_count.into(),
             transactions_per_block_e_m_s_d: value.transactions_per_block_emsd,
             finalization_period_e_m_a:      value.finalization_period_ema,
-            best_block_height:              value.best_block_height.require_owned()?.into(),
+            best_block_height:              value.best_block_height.require()?.into(),
             last_finalized_time:            value.last_finalized_time.map(|v| v.into()),
             finalization_count:             value.finalization_count.into(),
-            epoch_duration:                 value.epoch_duration.require_owned()?.into(),
+            epoch_duration:                 value.epoch_duration.require()?.into(),
             blocks_verified_count:          value.blocks_verified_count.into(),
-            slot_duration:                  value.slot_duration.require_owned()?.into(),
-            genesis_time:                   value.genesis_time.require_owned()?.into(),
+            slot_duration:                  value.slot_duration.require()?.into(),
+            genesis_time:                   value.genesis_time.require()?.into(),
             finalization_period_e_m_s_d:    value.finalization_period_emsd,
             transactions_per_block_e_m_a:   value.transactions_per_block_ema,
             block_arrive_latency_e_m_a:     value.block_arrive_latency_ema,
@@ -775,23 +771,23 @@ impl TryFrom<ConsensusInfo> for types::queries::ConsensusInfo {
             block_arrive_period_e_m_a:      value.block_arrive_period_ema,
             block_receive_period_e_m_a:     value.block_receive_period_ema,
             block_last_arrived_time:        value.block_last_arrived_time.map(|v| v.into()),
-            best_block:                     value.best_block.require_owned()?.try_into()?,
-            genesis_block:                  value.genesis_block.require_owned()?.try_into()?,
+            best_block:                     value.best_block.require()?.try_into()?,
+            genesis_block:                  value.genesis_block.require()?.try_into()?,
             block_last_received_time:       value.block_last_received_time.map(|v| v.into()),
             protocol_version:               ProtocolVersion::from_i32(value.protocol_version)
                 .ok_or_else(|| tonic::Status::internal("Unknown protocol version"))?
                 .into(),
-            genesis_index:                  value.genesis_index.require_owned()?.into(),
+            genesis_index:                  value.genesis_index.require()?.into(),
             current_era_genesis_block:      value
                 .current_era_genesis_block
-                .require_owned()?
+                .require()?
                 .try_into()?,
-            current_era_genesis_time:       value.current_era_genesis_time.require_owned()?.into(),
+            current_era_genesis_time:       value.current_era_genesis_time.require()?.into(),
         })
     }
 }
 
-impl TryFrom<CryptographicParameters> for types::queries::CryptographicParameters {
+impl TryFrom<CryptographicParameters> for super::types::queries::CryptographicParameters {
     type Error = tonic::Status;
 
     fn try_from(value: CryptographicParameters) -> Result<Self, Self::Error> {
@@ -810,49 +806,49 @@ impl TryFrom<CryptographicParameters> for types::queries::CryptographicParameter
     }
 }
 
-impl TryFrom<BlockInfo> for types::queries::BlockInfo {
+impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
     type Error = tonic::Status;
 
     fn try_from(value: BlockInfo) -> Result<Self, Self::Error> {
         Ok(Self {
             transactions_size:       value.transactions_size.into(),
-            block_parent:            value.parent_block.require_owned()?.try_into()?,
-            block_hash:              value.hash.require_owned()?.try_into()?,
+            block_parent:            value.parent_block.require()?.try_into()?,
+            block_hash:              value.hash.require()?.try_into()?,
             finalized:               value.finalized,
-            block_state_hash:        value.state_hash.require_owned()?.try_into()?,
-            block_arrive_time:       value.arrive_time.require_owned()?.into(),
-            block_receive_time:      value.receive_time.require_owned()?.into(),
+            block_state_hash:        value.state_hash.require()?.try_into()?,
+            block_arrive_time:       value.arrive_time.require()?.into(),
+            block_receive_time:      value.receive_time.require()?.into(),
             transaction_count:       value.transaction_count.into(),
-            transaction_energy_cost: value.transactions_energy_cost.require_owned()?.into(),
-            block_slot:              value.slot_number.require_owned()?.into(),
-            block_last_finalized:    value.last_finalized_block.require_owned()?.try_into()?,
-            block_slot_time:         value.slot_time.require_owned()?.into(),
-            block_height:            value.height.require_owned()?.into(),
-            era_block_height:        value.era_block_height.require_owned()?.into(),
-            genesis_index:           value.genesis_index.require_owned()?.into(),
+            transaction_energy_cost: value.transactions_energy_cost.require()?.into(),
+            block_slot:              value.slot_number.require()?.into(),
+            block_last_finalized:    value.last_finalized_block.require()?.try_into()?,
+            block_slot_time:         value.slot_time.require()?.into(),
+            block_height:            value.height.require()?.into(),
+            era_block_height:        value.era_block_height.require()?.into(),
+            genesis_index:           value.genesis_index.require()?.into(),
             block_baker:             value.baker.map(|b| b.into()),
         })
     }
 }
 
-impl TryFrom<PoolInfoResponse> for types::BakerPoolStatus {
+impl TryFrom<PoolInfoResponse> for super::types::BakerPoolStatus {
     type Error = tonic::Status;
 
     fn try_from(value: PoolInfoResponse) -> Result<Self, Self::Error> {
         Ok(Self {
-            baker_id:                   value.baker.require_owned()?.into(),
-            baker_address:              value.address.require_owned()?.try_into()?,
-            baker_equity_capital:       value.equity_capital.require_owned()?.into(),
-            delegated_capital:          value.delegated_capital.require_owned()?.into(),
-            delegated_capital_cap:      value.delegated_capital_cap.require_owned()?.into(),
-            pool_info:                  value.pool_info.require_owned()?.try_into()?,
+            baker_id:                   value.baker.require()?.into(),
+            baker_address:              value.address.require()?.try_into()?,
+            baker_equity_capital:       value.equity_capital.require()?.into(),
+            delegated_capital:          value.delegated_capital.require()?.into(),
+            delegated_capital_cap:      value.delegated_capital_cap.require()?.into(),
+            pool_info:                  value.pool_info.require()?.try_into()?,
             baker_stake_pending_change: value.equity_pending_change.try_into()?,
             current_payday_status:      if let Some(v) = value.current_payday_info {
                 Some(v.try_into()?)
             } else {
                 None
             },
-            all_pool_total_capital:     value.all_pool_total_capital.require_owned()?.into(),
+            all_pool_total_capital:     value.all_pool_total_capital.require()?.into(),
         })
     }
 }
@@ -862,13 +858,13 @@ impl TryFrom<Option<PoolPendingChange>> for super::types::PoolPendingChange {
 
     fn try_from(value: Option<PoolPendingChange>) -> Result<Self, Self::Error> {
         if let Some(value) = value {
-            match value.change.require_owned()? {
+            match value.change.require()? {
                 pool_pending_change::Change::Reduce(rs) => Ok(Self::ReduceBakerCapital {
-                    baker_equity_capital: rs.reduced_equity_capital.require_owned()?.into(),
-                    effective_time:       rs.effective_time.require_owned()?.into(),
+                    baker_equity_capital: rs.reduced_equity_capital.require()?.into(),
+                    effective_time:       rs.effective_time.require()?.into(),
                 }),
                 pool_pending_change::Change::Remove(rs) => Ok(Self::RemovePool {
-                    effective_time: rs.effective_time.require_owned()?.into(),
+                    effective_time: rs.effective_time.require()?.into(),
                 }),
             }
         } else {
@@ -884,11 +880,11 @@ impl TryFrom<PoolCurrentPaydayInfo> for super::types::CurrentPaydayBakerPoolStat
         Ok(Self {
             blocks_baked:            value.blocks_baked,
             finalization_live:       value.finalization_live,
-            transaction_fees_earned: value.transaction_fees_earned.require_owned()?.into(),
-            effective_stake:         value.effective_stake.require_owned()?.into(),
+            transaction_fees_earned: value.transaction_fees_earned.require()?.into(),
+            effective_stake:         value.effective_stake.require()?.into(),
             lottery_power:           value.lottery_power,
-            baker_equity_capital:    value.baker_equity_capital.require_owned()?.into(),
-            delegated_capital:       value.delegated_capital.require_owned()?.into(),
+            baker_equity_capital:    value.baker_equity_capital.require()?.into(),
+            delegated_capital:       value.delegated_capital.require()?.into(),
         })
     }
 }
@@ -898,17 +894,17 @@ impl TryFrom<PassiveDelegationInfo> for super::types::PassiveDelegationStatus {
 
     fn try_from(value: PassiveDelegationInfo) -> Result<Self, Self::Error> {
         Ok(Self {
-            delegated_capital: value.delegated_capital.require_owned()?.into(),
-            commission_rates: value.commission_rates.require_owned()?.try_into()?,
+            delegated_capital: value.delegated_capital.require()?.into(),
+            commission_rates: value.commission_rates.require()?.try_into()?,
             current_payday_transaction_fees_earned: value
                 .current_payday_transaction_fees_earned
-                .require_owned()?
+                .require()?
                 .into(),
             current_payday_delegated_capital: value
                 .current_payday_delegated_capital
-                .require_owned()?
+                .require()?
                 .into(),
-            all_pool_total_capital: value.all_pool_total_capital.require_owned()?.into(),
+            all_pool_total_capital: value.all_pool_total_capital.require()?.into(),
         })
     }
 }
@@ -946,55 +942,43 @@ impl TryFrom<TokenomicsInfo> for super::types::RewardsOverview {
     type Error = tonic::Status;
 
     fn try_from(value: TokenomicsInfo) -> Result<Self, Self::Error> {
-        match value.tokenomics.require_owned()? {
+        match value.tokenomics.require()? {
             tokenomics_info::Tokenomics::V0(value) => Ok(Self::V0 {
                 data: super::types::CommonRewardData {
                     protocol_version:            ProtocolVersion::from_i32(value.protocol_version)
-                        .require_owned()?
+                        .require()?
                         .into(),
-                    total_amount:                value.total_amount.require_owned()?.into(),
-                    total_encrypted_amount:      value
-                        .total_encrypted_amount
-                        .require_owned()?
-                        .into(),
-                    baking_reward_account:       value
-                        .baking_reward_account
-                        .require_owned()?
-                        .into(),
+                    total_amount:                value.total_amount.require()?.into(),
+                    total_encrypted_amount:      value.total_encrypted_amount.require()?.into(),
+                    baking_reward_account:       value.baking_reward_account.require()?.into(),
                     finalization_reward_account: value
                         .finalization_reward_account
-                        .require_owned()?
+                        .require()?
                         .into(),
-                    gas_account:                 value.gas_account.require_owned()?.into(),
+                    gas_account:                 value.gas_account.require()?.into(),
                 },
             }),
             tokenomics_info::Tokenomics::V1(value) => Ok(Self::V1 {
                 common: super::types::CommonRewardData {
                     protocol_version:            ProtocolVersion::from_i32(value.protocol_version)
-                        .require_owned()?
+                        .require()?
                         .into(),
-                    total_amount:                value.total_amount.require_owned()?.into(),
-                    total_encrypted_amount:      value
-                        .total_encrypted_amount
-                        .require_owned()?
-                        .into(),
-                    baking_reward_account:       value
-                        .baking_reward_account
-                        .require_owned()?
-                        .into(),
+                    total_amount:                value.total_amount.require()?.into(),
+                    total_encrypted_amount:      value.total_encrypted_amount.require()?.into(),
+                    baking_reward_account:       value.baking_reward_account.require()?.into(),
                     finalization_reward_account: value
                         .finalization_reward_account
-                        .require_owned()?
+                        .require()?
                         .into(),
-                    gas_account:                 value.gas_account.require_owned()?.into(),
+                    gas_account:                 value.gas_account.require()?.into(),
                 },
                 foundation_transaction_rewards: value
                     .foundation_transaction_rewards
-                    .require_owned()?
+                    .require()?
                     .into(),
-                next_payday_time: value.next_payday_time.require_owned()?.into(),
-                next_payday_mint_rate: value.next_payday_mint_rate.require_owned()?.try_into()?,
-                total_staked_capital: value.total_staked_capital.require_owned()?.into(),
+                next_payday_time: value.next_payday_time.require()?.into(),
+                next_payday_mint_rate: value.next_payday_mint_rate.require()?.try_into()?,
+                total_staked_capital: value.total_staked_capital.require()?.into(),
             }),
         }
     }
