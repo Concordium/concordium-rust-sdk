@@ -1,4 +1,4 @@
-/// Test the `GetTokenomicsStatus` endpoint.
+/// Test the `GetPassiveDelegationInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
 use structopt::StructOpt;
@@ -29,14 +29,14 @@ async fn main() -> anyhow::Result<()> {
 
     {
         let ai = client
-            .get_tokenomics_status(&v2::BlockIdentifier::Best)
+            .get_passive_delegation_info(&v2::BlockIdentifier::Best)
             .await?;
         println!("Best block {:#?}", ai);
     }
 
     {
         let ai = client
-            .get_tokenomics_status(&v2::BlockIdentifier::LastFinal)
+            .get_passive_delegation_info(&v2::BlockIdentifier::LastFinal)
             .await?;
         println!("Last finalized {:#?}", ai);
     }

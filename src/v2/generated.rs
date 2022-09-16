@@ -835,10 +835,10 @@ impl TryFrom<BlockInfo> for types::queries::BlockInfo {
     }
 }
 
-impl TryFrom<PoolStatus> for types::BakerPoolStatus {
+impl TryFrom<PoolInfoResponse> for types::BakerPoolStatus {
     type Error = tonic::Status;
 
-    fn try_from(value: PoolStatus) -> Result<Self, Self::Error> {
+    fn try_from(value: PoolInfoResponse) -> Result<Self, Self::Error> {
         Ok(Self {
             baker_id:                   value.baker.require_owned()?.into(),
             baker_address:              value.address.require_owned()?.try_into()?,
@@ -847,7 +847,7 @@ impl TryFrom<PoolStatus> for types::BakerPoolStatus {
             delegated_capital_cap:      value.delegated_capital_cap.require_owned()?.into(),
             pool_info:                  value.pool_info.require_owned()?.try_into()?,
             baker_stake_pending_change: value.equity_pending_change.try_into()?,
-            current_payday_status:      if let Some(v) = value.current_payday_status {
+            current_payday_status:      if let Some(v) = value.current_payday_info {
                 Some(v.try_into()?)
             } else {
                 None
@@ -877,10 +877,10 @@ impl TryFrom<Option<PoolPendingChange>> for super::types::PoolPendingChange {
     }
 }
 
-impl TryFrom<PoolCurrentPaydayStatus> for super::types::CurrentPaydayBakerPoolStatus {
+impl TryFrom<PoolCurrentPaydayInfo> for super::types::CurrentPaydayBakerPoolStatus {
     type Error = tonic::Status;
 
-    fn try_from(value: PoolCurrentPaydayStatus) -> Result<Self, Self::Error> {
+    fn try_from(value: PoolCurrentPaydayInfo) -> Result<Self, Self::Error> {
         Ok(Self {
             blocks_baked:            value.blocks_baked,
             finalization_live:       value.finalization_live,
@@ -893,10 +893,10 @@ impl TryFrom<PoolCurrentPaydayStatus> for super::types::CurrentPaydayBakerPoolSt
     }
 }
 
-impl TryFrom<PassiveDelegationStatus> for super::types::PassiveDelegationStatus {
+impl TryFrom<PassiveDelegationInfo> for super::types::PassiveDelegationStatus {
     type Error = tonic::Status;
 
-    fn try_from(value: PassiveDelegationStatus) -> Result<Self, Self::Error> {
+    fn try_from(value: PassiveDelegationInfo) -> Result<Self, Self::Error> {
         Ok(Self {
             delegated_capital: value.delegated_capital.require_owned()?.into(),
             commission_rates: value.commission_rates.require_owned()?.try_into()?,
@@ -942,12 +942,12 @@ impl From<&super::endpoints::BlocksAtHeightInput> for BlocksAtHeightRequest {
     }
 }
 
-impl TryFrom<TokenomicsStatus> for super::types::RewardsOverview {
+impl TryFrom<TokenomicsInfo> for super::types::RewardsOverview {
     type Error = tonic::Status;
 
-    fn try_from(value: TokenomicsStatus) -> Result<Self, Self::Error> {
+    fn try_from(value: TokenomicsInfo) -> Result<Self, Self::Error> {
         match value.tokenomics.require_owned()? {
-            tokenomics_status::Tokenomics::V0(value) => Ok(Self::V0 {
+            tokenomics_info::Tokenomics::V0(value) => Ok(Self::V0 {
                 data: super::types::CommonRewardData {
                     protocol_version:            ProtocolVersion::from_i32(value.protocol_version)
                         .require_owned()?
@@ -968,7 +968,7 @@ impl TryFrom<TokenomicsStatus> for super::types::RewardsOverview {
                     gas_account:                 value.gas_account.require_owned()?.into(),
                 },
             }),
-            tokenomics_status::Tokenomics::V1(value) => Ok(Self::V1 {
+            tokenomics_info::Tokenomics::V1(value) => Ok(Self::V1 {
                 common: super::types::CommonRewardData {
                     protocol_version:            ProtocolVersion::from_i32(value.protocol_version)
                         .require_owned()?

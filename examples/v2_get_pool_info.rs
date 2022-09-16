@@ -1,4 +1,4 @@
-/// Test the `GetPoolStatus` endpoint.
+/// Test the `GetPoolInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::v2;
@@ -32,7 +32,7 @@ async fn main() -> anyhow::Result<()> {
     while let Some(a) = res.response.next().await {
         let baker_id = a?;
         let status = client
-            .get_pool_status(&v2::BlockIdentifier::Best, baker_id)
+            .get_pool_info(&v2::BlockIdentifier::Best, baker_id)
             .await?;
         println!("Baker {:#?}: {:#?}", baker_id, status);
     }
