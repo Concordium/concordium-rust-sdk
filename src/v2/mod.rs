@@ -193,11 +193,11 @@ impl IntoRequest<generated::AccountAddress> for &AccountAddress {
     }
 }
 
-impl<PayloadType: transactions::PayloadLike> IntoRequest<generated::SendTransactionRequest>
+impl<PayloadType: transactions::PayloadLike> IntoRequest<generated::SendBlockItemRequest>
     for &transactions::BlockItem<PayloadType>
 {
-    fn into_request(self) -> tonic::Request<generated::SendTransactionRequest> {
-        tonic::Request::new(generated::SendTransactionRequest {
+    fn into_request(self) -> tonic::Request<generated::SendBlockItemRequest> {
+        tonic::Request::new(generated::SendBlockItemRequest {
             payload: crypto_common::to_bytes(&crypto_common::Versioned::new(
                 crypto_common::VERSION_0,
                 self,
@@ -369,16 +369,9 @@ impl Client {
         &mut self,
         bi: &transactions::BlockItem<PayloadType>,
     ) -> endpoints::RPCResult<TransactionHash> {
-        let response = self.client.send_transaction(bi).await?;
-        if response.into_inner().success {
-            Ok(bi.hash())
-        } else {
-            Err(endpoints::RPCError::CallError(
-                tonic::Status::invalid_argument(
-                    "Transaction was invalid and thus not accepted by the node.",
-                ),
-            ))
-        }
+        let response = self.client.send_block_item(bi).await?;
+        let response = TransactionHash::try_from(response.into_inner())?;
+        Ok(response)
     }
 
     /// Wait until the transaction is finalized. Returns
