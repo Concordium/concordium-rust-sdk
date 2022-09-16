@@ -4,7 +4,8 @@ use crate::{
         self, hashes,
         hashes::{BlockHash, TransactionHash},
         smart_contracts::{InstanceInfo, ModuleRef},
-        AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, TransactionStatus,
+        transactions, AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID,
+        TransactionStatus,
     },
 };
 use concordium_contracts_common::{AccountAddress, ContractAddress};
@@ -192,6 +193,19 @@ impl IntoRequest<generated::AccountAddress> for &AccountAddress {
     }
 }
 
+impl<PayloadType: transactions::PayloadLike> IntoRequest<generated::SendTransactionRequest>
+    for &transactions::BlockItem<PayloadType>
+{
+    fn into_request(self) -> tonic::Request<generated::SendTransactionRequest> {
+        tonic::Request::new(generated::SendTransactionRequest {
+            payload: crypto_common::to_bytes(&crypto_common::Versioned::new(
+                crypto_common::VERSION_0,
+                self,
+            )),
+        })
+    }
+}
+
 impl Client {
     pub async fn new<E: Into<tonic::transport::Endpoint>>(
         endpoint: E,
@@ -349,6 +363,64 @@ impl Client {
         let response = self.client.get_block_item_status(th).await?;
         let response = TransactionStatus::try_from(response.into_inner())?;
         Ok(response)
+    }
+
+    pub async fn send_block_item<PayloadType: transactions::PayloadLike>(
+        &mut self,
+        bi: &transactions::BlockItem<PayloadType>,
+    ) -> endpoints::RPCResult<TransactionHash> {
+        let response = self.client.send_transaction(bi).await?;
+        if response.into_inner().success {
+            Ok(bi.hash())
+        } else {
+            Err(endpoints::RPCError::CallError(
+                tonic::Status::invalid_argument(
+                    "Transaction was invalid and thus not accepted by the node.",
+                ),
+            ))
+        }
+    }
+
+    /// Wait until the transaction is finalized. Returns
+    /// [`NotFound`](QueryError::NotFound) in case the transaction is not
+    /// known to the node. In case of success, the return value is a pair of the
+    /// block hash of the block that contains the transactions, and its
+    /// outcome in the block.
+    ///
+    /// Since this can take an indefinite amount of time in general, users of
+    /// this function might wish to wrap it inside
+    /// [`timeout`](tokio::time::timeout) handler and handle the resulting
+    /// failure.
+    pub async fn wait_until_finalized(
+        &mut self,
+        hash: &types::hashes::TransactionHash,
+    ) -> endpoints::QueryResult<(types::hashes::BlockHash, types::BlockItemSummary)> {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(250));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            interval.tick().await;
+            if let types::TransactionStatus::Finalized(blocks) =
+                self.get_block_item_status(hash).await?
+            {
+                let mut iter = blocks.into_iter();
+                if let Some(rv) = iter.next() {
+                    if iter.next().is_some() {
+                        return Err(tonic::Status::internal(
+                            "Finalized transaction finalized into multiple blocks. This cannot \
+                             happen.",
+                        )
+                        .into());
+                    } else {
+                        return Ok(rv);
+                    }
+                } else {
+                    return Err(tonic::Status::internal(
+                        "Finalized transaction finalized into no blocks. This cannot happen.",
+                    )
+                    .into());
+                }
+            }
+        }
     }
 }
 
