@@ -1,9 +1,10 @@
-//! Test the `GetModuleList` endpoint.
+/// Test the `BlockItemStatus` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{endpoints, v2};
-use futures::StreamExt;
+use concordium_rust_sdk::types::hashes::TransactionHash;
 use structopt::StructOpt;
+
+use concordium_rust_sdk::v2;
 
 #[derive(StructOpt)]
 struct App {
@@ -12,7 +13,9 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: endpoints::Endpoint,
+    endpoint:    tonic::transport::Endpoint,
+    #[structopt(long = "transaction", help = "Transaction hash to query.")]
+    transaction: TransactionHash,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -26,12 +29,9 @@ async fn main() -> anyhow::Result<()> {
     let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
-    let mut al = client
-        .get_module_list(&v2::BlockIdentifier::LastFinal)
-        .await?;
-    println!("Blockhash: {}", al.block_hash);
-    while let Some(a) = al.response.next().await {
-        println!("{}", a?);
-    }
+
+    let res = client.get_block_item_status(&app.transaction).await?;
+    println!("{:#?}", res);
+
     Ok(())
 }

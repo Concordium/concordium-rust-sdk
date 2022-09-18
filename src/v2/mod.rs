@@ -1,8 +1,10 @@
 use crate::{
     endpoints,
     types::{
-        self, hashes, hashes::BlockHash, smart_contracts::ModuleRef, AbsoluteBlockHeight,
-        AccountInfo, CredentialRegistrationID,
+        self, hashes,
+        hashes::{BlockHash, TransactionHash},
+        smart_contracts::{InstanceInfo, ModuleRef},
+        AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, TransactionStatus,
     },
 };
 use concordium_contracts_common::{AccountAddress, ContractAddress};
@@ -119,6 +121,19 @@ impl From<&ModuleRef> for generated::ModuleRef {
     fn from(mr: &ModuleRef) -> Self { generated::ModuleRef { value: mr.to_vec() } }
 }
 
+impl From<&TransactionHash> for generated::TransactionHash {
+    fn from(th: &TransactionHash) -> Self { generated::TransactionHash { value: th.to_vec() } }
+}
+
+impl From<&ContractAddress> for generated::ContractAddress {
+    fn from(ca: &ContractAddress) -> Self {
+        generated::ContractAddress {
+            index:    ca.index,
+            subindex: ca.subindex,
+        }
+    }
+}
+
 impl IntoRequest<generated::AccountInfoRequest> for (&AccountIdentifier, &BlockIdentifier) {
     fn into_request(self) -> tonic::Request<generated::AccountInfoRequest> {
         let ai = generated::AccountInfoRequest {
@@ -141,11 +156,27 @@ impl IntoRequest<generated::AncestorsRequest> for (&BlockIdentifier, u64) {
 
 impl IntoRequest<generated::ModuleSourceRequest> for (&ModuleRef, &BlockIdentifier) {
     fn into_request(self) -> tonic::Request<generated::ModuleSourceRequest> {
-        let ai = generated::ModuleSourceRequest {
+        let r = generated::ModuleSourceRequest {
             block_hash: Some(self.1.into()),
             module_ref: Some(self.0.into()),
         };
-        tonic::Request::new(ai)
+        tonic::Request::new(r)
+    }
+}
+
+impl IntoRequest<generated::InstanceInfoRequest> for (&ContractAddress, &BlockIdentifier) {
+    fn into_request(self) -> tonic::Request<generated::InstanceInfoRequest> {
+        let r = generated::InstanceInfoRequest {
+            block_hash: Some(self.1.into()),
+            address:    Some(self.0.into()),
+        };
+        tonic::Request::new(r)
+    }
+}
+
+impl IntoRequest<generated::TransactionHash> for &TransactionHash {
+    fn into_request(self) -> tonic::Request<generated::TransactionHash> {
+        tonic::Request::new(self.into())
     }
 }
 
@@ -264,6 +295,20 @@ impl Client {
         })
     }
 
+    pub async fn get_instance_info(
+        &mut self,
+        address: &ContractAddress,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<InstanceInfo>> {
+        let response = self.client.get_instance_info((address, bi)).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = InstanceInfo::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
     pub async fn get_ancestors(
         &mut self,
         bi: &BlockIdentifier,
@@ -295,6 +340,15 @@ impl Client {
             Err(x) => Err(x),
         });
         Ok(stream)
+    }
+
+    pub async fn get_block_item_status(
+        &mut self,
+        th: &TransactionHash,
+    ) -> endpoints::QueryResult<TransactionStatus> {
+        let response = self.client.get_block_item_status(th).await?;
+        let response = TransactionStatus::try_from(response.into_inner())?;
+        Ok(response)
     }
 }
 

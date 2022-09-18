@@ -525,7 +525,9 @@ pub enum TransactionStatus {
     /// Transaction is finalized in the given block, with the given summary.
     /// If the finalization committee is not corrupt then this will always
     /// be a singleton map.
-    Finalized(BTreeMap<hashes::BlockHash, BlockItemSummary>),
+    Finalized(BTreeMap<hashes::BlockHash, BlockItemSummary>), /* TODO: Change to tuple instead
+                                                               * of map when deprecating use of
+                                                               * gRPC v1. */
     /// Transaction is committed to one or more blocks. The outcomes are listed
     /// for each block. Note that in the vast majority of cases the outcome of a
     /// transaction should not be dependent on the block it is in, but this
@@ -1125,7 +1127,7 @@ impl AccountTransactionEffects {
 pub enum ContractTraceElement {
     /// A contract instance was updated.
     Updated { data: InstanceUpdatedEvent },
-    /// A contract transferred am amount to the account,
+    /// A contract transferred an amount to the account.
     Transferred {
         /// Sender contract.
         from:   ContractAddress,
@@ -1197,6 +1199,8 @@ pub enum AccountTransactionEffects {
     /// [`TransferWithMemo`](transactions::Payload::TransferWithMemo)
     /// transaction.
     AccountTransferWithMemo {
+        // TODO: Consider combining this with the non-memo version when we move to gRPC v2 and have
+        // Option<Memo>.
         /// Amount that was transferred.
         amount: Amount,
         /// Receiver account.
@@ -1243,7 +1247,8 @@ pub enum AccountTransactionEffects {
     /// result of a successful [`EncryptedAmountTransferWithMemo`](
     ///   transactions::Payload::EncryptedAmountTransferWithMemo) transaction.
     EncryptedAmountTransferredWithMemo {
-        // FIXME: It would be better to only have one pointer
+        // TODO: Consider combining this with the non-memo version when we move to gRPC v2 and have
+        // Option<Memo>. FIXME: It would be better to only have one pointer
         removed: Box<EncryptedAmountRemovedEvent>,
         added:   Box<NewEncryptedAmountEvent>,
         memo:    Memo,
@@ -1279,6 +1284,8 @@ pub enum AccountTransactionEffects {
     ///
     /// [link]: transactions::Payload::TransferWithScheduleAndMemo
     TransferredWithScheduleAndMemo {
+        // TODO: Consider combining this with the non-memo version when we move to gRPC v2 and have
+        // Option<Memo>.
         /// Receiver account.
         to:     AccountAddress,
         /// The list of releases. Ordered by increasing timestamp.
@@ -1580,7 +1587,7 @@ pub enum UpdatePayload {
     #[serde(rename = "euroPerEnergy")]
     EuroPerEnergy(ExchangeRate),
     #[serde(rename = "microGTUPerEuro")]
-    MicroGTUPerEuro(ExchangeRate),
+    MicroGTUPerEuro(ExchangeRate), // TODO: Rename to CCD when switching to gRPC v2.
     #[serde(rename = "foundationAccount")]
     FoundationAccount(AccountAddress),
     #[serde(rename = "mintDistribution")]
@@ -1676,8 +1683,10 @@ impl UpdatePayload {
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+/// Parameters related to becoming a baker that apply to protocol versions 1-3.
 pub struct BakerParameters {
-    minimum_threshold_for_baking: Amount,
+    /// Minimum amount of CCD that an account must stake to become a baker.
+    pub minimum_threshold_for_baking: Amount,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -2238,7 +2247,7 @@ pub struct CooldownParameters {
 )]
 #[serde(transparent)]
 pub struct RewardPeriodLength {
-    reward_period_epochs: Epoch,
+    pub(crate) reward_period_epochs: Epoch,
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, Serialize, Copy, Clone)]
@@ -2253,7 +2262,8 @@ pub struct TimeParameters {
 
 #[derive(Debug, Serialize, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-/// Parameters related to staking pools.
+/// Parameters related to staking pools. This applies to protocol version 4 and
+/// up.
 pub struct PoolParameters {
     /// Fraction of finalization rewards charged by the passive delegation.
     pub passive_finalization_commission: AmountFraction,

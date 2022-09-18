@@ -1,8 +1,8 @@
-//! Test the `GetModuleList` endpoint.
+//! Test the `GetInstanceInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
+use concordium_contracts_common::ContractAddress;
 use concordium_rust_sdk::{endpoints, v2};
-use futures::StreamExt;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -13,6 +13,8 @@ struct App {
         default_value = "http://localhost:10001"
     )]
     endpoint: endpoints::Endpoint,
+    #[structopt(long = "address", help = "Contract address to query.")]
+    address:  ContractAddress,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -26,12 +28,11 @@ async fn main() -> anyhow::Result<()> {
     let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
-    let mut al = client
-        .get_module_list(&v2::BlockIdentifier::LastFinal)
+
+    let res = client
+        .get_instance_info(&app.address, &v2::BlockIdentifier::Best)
         .await?;
-    println!("Blockhash: {}", al.block_hash);
-    while let Some(a) = al.response.next().await {
-        println!("{}", a?);
-    }
+    println!("{:#?}", res);
+
     Ok(())
 }
