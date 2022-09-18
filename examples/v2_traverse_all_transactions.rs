@@ -58,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
 
             for trx in trxs {
                 let mut cc2 = client_v2.clone();
-                let hash = trx.hash.clone();
+                let hash = trx.hash;
                 tokio::spawn(async move {
                     match cc2.get_block_item_status(&hash).await {
                         Ok(res) => {

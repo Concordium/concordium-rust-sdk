@@ -66,6 +66,10 @@ impl From<ContractAddress> for super::ContractAddress {
     }
 }
 
+impl From<Slot> for super::types::Slot {
+    fn from(value: Slot) -> Self { super::types::Slot { slot: value.value } }
+}
+
 impl TryFrom<VersionedModuleSource> for super::types::smart_contracts::WasmModule {
     type Error = tonic::Status;
 
@@ -182,12 +186,31 @@ impl TryFrom<Sha256Hash> for super::hashes::Hash {
     }
 }
 
+impl TryFrom<StateHash> for super::hashes::StateHash {
+    type Error = tonic::Status;
+
+    fn try_from(value: StateHash) -> Result<Self, Self::Error> {
+        match value.value.try_into() {
+            Ok(hash) => Ok(Self::new(hash)),
+            Err(_) => Err(tonic::Status::internal("Unexpected state hash format.")),
+        }
+    }
+}
+
 impl From<AbsoluteBlockHeight> for super::AbsoluteBlockHeight {
     fn from(abh: AbsoluteBlockHeight) -> Self { Self { height: abh.value } }
 }
 
 impl From<BlockHeight> for super::types::BlockHeight {
     fn from(bh: BlockHeight) -> Self { Self { height: bh.value } }
+}
+
+impl From<super::AbsoluteBlockHeight> for AbsoluteBlockHeight {
+    fn from(abh: super::AbsoluteBlockHeight) -> Self { Self { value: abh.height } }
+}
+
+impl From<super::types::BlockHeight> for BlockHeight {
+    fn from(bh: super::types::BlockHeight) -> Self { Self { value: bh.height } }
 }
 
 impl From<SequenceNumber> for super::types::Nonce {
@@ -208,6 +231,10 @@ impl From<super::types::AccountIndex> for AccountIndex {
 
 impl From<BakerId> for super::types::BakerId {
     fn from(n: BakerId) -> Self { Self { id: n.value.into() } }
+}
+
+impl From<super::types::BakerId> for BakerId {
+    fn from(n: super::types::BakerId) -> Self { Self { value: n.id.into() } }
 }
 
 impl TryFrom<DelegationTarget> for super::types::DelegationTarget {
@@ -320,6 +347,14 @@ impl From<Duration> for super::types::SlotDuration {
 
 impl From<GenesisIndex> for super::types::GenesisIndex {
     fn from(value: GenesisIndex) -> Self { value.value.into() }
+}
+
+impl From<super::types::GenesisIndex> for GenesisIndex {
+    fn from(value: super::types::GenesisIndex) -> Self {
+        GenesisIndex {
+            value: value.into(),
+        }
+    }
 }
 
 impl From<ProtocolVersion> for super::types::ProtocolVersion {
@@ -502,16 +537,14 @@ impl TryFrom<ip_info::IpCdiVerifyKey> for ed25519_dalek::PublicKey {
     type Error = tonic::Status;
 
     fn try_from(value: ip_info::IpCdiVerifyKey) -> Result<Self, Self::Error> {
-        Ok(consume(&value.value)?)
+        consume(&value.value)
     }
 }
 
 impl TryFrom<ip_info::IpVerifyKey> for id::ps_sig::PublicKey<IpPairing> {
     type Error = tonic::Status;
 
-    fn try_from(value: ip_info::IpVerifyKey) -> Result<Self, Self::Error> {
-        Ok(consume(&value.value)?)
-    }
+    fn try_from(value: ip_info::IpVerifyKey) -> Result<Self, Self::Error> { consume(&value.value) }
 }
 
 impl TryFrom<UpdatePublicKey> for super::types::UpdatePublicKey {
@@ -875,9 +908,12 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
                     parts_per_hundred_thousands: super::types::PartsPerHundredThousands::new(
                         v.value.require()?.parts_per_hundred_thousand,
                     )
-                    .ok_or(tonic::Status::internal(
-                        "Invalid election difficulty. Above 100_000 parts per hundres thousands.",
-                    ))?,
+                    .ok_or_else(|| {
+                        tonic::Status::internal(
+                            "Invalid election difficulty. Above 100_000 parts per hundres \
+                             thousands.",
+                        )
+                    })?,
                 })
             }
             update_payload::Payload::EuroPerEnergyUpdate(v) => {
@@ -1090,7 +1126,7 @@ impl TryFrom<ArInfo> for id::types::ArInfo<ArCurve> {
     fn try_from(value: ArInfo) -> Result<Self, Self::Error> {
         Ok(Self {
             ar_identity:    id::types::ArIdentity::try_from(value.identity.require()?.value)
-                .map_err(|e| tonic::Status::internal(e))?,
+                .map_err(tonic::Status::internal)?,
             ar_description: value.description.require()?.into(),
             ar_public_key:  value.public_key.require()?.try_into()?,
         })
@@ -1269,34 +1305,7 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                 let effects = cui
                     .effects
                     .into_iter()
-                    .map(|e| {
-                        Ok(match e.element.require()? {
-                            contract_trace_element::Element::Updated(u) => {
-                                super::types::ContractTraceElement::Updated {
-                                    data: u.try_into()?,
-                                }
-                            }
-                            contract_trace_element::Element::Transferred(t) => {
-                                super::types::ContractTraceElement::Transferred {
-                                    from:   t.sender.require()?.into(),
-                                    amount: t.amount.require()?.into(),
-                                    to:     t.receiver.require()?.try_into()?,
-                                }
-                            }
-                            contract_trace_element::Element::Interrupted(i) => {
-                                super::types::ContractTraceElement::Interrupted {
-                                    address: i.address.require()?.into(),
-                                    events:  i.events.into_iter().map(Into::into).collect(),
-                                }
-                            }
-                            contract_trace_element::Element::Resumed(r) => {
-                                super::types::ContractTraceElement::Resumed {
-                                    address: r.address.require()?.into(),
-                                    success: r.success,
-                                }
-                            }
-                        })
-                    })
+                    .map(TryFrom::try_from)
                     .collect::<Result<_, tonic::Status>>()?;
                 Ok(Self::ContractUpdateIssued { effects })
             }
@@ -1421,6 +1430,39 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
     }
 }
 
+impl TryFrom<ContractTraceElement> for super::types::ContractTraceElement {
+    type Error = tonic::Status;
+
+    fn try_from(e: ContractTraceElement) -> Result<Self, Self::Error> {
+        Ok(match e.element.require()? {
+            contract_trace_element::Element::Updated(u) => {
+                super::types::ContractTraceElement::Updated {
+                    data: u.try_into()?,
+                }
+            }
+            contract_trace_element::Element::Transferred(t) => {
+                super::types::ContractTraceElement::Transferred {
+                    from:   t.sender.require()?.into(),
+                    amount: t.amount.require()?.into(),
+                    to:     t.receiver.require()?.try_into()?,
+                }
+            }
+            contract_trace_element::Element::Interrupted(i) => {
+                super::types::ContractTraceElement::Interrupted {
+                    address: i.address.require()?.into(),
+                    events:  i.events.into_iter().map(Into::into).collect(),
+                }
+            }
+            contract_trace_element::Element::Resumed(r) => {
+                super::types::ContractTraceElement::Resumed {
+                    address: r.address.require()?.into(),
+                    success: r.success,
+                }
+            }
+        })
+    }
+}
+
 impl TryFrom<DelegationEvent> for super::types::DelegationEvent {
     type Error = tonic::Status;
 
@@ -1542,10 +1584,10 @@ impl TryFrom<RegisteredData> for super::types::RegisteredData {
     type Error = tonic::Status;
 
     fn try_from(value: RegisteredData) -> Result<Self, Self::Error> {
-        Ok(value
+        value
             .value
             .try_into()
-            .map_err(|e| tonic::Status::invalid_argument(format!("{}", e)))?)
+            .map_err(|e| tonic::Status::invalid_argument(format!("{}", e)))
     }
 }
 
@@ -1901,5 +1943,227 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
                 .try_into()?,
             current_era_genesis_time:       value.current_era_genesis_time.require()?.into(),
         })
+    }
+}
+
+impl TryFrom<InvokeInstanceResponse> for super::types::smart_contracts::InvokeContractResult {
+    type Error = tonic::Status;
+
+    fn try_from(response: InvokeInstanceResponse) -> Result<Self, Self::Error> {
+        use super::types::smart_contracts::{InvokeContractResult, ReturnValue};
+        let result = match response.result.require()? {
+            invoke_instance_response::Result::Failure(value) => InvokeContractResult::Failure {
+                return_value: value.return_value.map(|b| ReturnValue { value: b }),
+                reason:       value.reason.require()?.try_into()?,
+                used_energy:  value.used_energy.require()?.into(),
+            },
+            invoke_instance_response::Result::Success(value) => InvokeContractResult::Success {
+                return_value: value.return_value.map(|b| ReturnValue { value: b }),
+                events:       value
+                    .effects
+                    .into_iter()
+                    .map(TryFrom::try_from)
+                    .collect::<Result<_, tonic::Status>>()?,
+                used_energy:  value.used_energy.require()?.into(),
+            },
+        };
+        Ok(result)
+    }
+}
+
+impl TryFrom<CryptographicParameters> for super::types::CryptographicParameters {
+    type Error = tonic::Status;
+
+    fn try_from(value: CryptographicParameters) -> Result<Self, Self::Error> {
+        Ok(Self {
+            genesis_string:          value.genesis_string,
+            on_chain_commitment_key: crypto_common::from_bytes(&mut std::io::Cursor::new(
+                &value.on_chain_commitment_key,
+            ))
+            .map_err(|_| tonic::Status::internal("Invalid on_chain_commitment_key received"))?,
+
+            bulletproof_generators: crypto_common::from_bytes(&mut std::io::Cursor::new(
+                &value.bulletproof_generators,
+            ))
+            .map_err(|_| tonic::Status::internal("Invalid bulletproof_generators received"))?,
+        })
+    }
+}
+
+impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
+    type Error = tonic::Status;
+
+    fn try_from(value: BlockInfo) -> Result<Self, Self::Error> {
+        Ok(Self {
+            transactions_size:       value.transactions_size.into(),
+            block_parent:            value.parent_block.require()?.try_into()?,
+            block_hash:              value.hash.require()?.try_into()?,
+            finalized:               value.finalized,
+            block_state_hash:        value.state_hash.require()?.try_into()?,
+            block_arrive_time:       value.arrive_time.require()?.into(),
+            block_receive_time:      value.receive_time.require()?.into(),
+            transaction_count:       value.transaction_count.into(),
+            transaction_energy_cost: value.transactions_energy_cost.require()?.into(),
+            block_slot:              value.slot_number.require()?.into(),
+            block_last_finalized:    value.last_finalized_block.require()?.try_into()?,
+            block_slot_time:         value.slot_time.require()?.into(),
+            block_height:            value.height.require()?.into(),
+            era_block_height:        value.era_block_height.require()?.into(),
+            genesis_index:           value.genesis_index.require()?.into(),
+            block_baker:             value.baker.map(|b| b.into()),
+        })
+    }
+}
+
+impl TryFrom<PoolInfoResponse> for super::types::BakerPoolStatus {
+    type Error = tonic::Status;
+
+    fn try_from(value: PoolInfoResponse) -> Result<Self, Self::Error> {
+        Ok(Self {
+            baker_id:                   value.baker.require()?.into(),
+            baker_address:              value.address.require()?.try_into()?,
+            baker_equity_capital:       value.equity_capital.require()?.into(),
+            delegated_capital:          value.delegated_capital.require()?.into(),
+            delegated_capital_cap:      value.delegated_capital_cap.require()?.into(),
+            pool_info:                  value.pool_info.require()?.try_into()?,
+            baker_stake_pending_change: value.equity_pending_change.try_into()?,
+            current_payday_status:      if let Some(v) = value.current_payday_info {
+                Some(v.try_into()?)
+            } else {
+                None
+            },
+            all_pool_total_capital:     value.all_pool_total_capital.require()?.into(),
+        })
+    }
+}
+
+impl TryFrom<Option<PoolPendingChange>> for super::types::PoolPendingChange {
+    type Error = tonic::Status;
+
+    fn try_from(value: Option<PoolPendingChange>) -> Result<Self, Self::Error> {
+        if let Some(value) = value {
+            match value.change.require()? {
+                pool_pending_change::Change::Reduce(rs) => Ok(Self::ReduceBakerCapital {
+                    baker_equity_capital: rs.reduced_equity_capital.require()?.into(),
+                    effective_time:       rs.effective_time.require()?.into(),
+                }),
+                pool_pending_change::Change::Remove(rs) => Ok(Self::RemovePool {
+                    effective_time: rs.effective_time.require()?.into(),
+                }),
+            }
+        } else {
+            Ok(Self::NoChange)
+        }
+    }
+}
+
+impl TryFrom<PoolCurrentPaydayInfo> for super::types::CurrentPaydayBakerPoolStatus {
+    type Error = tonic::Status;
+
+    fn try_from(value: PoolCurrentPaydayInfo) -> Result<Self, Self::Error> {
+        Ok(Self {
+            blocks_baked:            value.blocks_baked,
+            finalization_live:       value.finalization_live,
+            transaction_fees_earned: value.transaction_fees_earned.require()?.into(),
+            effective_stake:         value.effective_stake.require()?.into(),
+            lottery_power:           value.lottery_power,
+            baker_equity_capital:    value.baker_equity_capital.require()?.into(),
+            delegated_capital:       value.delegated_capital.require()?.into(),
+        })
+    }
+}
+
+impl TryFrom<PassiveDelegationInfo> for super::types::PassiveDelegationStatus {
+    type Error = tonic::Status;
+
+    fn try_from(value: PassiveDelegationInfo) -> Result<Self, Self::Error> {
+        Ok(Self {
+            delegated_capital: value.delegated_capital.require()?.into(),
+            commission_rates: value.commission_rates.require()?.try_into()?,
+            current_payday_transaction_fees_earned: value
+                .current_payday_transaction_fees_earned
+                .require()?
+                .into(),
+            current_payday_delegated_capital: value
+                .current_payday_delegated_capital
+                .require()?
+                .into(),
+            all_pool_total_capital: value.all_pool_total_capital.require()?.into(),
+        })
+    }
+}
+
+impl From<&super::endpoints::BlocksAtHeightInput> for BlocksAtHeightRequest {
+    fn from(&input: &super::endpoints::BlocksAtHeightInput) -> Self {
+        let blocks_at_height = match input {
+            super::endpoints::BlocksAtHeightInput::Absolute { height } => {
+                blocks_at_height_request::BlocksAtHeight::Absolute(
+                    blocks_at_height_request::Absolute {
+                        height: Some(height.into()),
+                    },
+                )
+            }
+
+            super::endpoints::BlocksAtHeightInput::Relative {
+                height,
+                genesis_index,
+                restrict,
+            } => blocks_at_height_request::BlocksAtHeight::Relative(
+                blocks_at_height_request::Relative {
+                    height: Some(height.into()),
+                    genesis_index: Some(genesis_index.into()),
+                    restrict,
+                },
+            ),
+        };
+        BlocksAtHeightRequest {
+            blocks_at_height: Some(blocks_at_height),
+        }
+    }
+}
+
+impl TryFrom<TokenomicsInfo> for super::types::RewardsOverview {
+    type Error = tonic::Status;
+
+    fn try_from(value: TokenomicsInfo) -> Result<Self, Self::Error> {
+        match value.tokenomics.require()? {
+            tokenomics_info::Tokenomics::V0(value) => Ok(Self::V0 {
+                data: super::types::CommonRewardData {
+                    protocol_version:            ProtocolVersion::from_i32(value.protocol_version)
+                        .require()?
+                        .into(),
+                    total_amount:                value.total_amount.require()?.into(),
+                    total_encrypted_amount:      value.total_encrypted_amount.require()?.into(),
+                    baking_reward_account:       value.baking_reward_account.require()?.into(),
+                    finalization_reward_account: value
+                        .finalization_reward_account
+                        .require()?
+                        .into(),
+                    gas_account:                 value.gas_account.require()?.into(),
+                },
+            }),
+            tokenomics_info::Tokenomics::V1(value) => Ok(Self::V1 {
+                common: super::types::CommonRewardData {
+                    protocol_version:            ProtocolVersion::from_i32(value.protocol_version)
+                        .require()?
+                        .into(),
+                    total_amount:                value.total_amount.require()?.into(),
+                    total_encrypted_amount:      value.total_encrypted_amount.require()?.into(),
+                    baking_reward_account:       value.baking_reward_account.require()?.into(),
+                    finalization_reward_account: value
+                        .finalization_reward_account
+                        .require()?
+                        .into(),
+                    gas_account:                 value.gas_account.require()?.into(),
+                },
+                foundation_transaction_rewards: value
+                    .foundation_transaction_rewards
+                    .require()?
+                    .into(),
+                next_payday_time: value.next_payday_time.require()?.into(),
+                next_payday_mint_rate: value.next_payday_mint_rate.require()?.try_into()?,
+                total_staked_capital: value.total_staked_capital.require()?.into(),
+            }),
+        }
     }
 }

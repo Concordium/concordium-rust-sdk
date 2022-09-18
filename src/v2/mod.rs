@@ -3,11 +3,11 @@ use crate::{
     types::{
         self, hashes,
         hashes::{BlockHash, TransactionHash},
-        smart_contracts::{InstanceInfo, ModuleRef},
+        smart_contracts::{ContractContext, InstanceInfo, InvokeContractResult, ModuleRef},
         AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, TransactionStatus,
     },
 };
-use concordium_contracts_common::{AccountAddress, ContractAddress};
+use concordium_contracts_common::{AccountAddress, Amount, ContractAddress, ReceiveName};
 use futures::{Stream, StreamExt};
 use tonic::IntoRequest;
 
@@ -93,6 +93,20 @@ impl From<&AccountAddress> for generated::AccountAddress {
     }
 }
 
+impl From<&super::types::Address> for generated::Address {
+    fn from(addr: &super::types::Address) -> Self {
+        let ty = match addr {
+            super::types::Address::Account(account) => {
+                generated::address::Type::Account(account.into())
+            }
+            super::types::Address::Contract(contract) => {
+                generated::address::Type::Contract(contract.into())
+            }
+        };
+        generated::Address { r#type: Some(ty) }
+    }
+}
+
 impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
     fn from(ai: &AccountIdentifier) -> Self {
         let account_identifier_input = match ai {
@@ -119,6 +133,30 @@ impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
 
 impl From<&ModuleRef> for generated::ModuleRef {
     fn from(mr: &ModuleRef) -> Self { generated::ModuleRef { value: mr.to_vec() } }
+}
+
+impl From<Amount> for generated::Amount {
+    fn from(a: Amount) -> Self {
+        generated::Amount {
+            value: a.micro_ccd(),
+        }
+    }
+}
+
+impl<'a> From<ReceiveName<'a>> for generated::ReceiveName {
+    fn from(a: ReceiveName<'a>) -> Self {
+        generated::ReceiveName {
+            value: a.get_chain_name().to_string(),
+        }
+    }
+}
+
+impl From<&[u8]> for generated::Parameter {
+    fn from(a: &[u8]) -> Self { generated::Parameter { value: a.to_vec() } }
+}
+
+impl From<types::Energy> for generated::Energy {
+    fn from(a: types::Energy) -> Self { generated::Energy { value: a.into() } }
 }
 
 impl From<&TransactionHash> for generated::TransactionHash {
@@ -192,6 +230,37 @@ impl IntoRequest<generated::AccountAddress> for &AccountAddress {
     }
 }
 
+impl IntoRequest<generated::InvokeInstanceRequest> for (&BlockIdentifier, &ContractContext) {
+    fn into_request(self) -> tonic::Request<generated::InvokeInstanceRequest> {
+        let (block, context) = self;
+        tonic::Request::new(generated::InvokeInstanceRequest {
+            block_hash: Some(block.into()),
+            invoker:    context.invoker.as_ref().map(|a| a.into()),
+            instance:   Some((&context.contract).into()),
+            amount:     Some(context.amount.into()),
+            entrypoint: Some(context.method.as_receive_name().into()),
+            parameter:  Some(context.parameter.as_ref().as_slice().into()),
+            energy:     Some(context.energy.into()),
+        })
+    }
+}
+
+impl IntoRequest<generated::PoolInfoRequest> for (&BlockIdentifier, types::BakerId) {
+    fn into_request(self) -> tonic::Request<generated::PoolInfoRequest> {
+        let req = generated::PoolInfoRequest {
+            block_hash: Some(self.0.into()),
+            baker:      Some(self.1.into()),
+        };
+        tonic::Request::new(req)
+    }
+}
+
+impl IntoRequest<generated::BlocksAtHeightRequest> for &endpoints::BlocksAtHeightInput {
+    fn into_request(self) -> tonic::Request<generated::BlocksAtHeightRequest> {
+        tonic::Request::new(self.into())
+    }
+}
+
 impl Client {
     pub async fn new<E: Into<tonic::transport::Endpoint>>(
         endpoint: E,
@@ -235,6 +304,19 @@ impl Client {
             .await?;
         let response = types::queries::ConsensusInfo::try_from(response.into_inner())?;
         Ok(response)
+    }
+
+    pub async fn get_cryptographic_parameters(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::CryptographicParameters>> {
+        let response = self.client.get_cryptographic_parameters(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::CryptographicParameters::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
     }
 
     pub async fn get_account_list(
@@ -349,6 +431,105 @@ impl Client {
         let response = self.client.get_block_item_status(th).await?;
         let response = TransactionStatus::try_from(response.into_inner())?;
         Ok(response)
+    }
+
+    pub async fn invoke_instance(
+        &mut self,
+        bi: &BlockIdentifier,
+        context: &ContractContext,
+    ) -> endpoints::QueryResult<QueryResponse<InvokeContractResult>> {
+        let response = self.client.invoke_instance((bi, context)).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = InvokeContractResult::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_block_info(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::queries::BlockInfo>> {
+        let response = self.client.get_block_info(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::queries::BlockInfo::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_baker_list(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::BakerId, tonic::Status>>>,
+    > {
+        let response = self.client.get_baker_list(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|x| x.map(From::from));
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_pool_info(
+        &mut self,
+        block_id: &BlockIdentifier,
+        baker_id: types::BakerId,
+    ) -> endpoints::QueryResult<QueryResponse<types::BakerPoolStatus>> {
+        let response = self.client.get_pool_info((block_id, baker_id)).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::BakerPoolStatus::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_passive_delegation_info(
+        &mut self,
+        block_id: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::PassiveDelegationStatus>> {
+        let response = self.client.get_passive_delegation_info(block_id).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::PassiveDelegationStatus::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_blocks_at_height(
+        &mut self,
+        blocks_at_height_input: &endpoints::BlocksAtHeightInput,
+    ) -> endpoints::QueryResult<Vec<BlockHash>> {
+        let response = self
+            .client
+            .get_blocks_at_height(blocks_at_height_input)
+            .await?;
+        let blocks = response
+            .into_inner()
+            .blocks
+            .into_iter()
+            .map(TryFrom::try_from)
+            .collect::<Result<_, tonic::Status>>()?;
+        Ok(blocks)
+    }
+
+    pub async fn get_tokenomics_info(
+        &mut self,
+        block_id: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::RewardsOverview>> {
+        let response = self.client.get_tokenomics_info(block_id).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::RewardsOverview::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
     }
 }
 

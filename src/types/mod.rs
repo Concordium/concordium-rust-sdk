@@ -30,6 +30,10 @@ use std::{
 };
 use thiserror::Error;
 
+/// Cryptographic context for the chain. These parameters are used to support
+/// zero-knowledge proofs.
+pub type CryptographicParameters = id::types::GlobalContext<id::constants::ArCurve>;
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 /// The state of the encrypted balance of an account.
@@ -391,46 +395,67 @@ mod lottery_power_parser {
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+/// The state of the baker currently registered on the account.
+/// Current here means "present". This is the information that is being updated
+/// by transactions (and rewards). This is in contrast to "epoch baker" which is
+/// the state of the baker that is currently eligible for baking.
+pub struct BakerPoolStatus {
+    /// The 'BakerId' of the pool owner.
+    pub baker_id:                   BakerId,
+    /// The account address of the pool owner.
+    pub baker_address:              AccountAddress,
+    /// The equity capital provided by the pool owner.
+    pub baker_equity_capital:       Amount,
+    /// The capital delegated to the pool by other accounts.
+    pub delegated_capital:          Amount,
+    /// The maximum amount that may be delegated to the pool, accounting for
+    /// leverage and stake limits.
+    pub delegated_capital_cap:      Amount,
+    /// The pool info associated with the pool: open status, metadata URL
+    /// and commission rates.
+    pub pool_info:                  BakerPoolInfo,
+    /// Any pending change to the baker's stake.
+    pub baker_stake_pending_change: PoolPendingChange,
+    /// Status of the pool in the current reward period. This will be [`None`]
+    /// if the pool is not a
+    pub current_payday_status:      Option<CurrentPaydayBakerPoolStatus>,
+    /// Total capital staked across all pools.
+    pub all_pool_total_capital:     Amount,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+/// State of the passive delegation pool at present. Changes to delegation,
+/// e.g., an account deciding to delegate are reflected in this structure at
+/// first.
+pub struct PassiveDelegationStatus {
+    /// The total capital delegated passively.
+    pub delegated_capital: Amount,
+    /// The passive delegation commission rates.
+    pub commission_rates: CommissionRates,
+    /// The transaction fees accruing to the passive delegators in the
+    /// current reward period.
+    pub current_payday_transaction_fees_earned: Amount,
+    /// The effective delegated capital to the passive delegators for the
+    /// current reward period.
+    pub current_payday_delegated_capital: Amount,
+    /// Total capital staked across all pools, including passive delegation.
+    pub all_pool_total_capital: Amount,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(tag = "poolType")]
 pub enum PoolStatus {
     #[serde(rename_all = "camelCase")]
     BakerPool {
-        /// The 'BakerId' of the pool owner.
-        baker_id:                   BakerId,
-        /// The account address of the pool owner.
-        baker_address:              AccountAddress,
-        /// The equity capital provided by the pool owner.
-        baker_equity_capital:       Amount,
-        /// The capital delegated to the pool by other accounts.
-        delegated_capital:          Amount,
-        /// The maximum amount that may be delegated to the pool, accounting for
-        /// leverage and stake limits.
-        delegated_capital_cap:      Amount,
-        /// The pool info associated with the pool: open status, metadata URL
-        /// and commission rates.
-        pool_info:                  BakerPoolInfo,
-        /// Any pending change to the baker's stake.
-        baker_stake_pending_change: PoolPendingChange,
-        /// Status of the pool in the current reward period. This will be [None]
-        /// if the pool is not a
-        current_payday_status:      Option<CurrentPaydayBakerPoolStatus>,
-        /// Total capital staked across all pools.
-        all_pool_total_capital:     Amount,
+        #[serde(flatten)]
+        status: BakerPoolStatus,
     },
     #[serde(rename_all = "camelCase")]
     PassiveDelegation {
-        /// The total capital delegated passively.
-        delegated_capital: Amount,
-        /// The passive delegation commission rates.
-        commission_rates: CommissionRates,
-        /// The transaction fees accruing to the passive delegators in the
-        /// current reward period.
-        current_payday_transaction_fees_earned: Amount,
-        /// The effective delegated capital to the passive delegators for the
-        /// current reward period.
-        current_payday_delegated_capital: Amount,
-        /// Total capital staked across all pools, including passive delegation.
-        all_pool_total_capital: Amount,
+        #[serde(flatten)]
+        status: PassiveDelegationStatus,
     },
 }
 
