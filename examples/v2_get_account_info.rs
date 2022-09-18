@@ -1,4 +1,4 @@
-/// Test the `GetAccountInfo` endpoint.
+//! Test the `GetAccountInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::id::types::AccountAddress;
