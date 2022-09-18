@@ -1,3 +1,6 @@
+//! Traverse all transactions on the chain from a given block backwards.
+//! This is mainly used to test integration and compatibility of the SDK with
+//! the node.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{endpoints, types, v2};
@@ -42,7 +45,6 @@ async fn main() -> anyhow::Result<()> {
 
     let gb = consensus_info.genesis_block;
     let mut cb = app.start_block.unwrap_or(consensus_info.best_block);
-    // let mut rng = thread_rng();
     while cb != gb {
         println!("{}", cb);
         let bi = client_v1.get_block_info(&cb).await?;
@@ -58,11 +60,14 @@ async fn main() -> anyhow::Result<()> {
                 let mut cc2 = client_v2.clone();
                 let hash = trx.hash.clone();
                 tokio::spawn(async move {
-                    let res = cc2
-                        .get_block_item_status(&hash)
-                        .await
-                        .expect(&format!("Failed to process transaction: {}", hash));
-                    println!("{:#?}", res);
+                    match cc2.get_block_item_status(&hash).await {
+                        Ok(res) => {
+                            println!("{:#?}", res);
+                        }
+                        Err(e) => {
+                            panic!("Failed to process transaction: {}: {}", hash, e);
+                        }
+                    }
                 });
             }
         }

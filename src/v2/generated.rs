@@ -1002,10 +1002,7 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
                         .passive_finalization_commission
                         .require()?
                         .into(),
-                    passive_baking_commission:       v
-                        .passive_baking_commission
-                        .require()?
-                        .into(),
+                    passive_baking_commission:       v.passive_baking_commission.require()?.into(),
                     passive_transaction_commission:  v
                         .passive_transaction_commission
                         .require()?
@@ -1015,10 +1012,7 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
                         baking:       commission_bounds.baking.require()?.try_into()?,
                         transaction:  commission_bounds.transaction.require()?.try_into()?,
                     },
-                    minimum_equity_capital:          v
-                        .minimum_equity_capital
-                        .require()?
-                        .into(),
+                    minimum_equity_capital:          v.minimum_equity_capital.require()?.into(),
                     capital_bound:                   v.capital_bound.require()?.try_into()?,
                     leverage_bound:                  super::types::LeverageFactor {
                         numerator:   leverage_bound.numerator,
@@ -1030,12 +1024,7 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
                 Self::TimeParametersCPV1(super::types::TimeParameters {
                     reward_period_length: super::types::RewardPeriodLength {
                         reward_period_epochs: super::types::Epoch {
-                            epoch: v
-                                .reward_period_length
-                                .require()?
-                                .value
-                                .require()?
-                                .value,
+                            epoch: v.reward_period_length.require()?.value.require()?.value,
                         },
                     },
                     mint_per_payday:      v.mint_per_payday.require()?.try_into()?,
@@ -1130,26 +1119,11 @@ impl TryFrom<AuthorizationsV0> for super::types::AuthorizationsV0 {
                 .collect::<Result<_, tonic::Status>>()?,
             emergency: value.emergency.require()?.try_into()?,
             protocol: value.protocol.require()?.try_into()?,
-            election_difficulty: value
-                .parameter_election_difficulty
-                .require()?
-                .try_into()?,
-            euro_per_energy: value
-                .parameter_euro_per_energy
-                .require()?
-                .try_into()?,
-            micro_gtu_per_euro: value
-                .parameter_micro_ccd_per_euro
-                .require()?
-                .try_into()?,
-            foundation_account: value
-                .parameter_foundation_account
-                .require()?
-                .try_into()?,
-            mint_distribution: value
-                .parameter_mint_distribution
-                .require()?
-                .try_into()?,
+            election_difficulty: value.parameter_election_difficulty.require()?.try_into()?,
+            euro_per_energy: value.parameter_euro_per_energy.require()?.try_into()?,
+            micro_gtu_per_euro: value.parameter_micro_ccd_per_euro.require()?.try_into()?,
+            foundation_account: value.parameter_foundation_account.require()?.try_into()?,
+            mint_distribution: value.parameter_mint_distribution.require()?.try_into()?,
             transaction_fee_distribution: value
                 .parameter_transaction_fee_distribution
                 .require()?
@@ -1542,10 +1516,7 @@ impl TryFrom<BakerEvent> for super::types::BakerEvent {
             baker_event::Event::BakerSetTransactionFeeCommission(v) => {
                 Self::BakerSetTransactionFeeCommission {
                     baker_id:                   v.baker_id.require()?.into(),
-                    transaction_fee_commission: v
-                        .transaction_fee_commission
-                        .require()?
-                        .into(),
+                    transaction_fee_commission: v.transaction_fee_commission.require()?.into(),
                 }
             }
             baker_event::Event::BakerSetBakingRewardCommission(v) => {
@@ -1708,10 +1679,7 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
             }
             reject_reason::Reason::RuntimeFailure(_) => Self::RuntimeFailure,
             reject_reason::Reason::AmountTooLarge(v) => Self::AmountTooLarge {
-                contents: (
-                    v.address.require()?.try_into()?,
-                    v.amount.require()?.into(),
-                ),
+                contents: (v.address.require()?.try_into()?, v.amount.require()?.into()),
             },
             reject_reason::Reason::SerializationFailure(_) => Self::SerializationFailure,
             reject_reason::Reason::OutOfEnergy(_) => Self::OutOfEnergy,

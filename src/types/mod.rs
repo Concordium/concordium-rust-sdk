@@ -1683,8 +1683,10 @@ impl UpdatePayload {
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+/// Parameters related to becoming a baker that apply to protocol versions 1-3.
 pub struct BakerParameters {
-    pub(crate) minimum_threshold_for_baking: Amount,
+    /// Minimum amount of CCD that an account must stake to become a baker.
+    pub minimum_threshold_for_baking: Amount,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -2260,7 +2262,8 @@ pub struct TimeParameters {
 
 #[derive(Debug, Serialize, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-/// Parameters related to staking pools.
+/// Parameters related to staking pools. This applies to protocol version 4 and
+/// up.
 pub struct PoolParameters {
     /// Fraction of finalization rewards charged by the passive delegation.
     pub passive_finalization_commission: AmountFraction,

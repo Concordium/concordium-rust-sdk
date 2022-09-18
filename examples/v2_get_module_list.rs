@@ -1,7 +1,7 @@
 //! Test the `GetModuleList` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{endpoints,v2};
+use concordium_rust_sdk::{endpoints, v2};
 use futures::StreamExt;
 use structopt::StructOpt;
 
