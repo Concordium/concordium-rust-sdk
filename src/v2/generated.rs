@@ -1,5 +1,8 @@
+#![allow(clippy::large_enum_variant, clippy::enum_variant_names)]
 tonic::include_proto!("concordium.v2");
 
+use super::Require;
+use crate::types;
 use crypto_common::{Deserial, Versioned, VERSION_0};
 use id::{
     constants::{ArCurve, AttributeKind},
@@ -8,8 +11,6 @@ use id::{
         InitialCredentialDeploymentValues,
     },
 };
-
-use super::Require;
 
 fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
     let mut cursor = std::io::Cursor::new(bytes);

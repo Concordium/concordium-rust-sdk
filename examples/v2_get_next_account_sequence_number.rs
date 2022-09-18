@@ -1,8 +1,7 @@
-/// Test the `GetNextAccountSequenceNumber` endpoint.
+//! Test the `GetNextAccountSequenceNumber` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::v2;
-use futures::StreamExt;
+use concordium_rust_sdk::{endpoints, id::types::AccountAddress, v2};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -12,7 +11,9 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: endpoints::Endpoint,
+    #[structopt(long = "account", help = "Address of the account to query.")]
+    account:  AccountAddress,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -27,15 +28,13 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect.")?;
 
-    let mut accounts = client.get_account_list(&v2::BlockIdentifier::Best).await?;
-    while let Some(account) = accounts.response.next().await {
-        let account = account?;
-        let next_nonce = client.get_next_account_sequence_number(&account).await?;
-        println!(
-            "{}: nonce {}, all_final {:?}",
-            account, next_nonce.nonce, next_nonce.all_final
-        );
-    }
+    let next_nonce = client
+        .get_next_account_sequence_number(&app.account)
+        .await?;
+    println!(
+        "nonce {}, all_final {:?}",
+        next_nonce.nonce, next_nonce.all_final
+    );
 
     Ok(())
 }
