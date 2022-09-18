@@ -21,7 +21,7 @@ pub const MAX_MEMO_SIZE: usize = 256;
 pub const MAX_PARAMETER_LEN: usize = 1024;
 
 /// Maximum allowed size of the Wasm module to deploy on the chain.
-pub const MAX_WASM_MODULE_SIZE: u32 = 65536;
+pub const MAX_WASM_MODULE_SIZE: u32 = 8 * 65536;
 
 /// Identifier of the default network over which messages are transmitted.
 /// This is also the only currently supported network.
