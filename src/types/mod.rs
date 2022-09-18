@@ -30,6 +30,10 @@ use std::{
 };
 use thiserror::Error;
 
+/// Cryptographic context for the chain. These parameters are used to support
+/// zero-knowledge proofs.
+pub type CryptographicParameters = id::types::GlobalContext<id::constants::ArCurve>;
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 /// The state of the encrypted balance of an account.
@@ -392,6 +396,10 @@ mod lottery_power_parser {
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+/// The state of the baker currently registered on the account.
+/// Current here means "present". This is the information that is being updated
+/// by transactions (and rewards). This is in contrast to "epoch baker" which is
+/// the state of the baker that is currently eligible for baking.
 pub struct BakerPoolStatus {
     /// The 'BakerId' of the pool owner.
     pub baker_id:                   BakerId,
@@ -409,7 +417,7 @@ pub struct BakerPoolStatus {
     pub pool_info:                  BakerPoolInfo,
     /// Any pending change to the baker's stake.
     pub baker_stake_pending_change: PoolPendingChange,
-    /// Status of the pool in the current reward period. This will be [None]
+    /// Status of the pool in the current reward period. This will be [`None`]
     /// if the pool is not a
     pub current_payday_status:      Option<CurrentPaydayBakerPoolStatus>,
     /// Total capital staked across all pools.
@@ -418,6 +426,9 @@ pub struct BakerPoolStatus {
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+/// State of the passive delegation pool at present. Changes to delegation,
+/// e.g., an account deciding to delegate are reflected in this structure at
+/// first.
 pub struct PassiveDelegationStatus {
     /// The total capital delegated passively.
     pub delegated_capital: Amount,

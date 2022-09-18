@@ -1,4 +1,4 @@
-/// Test the `GetPoolInfo` endpoint.
+//! Test the `GetPoolInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::v2;

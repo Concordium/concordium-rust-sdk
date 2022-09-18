@@ -1,8 +1,7 @@
-/// Test the `GetInstanceList` endpoint.
+//! Test the `GetBlocksAtHeight` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{endpoints::BlocksAtHeightInput, v2};
-use futures::StreamExt;
+use concordium_rust_sdk::{endpoints, endpoints::BlocksAtHeightInput, v2};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -12,7 +11,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: endpoints::Endpoint,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -29,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
 
     let info = client.get_consensus_info().await?;
 
-    let mut response = client
+    let response = client
         .get_blocks_at_height(&BlocksAtHeightInput::Absolute {
             height: info.best_block_height,
         })
@@ -38,8 +37,8 @@ async fn main() -> anyhow::Result<()> {
         "Blocks at best block {} ({}):",
         info.best_block, info.best_block_height
     );
-    while let Some(a) = response.next().await {
-        println!("{}", a?);
+    for block in response {
+        println!("{}", block);
     }
 
     Ok(())

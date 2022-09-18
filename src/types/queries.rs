@@ -52,8 +52,6 @@ pub struct BlockInfo {
     pub block_baker:             Option<BakerId>,
 }
 
-pub type CryptographicParameters = id::types::GlobalContext<id::constants::ArCurve>;
-
 #[derive(Debug, SerdeSerialize, SerdeDeserialize)]
 #[serde(rename_all = "camelCase")]
 /// Summary of the current state of consensus.

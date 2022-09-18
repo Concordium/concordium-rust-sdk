@@ -1,4 +1,4 @@
-/// Test the `GetPassiveDelegationInfo` endpoint.
+//! Test the `GetPassiveDelegationInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
 use structopt::StructOpt;

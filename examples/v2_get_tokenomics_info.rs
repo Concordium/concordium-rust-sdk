@@ -1,4 +1,4 @@
-/// Test the `GetTokenomicsInfo` endpoint.
+//! Test the `GetTokenomicsInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
 use structopt::StructOpt;

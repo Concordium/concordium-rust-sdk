@@ -1,4 +1,4 @@
-/// Test the `InvokeInstance` endpoint.
+//! Test the `InvokeInstance` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_contracts_common::{Amount, ContractAddress, OwnedReceiveName};

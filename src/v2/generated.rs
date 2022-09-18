@@ -537,16 +537,14 @@ impl TryFrom<ip_info::IpCdiVerifyKey> for ed25519_dalek::PublicKey {
     type Error = tonic::Status;
 
     fn try_from(value: ip_info::IpCdiVerifyKey) -> Result<Self, Self::Error> {
-        Ok(consume(&value.value)?)
+        consume(&value.value)
     }
 }
 
 impl TryFrom<ip_info::IpVerifyKey> for id::ps_sig::PublicKey<IpPairing> {
     type Error = tonic::Status;
 
-    fn try_from(value: ip_info::IpVerifyKey) -> Result<Self, Self::Error> {
-        Ok(consume(&value.value)?)
-    }
+    fn try_from(value: ip_info::IpVerifyKey) -> Result<Self, Self::Error> { consume(&value.value) }
 }
 
 impl TryFrom<UpdatePublicKey> for super::types::UpdatePublicKey {
@@ -910,9 +908,12 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
                     parts_per_hundred_thousands: super::types::PartsPerHundredThousands::new(
                         v.value.require()?.parts_per_hundred_thousand,
                     )
-                    .ok_or(tonic::Status::internal(
-                        "Invalid election difficulty. Above 100_000 parts per hundres thousands.",
-                    ))?,
+                    .ok_or_else(|| {
+                        tonic::Status::internal(
+                            "Invalid election difficulty. Above 100_000 parts per hundres \
+                             thousands.",
+                        )
+                    })?,
                 })
             }
             update_payload::Payload::EuroPerEnergyUpdate(v) => {
@@ -1125,7 +1126,7 @@ impl TryFrom<ArInfo> for id::types::ArInfo<ArCurve> {
     fn try_from(value: ArInfo) -> Result<Self, Self::Error> {
         Ok(Self {
             ar_identity:    id::types::ArIdentity::try_from(value.identity.require()?.value)
-                .map_err(|e| tonic::Status::internal(e))?,
+                .map_err(tonic::Status::internal)?,
             ar_description: value.description.require()?.into(),
             ar_public_key:  value.public_key.require()?.try_into()?,
         })
@@ -1583,10 +1584,10 @@ impl TryFrom<RegisteredData> for super::types::RegisteredData {
     type Error = tonic::Status;
 
     fn try_from(value: RegisteredData) -> Result<Self, Self::Error> {
-        Ok(value
+        value
             .value
             .try_into()
-            .map_err(|e| tonic::Status::invalid_argument(format!("{}", e)))?)
+            .map_err(|e| tonic::Status::invalid_argument(format!("{}", e)))
     }
 }
 
@@ -1970,7 +1971,7 @@ impl TryFrom<InvokeInstanceResponse> for super::types::smart_contracts::InvokeCo
     }
 }
 
-impl TryFrom<CryptographicParameters> for super::types::queries::CryptographicParameters {
+impl TryFrom<CryptographicParameters> for super::types::CryptographicParameters {
     type Error = tonic::Status;
 
     fn try_from(value: CryptographicParameters) -> Result<Self, Self::Error> {

@@ -1,4 +1,4 @@
-/// Test the `GetAccountInfo` endpoint.
+//! Test the `GetBlockInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
 use structopt::StructOpt;
