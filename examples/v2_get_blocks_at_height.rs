@@ -1,10 +1,8 @@
-//! Test the `GetAccountInfo` endpoint.
+//! Test the `GetBlocksAtHeight` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::id::types::AccountAddress;
+use concordium_rust_sdk::{endpoints, endpoints::BlocksAtHeightInput, v2};
 use structopt::StructOpt;
-
-use concordium_rust_sdk::v2;
 
 #[derive(StructOpt)]
 struct App {
@@ -13,9 +11,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: tonic::transport::Endpoint,
-    #[structopt(long = "address", help = "Account address to query.")]
-    address:  AccountAddress,
+    endpoint: endpoints::Endpoint,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -30,18 +26,19 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect.")?;
 
-    {
-        let ai = client
-            .get_account_info(&app.address.into(), &v2::BlockIdentifier::Best)
-            .await?;
-        println!("{:#?}", ai);
-    }
+    let info = client.get_consensus_info().await?;
 
-    {
-        let ai = client
-            .get_account_info(&app.address.into(), &v2::BlockIdentifier::LastFinal)
-            .await?;
-        println!("{:#?}", ai);
+    let response = client
+        .get_blocks_at_height(&BlocksAtHeightInput::Absolute {
+            height: info.best_block_height,
+        })
+        .await?;
+    println!(
+        "Blocks at best block {} ({}):",
+        info.best_block, info.best_block_height
+    );
+    for block in response {
+        println!("{}", block);
     }
 
     Ok(())

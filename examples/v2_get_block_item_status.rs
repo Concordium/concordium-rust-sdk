@@ -1,7 +1,7 @@
-//! Test the `GetAccountInfo` endpoint.
+/// Test the `BlockItemStatus` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::id::types::AccountAddress;
+use concordium_rust_sdk::types::hashes::TransactionHash;
 use structopt::StructOpt;
 
 use concordium_rust_sdk::v2;
@@ -13,9 +13,9 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: tonic::transport::Endpoint,
-    #[structopt(long = "address", help = "Account address to query.")]
-    address:  AccountAddress,
+    endpoint:    tonic::transport::Endpoint,
+    #[structopt(long = "transaction", help = "Transaction hash to query.")]
+    transaction: TransactionHash,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -30,19 +30,8 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect.")?;
 
-    {
-        let ai = client
-            .get_account_info(&app.address.into(), &v2::BlockIdentifier::Best)
-            .await?;
-        println!("{:#?}", ai);
-    }
-
-    {
-        let ai = client
-            .get_account_info(&app.address.into(), &v2::BlockIdentifier::LastFinal)
-            .await?;
-        println!("{:#?}", ai);
-    }
+    let res = client.get_block_item_status(&app.transaction).await?;
+    println!("{:#?}", res);
 
     Ok(())
 }

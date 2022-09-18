@@ -1,10 +1,9 @@
-//! Test the `GetAccountInfo` endpoint.
+//! Test the `GetInstanceInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::id::types::AccountAddress;
+use concordium_contracts_common::ContractAddress;
+use concordium_rust_sdk::{endpoints, v2};
 use structopt::StructOpt;
-
-use concordium_rust_sdk::v2;
 
 #[derive(StructOpt)]
 struct App {
@@ -13,9 +12,9 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: tonic::transport::Endpoint,
-    #[structopt(long = "address", help = "Account address to query.")]
-    address:  AccountAddress,
+    endpoint: endpoints::Endpoint,
+    #[structopt(long = "address", help = "Contract address to query.")]
+    address:  ContractAddress,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -30,19 +29,10 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect.")?;
 
-    {
-        let ai = client
-            .get_account_info(&app.address.into(), &v2::BlockIdentifier::Best)
-            .await?;
-        println!("{:#?}", ai);
-    }
-
-    {
-        let ai = client
-            .get_account_info(&app.address.into(), &v2::BlockIdentifier::LastFinal)
-            .await?;
-        println!("{:#?}", ai);
-    }
+    let res = client
+        .get_instance_info(app.address, &v2::BlockIdentifier::Best)
+        .await?;
+    println!("{:#?}", res);
 
     Ok(())
 }

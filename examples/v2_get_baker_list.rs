@@ -1,10 +1,9 @@
-//! Test the `GetAccountInfo` endpoint.
+//! Test the `GetBakerList` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::id::types::AccountAddress;
-use structopt::StructOpt;
-
 use concordium_rust_sdk::v2;
+use futures::StreamExt;
+use structopt::StructOpt;
 
 #[derive(StructOpt)]
 struct App {
@@ -14,8 +13,6 @@ struct App {
         default_value = "http://localhost:10001"
     )]
     endpoint: tonic::transport::Endpoint,
-    #[structopt(long = "address", help = "Account address to query.")]
-    address:  AccountAddress,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -29,20 +26,12 @@ async fn main() -> anyhow::Result<()> {
     let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
-
-    {
-        let ai = client
-            .get_account_info(&app.address.into(), &v2::BlockIdentifier::Best)
-            .await?;
-        println!("{:#?}", ai);
+    let mut res = client
+        .get_baker_list(&v2::BlockIdentifier::LastFinal)
+        .await?;
+    println!("Blockhash: {}", res.block_hash);
+    while let Some(a) = res.response.next().await {
+        println!("{}", a?);
     }
-
-    {
-        let ai = client
-            .get_account_info(&app.address.into(), &v2::BlockIdentifier::LastFinal)
-            .await?;
-        println!("{:#?}", ai);
-    }
-
     Ok(())
 }

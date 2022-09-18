@@ -240,7 +240,7 @@ pub enum ModuleRefMarker {}
 /// Reference to a deployed Wasm module on the chain.
 pub type ModuleRef = hashes::HashBytes<ModuleRefMarker>;
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, AsRef, Into)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, AsRef, Into, From)]
 #[serde(transparent)]
 /// An event logged by a smart contract initialization.
 pub struct ContractEvent {

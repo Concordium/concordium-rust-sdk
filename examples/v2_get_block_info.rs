@@ -1,7 +1,6 @@
-//! Test the `GetAccountInfo` endpoint.
+//! Test the `GetBlockInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::id::types::AccountAddress;
 use structopt::StructOpt;
 
 use concordium_rust_sdk::v2;
@@ -14,8 +13,6 @@ struct App {
         default_value = "http://localhost:10001"
     )]
     endpoint: tonic::transport::Endpoint,
-    #[structopt(long = "address", help = "Account address to query.")]
-    address:  AccountAddress,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -31,17 +28,15 @@ async fn main() -> anyhow::Result<()> {
         .context("Cannot connect.")?;
 
     {
-        let ai = client
-            .get_account_info(&app.address.into(), &v2::BlockIdentifier::Best)
-            .await?;
-        println!("{:#?}", ai);
+        let ai = client.get_block_info(&v2::BlockIdentifier::Best).await?;
+        println!("Best block {:#?}", ai);
     }
 
     {
         let ai = client
-            .get_account_info(&app.address.into(), &v2::BlockIdentifier::LastFinal)
+            .get_block_info(&v2::BlockIdentifier::LastFinal)
             .await?;
-        println!("{:#?}", ai);
+        println!("Last finalized {:#?}", ai);
     }
 
     Ok(())
