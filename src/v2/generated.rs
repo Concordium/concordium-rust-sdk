@@ -1,5 +1,8 @@
+#![allow(clippy::large_enum_variant, clippy::enum_variant_names)]
 tonic::include_proto!("concordium.v2");
 
+use super::Require;
+use crate::types;
 use crypto_common::{Deserial, Versioned, VERSION_0};
 use id::{
     constants::{ArCurve, AttributeKind},
@@ -8,8 +11,6 @@ use id::{
         InitialCredentialDeploymentValues,
     },
 };
-
-use super::Require;
 
 fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
     let mut cursor = std::io::Cursor::new(bytes);
@@ -32,6 +33,48 @@ impl TryFrom<AccountAddress> for super::AccountAddress {
                 "Unexpected account address format.",
             )),
         }
+    }
+}
+
+impl TryFrom<ModuleRef> for super::ModuleRef {
+    type Error = tonic::Status;
+
+    fn try_from(value: ModuleRef) -> Result<Self, Self::Error> {
+        match value.value.try_into() {
+            Ok(mod_ref) => Ok(Self::new(mod_ref)),
+            Err(_) => Err(tonic::Status::internal(
+                "Unexpected module reference format.",
+            )),
+        }
+    }
+}
+
+impl From<ContractAddress> for super::ContractAddress {
+    fn from(value: ContractAddress) -> Self {
+        super::ContractAddress::new(value.index, value.subindex)
+    }
+}
+
+impl TryFrom<VersionedModuleSource> for super::types::smart_contracts::WasmModule {
+    type Error = tonic::Status;
+
+    fn try_from(versioned_module: VersionedModuleSource) -> Result<Self, Self::Error> {
+        use super::types::smart_contracts::WasmVersion;
+        let module = match versioned_module.module.require()? {
+            versioned_module_source::Module::V0(versioned_module_source::ModuleSourceV0 {
+                value,
+            }) => Self {
+                version: WasmVersion::V0,
+                source:  value.into(),
+            },
+            versioned_module_source::Module::V1(versioned_module_source::ModuleSourceV1 {
+                value,
+            }) => Self {
+                version: WasmVersion::V1,
+                source:  value.into(),
+            },
+        };
+        Ok(module)
     }
 }
 
@@ -175,19 +218,42 @@ impl TryFrom<EncryptedBalance> for super::types::AccountEncryptedAmount {
     }
 }
 
+impl From<Duration> for chrono::Duration {
+    fn from(value: Duration) -> Self { chrono::Duration::milliseconds(value.value as i64) }
+}
+
+impl From<Duration> for super::types::SlotDuration {
+    fn from(value: Duration) -> Self {
+        super::types::SlotDuration {
+            millis: value.value,
+        }
+    }
+}
+
+impl From<GenesisIndex> for super::types::GenesisIndex {
+    fn from(value: GenesisIndex) -> Self { value.value.into() }
+}
+
+impl From<ProtocolVersion> for super::types::ProtocolVersion {
+    fn from(value: ProtocolVersion) -> Self {
+        match value {
+            ProtocolVersion::ProtocolVersion1 => super::types::ProtocolVersion::P1,
+            ProtocolVersion::ProtocolVersion2 => super::types::ProtocolVersion::P2,
+            ProtocolVersion::ProtocolVersion3 => super::types::ProtocolVersion::P3,
+            ProtocolVersion::ProtocolVersion4 => super::types::ProtocolVersion::P4,
+        }
+    }
+}
+
 impl TryFrom<StakePendingChange> for super::types::StakePendingChange {
     type Error = tonic::Status;
 
     fn try_from(value: StakePendingChange) -> Result<Self, Self::Error> {
         match value.change.require()? {
-            stake_pending_change::Change::Reduce(rs) => {
-                let new_stake = rs.new_stake.require()?.into();
-                let effective_time = rs.effective_time.require()?.into();
-                Ok(Self::ReduceStake {
-                    new_stake,
-                    effective_time,
-                })
-            }
+            stake_pending_change::Change::Reduce(rs) => Ok(Self::ReduceStake {
+                new_stake:      rs.new_stake.require()?.into(),
+                effective_time: rs.effective_time.require()?.into(),
+            }),
             stake_pending_change::Change::Remove(rs) => {
                 let effective_time = rs.into();
                 Ok(Self::RemoveStake { effective_time })
@@ -307,10 +373,9 @@ impl TryFrom<Release> for super::types::Release {
     type Error = tonic::Status;
 
     fn try_from(value: Release) -> Result<Self, Self::Error> {
-        let timestamp = value.timestamp.require()?.into();
         Ok(Self {
-            timestamp,
-            amount: value.amount.require()?.into(),
+            timestamp:    value.timestamp.require()?.into(),
+            amount:       value.amount.require()?.into(),
             transactions: value
                 .transactions
                 .into_iter()
@@ -607,6 +672,61 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             account_index,
             account_stake,
             account_address,
+        })
+    }
+}
+
+impl TryFrom<NextAccountSequenceNumber> for super::types::queries::AccountNonceResponse {
+    type Error = tonic::Status;
+
+    fn try_from(value: NextAccountSequenceNumber) -> Result<Self, Self::Error> {
+        Ok(Self {
+            nonce:     value.sequence_number.require()?.into(),
+            all_final: value.all_final,
+        })
+    }
+}
+
+impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
+    type Error = tonic::Status;
+
+    fn try_from(value: ConsensusInfo) -> Result<Self, Self::Error> {
+        Ok(Self {
+            last_finalized_block_height:    value.last_finalized_block_height.require()?.into(),
+            block_arrive_latency_e_m_s_d:   value.block_arrive_latency_emsd,
+            block_receive_latency_e_m_s_d:  value.block_receive_latency_emsd,
+            last_finalized_block:           value.last_finalized_block.require()?.try_into()?,
+            block_receive_period_e_m_s_d:   value.block_receive_period_emsd,
+            block_arrive_period_e_m_s_d:    value.block_arrive_period_emsd,
+            blocks_received_count:          value.blocks_received_count.into(),
+            transactions_per_block_e_m_s_d: value.transactions_per_block_emsd,
+            finalization_period_e_m_a:      value.finalization_period_ema,
+            best_block_height:              value.best_block_height.require()?.into(),
+            last_finalized_time:            value.last_finalized_time.map(|v| v.into()),
+            finalization_count:             value.finalization_count.into(),
+            epoch_duration:                 value.epoch_duration.require()?.into(),
+            blocks_verified_count:          value.blocks_verified_count.into(),
+            slot_duration:                  value.slot_duration.require()?.into(),
+            genesis_time:                   value.genesis_time.require()?.into(),
+            finalization_period_e_m_s_d:    value.finalization_period_emsd,
+            transactions_per_block_e_m_a:   value.transactions_per_block_ema,
+            block_arrive_latency_e_m_a:     value.block_arrive_latency_ema,
+            block_receive_latency_e_m_a:    value.block_receive_latency_ema,
+            block_arrive_period_e_m_a:      value.block_arrive_period_ema,
+            block_receive_period_e_m_a:     value.block_receive_period_ema,
+            block_last_arrived_time:        value.block_last_arrived_time.map(|v| v.into()),
+            best_block:                     value.best_block.require()?.try_into()?,
+            genesis_block:                  value.genesis_block.require()?.try_into()?,
+            block_last_received_time:       value.block_last_received_time.map(|v| v.into()),
+            protocol_version:               ProtocolVersion::from_i32(value.protocol_version)
+                .ok_or_else(|| tonic::Status::internal("Unknown protocol version"))?
+                .into(),
+            genesis_index:                  value.genesis_index.require()?.into(),
+            current_era_genesis_block:      value
+                .current_era_genesis_block
+                .require()?
+                .try_into()?,
+            current_era_genesis_time:       value.current_era_genesis_time.require()?.into(),
         })
     }
 }
