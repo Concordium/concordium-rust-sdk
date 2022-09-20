@@ -30,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
         .context("Cannot connect.")?;
 
     let res = client
-        .get_instance_info(&app.address, &v2::BlockIdentifier::Best)
+        .get_instance_info(app.address, &v2::BlockIdentifier::Best)
         .await?;
     println!("{:#?}", res);
 

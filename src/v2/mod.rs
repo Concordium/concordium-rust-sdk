@@ -107,30 +107,6 @@ impl From<&super::types::Address> for generated::Address {
     }
 }
 
-impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
-    fn from(ai: &AccountIdentifier) -> Self {
-        let account_identifier_input = match ai {
-            AccountIdentifier::Address(addr) => {
-                generated::account_identifier_input::AccountIdentifierInput::Address(addr.into())
-            }
-            AccountIdentifier::CredId(credid) => {
-                let credid = generated::CredentialRegistrationId {
-                    value: crypto_common::to_bytes(credid),
-                };
-                generated::account_identifier_input::AccountIdentifierInput::CredId(credid)
-            }
-            AccountIdentifier::Index(index) => {
-                generated::account_identifier_input::AccountIdentifierInput::AccountIndex(
-                    (*index).into(),
-                )
-            }
-        };
-        generated::AccountIdentifierInput {
-            account_identifier_input: Some(account_identifier_input),
-        }
-    }
-}
-
 impl From<&ModuleRef> for generated::ModuleRef {
     fn from(mr: &ModuleRef) -> Self { generated::ModuleRef { value: mr.to_vec() } }
 }
@@ -172,6 +148,30 @@ impl From<&ContractAddress> for generated::ContractAddress {
     }
 }
 
+impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
+    fn from(ai: &AccountIdentifier) -> Self {
+        let account_identifier_input = match ai {
+            AccountIdentifier::Address(addr) => {
+                generated::account_identifier_input::AccountIdentifierInput::Address(addr.into())
+            }
+            AccountIdentifier::CredId(credid) => {
+                let credid = generated::CredentialRegistrationId {
+                    value: crypto_common::to_bytes(credid),
+                };
+                generated::account_identifier_input::AccountIdentifierInput::CredId(credid)
+            }
+            AccountIdentifier::Index(index) => {
+                generated::account_identifier_input::AccountIdentifierInput::AccountIndex(
+                    (*index).into(),
+                )
+            }
+        };
+        generated::AccountIdentifierInput {
+            account_identifier_input: Some(account_identifier_input),
+        }
+    }
+}
+
 impl IntoRequest<generated::AccountInfoRequest> for (&AccountIdentifier, &BlockIdentifier) {
     fn into_request(self) -> tonic::Request<generated::AccountInfoRequest> {
         let ai = generated::AccountInfoRequest {
@@ -202,11 +202,24 @@ impl IntoRequest<generated::ModuleSourceRequest> for (&ModuleRef, &BlockIdentifi
     }
 }
 
-impl IntoRequest<generated::InstanceInfoRequest> for (&ContractAddress, &BlockIdentifier) {
+impl IntoRequest<generated::InstanceInfoRequest> for (ContractAddress, &BlockIdentifier) {
     fn into_request(self) -> tonic::Request<generated::InstanceInfoRequest> {
         let r = generated::InstanceInfoRequest {
             block_hash: Some(self.1.into()),
             address:    Some(self.0.into()),
+        };
+        tonic::Request::new(r)
+    }
+}
+
+impl<V: Into<Vec<u8>>> IntoRequest<generated::InstanceStateLookupRequest>
+    for (ContractAddress, &BlockIdentifier, V)
+{
+    fn into_request(self) -> tonic::Request<generated::InstanceStateLookupRequest> {
+        let r = generated::InstanceStateLookupRequest {
+            block_hash: Some(self.1.into()),
+            address:    Some(self.0.into()),
+            key:        self.2.into(),
         };
         tonic::Request::new(r)
     }
@@ -379,7 +392,7 @@ impl Client {
 
     pub async fn get_instance_info(
         &mut self,
-        address: &ContractAddress,
+        address: ContractAddress,
         bi: &BlockIdentifier,
     ) -> endpoints::QueryResult<QueryResponse<InstanceInfo>> {
         let response = self.client.get_instance_info((address, bi)).await?;
@@ -422,6 +435,43 @@ impl Client {
             Err(x) => Err(x),
         });
         Ok(stream)
+    }
+
+    pub async fn get_instance_state(
+        &mut self,
+        ca: ContractAddress,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<(Vec<u8>, Vec<u8>), tonic::Status>>>,
+    > {
+        let response = self.client.get_instance_state((ca, bi)).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|x| match x {
+            Ok(v) => {
+                let key = v.key;
+                let value = v.value;
+                Ok((key, value))
+            }
+            Err(x) => Err(x),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn instance_state_lookup(
+        &mut self,
+        ca: ContractAddress,
+        key: impl Into<Vec<u8>>,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<Vec<u8>>> {
+        let response = self.client.instance_state_lookup((ca, bi, key)).await?;
+        let block_hash = extract_metadata(&response)?;
+        Ok(QueryResponse {
+            block_hash,
+            response: response.into_inner().value,
+        })
     }
 
     pub async fn get_block_item_status(

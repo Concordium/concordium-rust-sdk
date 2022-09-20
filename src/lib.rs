@@ -75,4 +75,8 @@ pub use eddsa_ed25519;
 /// Re-export the VRF function implementation.
 pub use ecvrf;
 
+/// Version 2 GRPC API.
 pub mod v2;
+
+/// Functionality related to smart contracts.
+pub mod smart_contracts;

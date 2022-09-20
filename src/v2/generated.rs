@@ -36,6 +36,15 @@ impl TryFrom<AccountAddress> for super::AccountAddress {
     }
 }
 
+impl From<super::ContractAddress> for ContractAddress {
+    fn from(value: super::ContractAddress) -> Self {
+        Self {
+            index:    value.index,
+            subindex: value.subindex,
+        }
+    }
+}
+
 impl TryFrom<Address> for super::types::Address {
     type Error = tonic::Status;
 
