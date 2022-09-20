@@ -212,6 +212,19 @@ impl IntoRequest<generated::InstanceInfoRequest> for (ContractAddress, &BlockIde
     }
 }
 
+impl<V: Into<Vec<u8>>> IntoRequest<generated::InstanceStateLookupRequest>
+    for (ContractAddress, &BlockIdentifier, V)
+{
+    fn into_request(self) -> tonic::Request<generated::InstanceStateLookupRequest> {
+        let r = generated::InstanceStateLookupRequest {
+            block_hash: Some(self.1.into()),
+            address:    Some(self.0.into()),
+            key:        self.2.into(),
+        };
+        tonic::Request::new(r)
+    }
+}
+
 impl IntoRequest<generated::TransactionHash> for &TransactionHash {
     fn into_request(self) -> tonic::Request<generated::TransactionHash> {
         tonic::Request::new(self.into())
@@ -444,6 +457,20 @@ impl Client {
         Ok(QueryResponse {
             block_hash,
             response: stream,
+        })
+    }
+
+    pub async fn instance_state_lookup(
+        &mut self,
+        ca: ContractAddress,
+        key: impl Into<Vec<u8>>,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<Vec<u8>>> {
+        let response = self.client.instance_state_lookup((ca, bi, key)).await?;
+        let block_hash = extract_metadata(&response)?;
+        Ok(QueryResponse {
+            block_hash,
+            response: response.into_inner().value,
         })
     }
 
