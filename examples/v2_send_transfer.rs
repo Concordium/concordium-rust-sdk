@@ -74,7 +74,7 @@ async fn main() -> anyhow::Result<()> {
     let item = BlockItem::AccountTransaction(tx);
     // submit the transaction to the chain
     println!("Sending transfer");
-    let transaction_hash = client.send_block_item(&item).await?;
+    let transaction_hash = client.send_block_item(item).await?;
     println!(
         "Transaction {} submitted (nonce = {}).",
         transaction_hash, nonce,
