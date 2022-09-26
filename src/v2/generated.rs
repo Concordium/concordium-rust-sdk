@@ -206,6 +206,19 @@ impl TryFrom<StateHash> for super::hashes::StateHash {
     }
 }
 
+impl TryFrom<LeadershipElectionNonce> for super::hashes::LeadershipElectionNonce {
+    type Error = tonic::Status;
+
+    fn try_from(value: LeadershipElectionNonce) -> Result<Self, Self::Error> {
+        match value.value.try_into() {
+            Ok(hash) => Ok(Self::new(hash)),
+            Err(_) => Err(tonic::Status::internal(
+                "Unexpected leadership election nonce format.",
+            )),
+        }
+    }
+}
+
 impl From<AbsoluteBlockHeight> for super::AbsoluteBlockHeight {
     fn from(abh: AbsoluteBlockHeight) -> Self { Self { height: abh.value } }
 }
@@ -925,6 +938,23 @@ impl TryFrom<BlockItemSummary> for super::types::BlockItemSummary {
     }
 }
 
+impl TryFrom<ElectionDifficulty> for super::types::ElectionDifficulty {
+    type Error = tonic::Status;
+
+    fn try_from(value: ElectionDifficulty) -> Result<Self, Self::Error> {
+        Ok(Self {
+            parts_per_hundred_thousands: super::types::PartsPerHundredThousands::new(
+                value.value.require()?.parts_per_hundred_thousand,
+            )
+            .ok_or_else(|| {
+                tonic::Status::internal(
+                    "Invalid election difficulty. Above 100_000 parts per hundres thousands.",
+                )
+            })?,
+        })
+    }
+}
+
 impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
     type Error = tonic::Status;
 
@@ -939,17 +969,7 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
                 })
             }
             update_payload::Payload::ElectionDifficultyUpdate(v) => {
-                Self::ElectionDifficulty(super::types::ElectionDifficulty {
-                    parts_per_hundred_thousands: super::types::PartsPerHundredThousands::new(
-                        v.value.require()?.parts_per_hundred_thousand,
-                    )
-                    .ok_or_else(|| {
-                        tonic::Status::internal(
-                            "Invalid election difficulty. Above 100_000 parts per hundres \
-                             thousands.",
-                        )
-                    })?,
-                })
+                Self::ElectionDifficulty(v.try_into()?)
             }
             update_payload::Payload::EuroPerEnergyUpdate(v) => {
                 let value = v.value.require()?;
@@ -2295,5 +2315,33 @@ mod test {
         let to = QBranch::try_from(from).expect("Failed to convert branch");
 
         assert_eq!(to, to_target);
+    }
+}
+
+impl TryFrom<election_info::Baker> for super::types::BirkBaker {
+    type Error = tonic::Status;
+
+    fn try_from(info: election_info::Baker) -> Result<Self, Self::Error> {
+        Ok(Self {
+            baker_id:            info.baker.require()?.into(),
+            baker_lottery_power: info.lottery_power,
+            baker_account:       info.account.require()?.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<ElectionInfo> for super::types::BirkParameters {
+    type Error = tonic::Status;
+
+    fn try_from(info: ElectionInfo) -> Result<Self, Self::Error> {
+        Ok(Self {
+            election_difficulty: info.election_difficulty.require()?.try_into()?,
+            election_nonce:      info.election_nonce.require()?.try_into()?,
+            bakers:              info
+                .baker_election_info
+                .into_iter()
+                .map(|c| c.try_into())
+                .collect::<Result<_, _>>()?,
+        })
     }
 }

@@ -677,6 +677,19 @@ impl Client {
         let response = types::queries::Branch::try_from(response.into_inner())?;
         Ok(response)
     }
+
+    pub async fn get_election_info(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::BirkParameters>> {
+        let response = self.client.get_election_info(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::BirkParameters::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
 }
 
 fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<BlockHash> {
