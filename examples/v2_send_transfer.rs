@@ -72,6 +72,7 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let item = BlockItem::AccountTransaction(tx);
+    let bi_hash = item.hash();
     // submit the transaction to the chain
     println!("Sending transfer");
     let transaction_hash = client.send_block_item(item).await?;
@@ -79,6 +80,7 @@ async fn main() -> anyhow::Result<()> {
         "Transaction {} submitted (nonce = {}).",
         transaction_hash, nonce,
     );
+    println!("Rust-SDK hash: {}", bi_hash);
     println!("Waiting until finalized.");
     let (bh, bs) = client.wait_until_finalized(&transaction_hash).await?;
     println!("Transaction finalized in block {}.", bh);
