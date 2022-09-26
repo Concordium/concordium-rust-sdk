@@ -274,6 +274,28 @@ impl IntoRequest<generated::BlocksAtHeightRequest> for &endpoints::BlocksAtHeigh
     }
 }
 
+impl IntoRequest<generated::GetPoolDelegatorsRequest> for (&BlockIdentifier, types::BakerId) {
+    fn into_request(self) -> tonic::Request<generated::GetPoolDelegatorsRequest> {
+        let req = generated::GetPoolDelegatorsRequest {
+            block_hash: Some(self.0.into()),
+            baker:      Some(self.1.into()),
+        };
+        tonic::Request::new(req)
+    }
+}
+
+impl IntoRequest<generated::GetPoolDelegatorsRewardPeriodRequest>
+    for (&BlockIdentifier, types::BakerId)
+{
+    fn into_request(self) -> tonic::Request<generated::GetPoolDelegatorsRewardPeriodRequest> {
+        let req = generated::GetPoolDelegatorsRewardPeriodRequest {
+            block_hash: Some(self.0.into()),
+            baker:      Some(self.1.into()),
+        };
+        tonic::Request::new(req)
+    }
+}
+
 impl Client {
     pub async fn new<E: Into<tonic::transport::Endpoint>>(
         endpoint: E,
@@ -579,6 +601,83 @@ impl Client {
         Ok(QueryResponse {
             block_hash,
             response,
+        })
+    }
+
+    pub async fn get_pool_delegators(
+        &mut self,
+        bi: &BlockIdentifier,
+        baker_id: types::BakerId,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::PoolDelegator, tonic::Status>>>,
+    > {
+        let response = self.client.get_pool_delegators((bi, baker_id)).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(delegator) => delegator.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_pool_delegators_reward_period(
+        &mut self,
+        bi: &BlockIdentifier,
+        baker_id: types::BakerId,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::PoolDelegatorRewardPeriod, tonic::Status>>>,
+    > {
+        let response = self
+            .client
+            .get_pool_delegators_reward_period((bi, baker_id))
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(delegator) => delegator.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_passive_delegators(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::PoolDelegator, tonic::Status>>>,
+    > {
+        let response = self.client.get_passive_delegators(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(delegator) => delegator.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_passive_delegators_reward_period(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::PoolDelegatorRewardPeriod, tonic::Status>>>,
+    > {
+        let response = self.client.get_passive_delegators_reward_period(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(delegator) => delegator.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
         })
     }
 }

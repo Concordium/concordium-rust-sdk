@@ -780,6 +780,32 @@ impl From<Timestamp> for chrono::DateTime<chrono::Utc> {
     }
 }
 
+impl TryFrom<PoolDelegator> for super::types::PoolDelegator {
+    type Error = tonic::Status;
+
+    fn try_from(delegator: PoolDelegator) -> Result<Self, Self::Error> {
+        Ok(Self {
+            account:        delegator.account.require()?.try_into()?,
+            stake:          delegator.stake.require()?.into(),
+            pending_change: delegator
+                .pending_change
+                .map(TryFrom::try_from)
+                .transpose()?,
+        })
+    }
+}
+
+impl TryFrom<PoolDelegatorRewardPeriod> for super::types::PoolDelegatorRewardPeriod {
+    type Error = tonic::Status;
+
+    fn try_from(delegator: PoolDelegatorRewardPeriod) -> Result<Self, Self::Error> {
+        Ok(Self {
+            account: delegator.account.require()?.try_into()?,
+            stake:   delegator.stake.require()?.into(),
+        })
+    }
+}
+
 impl TryFrom<AccountInfo> for super::types::AccountInfo {
     type Error = tonic::Status;
 

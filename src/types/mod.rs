@@ -239,6 +239,26 @@ impl StakePendingChange {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+/// Stream item for `GetPoolDelegators`.
+pub struct PoolDelegator {
+    /// The delegator account address.
+    pub account:        AccountAddress,
+    /// The amount of stake currently staked to the pool.
+    pub stake:          Amount,
+    /// Pending change to the current stake of the delegator.
+    pub pending_change: Option<StakePendingChange>,
+}
+
+#[derive(Debug, Clone, Copy)]
+/// Stream item for `GetPoolDelegatorsRewardPeriod`.
+pub struct PoolDelegatorRewardPeriod {
+    /// The delegator account address.
+    pub account: AccountAddress,
+    /// The amount of stake currently staked to the pool.
+    pub stake:   Amount,
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
 #[serde(
     rename_all = "camelCase",
