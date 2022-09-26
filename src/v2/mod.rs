@@ -680,6 +680,15 @@ impl Client {
             response: stream,
         })
     }
+
+    pub async fn get_branches(&mut self) -> endpoints::QueryResult<types::queries::Branch> {
+        let response = self
+            .client
+            .get_branches(generated::Empty::default())
+            .await?;
+        let response = types::queries::Branch::try_from(response.into_inner())?;
+        Ok(response)
+    }
 }
 
 fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<BlockHash> {

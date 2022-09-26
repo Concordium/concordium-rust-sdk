@@ -2202,3 +2202,18 @@ impl TryFrom<TokenomicsInfo> for super::types::RewardsOverview {
         }
     }
 }
+
+impl TryFrom<Branch> for super::types::queries::Branch {
+    type Error = tonic::Status;
+
+    fn try_from(value: Branch) -> Result<Self, Self::Error> {
+        Ok(Self {
+            block_hash: value.block_hash.require()?.try_into()?,
+            children:   value
+                .children
+                .into_iter()
+                .map(|c| c.try_into())
+                .collect::<Result<_, _>>()?,
+        })
+    }
+}
