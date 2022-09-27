@@ -690,6 +690,26 @@ impl Client {
             response,
         })
     }
+
+    pub async fn get_identity_providers(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<
+            impl Stream<Item = Result<id::types::IpInfo<id::constants::IpPairing>, tonic::Status>>,
+        >,
+    > {
+        let response = self.client.get_identity_providers(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(delegator) => delegator.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
 }
 
 fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<BlockHash> {
