@@ -240,8 +240,8 @@ impl StakePendingChange {
 }
 
 #[derive(Debug, Clone, Copy)]
-/// Stream item for `GetPoolDelegators`.
-pub struct PoolDelegator {
+/// Information about a registered passive or pool delegator.
+pub struct DelegatorInfo {
     /// The delegator account address.
     pub account:        AccountAddress,
     /// The amount of stake currently staked to the pool.
@@ -251,8 +251,8 @@ pub struct PoolDelegator {
 }
 
 #[derive(Debug, Clone, Copy)]
-/// Stream item for `GetPoolDelegatorsRewardPeriod`.
-pub struct PoolDelegatorRewardPeriod {
+/// Information about a passive or pool delegator fixed in a reward period.
+pub struct DelegatorRewardPeriodInfo {
     /// The delegator account address.
     pub account: AccountAddress,
     /// The amount of stake currently staked to the pool.

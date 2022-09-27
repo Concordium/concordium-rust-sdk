@@ -284,18 +284,6 @@ impl IntoRequest<generated::GetPoolDelegatorsRequest> for (&BlockIdentifier, typ
     }
 }
 
-impl IntoRequest<generated::GetPoolDelegatorsRewardPeriodRequest>
-    for (&BlockIdentifier, types::BakerId)
-{
-    fn into_request(self) -> tonic::Request<generated::GetPoolDelegatorsRewardPeriodRequest> {
-        let req = generated::GetPoolDelegatorsRewardPeriodRequest {
-            block_hash: Some(self.0.into()),
-            baker:      Some(self.1.into()),
-        };
-        tonic::Request::new(req)
-    }
-}
-
 impl Client {
     pub async fn new<E: Into<tonic::transport::Endpoint>>(
         endpoint: E,
@@ -609,7 +597,7 @@ impl Client {
         bi: &BlockIdentifier,
         baker_id: types::BakerId,
     ) -> endpoints::QueryResult<
-        QueryResponse<impl Stream<Item = Result<types::PoolDelegator, tonic::Status>>>,
+        QueryResponse<impl Stream<Item = Result<types::DelegatorInfo, tonic::Status>>>,
     > {
         let response = self.client.get_pool_delegators((bi, baker_id)).await?;
         let block_hash = extract_metadata(&response)?;
@@ -628,7 +616,7 @@ impl Client {
         bi: &BlockIdentifier,
         baker_id: types::BakerId,
     ) -> endpoints::QueryResult<
-        QueryResponse<impl Stream<Item = Result<types::PoolDelegatorRewardPeriod, tonic::Status>>>,
+        QueryResponse<impl Stream<Item = Result<types::DelegatorRewardPeriodInfo, tonic::Status>>>,
     > {
         let response = self
             .client
@@ -649,7 +637,7 @@ impl Client {
         &mut self,
         bi: &BlockIdentifier,
     ) -> endpoints::QueryResult<
-        QueryResponse<impl Stream<Item = Result<types::PoolDelegator, tonic::Status>>>,
+        QueryResponse<impl Stream<Item = Result<types::DelegatorInfo, tonic::Status>>>,
     > {
         let response = self.client.get_passive_delegators(bi).await?;
         let block_hash = extract_metadata(&response)?;
@@ -667,7 +655,7 @@ impl Client {
         &mut self,
         bi: &BlockIdentifier,
     ) -> endpoints::QueryResult<
-        QueryResponse<impl Stream<Item = Result<types::PoolDelegatorRewardPeriod, tonic::Status>>>,
+        QueryResponse<impl Stream<Item = Result<types::DelegatorRewardPeriodInfo, tonic::Status>>>,
     > {
         let response = self.client.get_passive_delegators_reward_period(bi).await?;
         let block_hash = extract_metadata(&response)?;
