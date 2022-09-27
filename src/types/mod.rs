@@ -2094,6 +2094,11 @@ pub struct RegisteredData {
     bytes: Vec<u8>,
 }
 
+impl RegisteredData {
+    /// Convert into the inner vector of bytes.
+    pub fn into_inner(self) -> Vec<u8> { self.bytes }
+}
+
 /// Registered data is too large.
 #[derive(Debug, Error, Copy, Clone)]
 #[error("Data is too large to be registered ({actual_size}).")]
@@ -2149,6 +2154,11 @@ pub struct Memo {
     #[serde(with = "crate::internal::byte_array_hex")]
     #[size_length = 2]
     bytes: Vec<u8>,
+}
+
+impl Memo {
+    /// Convert into the inner vector of bytes.
+    pub fn into_inner(self) -> Vec<u8> { self.bytes }
 }
 
 /// An error used to signal that an object was too big to be converted.

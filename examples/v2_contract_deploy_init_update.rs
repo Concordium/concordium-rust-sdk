@@ -1,4 +1,5 @@
-//! Basic example that shows how to initialize and update a smart contract.
+//! Basic example that shows how to deploy, initialize, and update a smart
+//! contract.
 //!
 //! In particular, it uses the "weather" contract which is part of the
 //! [icecream example contract](https://github.com/Concordium/concordium-rust-smart-contracts/blob/main/examples/icecream/src/lib.rs).
@@ -12,11 +13,13 @@ use concordium_rust_sdk::{
     endpoints,
     id::types::{AccountAddress, AccountKeys},
     types::{
-        smart_contracts::{ModuleRef, Parameter},
+        smart_contracts::{ModuleRef, Parameter, WasmModule},
         transactions::{send, BlockItem, InitContractPayload, UpdateContractPayload},
         AccountInfo,
     },
+    v2,
 };
+use crypto_common::Deserial;
 use std::path::PathBuf;
 use structopt::*;
 use thiserror::Error;
@@ -46,6 +49,11 @@ struct AccountData {
 
 #[derive(StructOpt)]
 enum Action {
+    #[structopt(about = "Deploy the module")]
+    Deploy {
+        #[structopt(long = "module", help = "Path to the contract module.")]
+        module_path: PathBuf,
+    },
     #[structopt(about = "Initialize the contract with the provided weather")]
     Init {
         #[structopt(long, help = "The initial weather.")]
@@ -97,7 +105,9 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
-    let mut client = endpoints::Client::connect(app.endpoint, "rpcadmin").await?;
+    let mut client = v2::Client::new(app.endpoint)
+        .await
+        .context("Cannot connect.")?;
 
     // load account keys and sender address from a file
     let keys: AccountData = serde_json::from_str(
@@ -105,11 +115,11 @@ async fn main() -> anyhow::Result<()> {
     )
     .context("Could not parse the keys file.")?;
 
-    let consensus_info = client.get_consensus_status().await?;
     // Get the initial nonce at the last finalized block.
     let acc_info: AccountInfo = client
-        .get_account_info(&keys.address, &consensus_info.last_finalized_block)
-        .await?;
+        .get_account_info(&keys.address.into(), &v2::BlockIdentifier::Best)
+        .await?
+        .response;
 
     let nonce = acc_info.account_nonce;
     // set expiry to now + 5min
@@ -156,11 +166,18 @@ async fn main() -> anyhow::Result<()> {
                 10000u64.into(),
             )
         }
+        Action::Deploy { module_path } => {
+            // load file
+            // decode module
+            let contents = std::fs::read(module_path).context("Could not read contract module.")?;
+            let payload: WasmModule = Deserial::deserial(&mut std::io::Cursor::new(contents))?;
+            send::deploy_module(&keys.account_keys, keys.address, nonce, expiry, payload)
+        }
     };
 
     let item = BlockItem::AccountTransaction(tx);
     // submit the transaction to the chain
-    let transaction_hash = client.send_block_item(&item).await?;
+    let transaction_hash = client.send_block_item(item).await?;
     println!(
         "Transaction {} submitted (nonce = {}).",
         transaction_hash, nonce,

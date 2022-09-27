@@ -5,15 +5,21 @@ use crate::{
     types::{
         self, hashes,
         hashes::{BlockHash, TransactionHash},
-        smart_contracts::{InstanceInfo, ModuleRef},
-        transactions::{self, EncodedPayload, Payload},
-        AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, Energy, Nonce,
-        TransactionStatus,
+        smart_contracts::{InstanceInfo, ModuleRef, Parameter, WasmModule},
+        transactions::{
+            self, EncodedPayload, InitContractPayload, Payload, UpdateContractPayload,
+            UpdateInstruction,
+        },
+        AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, Energy, Memo, Nonce,
+        RegisteredData, TransactionStatus, UpdateSequenceNumber,
     },
 };
-use concordium_contracts_common::{AccountAddress, Amount, ContractAddress};
+use concordium_contracts_common::{
+    AccountAddress, Amount, ContractAddress, OwnedContractName, OwnedReceiveName,
+};
 use crypto_common::types::TransactionTime;
 use futures::{Stream, StreamExt};
+use id::types::AccountCredentialMessage;
 use tonic::IntoRequest;
 
 mod generated;
@@ -106,6 +112,22 @@ impl From<AccountAddress> for generated::AccountAddress {
     }
 }
 
+impl From<Memo> for generated::Memo {
+    fn from(v: Memo) -> Self {
+        Self {
+            value: v.into_inner(),
+        }
+    }
+}
+
+impl From<RegisteredData> for generated::RegisteredData {
+    fn from(v: RegisteredData) -> Self {
+        Self {
+            value: v.into_inner(),
+        }
+    }
+}
+
 impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
     fn from(ai: &AccountIdentifier) -> Self {
         let account_identifier_input = match ai {
@@ -131,16 +153,98 @@ impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
 }
 
 impl From<&ModuleRef> for generated::ModuleRef {
-    fn from(mr: &ModuleRef) -> Self { generated::ModuleRef { value: mr.to_vec() } }
+    fn from(mr: &ModuleRef) -> Self { Self { value: mr.to_vec() } }
+}
+
+impl From<ModuleRef> for generated::ModuleRef {
+    fn from(mr: ModuleRef) -> Self { Self { value: mr.to_vec() } }
+}
+
+impl From<WasmModule> for generated::VersionedModuleSource {
+    fn from(v: WasmModule) -> Self {
+        Self {
+            module: Some(match v.version {
+                types::smart_contracts::WasmVersion::V0 => {
+                    generated::versioned_module_source::Module::V0(
+                        generated::versioned_module_source::ModuleSourceV0 {
+                            value: v.source.into_inner(),
+                        },
+                    )
+                }
+                types::smart_contracts::WasmVersion::V1 => {
+                    generated::versioned_module_source::Module::V1(
+                        generated::versioned_module_source::ModuleSourceV1 {
+                            value: v.source.into_inner(),
+                        },
+                    )
+                }
+            }),
+        }
+    }
+}
+
+impl From<OwnedContractName> for generated::InitName {
+    fn from(v: OwnedContractName) -> Self {
+        Self {
+            value: v.as_contract_name().get_chain_name().to_string(),
+        }
+    }
+}
+
+impl From<OwnedReceiveName> for generated::ReceiveName {
+    fn from(v: OwnedReceiveName) -> Self {
+        Self {
+            value: v.as_receive_name().get_chain_name().to_string(),
+        }
+    }
+}
+
+impl From<Parameter> for generated::Parameter {
+    fn from(v: Parameter) -> Self {
+        Self {
+            value: v.into_inner(),
+        }
+    }
+}
+
+impl From<InitContractPayload> for generated::InitContractPayload {
+    fn from(v: InitContractPayload) -> Self {
+        Self {
+            amount:     Some(v.amount.into()),
+            module_ref: Some(v.mod_ref.into()),
+            init_name:  Some(v.init_name.into()),
+            parameter:  Some(v.param.into()),
+        }
+    }
+}
+
+impl From<UpdateContractPayload> for generated::UpdateContractPayload {
+    fn from(v: UpdateContractPayload) -> Self {
+        Self {
+            amount:       Some(v.amount.into()),
+            address:      Some(v.address.into()),
+            receive_name: Some(v.receive_name.into()),
+            parameter:    Some(v.message.into()),
+        }
+    }
 }
 
 impl From<&TransactionHash> for generated::TransactionHash {
-    fn from(th: &TransactionHash) -> Self { generated::TransactionHash { value: th.to_vec() } }
+    fn from(th: &TransactionHash) -> Self { Self { value: th.to_vec() } }
 }
 
 impl From<&ContractAddress> for generated::ContractAddress {
     fn from(ca: &ContractAddress) -> Self {
-        generated::ContractAddress {
+        Self {
+            index:    ca.index,
+            subindex: ca.subindex,
+        }
+    }
+}
+
+impl From<ContractAddress> for generated::ContractAddress {
+    fn from(ca: ContractAddress) -> Self {
+        Self {
             index:    ca.index,
             subindex: ca.subindex,
         }
@@ -149,6 +253,10 @@ impl From<&ContractAddress> for generated::ContractAddress {
 
 impl From<Nonce> for generated::SequenceNumber {
     fn from(v: Nonce) -> Self { generated::SequenceNumber { value: v.nonce } }
+}
+
+impl From<UpdateSequenceNumber> for generated::UpdateSequenceNumber {
+    fn from(v: UpdateSequenceNumber) -> Self { generated::UpdateSequenceNumber { value: v.number } }
 }
 
 impl From<Energy> for generated::Energy {
@@ -160,7 +268,64 @@ impl From<TransactionTime> for generated::TransactionTime {
 }
 
 impl From<&Amount> for generated::Amount {
-    fn from(v: &Amount) -> Self { generated::Amount { value: v.micro_ccd } }
+    fn from(v: &Amount) -> Self { Self { value: v.micro_ccd } }
+}
+
+impl From<Amount> for generated::Amount {
+    fn from(v: Amount) -> Self { Self { value: v.micro_ccd } }
+}
+
+impl
+    From<
+        &AccountCredentialMessage<
+            id::constants::IpPairing,
+            id::constants::ArCurve,
+            id::constants::AttributeKind,
+        >,
+    > for generated::CredentialDeployment
+{
+    fn from(
+        v: &AccountCredentialMessage<
+            id::constants::IpPairing,
+            id::constants::ArCurve,
+            id::constants::AttributeKind,
+        >,
+    ) -> Self {
+        Self {
+            message_expiry: Some(v.message_expiry.into()),
+            payload:        Some(generated::credential_deployment::Payload::RawPayload(
+                crypto_common::to_bytes(&v.credential),
+            )),
+        }
+    }
+}
+
+impl From<UpdateInstruction> for generated::UpdateInstruction {
+    fn from(v: UpdateInstruction) -> Self {
+        Self {
+            signatures: Some(generated::SignatureMap {
+                signatures: {
+                    let mut hm = HashMap::new();
+                    for (key_idx, sig) in v.signatures.signatures.into_iter() {
+                        hm.insert(key_idx.index.into(), generated::Signature {
+                            value: sig.sig,
+                        });
+                    }
+                    hm
+                },
+            }),
+            header:     Some(generated::UpdateInstructionHeader {
+                sequence_number: Some(v.header.seq_number.into()),
+                effective_time:  Some(v.header.effective_time.into()),
+                timeout:         Some(v.header.timeout.into()),
+            }),
+            payload:    Some(generated::UpdateInstructionPayload {
+                payload: Some(generated::update_instruction_payload::Payload::RawPayload(
+                    crypto_common::to_bytes(&v.payload),
+                )), // TODO: Can we use the serial instance here? Or will that end up as LE?
+            }),
+        }
+    }
 }
 
 impl IntoRequest<generated::AccountInfoRequest> for (&AccountIdentifier, &BlockIdentifier) {
@@ -237,12 +402,12 @@ impl IntoRequest<generated::SendBlockItemRequest> for transactions::BlockItem<Pa
                                             HashMap::new();
                                         for (key_idx, sig) in sig_map.into_iter() {
                                             acc_sig_map
-                                                .insert(key_idx.0 as u32, generated::Signature {
+                                                .insert(key_idx.0.into(), generated::Signature {
                                                     value: sig.sig,
                                                 });
                                         }
                                         cred_map.insert(
-                                            cred_idx.index as u32,
+                                            cred_idx.index.into(),
                                             generated::AccountSignatureMap {
                                                 signatures: acc_sig_map,
                                             },
@@ -259,33 +424,49 @@ impl IntoRequest<generated::SendBlockItemRequest> for transactions::BlockItem<Pa
                                 energy_amount:   Some(v.header.energy_amount.into()),
                                 expiry:          Some(v.header.expiry.into()),
                             }),
-                            payload:   Some(match &v.payload {
-                                // Payload::DeployModule { module } => todo!(),
-                                // Payload::InitContract { payload } => todo!(),
-                                // Payload::Update { payload } => todo!(),
-                                Payload::Transfer { to_address, amount } => {
-                                    generated::account_transaction::Payload::Transfer(
-                                        generated::account_transaction_effects::AccountTransfer {
-                                            amount:   Some(amount.into()),
-                                            receiver: Some(to_address.into()),
-                                            memo:     None,
+                            payload:   Some(generated::AccountTransactionPayload {
+                                payload: Some(
+                                    match v.payload {
+                                        Payload::DeployModule { module } =>
+                                            generated::account_transaction_payload::Payload::DeployModule(module.into()),
+                                        Payload::InitContract { payload } => generated::account_transaction_payload::Payload::InitContract(payload.into()),
+                                        Payload::Update{ payload } => generated::account_transaction_payload::Payload::UpdateContract(payload.into()),
+                                        Payload::Transfer { to_address, amount } => {
+                                            generated::account_transaction_payload::Payload::Transfer(
+                                                generated::account_transaction_effects::AccountTransfer {
+                                                    amount:   Some(amount.into()),
+                                                    receiver: Some(to_address.into()),
+                                                    memo:     None,
+                                                },
+                                            )
                                         },
-                                    )
-                                }
-                                // Payload::TransferWithSchedule { to, schedule } => todo!(),
-                                // Payload::RegisterData { data } => todo!(),
-                                // Payload::TransferWithMemo { to_address, memo, amount } =>
-                                // todo!(),
-                                pl => generated::account_transaction::Payload::RawPayload(
-                                    crypto_common::to_bytes(&pl),
+                                        Payload::RegisterData { data } =>
+                                            generated::account_transaction_payload::Payload::RegisterData(data.into()),
+                                        Payload::TransferWithMemo { to_address, memo, amount } => {
+                                            generated::account_transaction_payload::Payload::Transfer(
+                                                generated::account_transaction_effects::AccountTransfer {
+                                                    amount:   Some(amount.into()),
+                                                    receiver: Some(to_address.into()),
+                                                    memo:     Some(memo.into()),
+                                                },
+                                            )
+                                        },
+                                        pl => generated::account_transaction_payload::Payload::RawPayload(
+                                            crypto_common::to_bytes(&pl)
+                                        ),
+                                    }
                                 ),
                             }),
                         },
                     ),
                 ),
             },
-            transactions::BlockItem::CredentialDeployment(_) => todo!(),
-            transactions::BlockItem::UpdateInstruction(_) => todo!(),
+            transactions::BlockItem::CredentialDeployment(v) => generated::SendBlockItemRequest {
+                block_item_type: Some(generated::send_block_item_request::BlockItemType::CredentialDeployment(v.as_ref().into())),
+            },
+            transactions::BlockItem::UpdateInstruction(v) => generated::SendBlockItemRequest {
+                block_item_type: Some(generated::send_block_item_request::BlockItemType::UpdateInstruction(v.into())),
+            },
         };
         tonic::Request::new(request)
     }
@@ -307,12 +488,12 @@ impl IntoRequest<generated::SendBlockItemRequest> for transactions::BlockItem<En
                                             HashMap::new();
                                         for (key_idx, sig) in sig_map.into_iter() {
                                             acc_sig_map
-                                                .insert(key_idx.0 as u32, generated::Signature {
+                                                .insert(key_idx.0.into(), generated::Signature {
                                                     value: sig.sig,
                                                 });
                                         }
                                         cred_map.insert(
-                                            cred_idx.index as u32,
+                                            cred_idx.index.into(),
                                             generated::AccountSignatureMap {
                                                 signatures: acc_sig_map,
                                             },
@@ -329,15 +510,29 @@ impl IntoRequest<generated::SendBlockItemRequest> for transactions::BlockItem<En
                                 energy_amount:   Some(v.header.energy_amount.into()),
                                 expiry:          Some(v.header.expiry.into()),
                             }),
-                            payload:   Some(generated::account_transaction::Payload::RawPayload(
-                                v.payload.payload,
-                            )),
+                            payload:   Some(generated::AccountTransactionPayload {
+                                payload: Some(
+                                    generated::account_transaction_payload::Payload::RawPayload(
+                                        v.payload.payload,
+                                    ),
+                                ),
+                            }),
                         },
                     ),
                 ),
             },
-            transactions::BlockItem::CredentialDeployment(_) => todo!(),
-            transactions::BlockItem::UpdateInstruction(_) => todo!(),
+            transactions::BlockItem::CredentialDeployment(v) => generated::SendBlockItemRequest {
+                block_item_type: Some(
+                    generated::send_block_item_request::BlockItemType::CredentialDeployment(
+                        v.as_ref().into(),
+                    ),
+                ),
+            },
+            transactions::BlockItem::UpdateInstruction(v) => generated::SendBlockItemRequest {
+                block_item_type: Some(
+                    generated::send_block_item_request::BlockItemType::UpdateInstruction(v.into()),
+                ),
+            },
         };
         tonic::Request::new(request)
     }
@@ -502,7 +697,6 @@ impl Client {
         Ok(response)
     }
 
-    // TODO: Figure out how to handle signing when this has the unencoded `Payload`.
     pub async fn send_block_item(
         &mut self,
         bi: transactions::BlockItem<EncodedPayload>,

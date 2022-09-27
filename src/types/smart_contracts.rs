@@ -221,6 +221,11 @@ pub struct Parameter {
     bytes: Vec<u8>,
 }
 
+impl Parameter {
+    /// Convert into the inner vector of bytes.
+    pub fn into_inner(self) -> Vec<u8> { self.bytes }
+}
+
 /// Manual implementation to ensure size limit.
 impl Deserial for Parameter {
     fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
@@ -259,7 +264,11 @@ pub struct ModuleSource {
 }
 
 impl ModuleSource {
+    /// Get the size of the module.
     pub fn size(&self) -> u64 { self.bytes.len() as u64 }
+
+    /// Convert into the inner vector of bytes.
+    pub fn into_inner(self) -> Vec<u8> { self.bytes }
 }
 
 impl Deserial for ModuleSource {
