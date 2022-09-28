@@ -1,5 +1,5 @@
-//! Basic example that shows how to send a transaction, in this case a transfer
-//! from the account to itself.
+//! Basic example that shows how to send a transaction with an optional memo, in
+//! this case a transfer from the account to itself.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
@@ -31,6 +31,11 @@ struct App {
     endpoint:  tonic::transport::Endpoint,
     #[structopt(long = "account", help = "Path to the account key file.")]
     keys_path: PathBuf,
+    #[structopt(
+        long = "memo",
+        help = "Optional memo to be included in the transaction."
+    )]
+    memo:      Option<String>,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -60,18 +65,38 @@ async fn main() -> anyhow::Result<()> {
     // set expiry to now + 5min
     let expiry: TransactionTime =
         TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
-    let tx = send::transfer(
-        &keys.account_keys,
-        keys.address,
-        nonce,
-        expiry,
-        keys.address,              // send to ourselves
-        Amount::from_micro_ccd(1), // send 1 microCCD
-    );
+    let tx = match &app.memo {
+        None => {
+            send::transfer(
+                &keys.account_keys,
+                keys.address,
+                nonce,
+                expiry,
+                keys.address,              // send to ourselves
+                Amount::from_micro_ccd(1), // send 1 microCCD
+            )
+        }
+        Some(memo) => {
+            let memo = memo.as_bytes().to_owned().try_into()?;
+            send::transfer_with_memo(
+                &keys.account_keys,
+                keys.address,
+                nonce,
+                expiry,
+                keys.address,
+                Amount::from_micro_ccd(1),
+                memo,
+            )
+        }
+    };
 
     let item = BlockItem::AccountTransaction(tx);
     // submit the transaction to the chain
-    println!("Sending transfer");
+    if let Some(memo) = app.memo {
+        println!("Sending transfer with memo: \"{}\"", memo);
+    } else {
+        println!("Sending transfer");
+    }
     let transaction_hash = client.send_block_item(&item).await?;
     println!(
         "Transaction {} submitted (nonce = {}).",

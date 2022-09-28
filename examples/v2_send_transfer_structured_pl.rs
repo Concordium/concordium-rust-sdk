@@ -1,5 +1,5 @@
-//! Basic example that shows how to send a transaction, in this case a transfer
-//! from the account to itself.
+//! Basic example that shows how to send a transaction with an optional memo, in
+//! this case a transfer from the account to itself.
 //!
 //! It also exercises the endpoint for getting the
 //! transaction sign hash and using sending in a structured protobuf payload.
@@ -40,6 +40,11 @@ struct App {
     endpoint:  tonic::transport::Endpoint,
     #[structopt(long = "account", help = "Path to the account key file.")]
     keys_path: PathBuf,
+    #[structopt(
+        long = "memo",
+        help = "Optional memo to be included in the transaction."
+    )]
+    memo:      Option<String>,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -76,9 +81,19 @@ async fn main() -> anyhow::Result<()> {
         payload_size: PayloadSize::from(0), // The node calculates this automatically now.
         expiry,
     };
-    let payload = Payload::Transfer {
-        to_address: keys.address,
-        amount:     Amount::from_micro_ccd(1),
+    let payload = match &app.memo {
+        None => Payload::Transfer {
+            to_address: keys.address,
+            amount:     Amount::from_micro_ccd(1),
+        },
+        Some(memo) => {
+            let memo = memo.as_bytes().to_owned().try_into()?;
+            Payload::TransferWithMemo {
+                to_address: keys.address,
+                memo,
+                amount: Amount::from_micro_ccd(1),
+            }
+        }
     };
 
     let trx_sign_hash = client
@@ -93,7 +108,11 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // submit the transaction to the chain
-    println!("Sending transfer");
+    if let Some(memo) = app.memo {
+        println!("Sending transfer with memo: \"{}\"", memo);
+    } else {
+        println!("Sending transfer");
+    }
     let transaction_hash = client.send_block_item_unencoded(&bi).await?;
     println!(
         "Transaction {} submitted (nonce = {}).",
