@@ -239,6 +239,26 @@ impl StakePendingChange {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+/// Information about a registered passive or pool delegator.
+pub struct DelegatorInfo {
+    /// The delegator account address.
+    pub account:        AccountAddress,
+    /// The amount of stake currently staked to the pool.
+    pub stake:          Amount,
+    /// Pending change to the current stake of the delegator.
+    pub pending_change: Option<StakePendingChange>,
+}
+
+#[derive(Debug, Clone, Copy)]
+/// Information about a passive or pool delegator fixed in a reward period.
+pub struct DelegatorRewardPeriodInfo {
+    /// The delegator account address.
+    pub account: AccountAddress,
+    /// The amount of stake currently staked to the pool.
+    pub stake:   Amount,
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
 #[serde(
     rename_all = "camelCase",
