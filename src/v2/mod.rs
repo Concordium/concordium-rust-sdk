@@ -730,6 +730,21 @@ impl Client {
             response: stream,
         })
     }
+
+    pub async fn get_account_non_finalized_transactions(
+        &mut self,
+        account_address: &AccountAddress,
+    ) -> endpoints::QueryResult<impl Stream<Item = Result<TransactionHash, tonic::Status>>> {
+        let response = self
+            .client
+            .get_account_non_finalized_transactions(account_address)
+            .await?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(transaction_hash) => transaction_hash.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(stream)
+    }
 }
 
 fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<BlockHash> {
