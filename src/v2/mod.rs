@@ -702,7 +702,27 @@ impl Client {
         let response = self.client.get_identity_providers(bi).await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|result| match result {
-            Ok(delegator) => delegator.try_into(),
+            Ok(ip_info) => ip_info.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_anonymity_revokers(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<
+            impl Stream<Item = Result<id::types::ArInfo<id::constants::ArCurve>, tonic::Status>>,
+        >,
+    > {
+        let response = self.client.get_anonymity_revokers(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(ar_info) => ar_info.try_into(),
             Err(err) => Err(err),
         });
         Ok(QueryResponse {
