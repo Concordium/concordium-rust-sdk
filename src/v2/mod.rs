@@ -12,6 +12,7 @@ use futures::{Stream, StreamExt};
 use tonic::IntoRequest;
 
 mod generated;
+pub mod v2_types;
 
 #[derive(Clone, Debug)]
 /// Client that can perform queries.
@@ -580,6 +581,15 @@ impl Client {
             block_hash,
             response,
         })
+    }
+
+    pub async fn get_node_status(&mut self) -> endpoints::QueryResult<v2_types::NodeStatus> {
+        let response = self
+            .client
+            .get_node_status(generated::Empty::default())
+            .await?;
+        let node_status = v2_types::NodeStatus::try_from(response.into_inner())?;
+        Ok(node_status)
     }
 }
 
