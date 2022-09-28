@@ -8,7 +8,7 @@ use crate::types::{
         ContractAddress, Deserial, OwnedReceiveName, ParseError, Read, Serial, Write,
     },
 };
-use derive_more::{AsRef, Display, From};
+use derive_more::{AsRef, Display, From, Into};
 use num::ToPrimitive;
 use num_bigint::BigUint;
 use num_traits::Zero;
@@ -20,7 +20,8 @@ use thiserror::*;
 /// According to the CIS-2 specification, a token amount can be in the range
 /// from 0 to 2^256 - 1.
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, From, Display)]
-pub struct TokenAmount(BigUint);
+#[repr(transparent)]
+pub struct TokenAmount(pub BigUint);
 
 impl From<TokenAmount> for BigUint {
     fn from(v: TokenAmount) -> BigUint { v.0 }
@@ -118,7 +119,7 @@ impl Deserial for TokenAmount {
 }
 
 /// CIS2 Token ID can be up to 255 bytes in size.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, AsRef)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Into, AsRef)]
 pub struct TokenId(Vec<u8>);
 
 /// Error for constructing a new [`TokenId`](TokenId).
@@ -340,7 +341,7 @@ impl Serial for Transfer {
 pub struct NewTransferParamsError;
 
 /// The parameter type for the NFT contract function `CIS2-NFT.transfer`.
-#[derive(Debug, AsRef, Clone)]
+#[derive(Debug, AsRef, Clone, Into)]
 pub struct TransferParams(Vec<Transfer>);
 
 impl TransferParams {
@@ -422,7 +423,7 @@ impl Serial for UpdateOperator {
 }
 
 /// The parameter type for the NFT contract function `CIS2-NFT.updateOperator`.
-#[derive(Debug, AsRef, Clone)]
+#[derive(Debug, AsRef, Clone, Into)]
 pub struct UpdateOperatorParams(Vec<UpdateOperator>);
 
 /// Error for constructing a new [`UpdateOperatorParams`](UpdateOperatorParams).
@@ -476,7 +477,7 @@ impl Serial for BalanceOfQuery {
 }
 
 /// The parameter type for the NFT contract function `CIS2-NFT.balanceOf`.
-#[derive(Debug, Clone, AsRef)]
+#[derive(Debug, Clone, AsRef, Into)]
 pub struct BalanceOfQueryParams(Vec<BalanceOfQuery>);
 
 /// Error for constructing a new [`BalanceOfQueryParams`](BalanceOfQueryParams).
@@ -513,7 +514,7 @@ impl Serial for BalanceOfQueryParams {
 /// The response which is sent back when calling the contract function
 /// `balanceOf`.
 /// It consists of the list of token amounts in the same order as the queries.
-#[derive(Debug, PartialEq, Eq, AsRef, Clone)]
+#[derive(Debug, PartialEq, Eq, AsRef, Clone, Into)]
 pub struct BalanceOfQueryResponse(Vec<TokenAmount>);
 
 /// Error for constructing a new
@@ -571,7 +572,7 @@ impl Serial for OperatorOfQuery {
 }
 
 /// The parameter type for the NFT contract function `CIS2-NFT.operatorOf`.
-#[derive(Debug, Clone, AsRef)]
+#[derive(Debug, Clone, AsRef, Into)]
 pub struct OperatorOfQueryParams(Vec<OperatorOfQuery>);
 
 /// Error for constructing a new
@@ -610,7 +611,7 @@ impl Serial for OperatorOfQueryParams {
 /// `operatorOf`.
 /// It consists of the list of results in the same order and length as the
 /// queries in the parameter.
-#[derive(Debug, Clone, AsRef)]
+#[derive(Debug, Clone, AsRef, Into)]
 pub struct OperatorOfQueryResponse(Vec<bool>);
 
 /// Error for constructing a new
@@ -652,7 +653,7 @@ impl Deserial for OperatorOfQueryResponse {
 pub type TokenMetadataQuery = TokenId;
 
 /// The parameter type for the NFT contract function `CIS2-NFT.operatorOf`.
-#[derive(Debug, Clone, From, AsRef)]
+#[derive(Debug, Clone, From, AsRef, Into)]
 pub struct TokenMetadataQueryParams(Vec<TokenMetadataQuery>);
 
 /// Error for constructing a new
@@ -690,7 +691,7 @@ impl Serial for TokenMetadataQueryParams {
 /// The response which is sent back when calling the contract function
 /// `tokenMetadata`.
 /// It consists of the list of queries paired with their corresponding result.
-#[derive(Debug, Clone, AsRef)]
+#[derive(Debug, Clone, AsRef, Into)]
 pub struct TokenMetadataQueryResponse(Vec<MetadataUrl>);
 
 /// Error for constructing a new

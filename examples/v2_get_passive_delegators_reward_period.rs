@@ -1,7 +1,8 @@
-//! Test the `GetConsensusInfo` endpoint.
+//! Test the `GetPassiveDelegatorsRewardPeriod` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{endpoints, v2};
+use concordium_rust_sdk::{endpoints::Endpoint, v2};
+use futures::StreamExt;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -11,7 +12,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: endpoints::Endpoint,
+    endpoint: Endpoint,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -22,12 +23,16 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
-    let mut client = v2::Client::new(app.endpoint.clone())
+    let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
+    let mut response_delegators = client
+        .get_passive_delegators_reward_period(&v2::BlockIdentifier::LastFinal)
+        .await?;
 
-    let info = client.get_consensus_info().await?;
-    println!("{:#?}", info);
-
+    println!("Blockhash: {}", response_delegators.block_hash);
+    while let Some(a) = response_delegators.response.next().await.transpose()? {
+        println!(" - {:?}", &a);
+    }
     Ok(())
 }

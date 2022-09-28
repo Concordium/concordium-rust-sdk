@@ -1,7 +1,7 @@
-/// Test the `GetInstanceList` endpoint.
+//! Test the `GetInstanceList` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::v2;
+use concordium_rust_sdk::{endpoints, v2};
 use futures::StreamExt;
 use structopt::StructOpt;
 
@@ -12,7 +12,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: endpoints::Endpoint,
 }
 
 #[tokio::main(flavor = "multi_thread")]

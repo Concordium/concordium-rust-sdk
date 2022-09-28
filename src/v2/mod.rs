@@ -5,7 +5,9 @@ use crate::{
     types::{
         self, hashes,
         hashes::{BlockHash, TransactionHash, TransactionSignHash},
-        smart_contracts::{InstanceInfo, ModuleRef, Parameter, WasmModule},
+        smart_contracts::{
+            ContractContext, InstanceInfo, InvokeContractResult, ModuleRef, Parameter, WasmModule,
+        },
         transactions::{
             self, EncodedPayload, InitContractPayload, Payload, UpdateContractPayload,
             UpdateInstruction,
@@ -15,7 +17,7 @@ use crate::{
     },
 };
 use concordium_contracts_common::{
-    AccountAddress, Amount, ContractAddress, OwnedContractName, OwnedReceiveName,
+    AccountAddress, Amount, ContractAddress, OwnedContractName, OwnedReceiveName, ReceiveName,
 };
 use crypto_common::types::{TransactionSignature, TransactionTime};
 use futures::{Stream, StreamExt};
@@ -112,10 +114,32 @@ impl From<AccountAddress> for generated::AccountAddress {
     }
 }
 
+impl From<&super::types::Address> for generated::Address {
+    fn from(addr: &super::types::Address) -> Self {
+        let ty = match addr {
+            super::types::Address::Account(account) => {
+                generated::address::Type::Account(account.into())
+            }
+            super::types::Address::Contract(contract) => {
+                generated::address::Type::Contract(contract.into())
+            }
+        };
+        generated::Address { r#type: Some(ty) }
+    }
+}
+
 impl From<&Memo> for generated::Memo {
     fn from(v: &Memo) -> Self {
         Self {
             value: v.get_ref().to_owned(),
+        }
+    }
+}
+
+impl<'a> From<ReceiveName<'a>> for generated::ReceiveName {
+    fn from(a: ReceiveName<'a>) -> Self {
+        generated::ReceiveName {
+            value: a.get_chain_name().to_string(),
         }
     }
 }
@@ -126,6 +150,13 @@ impl From<&RegisteredData> for generated::RegisteredData {
             value: v.get_ref().to_owned(),
         }
     }
+}
+impl From<&[u8]> for generated::Parameter {
+    fn from(a: &[u8]) -> Self { generated::Parameter { value: a.to_vec() } }
+}
+
+impl From<&TransactionHash> for generated::TransactionHash {
+    fn from(th: &TransactionHash) -> Self { generated::TransactionHash { value: th.to_vec() } }
 }
 
 impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
@@ -229,21 +260,8 @@ impl From<&UpdateContractPayload> for generated::UpdateContractPayload {
     }
 }
 
-impl From<&TransactionHash> for generated::TransactionHash {
-    fn from(th: &TransactionHash) -> Self { Self { value: th.to_vec() } }
-}
-
 impl From<&ContractAddress> for generated::ContractAddress {
     fn from(ca: &ContractAddress) -> Self {
-        Self {
-            index:    ca.index,
-            subindex: ca.subindex,
-        }
-    }
-}
-
-impl From<ContractAddress> for generated::ContractAddress {
-    fn from(ca: ContractAddress) -> Self {
         Self {
             index:    ca.index,
             subindex: ca.subindex,
@@ -358,11 +376,24 @@ impl IntoRequest<generated::ModuleSourceRequest> for (&ModuleRef, &BlockIdentifi
     }
 }
 
-impl IntoRequest<generated::InstanceInfoRequest> for (&ContractAddress, &BlockIdentifier) {
+impl IntoRequest<generated::InstanceInfoRequest> for (ContractAddress, &BlockIdentifier) {
     fn into_request(self) -> tonic::Request<generated::InstanceInfoRequest> {
         let r = generated::InstanceInfoRequest {
             block_hash: Some(self.1.into()),
             address:    Some(self.0.into()),
+        };
+        tonic::Request::new(r)
+    }
+}
+
+impl<V: Into<Vec<u8>>> IntoRequest<generated::InstanceStateLookupRequest>
+    for (ContractAddress, &BlockIdentifier, V)
+{
+    fn into_request(self) -> tonic::Request<generated::InstanceStateLookupRequest> {
+        let r = generated::InstanceStateLookupRequest {
+            block_hash: Some(self.1.into()),
+            address:    Some(self.0.into()),
+            key:        self.2.into(),
         };
         tonic::Request::new(r)
     }
@@ -555,6 +586,47 @@ impl IntoRequest<generated::SendBlockItemRequest> for &transactions::BlockItem<E
     }
 }
 
+impl IntoRequest<generated::InvokeInstanceRequest> for (&BlockIdentifier, &ContractContext) {
+    fn into_request(self) -> tonic::Request<generated::InvokeInstanceRequest> {
+        let (block, context) = self;
+        tonic::Request::new(generated::InvokeInstanceRequest {
+            block_hash: Some(block.into()),
+            invoker:    context.invoker.as_ref().map(|a| a.into()),
+            instance:   Some((&context.contract).into()),
+            amount:     Some(context.amount.into()),
+            entrypoint: Some(context.method.as_receive_name().into()),
+            parameter:  Some(context.parameter.as_ref().as_slice().into()),
+            energy:     Some(context.energy.into()),
+        })
+    }
+}
+
+impl IntoRequest<generated::PoolInfoRequest> for (&BlockIdentifier, types::BakerId) {
+    fn into_request(self) -> tonic::Request<generated::PoolInfoRequest> {
+        let req = generated::PoolInfoRequest {
+            block_hash: Some(self.0.into()),
+            baker:      Some(self.1.into()),
+        };
+        tonic::Request::new(req)
+    }
+}
+
+impl IntoRequest<generated::BlocksAtHeightRequest> for &endpoints::BlocksAtHeightInput {
+    fn into_request(self) -> tonic::Request<generated::BlocksAtHeightRequest> {
+        tonic::Request::new(self.into())
+    }
+}
+
+impl IntoRequest<generated::GetPoolDelegatorsRequest> for (&BlockIdentifier, types::BakerId) {
+    fn into_request(self) -> tonic::Request<generated::GetPoolDelegatorsRequest> {
+        let req = generated::GetPoolDelegatorsRequest {
+            block_hash: Some(self.0.into()),
+            baker:      Some(self.1.into()),
+        };
+        tonic::Request::new(req)
+    }
+}
+
 impl Client {
     pub async fn new<E: Into<tonic::transport::Endpoint>>(
         endpoint: E,
@@ -598,6 +670,19 @@ impl Client {
             .await?;
         let response = types::queries::ConsensusInfo::try_from(response.into_inner())?;
         Ok(response)
+    }
+
+    pub async fn get_cryptographic_parameters(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::CryptographicParameters>> {
+        let response = self.client.get_cryptographic_parameters(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::CryptographicParameters::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
     }
 
     pub async fn get_account_list(
@@ -660,7 +745,7 @@ impl Client {
 
     pub async fn get_instance_info(
         &mut self,
-        address: &ContractAddress,
+        address: ContractAddress,
         bi: &BlockIdentifier,
     ) -> endpoints::QueryResult<QueryResponse<InstanceInfo>> {
         let response = self.client.get_instance_info((address, bi)).await?;
@@ -696,13 +781,50 @@ impl Client {
             .await?;
         let stream = response.into_inner().map(|x| match x {
             Ok(v) => {
-                let block_hash = v.hash.require_owned().and_then(TryFrom::try_from)?;
-                let height = v.height.require_owned()?.into();
+                let block_hash = v.hash.require().and_then(TryFrom::try_from)?;
+                let height = v.height.require()?.into();
                 Ok(FinalizedBlockInfo { block_hash, height })
             }
             Err(x) => Err(x),
         });
         Ok(stream)
+    }
+
+    pub async fn get_instance_state(
+        &mut self,
+        ca: ContractAddress,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<(Vec<u8>, Vec<u8>), tonic::Status>>>,
+    > {
+        let response = self.client.get_instance_state((ca, bi)).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|x| match x {
+            Ok(v) => {
+                let key = v.key;
+                let value = v.value;
+                Ok((key, value))
+            }
+            Err(x) => Err(x),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn instance_state_lookup(
+        &mut self,
+        ca: ContractAddress,
+        key: impl Into<Vec<u8>>,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<Vec<u8>>> {
+        let response = self.client.instance_state_lookup((ca, bi, key)).await?;
+        let block_hash = extract_metadata(&response)?;
+        Ok(QueryResponse {
+            block_hash,
+            response: response.into_inner().value,
+        })
     }
 
     pub async fn get_block_item_status(
@@ -786,6 +908,191 @@ impl Client {
             }
         }
     }
+
+    pub async fn invoke_instance(
+        &mut self,
+        bi: &BlockIdentifier,
+        context: &ContractContext,
+    ) -> endpoints::QueryResult<QueryResponse<InvokeContractResult>> {
+        let response = self.client.invoke_instance((bi, context)).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = InvokeContractResult::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_block_info(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::queries::BlockInfo>> {
+        let response = self.client.get_block_info(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::queries::BlockInfo::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_baker_list(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::BakerId, tonic::Status>>>,
+    > {
+        let response = self.client.get_baker_list(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|x| x.map(From::from));
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_pool_info(
+        &mut self,
+        block_id: &BlockIdentifier,
+        baker_id: types::BakerId,
+    ) -> endpoints::QueryResult<QueryResponse<types::BakerPoolStatus>> {
+        let response = self.client.get_pool_info((block_id, baker_id)).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::BakerPoolStatus::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_passive_delegation_info(
+        &mut self,
+        block_id: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::PassiveDelegationStatus>> {
+        let response = self.client.get_passive_delegation_info(block_id).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::PassiveDelegationStatus::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_blocks_at_height(
+        &mut self,
+        blocks_at_height_input: &endpoints::BlocksAtHeightInput,
+    ) -> endpoints::QueryResult<Vec<BlockHash>> {
+        let response = self
+            .client
+            .get_blocks_at_height(blocks_at_height_input)
+            .await?;
+        let blocks = response
+            .into_inner()
+            .blocks
+            .into_iter()
+            .map(TryFrom::try_from)
+            .collect::<Result<_, tonic::Status>>()?;
+        Ok(blocks)
+    }
+
+    pub async fn get_tokenomics_info(
+        &mut self,
+        block_id: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::RewardsOverview>> {
+        let response = self.client.get_tokenomics_info(block_id).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::RewardsOverview::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_pool_delegators(
+        &mut self,
+        bi: &BlockIdentifier,
+        baker_id: types::BakerId,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::DelegatorInfo, tonic::Status>>>,
+    > {
+        let response = self.client.get_pool_delegators((bi, baker_id)).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(delegator) => delegator.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_pool_delegators_reward_period(
+        &mut self,
+        bi: &BlockIdentifier,
+        baker_id: types::BakerId,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::DelegatorRewardPeriodInfo, tonic::Status>>>,
+    > {
+        let response = self
+            .client
+            .get_pool_delegators_reward_period((bi, baker_id))
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(delegator) => delegator.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_passive_delegators(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::DelegatorInfo, tonic::Status>>>,
+    > {
+        let response = self.client.get_passive_delegators(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(delegator) => delegator.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_passive_delegators_reward_period(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::DelegatorRewardPeriodInfo, tonic::Status>>>,
+    > {
+        let response = self.client.get_passive_delegators_reward_period(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(delegator) => delegator.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_branches(&mut self) -> endpoints::QueryResult<types::queries::Branch> {
+        let response = self
+            .client
+            .get_branches(generated::Empty::default())
+            .await?;
+        let response = types::queries::Branch::try_from(response.into_inner())?;
+        Ok(response)
+    }
 }
 
 fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<BlockHash> {
@@ -794,7 +1101,7 @@ fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<Bl
             let bytes = bytes.as_bytes();
             if bytes.len() == 64 {
                 let mut hash = [0u8; 32];
-                if let Err(_) = hex::decode_to_slice(bytes, &mut hash) {
+                if hex::decode_to_slice(bytes, &mut hash).is_err() {
                     tonic::Status::unknown("Response does correctly encode the block hash.");
                 }
                 Ok(hash.into())
@@ -819,21 +1126,13 @@ fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<Bl
 /// so it is up to the application to validate inputs if they are required.
 trait Require<E> {
     type A;
-    fn require(&self) -> Result<&Self::A, E>;
-    fn require_owned(self) -> Result<Self::A, E>;
+    fn require(self) -> Result<Self::A, E>;
 }
 
 impl<A> Require<tonic::Status> for Option<A> {
     type A = A;
 
-    fn require(&self) -> Result<&Self::A, tonic::Status> {
-        match self {
-            Some(v) => Ok(v),
-            None => Err(tonic::Status::invalid_argument("missing field in response")),
-        }
-    }
-
-    fn require_owned(self) -> Result<Self::A, tonic::Status> {
+    fn require(self) -> Result<Self::A, tonic::Status> {
         match self {
             Some(v) => Ok(v),
             None => Err(tonic::Status::invalid_argument("missing field in response")),

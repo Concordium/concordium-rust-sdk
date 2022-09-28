@@ -888,17 +888,24 @@ impl Deserial for LeverageFactor {
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+/// Mint distribution that applies to protocol versions 1-3.
 pub struct MintDistributionV0 {
-    pub(crate) mint_per_slot:       MintRate,
-    pub(crate) baking_reward:       AmountFraction,
-    pub(crate) finalization_reward: AmountFraction,
+    /// The increase in CCD amount per slot.
+    pub mint_per_slot:       MintRate,
+    /// Fraction of newly minted CCD allocated to baker rewards.
+    pub baking_reward:       AmountFraction,
+    /// Fraction of newly minted CCD allocated to finalization rewards.
+    pub finalization_reward: AmountFraction,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Serial, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+/// Mint distribution parameters that apply to protocol version 4 and up.
 pub struct MintDistributionV1 {
-    pub(crate) baking_reward:       AmountFraction,
-    pub(crate) finalization_reward: AmountFraction,
+    /// Fraction of newly minted CCD allocated to baker rewards.
+    pub baking_reward:       AmountFraction,
+    /// Fraction of newly minted CCD allocated to finalization rewards.
+    pub finalization_reward: AmountFraction,
 }
 
 impl Deserial for MintDistributionV0 {

@@ -1,3 +1,6 @@
+//! Traverse all transactions on the chain from a given block backwards.
+//! This is mainly used to test integration and compatibility of the SDK with
+//! the node.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{endpoints, types, v2};
@@ -43,7 +46,6 @@ async fn main() -> anyhow::Result<()> {
 
     let gb = consensus_info.genesis_block;
     let mut cb = app.start_block.unwrap_or(consensus_info.best_block);
-    // let mut rng = thread_rng();
     while cb != gb {
         println!("{}", cb);
         let bi = client_v1.get_block_info(&cb).await?;
@@ -57,26 +59,15 @@ async fn main() -> anyhow::Result<()> {
 
             for trx in trxs {
                 let mut cc2 = client_v2.clone();
-                let mut cc = client_v1.clone();
-                let hash = trx.hash.clone();
+                let hash = trx.hash;
                 tokio::spawn(async move {
-                    let res1 = cc.get_transaction_status(&hash).await.expect(&format!(
-                        "Failed to process transaction with v1 client: {}",
-                        hash
-                    ));
-                    let res1_json = serde_json::to_string_pretty(&res1)
-                        .expect("Failed to convert trx status v1 to json");
-                    let res2 = cc2.get_block_item_status(&hash).await.expect(&format!(
-                        "Failed to process transaction with v2 client: {}",
-                        hash
-                    ));
-                    let res2_json = serde_json::to_string_pretty(&res2)
-                        .expect("Failed to convert trx status v2 to json");
-                    if res1_json != res2_json {
-                        println!(
-                            "\n\nERROR: {}\nV1:\n{}\nV2:\n{}\n\n",
-                            hash, res1_json, res2_json
-                        );
+                    match cc2.get_block_item_status(&hash).await {
+                        Ok(res) => {
+                            println!("{:#?}", res);
+                        }
+                        Err(e) => {
+                            panic!("Failed to process transaction: {}: {}", hash, e);
+                        }
                     }
                 });
             }

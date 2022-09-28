@@ -1,7 +1,7 @@
-//! Test the `GetAccountList` endpoint.
+//! Test the `GetPoolDelegators` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::v2;
+use concordium_rust_sdk::{endpoints::Endpoint, v2};
 use futures::StreamExt;
 use structopt::StructOpt;
 
@@ -12,7 +12,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: Endpoint,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -26,12 +26,19 @@ async fn main() -> anyhow::Result<()> {
     let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
-    let mut al = client
-        .get_account_list(&v2::BlockIdentifier::LastFinal)
+    let mut res = client
+        .get_baker_list(&v2::BlockIdentifier::LastFinal)
         .await?;
-    println!("Blockhash: {}", al.block_hash);
-    while let Some(a) = al.response.next().await {
-        println!("{}", a?);
+    println!("Blockhash: {}", res.block_hash);
+    while let Some(a) = res.response.next().await.transpose()? {
+        let mut response_delegators = client
+            .get_pool_delegators(&v2::BlockIdentifier::Given(res.block_hash), a)
+            .await?;
+        println!("Baker {:?}", &a);
+
+        while let Some(a) = response_delegators.response.next().await.transpose()? {
+            println!(" - {:?}", &a);
+        }
     }
     Ok(())
 }

@@ -147,7 +147,7 @@ pub struct ConsensusInfo {
     pub current_era_genesis_time:       chrono::DateTime<chrono::Utc>,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Debug, SerdeSerialize, SerdeDeserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 /// Branches of the tree. This is the part of the tree above the last finalized
 /// block.

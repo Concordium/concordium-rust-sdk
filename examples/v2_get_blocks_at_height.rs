@@ -1,7 +1,7 @@
-//! Test the `GetConsensusInfo` endpoint.
+//! Test the `GetBlocksAtHeight` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{endpoints, v2};
+use concordium_rust_sdk::{endpoints, endpoints::BlocksAtHeightInput, v2};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -22,12 +22,24 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
-    let mut client = v2::Client::new(app.endpoint.clone())
+    let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
 
     let info = client.get_consensus_info().await?;
-    println!("{:#?}", info);
+
+    let response = client
+        .get_blocks_at_height(&BlocksAtHeightInput::Absolute {
+            height: info.best_block_height,
+        })
+        .await?;
+    println!(
+        "Blocks at best block {} ({}):",
+        info.best_block, info.best_block_height
+    );
+    for block in response {
+        println!("{}", block);
+    }
 
     Ok(())
 }

@@ -1,8 +1,9 @@
-//! Test the `GetConsensusInfo` endpoint.
+//! Test the `GetTokenomicsInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{endpoints, v2};
 use structopt::StructOpt;
+
+use concordium_rust_sdk::v2;
 
 #[derive(StructOpt)]
 struct App {
@@ -11,7 +12,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: endpoints::Endpoint,
+    endpoint: tonic::transport::Endpoint,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -22,12 +23,23 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
-    let mut client = v2::Client::new(app.endpoint.clone())
+    let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
 
-    let info = client.get_consensus_info().await?;
-    println!("{:#?}", info);
+    {
+        let ai = client
+            .get_tokenomics_info(&v2::BlockIdentifier::Best)
+            .await?;
+        println!("Best block {:#?}", ai);
+    }
+
+    {
+        let ai = client
+            .get_tokenomics_info(&v2::BlockIdentifier::LastFinal)
+            .await?;
+        println!("Last finalized {:#?}", ai);
+    }
 
     Ok(())
 }

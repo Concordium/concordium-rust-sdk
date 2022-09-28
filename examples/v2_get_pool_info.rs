@@ -1,7 +1,8 @@
-//! Test the `GetConsensusInfo` endpoint.
+//! Test the `GetPoolInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{endpoints, v2};
+use concordium_rust_sdk::v2;
+use futures::StreamExt;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -11,7 +12,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: endpoints::Endpoint,
+    endpoint: tonic::transport::Endpoint,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -22,12 +23,19 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
-    let mut client = v2::Client::new(app.endpoint.clone())
+    let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
 
-    let info = client.get_consensus_info().await?;
-    println!("{:#?}", info);
+    let mut res = client.get_baker_list(&v2::BlockIdentifier::Best).await?;
+    println!("Best block {:#?}:", res.block_hash);
+    while let Some(a) = res.response.next().await {
+        let baker_id = a?;
+        let status = client
+            .get_pool_info(&v2::BlockIdentifier::Best, baker_id)
+            .await?;
+        println!("Baker {:#?}: {:#?}", baker_id, status);
+    }
 
     Ok(())
 }
