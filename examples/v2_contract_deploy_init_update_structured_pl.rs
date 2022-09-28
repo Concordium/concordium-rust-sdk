@@ -3,6 +3,9 @@
 //!
 //! In particular, it uses the "weather" contract which is part of the
 //! [icecream example contract](https://github.com/Concordium/concordium-rust-smart-contracts/blob/main/examples/icecream/src/lib.rs).
+//!
+//! It also exercises the endpoint for getting the
+//! transaction sign hash and using sending in a structured protobuf payload.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_contracts_common::{
@@ -14,7 +17,10 @@ use concordium_rust_sdk::{
     id::types::{AccountAddress, AccountKeys},
     types::{
         smart_contracts::{ModuleRef, Parameter, WasmModule},
-        transactions::{send, BlockItem, InitContractPayload, UpdateContractPayload},
+        transactions::{
+            AccountTransaction, BlockItem, InitContractPayload, Payload, PayloadSize,
+            TransactionHeader, TransactionSigner, UpdateContractPayload,
+        },
         AccountInfo,
     },
     v2,
@@ -126,7 +132,15 @@ async fn main() -> anyhow::Result<()> {
     let expiry: TransactionTime =
         TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
 
-    let tx = match app.action {
+    let header = TransactionHeader {
+        sender: keys.address,
+        nonce,
+        energy_amount: 30000u64.into(),
+        payload_size: PayloadSize::from(0), // The node calculates this automatically now.
+        expiry,
+    };
+
+    let payload = match app.action {
         Action::Init {
             weather,
             module_ref: mod_ref,
@@ -138,15 +152,7 @@ async fn main() -> anyhow::Result<()> {
                 init_name: OwnedContractName::new_unchecked("init_weather".to_string()),
                 param,
             };
-
-            send::init_contract(
-                &keys.account_keys,
-                keys.address,
-                nonce,
-                expiry,
-                payload,
-                10000u64.into(),
-            )
+            Payload::InitContract { payload }
         }
         Action::Update { weather, address } => {
             let message = Parameter::from(concordium_contracts_common::to_bytes(&weather));
@@ -156,26 +162,28 @@ async fn main() -> anyhow::Result<()> {
                 receive_name: OwnedReceiveName::new_unchecked("weather.set".to_string()),
                 message,
             };
-
-            send::update_contract(
-                &keys.account_keys,
-                keys.address,
-                nonce,
-                expiry,
-                payload,
-                10000u64.into(),
-            )
+            Payload::Update { payload }
         }
         Action::Deploy { module_path } => {
             let contents = std::fs::read(module_path).context("Could not read contract module.")?;
-            let payload: WasmModule = Deserial::deserial(&mut std::io::Cursor::new(contents))?;
-            send::deploy_module(&keys.account_keys, keys.address, nonce, expiry, payload)
+            let module: WasmModule = Deserial::deserial(&mut std::io::Cursor::new(contents))?;
+            Payload::DeployModule { module }
         }
     };
 
-    let item = BlockItem::AccountTransaction(tx);
+    let trx_sign_hash = client
+        .get_account_transaction_sign_hash(&header, &payload)
+        .await?;
+
+    let signature = keys.account_keys.sign_transaction_hash(&trx_sign_hash);
+    let bi = BlockItem::AccountTransaction(AccountTransaction {
+        signature,
+        header,
+        payload,
+    });
+
     // submit the transaction to the chain
-    let transaction_hash = client.send_block_item(&item).await?;
+    let transaction_hash = client.send_block_item_unencoded(&bi).await?;
     println!(
         "Transaction {} submitted (nonce = {}).",
         transaction_hash, nonce,

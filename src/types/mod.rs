@@ -2095,8 +2095,8 @@ pub struct RegisteredData {
 }
 
 impl RegisteredData {
-    /// Convert into the inner vector of bytes.
-    pub fn into_inner(self) -> Vec<u8> { self.bytes }
+    /// Get a reference to the data.
+    pub fn get_ref(&self) -> &[u8] { &self.bytes }
 }
 
 /// Registered data is too large.
@@ -2157,8 +2157,8 @@ pub struct Memo {
 }
 
 impl Memo {
-    /// Convert into the inner vector of bytes.
-    pub fn into_inner(self) -> Vec<u8> { self.bytes }
+    /// Get a reference to the inner data.
+    pub fn get_ref(&self) -> &[u8] { &self.bytes }
 }
 
 /// An error used to signal that an object was too big to be converted.

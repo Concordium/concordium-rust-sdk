@@ -222,8 +222,8 @@ pub struct Parameter {
 }
 
 impl Parameter {
-    /// Convert into the inner vector of bytes.
-    pub fn into_inner(self) -> Vec<u8> { self.bytes }
+    /// Get a reference to the inner data.
+    pub fn get_ref(&self) -> &[u8] { &self.bytes }
 }
 
 /// Manual implementation to ensure size limit.
@@ -267,8 +267,8 @@ impl ModuleSource {
     /// Get the size of the module.
     pub fn size(&self) -> u64 { self.bytes.len() as u64 }
 
-    /// Convert into the inner vector of bytes.
-    pub fn into_inner(self) -> Vec<u8> { self.bytes }
+    /// Get a reference to the inner data.
+    pub fn get_ref(&self) -> &[u8] { &self.bytes }
 }
 
 impl Deserial for ModuleSource {

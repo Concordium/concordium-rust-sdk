@@ -169,6 +169,19 @@ impl TryFrom<TransactionHash> for super::hashes::TransactionHash {
     }
 }
 
+impl TryFrom<AccountTransactionSignHash> for super::hashes::TransactionSignHash {
+    type Error = tonic::Status;
+
+    fn try_from(value: AccountTransactionSignHash) -> Result<Self, Self::Error> {
+        match value.value.try_into() {
+            Ok(hash) => Ok(Self::new(hash)),
+            Err(_) => Err(tonic::Status::internal(
+                "Unexpected account transaction sign hash format.",
+            )),
+        }
+    }
+}
+
 impl TryFrom<Sha256Hash> for super::hashes::Hash {
     type Error = tonic::Status;
 

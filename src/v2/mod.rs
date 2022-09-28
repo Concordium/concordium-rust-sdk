@@ -4,7 +4,7 @@ use crate::{
     endpoints,
     types::{
         self, hashes,
-        hashes::{BlockHash, TransactionHash},
+        hashes::{BlockHash, TransactionHash, TransactionSignHash},
         smart_contracts::{InstanceInfo, ModuleRef, Parameter, WasmModule},
         transactions::{
             self, EncodedPayload, InitContractPayload, Payload, UpdateContractPayload,
@@ -17,7 +17,7 @@ use crate::{
 use concordium_contracts_common::{
     AccountAddress, Amount, ContractAddress, OwnedContractName, OwnedReceiveName,
 };
-use crypto_common::types::TransactionTime;
+use crypto_common::types::{TransactionSignature, TransactionTime};
 use futures::{Stream, StreamExt};
 use id::types::AccountCredentialMessage;
 use tonic::IntoRequest;
@@ -112,18 +112,18 @@ impl From<AccountAddress> for generated::AccountAddress {
     }
 }
 
-impl From<Memo> for generated::Memo {
-    fn from(v: Memo) -> Self {
+impl From<&Memo> for generated::Memo {
+    fn from(v: &Memo) -> Self {
         Self {
-            value: v.into_inner(),
+            value: v.get_ref().to_owned(),
         }
     }
 }
 
-impl From<RegisteredData> for generated::RegisteredData {
-    fn from(v: RegisteredData) -> Self {
+impl From<&RegisteredData> for generated::RegisteredData {
+    fn from(v: &RegisteredData) -> Self {
         Self {
-            value: v.into_inner(),
+            value: v.get_ref().to_owned(),
         }
     }
 }
@@ -160,21 +160,21 @@ impl From<ModuleRef> for generated::ModuleRef {
     fn from(mr: ModuleRef) -> Self { Self { value: mr.to_vec() } }
 }
 
-impl From<WasmModule> for generated::VersionedModuleSource {
-    fn from(v: WasmModule) -> Self {
+impl From<&WasmModule> for generated::VersionedModuleSource {
+    fn from(v: &WasmModule) -> Self {
         Self {
             module: Some(match v.version {
                 types::smart_contracts::WasmVersion::V0 => {
                     generated::versioned_module_source::Module::V0(
                         generated::versioned_module_source::ModuleSourceV0 {
-                            value: v.source.into_inner(),
+                            value: v.source.get_ref().to_owned(),
                         },
                     )
                 }
                 types::smart_contracts::WasmVersion::V1 => {
                     generated::versioned_module_source::Module::V1(
                         generated::versioned_module_source::ModuleSourceV1 {
-                            value: v.source.into_inner(),
+                            value: v.source.get_ref().to_owned(),
                         },
                     )
                 }
@@ -183,48 +183,48 @@ impl From<WasmModule> for generated::VersionedModuleSource {
     }
 }
 
-impl From<OwnedContractName> for generated::InitName {
-    fn from(v: OwnedContractName) -> Self {
+impl From<&OwnedContractName> for generated::InitName {
+    fn from(v: &OwnedContractName) -> Self {
         Self {
             value: v.as_contract_name().get_chain_name().to_string(),
         }
     }
 }
 
-impl From<OwnedReceiveName> for generated::ReceiveName {
-    fn from(v: OwnedReceiveName) -> Self {
+impl From<&OwnedReceiveName> for generated::ReceiveName {
+    fn from(v: &OwnedReceiveName) -> Self {
         Self {
             value: v.as_receive_name().get_chain_name().to_string(),
         }
     }
 }
 
-impl From<Parameter> for generated::Parameter {
-    fn from(v: Parameter) -> Self {
+impl From<&Parameter> for generated::Parameter {
+    fn from(v: &Parameter) -> Self {
         Self {
-            value: v.into_inner(),
+            value: v.get_ref().to_owned(),
         }
     }
 }
 
-impl From<InitContractPayload> for generated::InitContractPayload {
-    fn from(v: InitContractPayload) -> Self {
+impl From<&InitContractPayload> for generated::InitContractPayload {
+    fn from(v: &InitContractPayload) -> Self {
         Self {
             amount:     Some(v.amount.into()),
             module_ref: Some(v.mod_ref.into()),
-            init_name:  Some(v.init_name.into()),
-            parameter:  Some(v.param.into()),
+            init_name:  Some((&v.init_name).into()),
+            parameter:  Some((&v.param).into()),
         }
     }
 }
 
-impl From<UpdateContractPayload> for generated::UpdateContractPayload {
-    fn from(v: UpdateContractPayload) -> Self {
+impl From<&UpdateContractPayload> for generated::UpdateContractPayload {
+    fn from(v: &UpdateContractPayload) -> Self {
         Self {
             amount:       Some(v.amount.into()),
             address:      Some(v.address.into()),
-            receive_name: Some(v.receive_name.into()),
-            parameter:    Some(v.message.into()),
+            receive_name: Some((&v.receive_name).into()),
+            parameter:    Some((&v.message).into()),
         }
     }
 }
@@ -300,15 +300,15 @@ impl
     }
 }
 
-impl From<UpdateInstruction> for generated::UpdateInstruction {
-    fn from(v: UpdateInstruction) -> Self {
+impl From<&UpdateInstruction> for generated::UpdateInstruction {
+    fn from(v: &UpdateInstruction) -> Self {
         Self {
             signatures: Some(generated::SignatureMap {
                 signatures: {
                     let mut hm = HashMap::new();
-                    for (key_idx, sig) in v.signatures.signatures.into_iter() {
+                    for (key_idx, sig) in v.signatures.signatures.iter() {
                         hm.insert(key_idx.index.into(), generated::Signature {
-                            value: sig.sig,
+                            value: sig.sig.to_owned(),
                         });
                     }
                     hm
@@ -386,134 +386,151 @@ impl IntoRequest<generated::AccountAddress> for &AccountAddress {
     }
 }
 
-impl IntoRequest<generated::SendBlockItemRequest> for transactions::BlockItem<Payload> {
+impl From<transactions::TransactionHeader> for generated::AccountTransactionHeader {
+    fn from(v: transactions::TransactionHeader) -> Self { (&v).into() }
+}
+
+impl From<&transactions::TransactionHeader> for generated::AccountTransactionHeader {
+    fn from(v: &transactions::TransactionHeader) -> Self {
+        Self {
+            sender:          Some(generated::AccountAddress::from(v.sender)),
+            sequence_number: Some(v.nonce.into()),
+            energy_amount:   Some(v.energy_amount.into()),
+            expiry:          Some(v.expiry.into()),
+        }
+    }
+}
+
+impl From<transactions::Payload> for generated::AccountTransactionPayload {
+    fn from(v: transactions::Payload) -> Self { (&v).into() }
+}
+
+impl From<&transactions::Payload> for generated::AccountTransactionPayload {
+    fn from(v: &transactions::Payload) -> Self {
+        Self {
+            payload: Some(match v {
+                Payload::DeployModule { module } => {
+                    generated::account_transaction_payload::Payload::DeployModule(module.into())
+                }
+                Payload::InitContract { payload } => {
+                    generated::account_transaction_payload::Payload::InitContract(payload.into())
+                }
+                Payload::Update { payload } => {
+                    generated::account_transaction_payload::Payload::UpdateContract(payload.into())
+                }
+                Payload::Transfer { to_address, amount } => {
+                    generated::account_transaction_payload::Payload::Transfer(
+                        generated::account_transaction_effects::AccountTransfer {
+                            amount:   Some(amount.into()),
+                            receiver: Some(to_address.into()),
+                            memo:     None,
+                        },
+                    )
+                }
+                Payload::RegisterData { data } => {
+                    generated::account_transaction_payload::Payload::RegisterData(data.into())
+                }
+                Payload::TransferWithMemo {
+                    to_address,
+                    memo,
+                    amount,
+                } => generated::account_transaction_payload::Payload::Transfer(
+                    generated::account_transaction_effects::AccountTransfer {
+                        amount:   Some(amount.into()),
+                        receiver: Some(to_address.into()),
+                        memo:     Some(memo.into()),
+                    },
+                ),
+                pl => generated::account_transaction_payload::Payload::RawPayload(
+                    crypto_common::to_bytes(&pl),
+                ),
+            }),
+        }
+    }
+}
+
+impl From<TransactionSignature> for generated::AccountTransactionSignature {
+    fn from(v: TransactionSignature) -> Self { (&v).into() }
+}
+
+impl From<&TransactionSignature> for generated::AccountTransactionSignature {
+    fn from(v: &TransactionSignature) -> Self {
+        Self {
+            signatures: {
+                let mut cred_map: HashMap<u32, generated::AccountSignatureMap> = HashMap::new();
+                for (cred_idx, sig_map) in v.signatures.iter() {
+                    let mut acc_sig_map: HashMap<u32, generated::Signature> = HashMap::new();
+                    for (key_idx, sig) in sig_map.iter() {
+                        acc_sig_map.insert(key_idx.0.into(), generated::Signature {
+                            value: sig.sig.to_owned(),
+                        });
+                    }
+                    cred_map.insert(cred_idx.index.into(), generated::AccountSignatureMap {
+                        signatures: acc_sig_map,
+                    });
+                }
+                cred_map
+            },
+        }
+    }
+}
+
+impl IntoRequest<generated::UnsignedAccountTransaction>
+    for (&transactions::TransactionHeader, &transactions::Payload)
+{
+    fn into_request(self) -> tonic::Request<generated::UnsignedAccountTransaction> {
+        let request = generated::UnsignedAccountTransaction {
+            header:  Some(self.0.into()),
+            payload: Some(self.1.into()),
+        };
+        tonic::Request::new(request)
+    }
+}
+
+impl IntoRequest<generated::SendBlockItemRequest> for &transactions::BlockItem<Payload> {
     fn into_request(self) -> tonic::Request<generated::SendBlockItemRequest> {
         let request = match self {
             transactions::BlockItem::AccountTransaction(v) => generated::SendBlockItemRequest {
                 block_item_type: Some(
                     generated::send_block_item_request::BlockItemType::AccountTransaction(
                         generated::AccountTransaction {
-                            signature: Some(generated::AccountTransactionSignature {
-                                signatures: {
-                                    let mut cred_map: HashMap<u32, generated::AccountSignatureMap> =
-                                        HashMap::new();
-                                    for (cred_idx, sig_map) in v.signature.signatures.into_iter() {
-                                        let mut acc_sig_map: HashMap<u32, generated::Signature> =
-                                            HashMap::new();
-                                        for (key_idx, sig) in sig_map.into_iter() {
-                                            acc_sig_map
-                                                .insert(key_idx.0.into(), generated::Signature {
-                                                    value: sig.sig,
-                                                });
-                                        }
-                                        cred_map.insert(
-                                            cred_idx.index.into(),
-                                            generated::AccountSignatureMap {
-                                                signatures: acc_sig_map,
-                                            },
-                                        );
-                                    }
-                                    cred_map
-                                },
-                            }),
-                            header:    Some(generated::AccountTransactionHeader {
-                                sender:          Some(generated::AccountAddress::from(
-                                    &v.header.sender,
-                                )),
-                                sequence_number: Some(v.header.nonce.into()),
-                                energy_amount:   Some(v.header.energy_amount.into()),
-                                expiry:          Some(v.header.expiry.into()),
-                            }),
-                            payload:   Some(generated::AccountTransactionPayload {
-                                payload: Some(
-                                    match v.payload {
-                                        Payload::DeployModule { module } =>
-                                            generated::account_transaction_payload::Payload::DeployModule(module.into()),
-                                        Payload::InitContract { payload } => generated::account_transaction_payload::Payload::InitContract(payload.into()),
-                                        Payload::Update{ payload } => generated::account_transaction_payload::Payload::UpdateContract(payload.into()),
-                                        Payload::Transfer { to_address, amount } => {
-                                            generated::account_transaction_payload::Payload::Transfer(
-                                                generated::account_transaction_effects::AccountTransfer {
-                                                    amount:   Some(amount.into()),
-                                                    receiver: Some(to_address.into()),
-                                                    memo:     None,
-                                                },
-                                            )
-                                        },
-                                        Payload::RegisterData { data } =>
-                                            generated::account_transaction_payload::Payload::RegisterData(data.into()),
-                                        Payload::TransferWithMemo { to_address, memo, amount } => {
-                                            generated::account_transaction_payload::Payload::Transfer(
-                                                generated::account_transaction_effects::AccountTransfer {
-                                                    amount:   Some(amount.into()),
-                                                    receiver: Some(to_address.into()),
-                                                    memo:     Some(memo.into()),
-                                                },
-                                            )
-                                        },
-                                        pl => generated::account_transaction_payload::Payload::RawPayload(
-                                            crypto_common::to_bytes(&pl)
-                                        ),
-                                    }
-                                ),
-                            }),
+                            signature: Some((&v.signature).into()),
+                            header:    Some((&v.header).into()),
+                            payload:   Some((&v.payload).into()),
                         },
                     ),
                 ),
             },
             transactions::BlockItem::CredentialDeployment(v) => generated::SendBlockItemRequest {
-                block_item_type: Some(generated::send_block_item_request::BlockItemType::CredentialDeployment(v.as_ref().into())),
+                block_item_type: Some(
+                    generated::send_block_item_request::BlockItemType::CredentialDeployment(
+                        v.as_ref().into(),
+                    ),
+                ),
             },
             transactions::BlockItem::UpdateInstruction(v) => generated::SendBlockItemRequest {
-                block_item_type: Some(generated::send_block_item_request::BlockItemType::UpdateInstruction(v.into())),
+                block_item_type: Some(
+                    generated::send_block_item_request::BlockItemType::UpdateInstruction(v.into()),
+                ),
             },
         };
         tonic::Request::new(request)
     }
 }
 
-impl IntoRequest<generated::SendBlockItemRequest> for transactions::BlockItem<EncodedPayload> {
+impl IntoRequest<generated::SendBlockItemRequest> for &transactions::BlockItem<EncodedPayload> {
     fn into_request(self) -> tonic::Request<generated::SendBlockItemRequest> {
         let request = match self {
             transactions::BlockItem::AccountTransaction(v) => generated::SendBlockItemRequest {
                 block_item_type: Some(
                     generated::send_block_item_request::BlockItemType::AccountTransaction(
                         generated::AccountTransaction {
-                            signature: Some(generated::AccountTransactionSignature {
-                                signatures: {
-                                    let mut cred_map: HashMap<u32, generated::AccountSignatureMap> =
-                                        HashMap::new();
-                                    for (cred_idx, sig_map) in v.signature.signatures.into_iter() {
-                                        let mut acc_sig_map: HashMap<u32, generated::Signature> =
-                                            HashMap::new();
-                                        for (key_idx, sig) in sig_map.into_iter() {
-                                            acc_sig_map
-                                                .insert(key_idx.0.into(), generated::Signature {
-                                                    value: sig.sig,
-                                                });
-                                        }
-                                        cred_map.insert(
-                                            cred_idx.index.into(),
-                                            generated::AccountSignatureMap {
-                                                signatures: acc_sig_map,
-                                            },
-                                        );
-                                    }
-                                    cred_map
-                                },
-                            }),
-                            header:    Some(generated::AccountTransactionHeader {
-                                sender:          Some(generated::AccountAddress::from(
-                                    &v.header.sender,
-                                )),
-                                sequence_number: Some(v.header.nonce.into()),
-                                energy_amount:   Some(v.header.energy_amount.into()),
-                                expiry:          Some(v.header.expiry.into()),
-                            }),
+                            signature: Some((&v.signature).into()),
+                            header:    Some((&v.header).into()),
                             payload:   Some(generated::AccountTransactionPayload {
                                 payload: Some(
                                     generated::account_transaction_payload::Payload::RawPayload(
-                                        v.payload.payload,
+                                        v.payload.payload.to_owned(),
                                     ),
                                 ),
                             }),
@@ -699,7 +716,29 @@ impl Client {
 
     pub async fn send_block_item(
         &mut self,
-        bi: transactions::BlockItem<EncodedPayload>,
+        bi: &transactions::BlockItem<EncodedPayload>,
+    ) -> endpoints::RPCResult<TransactionHash> {
+        let response = self.client.send_block_item(bi).await?;
+        let response = TransactionHash::try_from(response.into_inner())?;
+        Ok(response)
+    }
+
+    pub async fn get_account_transaction_sign_hash(
+        &mut self,
+        header: &transactions::TransactionHeader,
+        payload: &transactions::Payload,
+    ) -> endpoints::RPCResult<TransactionSignHash> {
+        let response = self
+            .client
+            .get_account_transaction_sign_hash((header, payload))
+            .await?;
+        let response = TransactionSignHash::try_from(response.into_inner())?;
+        Ok(response)
+    }
+
+    pub async fn send_block_item_unencoded(
+        &mut self,
+        bi: &transactions::BlockItem<Payload>,
     ) -> endpoints::RPCResult<TransactionHash> {
         let response = self.client.send_block_item(bi).await?;
         let response = TransactionHash::try_from(response.into_inner())?;
