@@ -1,7 +1,7 @@
+//! Get the 'NodeStatus' of the given node.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{endpoints, v2};
-use futures::StreamExt;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -26,6 +26,6 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect to the node.")?;
     let node_status = client.get_node_status().await?;
-    println!("node status: {:?}", node_status);
+    println!("{:?}", node_status);
     Ok(())
 }
