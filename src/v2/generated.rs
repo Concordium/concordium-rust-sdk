@@ -2262,6 +2262,120 @@ impl TryFrom<Branch> for super::types::queries::Branch {
     }
 }
 
+impl TryFrom<election_info::Baker> for super::types::BirkBaker {
+    type Error = tonic::Status;
+
+    fn try_from(info: election_info::Baker) -> Result<Self, Self::Error> {
+        Ok(Self {
+            baker_id:            info.baker.require()?.into(),
+            baker_lottery_power: info.lottery_power,
+            baker_account:       info.account.require()?.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<ElectionInfo> for super::types::BirkParameters {
+    type Error = tonic::Status;
+
+    fn try_from(info: ElectionInfo) -> Result<Self, Self::Error> {
+        Ok(Self {
+            election_difficulty: info.election_difficulty.require()?.try_into()?,
+            election_nonce:      info.election_nonce.require()?.try_into()?,
+            bakers:              info
+                .baker_election_info
+                .into_iter()
+                .map(|c| c.try_into())
+                .collect::<Result<_, _>>()?,
+        })
+    }
+}
+
+impl TryFrom<block_special_event::AccountAmounts>
+    for BTreeMap<super::AccountAddress, super::Amount>
+{
+    type Error = tonic::Status;
+
+    fn try_from(message: block_special_event::AccountAmounts) -> Result<Self, Self::Error> {
+        fn mapper(
+            entry: block_special_event::account_amounts::Entry,
+        ) -> Result<(super::AccountAddress, super::Amount), tonic::Status> {
+            Ok((
+                entry.account.require()?.try_into()?,
+                entry.amount.require()?.into(),
+            ))
+        }
+
+        Ok(message
+            .entries
+            .into_iter()
+            .map(mapper)
+            .collect::<Result<_, _>>()?)
+    }
+}
+
+impl TryFrom<BlockSpecialEvent> for super::types::SpecialTransactionOutcome {
+    type Error = tonic::Status;
+
+    fn try_from(message: BlockSpecialEvent) -> Result<Self, Self::Error> {
+        let event = match message.event.require()? {
+            block_special_event::Event::BakingRewards(event) => Self::BakingRewards {
+                baker_rewards: event.baker_rewards.require()?.try_into()?,
+                remainder:     event.remainder.require()?.into(),
+            },
+            block_special_event::Event::Mint(event) => Self::Mint {
+                mint_baking_reward:               event.mint_baking_reward.require()?.into(),
+                mint_finalization_reward:         event.mint_finalization_reward.require()?.into(),
+                mint_platform_development_charge: event
+                    .mint_platform_development_charge
+                    .require()?
+                    .into(),
+                foundation_account:               event.foundation_account.require()?.try_into()?,
+            },
+            block_special_event::Event::FinalizationRewards(event) => Self::FinalizationRewards {
+                finalization_rewards: event.finalization_rewards.require()?.try_into()?,
+                remainder:            event.remainder.require()?.into(),
+            },
+            block_special_event::Event::BlockReward(event) => Self::BlockReward {
+                transaction_fees:   event.transaction_fees.require()?.into(),
+                old_gas_account:    event.old_gas_account.require()?.into(),
+                new_gas_account:    event.new_gas_account.require()?.into(),
+                baker_reward:       event.baker_reward.require()?.into(),
+                foundation_charge:  event.foundation_charge.require()?.into(),
+                baker:              event.baker.require()?.try_into()?,
+                foundation_account: event.foundation_account.require()?.try_into()?,
+            },
+            block_special_event::Event::PaydayFoundationReward(event) => {
+                Self::PaydayFoundationReward {
+                    foundation_account: event.foundation_account.require()?.try_into()?,
+                    development_charge: event.development_charge.require()?.into(),
+                }
+            }
+            block_special_event::Event::PaydayAccountReward(event) => Self::PaydayAccountReward {
+                account:             event.account.require()?.try_into()?,
+                transaction_fees:    event.transaction_fees.require()?.into(),
+                baker_reward:        event.baker_reward.require()?.into(),
+                finalization_reward: event.finalization_reward.require()?.into(),
+            },
+            block_special_event::Event::BlockAccrueReward(event) => Self::BlockAccrueReward {
+                transaction_fees:  event.transaction_fees.require()?.into(),
+                old_gas_account:   event.old_gas_account.require()?.into(),
+                new_gas_account:   event.new_gas_account.require()?.into(),
+                baker_reward:      event.baker_reward.require()?.into(),
+                passive_reward:    event.passive_reward.require()?.into(),
+                foundation_charge: event.foundation_charge.require()?.into(),
+                baker_id:          event.baker.require()?.into(),
+            },
+            block_special_event::Event::PaydayPoolReward(event) => Self::PaydayPoolReward {
+                pool_owner:          event.pool_owner.map(|b| b.into()),
+                transaction_fees:    event.transaction_fees.require()?.into(),
+                baker_reward:        event.baker_reward.require()?.into(),
+                finalization_reward: event.finalization_reward.require()?.into(),
+            },
+        };
+        Ok(event)
+    }
+}
+
 #[cfg(test)]
 mod test {
 
@@ -2315,33 +2429,5 @@ mod test {
         let to = QBranch::try_from(from).expect("Failed to convert branch");
 
         assert_eq!(to, to_target);
-    }
-}
-
-impl TryFrom<election_info::Baker> for super::types::BirkBaker {
-    type Error = tonic::Status;
-
-    fn try_from(info: election_info::Baker) -> Result<Self, Self::Error> {
-        Ok(Self {
-            baker_id:            info.baker.require()?.into(),
-            baker_lottery_power: info.lottery_power,
-            baker_account:       info.account.require()?.try_into()?,
-        })
-    }
-}
-
-impl TryFrom<ElectionInfo> for super::types::BirkParameters {
-    type Error = tonic::Status;
-
-    fn try_from(info: ElectionInfo) -> Result<Self, Self::Error> {
-        Ok(Self {
-            election_difficulty: info.election_difficulty.require()?.try_into()?,
-            election_nonce:      info.election_nonce.require()?.try_into()?,
-            bakers:              info
-                .baker_election_info
-                .into_iter()
-                .map(|c| c.try_into())
-                .collect::<Result<_, _>>()?,
-        })
     }
 }
