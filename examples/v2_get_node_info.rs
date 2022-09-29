@@ -1,4 +1,4 @@
-//! Get the 'NodeStatus' of the given node.
+//! Get the 'NodeInfo' of the given node.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{endpoints, v2};
@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
     let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect to the node.")?;
-    let node_status = client.get_node_status().await?;
-    println!("{:?}", node_status);
+    let node_info = client.get_node_info().await?;
+    println!("{:?}", node_info);
     Ok(())
 }
