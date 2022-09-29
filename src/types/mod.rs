@@ -29,6 +29,7 @@ use std::{
     marker::PhantomData,
 };
 use thiserror::Error;
+use crate::v2::Require;
 
 /// Cryptographic context for the chain. These parameters are used to support
 /// zero-knowledge proofs.
@@ -2648,5 +2649,154 @@ mod transaction_fee_distribution {
                 Err("Transaction fee fractions exceed 100%.")
             }
         }
+    }
+}
+
+/// The network status of a node informs of the following:
+/// * The node id. An id which it uses to identify itself to other peers and 
+///    it is used for logging purposes internally. 
+///    NB. The 'node_id' is spoofable and as such should not serve as a trust instrument.
+/// * 'peer_total_sent' is the total amount of packets sent by the node.
+/// * 'peer_total_received' is the total amount of packets received by the node.
+/// * 'avg_bps_in' is the average bytes per second received by the node.
+/// * 'avg_bps_out' is the average bytes per second transmitted by the node.
+#[derive(Debug)]
+pub struct NetworkStatus {
+    pub node_id:             String,
+    pub peer_total_sent:     u64,
+    pub peer_total_received: u64,
+    pub avg_bps_in:          u64,
+    pub avg_bps_out:         u64,
+}
+
+/// A UNIX timestamp 
+/// The number of seconds that has elapsed since 1970 00:00:00 UTC.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
+pub struct UnixTimestamp (u64);
+
+impl From<UnixTimestamp> for chrono::DateTime<chrono::Utc> {
+    fn from(ts: UnixTimestamp) -> Self {
+        chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
+            + chrono::Duration::seconds(ts.0 as i64)
+    }
+}
+
+/// A node can either be a 'Bootstrapper' or 'Node'.
+/// The 'Bootstrapper' is a special kind of node that does not participate 
+/// in consensus but merely relay peers.
+/// The 'Node' is a node that participates in consensus either passively (only processing incoming blocks)
+/// or actively i.e. by being a baker.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Display, From, TryInto)]
+pub enum NodeType {
+    Bootstrapper, 
+    Node,
+}
+
+impl TryFrom<i32> for NodeType {
+    type Error = anyhow::Error;
+
+    // Parse the node type.
+    // The node type is specified via an enum:
+    // * 0 => The node is a bootstrapper and is simply relaying peers.
+    // * 1 => The node is participating in consensus either actively (baking) or passively (solely processing blocks).
+    // If the result is none of the above we return an error "Malformed node type."
+    fn try_from(v: i32) -> Result<Self, Self::Error> {
+        match v {
+            x if x == NodeType::Bootstrapper as i32 => Ok(NodeType::Bootstrapper),
+            x if x == NodeType::Node as i32 => Ok(NodeType::Node),
+            _ => Err(anyhow::anyhow!("Malformed node type")),
+        }
+    }
+}
+
+#[derive(Debug)]
+/// Consensus related information for a node.
+pub enum ConsensusStatus {
+    // The consensus protocol is not running on the node.
+    // This only occurs when the node does not support the protocol on the chain or the node is a 'Bootstrapper'.
+    ConsensusNotRunning,
+    // The node is a passive member of the consensus. This means: 
+    // * The node is processing blocks.
+    // * The node is relaying transactions and blocks onto the network.
+    // * The node is responding to catch up messages from its peers.
+    // * In particular this means that the node is __not__ baking blocks.
+    ConsensusPassive,
+    // The node has been configured with baker keys however it is not currently baking and possilby never will.
+    NotInCommittee,
+    // The baker keys are registered however the baker is not in the committee 
+    // for the current 'Epoch'.
+    AddedButNotActiveInCommittee,
+    // The node has been configured with baker keys that does not match the account.
+    AddedButWrongKeys,
+    // The node is member of the baking committee.
+    Baker(crate::types::BakerId),
+    // The node is member of the baking and finalization committee.
+    Finalizer(crate::types::BakerId),
+}
+
+#[derive(Debug)]
+/// The status of the requested node.
+pub struct NodeStatus {
+    // The version of the node.
+    // Note. if the returned version from the node does 
+    // not conform to semantic versioning then the parsing will fail.
+    pub version: semver::Version,
+    // Type of the node, see [NodeType]
+    pub node_type: NodeType,
+    // The local (UTC) time of the node.
+    pub local_time:   chrono::DateTime<chrono::Utc>,
+    // How long the node has been alive.
+    pub uptime:  chrono::Duration,
+    // Information related to the network for the node.
+    pub network_status:   NetworkStatus,
+    // Information related to consensus for the node.
+    pub consensus_status: ConsensusStatus,
+}
+
+impl From<crate::v2::generated::NetworkStatus> for NetworkStatus {
+    fn from(network_status: crate::v2::generated::NetworkStatus) -> Self {
+        NetworkStatus {
+            node_id: network_status.node_id,
+            peer_total_sent: network_status.peer_total_sent,
+            peer_total_received: network_status.peer_total_received,
+            avg_bps_in: network_status.avg_bps_in,
+            avg_bps_out: network_status.avg_bps_out,
+            
+        }
+    }
+}
+
+impl TryFrom<crate::v2::generated::NodeStatus> for NodeStatus {
+    type Error = anyhow::Error;
+
+    fn try_from(node_status: crate::v2::generated::NodeStatus) -> Result<Self, Self::Error> {
+        let version = semver::Version::parse(&node_status.peer_version)?;
+        let node_type = node_status.node_type.try_into()?;
+        let local_time = UnixTimestamp::from(node_status.local_time.require()?.timestamp).into();
+        let uptime = DurationSeconds::from(node_status.peer_uptime.require()?.value).into();
+        let network_status = node_status.network_status.require()?.into();        
+        let consensus_status = match node_status.consensus_status.require()? {
+            crate::v2::generated::node_status::ConsensusStatus::NoBaker(0) => ConsensusStatus::ConsensusNotRunning,
+            crate::v2::generated::node_status::ConsensusStatus::NoBaker(1) => ConsensusStatus::ConsensusPassive,
+            crate::v2::generated::node_status::ConsensusStatus::BakerConsensusStatus(baking_status) => {
+                match baking_status.committee_status.require()? {
+                    crate::v2::generated::baker_consensus_status::CommitteeStatus::PassiveCommitteeStatus(0) => ConsensusStatus::NotInCommittee,
+                    crate::v2::generated::baker_consensus_status::CommitteeStatus::PassiveCommitteeStatus(1) => ConsensusStatus::AddedButNotActiveInCommittee,
+                    crate::v2::generated::baker_consensus_status::CommitteeStatus::PassiveCommitteeStatus(2) => ConsensusStatus::AddedButWrongKeys,
+                    crate::v2::generated::baker_consensus_status::CommitteeStatus::ActiveBakerCommitteeStatus(active_baker) => ConsensusStatus::Baker(active_baker.baker_id.require()?.into()),
+                    crate::v2::generated::baker_consensus_status::CommitteeStatus::ActiveFinalizerCommitteeStatus(active_baker) => ConsensusStatus::Finalizer(active_baker.baker_id.require()?.into()),
+                    _ => anyhow::bail!("Malformed committee status"),
+                }
+            },
+            _ => anyhow::bail!("Malformed consensus status.")
+        };
+        Ok(NodeStatus{
+            version,
+            node_type,
+            local_time,
+            uptime,
+            network_status,
+            consensus_status,
+        })
     }
 }

@@ -11,8 +11,7 @@ use concordium_contracts_common::{AccountAddress, Amount, ContractAddress, Recei
 use futures::{Stream, StreamExt};
 use tonic::IntoRequest;
 
-mod generated;
-pub mod v2_types;
+pub mod generated;
 
 #[derive(Clone, Debug)]
 /// Client that can perform queries.
@@ -583,12 +582,12 @@ impl Client {
         })
     }
 
-    pub async fn get_node_status(&mut self) -> endpoints::QueryResult<v2_types::NodeStatus> {
+    pub async fn get_node_status(&mut self) -> endpoints::RPCResult<types::NodeStatus> {
         let response = self
             .client
             .get_node_status(generated::Empty::default())
             .await?;
-        let node_status = v2_types::NodeStatus::try_from(response.into_inner())?;
+        let node_status = types::NodeStatus::try_from(response.into_inner())?;
         Ok(node_status)
     }
 }
@@ -622,7 +621,7 @@ fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<Bl
 ///
 /// The main reason for needing this is that in proto3 all fields are optional,
 /// so it is up to the application to validate inputs if they are required.
-trait Require<E> {
+pub trait Require<E> {
     type A;
     fn require(self) -> Result<Self::A, E>;
 }
