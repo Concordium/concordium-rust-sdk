@@ -677,6 +677,74 @@ impl Client {
         let response = types::queries::Branch::try_from(response.into_inner())?;
         Ok(response)
     }
+
+    pub async fn get_election_info(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::BirkParameters>> {
+        let response = self.client.get_election_info(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::BirkParameters::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_identity_providers(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<
+            impl Stream<Item = Result<id::types::IpInfo<id::constants::IpPairing>, tonic::Status>>,
+        >,
+    > {
+        let response = self.client.get_identity_providers(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(ip_info) => ip_info.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_anonymity_revokers(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<
+            impl Stream<Item = Result<id::types::ArInfo<id::constants::ArCurve>, tonic::Status>>,
+        >,
+    > {
+        let response = self.client.get_anonymity_revokers(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(ar_info) => ar_info.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_account_non_finalized_transactions(
+        &mut self,
+        account_address: &AccountAddress,
+    ) -> endpoints::QueryResult<impl Stream<Item = Result<TransactionHash, tonic::Status>>> {
+        let response = self
+            .client
+            .get_account_non_finalized_transactions(account_address)
+            .await?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(transaction_hash) => transaction_hash.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(stream)
+    }
 }
 
 fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<BlockHash> {
