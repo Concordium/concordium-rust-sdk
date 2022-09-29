@@ -582,13 +582,13 @@ impl Client {
         })
     }
 
-    pub async fn get_node_status(&mut self) -> endpoints::RPCResult<types::NodeStatus> {
+    pub async fn get_node_info(&mut self) -> endpoints::RPCResult<types::NodeInfo> {
         let response = self
             .client
-            .get_node_status(generated::Empty::default())
+            .get_node_info(generated::Empty::default())
             .await?;
-        let node_status = types::NodeStatus::try_from(response.into_inner())?;
-        Ok(node_status)
+        let node_info = types::NodeInfo::try_from(response.into_inner())?;
+        Ok(node_info)
     }
 }
 
