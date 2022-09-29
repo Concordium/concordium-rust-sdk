@@ -9,8 +9,7 @@ use crate::{
             ContractContext, InstanceInfo, InvokeContractResult, ModuleRef, Parameter, WasmModule,
         },
         transactions::{
-            self, EncodedPayload, InitContractPayload, Payload, UpdateContractPayload,
-            UpdateInstruction,
+            self, InitContractPayload, Payload, UpdateContractPayload, UpdateInstruction,
         },
         AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, Energy, Memo, Nonce,
         RegisteredData, TransactionStatus, UpdateSequenceNumber,
@@ -340,7 +339,7 @@ impl From<&UpdateInstruction> for generated::UpdateInstruction {
             payload:    Some(generated::UpdateInstructionPayload {
                 payload: Some(generated::update_instruction_payload::Payload::RawPayload(
                     crypto_common::to_bytes(&v.payload),
-                )), // TODO: Can we use the serial instance here? Or will that end up as LE?
+                )),
             }),
         }
     }
@@ -432,6 +431,20 @@ impl From<&transactions::TransactionHeader> for generated::AccountTransactionHea
     }
 }
 
+impl From<transactions::EncodedPayload> for generated::AccountTransactionPayload {
+    fn from(v: transactions::EncodedPayload) -> Self { (&v).into() }
+}
+
+impl From<&transactions::EncodedPayload> for generated::AccountTransactionPayload {
+    fn from(v: &transactions::EncodedPayload) -> Self {
+        Self {
+            payload: Some(generated::account_transaction_payload::Payload::RawPayload(
+                v.payload.clone(),
+            )),
+        }
+    }
+}
+
 impl From<transactions::Payload> for generated::AccountTransactionPayload {
     fn from(v: transactions::Payload) -> Self { (&v).into() }
 }
@@ -518,38 +531,43 @@ impl IntoRequest<generated::UnsignedAccountTransaction>
     }
 }
 
-impl IntoRequest<generated::SendBlockItemRequest> for &transactions::BlockItem<Payload> {
-    fn into_request(self) -> tonic::Request<generated::SendBlockItemRequest> {
-        let request = match self {
-            transactions::BlockItem::AccountTransaction(v) => generated::SendBlockItemRequest {
-                block_item_type: Some(
-                    generated::send_block_item_request::BlockItemType::AccountTransaction(
-                        generated::AccountTransaction {
-                            signature: Some((&v.signature).into()),
-                            header:    Some((&v.header).into()),
-                            payload:   Some((&v.payload).into()),
-                        },
-                    ),
-                ),
-            },
-            transactions::BlockItem::CredentialDeployment(v) => generated::SendBlockItemRequest {
-                block_item_type: Some(
-                    generated::send_block_item_request::BlockItemType::CredentialDeployment(
-                        v.as_ref().into(),
-                    ),
-                ),
-            },
-            transactions::BlockItem::UpdateInstruction(v) => generated::SendBlockItemRequest {
-                block_item_type: Some(
-                    generated::send_block_item_request::BlockItemType::UpdateInstruction(v.into()),
-                ),
-            },
-        };
-        tonic::Request::new(request)
-    }
-}
+// impl IntoRequest<generated::SendBlockItemRequest> for
+// &transactions::BlockItem<Payload> {     fn into_request(self) ->
+// tonic::Request<generated::SendBlockItemRequest> {         let request = match
+// self {             transactions::BlockItem::AccountTransaction(v) =>
+// generated::SendBlockItemRequest {                 block_item_type: Some(
+//
+// generated::send_block_item_request::BlockItemType::AccountTransaction(
+//                         generated::AccountTransaction {
+//                             signature: Some((&v.signature).into()),
+//                             header:    Some((&v.header).into()),
+//                             payload:   Some((&v.payload).into()),
+//                         },
+//                     ),
+//                 ),
+//             },
+//             transactions::BlockItem::CredentialDeployment(v) =>
+// generated::SendBlockItemRequest {                 block_item_type: Some(
+//
+// generated::send_block_item_request::BlockItemType::CredentialDeployment(
+//                         v.as_ref().into(),
+//                     ),
+//                 ),
+//             },
+//             transactions::BlockItem::UpdateInstruction(v) =>
+// generated::SendBlockItemRequest {                 block_item_type: Some(
+//
+// generated::send_block_item_request::BlockItemType::UpdateInstruction(v.
+// into()),                 ),
+//             },
+//         };
+//         tonic::Request::new(request)
+//     }
+// }
 
-impl IntoRequest<generated::SendBlockItemRequest> for &transactions::BlockItem<EncodedPayload> {
+impl<P: Into<generated::AccountTransactionPayload>> IntoRequest<generated::SendBlockItemRequest>
+    for &transactions::BlockItem<P>
+{
     fn into_request(self) -> tonic::Request<generated::SendBlockItemRequest> {
         let request = match self {
             transactions::BlockItem::AccountTransaction(v) => generated::SendBlockItemRequest {
@@ -558,13 +576,10 @@ impl IntoRequest<generated::SendBlockItemRequest> for &transactions::BlockItem<E
                         generated::AccountTransaction {
                             signature: Some((&v.signature).into()),
                             header:    Some((&v.header).into()),
-                            payload:   Some(generated::AccountTransactionPayload {
-                                payload: Some(
-                                    generated::account_transaction_payload::Payload::RawPayload(
-                                        v.payload.payload.to_owned(),
-                                    ),
-                                ),
-                            }),
+                            payload:   {
+                                let atp: generated::AccountTransactionPayload = (&v.payload).into();
+                                Some(atp)
+                            },
                         },
                     ),
                 ),
@@ -836,9 +851,9 @@ impl Client {
         Ok(response)
     }
 
-    pub async fn send_block_item(
+    pub async fn send_block_item<P: Into<generated::AccountTransactionPayload>>(
         &mut self,
-        bi: &transactions::BlockItem<EncodedPayload>,
+        bi: &transactions::BlockItem<P>,
     ) -> endpoints::RPCResult<TransactionHash> {
         let response = self.client.send_block_item(bi).await?;
         let response = TransactionHash::try_from(response.into_inner())?;
@@ -858,14 +873,14 @@ impl Client {
         Ok(response)
     }
 
-    pub async fn send_block_item_unencoded(
-        &mut self,
-        bi: &transactions::BlockItem<Payload>,
-    ) -> endpoints::RPCResult<TransactionHash> {
-        let response = self.client.send_block_item(bi).await?;
-        let response = TransactionHash::try_from(response.into_inner())?;
-        Ok(response)
-    }
+    // pub async fn send_block_item_unencoded(
+    //     &mut self,
+    //     bi: &transactions::BlockItem<Payload>,
+    // ) -> endpoints::RPCResult<TransactionHash> {
+    //     let response = self.client.send_block_item(bi).await?;
+    //     let response = TransactionHash::try_from(response.into_inner())?;
+    //     Ok(response)
+    // }
 
     /// Wait until the transaction is finalized. Returns
     /// [`NotFound`](QueryError::NotFound) in case the transaction is not
