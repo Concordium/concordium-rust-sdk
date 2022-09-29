@@ -4,7 +4,8 @@ use crate::{
         self, hashes,
         hashes::{BlockHash, TransactionHash},
         smart_contracts::{ContractContext, InstanceInfo, InvokeContractResult, ModuleRef},
-        AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, TransactionStatus,
+        AbsoluteBlockHeight, AccountInfo, BlockItemSummary, CredentialRegistrationID,
+        TransactionStatus,
     },
 };
 use concordium_contracts_common::{AccountAddress, Amount, ContractAddress, ReceiveName};
@@ -744,6 +745,24 @@ impl Client {
             Err(err) => Err(err),
         });
         Ok(stream)
+    }
+
+    pub async fn get_block_transaction_events(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<BlockItemSummary, tonic::Status>>>,
+    > {
+        let response = self.client.get_block_transaction_events(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(summary) => summary.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
     }
 }
 
