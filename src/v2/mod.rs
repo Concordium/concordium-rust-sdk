@@ -11,7 +11,7 @@ use concordium_contracts_common::{AccountAddress, Amount, ContractAddress, Recei
 use futures::{Stream, StreamExt};
 use tonic::IntoRequest;
 
-mod generated;
+pub mod generated;
 
 #[derive(Clone, Debug)]
 /// Client that can perform queries.
@@ -745,6 +745,15 @@ impl Client {
         });
         Ok(stream)
     }
+
+    pub async fn get_peers_info(&mut self) -> endpoints::RPCResult<types::peers_info::PeersInfo> {
+        let response = self
+            .client
+            .get_peers_info(generated::Empty::default())
+            .await?;
+        let peers_info = types::peers_info::PeersInfo::try_from(response.into_inner())?;
+        Ok(peers_info)
+    }
 }
 
 fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<BlockHash> {
@@ -776,7 +785,7 @@ fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<Bl
 ///
 /// The main reason for needing this is that in proto3 all fields are optional,
 /// so it is up to the application to validate inputs if they are required.
-trait Require<E> {
+pub trait Require<E> {
     type A;
     fn require(self) -> Result<Self::A, E>;
 }
