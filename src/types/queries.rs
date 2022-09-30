@@ -1,7 +1,11 @@
 //! Types that appear in various queries of the node.
 
-use super::{basic::*, hashes::*, network::RemotePeerId};
-use crypto_common::{SerdeDeserialize, SerdeSerialize};
+use super::{
+    basic::*, hashes::*, network::RemotePeerId, Authorizations, BakerParameters,
+    CooldownParameters, GASRewards, HigherLevelAccessStructure, Level1KeysKind, PoolParameters,
+    ProtocolUpdate, RootKeysKind, TimeParameters, TransactionFeeDistribution,
+};
+use crypto_common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize};
 use std::net::IpAddr;
 
 #[derive(SerdeDeserialize, Debug, SerdeSerialize)]
@@ -227,4 +231,52 @@ pub enum ActiveConsensusState {
 pub enum BanMethod {
     Ip(IpAddr),
     Id(RemotePeerId),
+}
+
+#[derive(Debug, Clone)]
+pub struct PendingUpdate {
+    effective_time: TransactionTime,
+    effect:         PendingUpdateEffect,
+}
+
+#[derive(Debug, Clone)]
+pub enum PendingUpdateEffect {
+    RootKeys(HigherLevelAccessStructure<RootKeysKind>),
+    Level1Keys(HigherLevelAccessStructure<Level1KeysKind>),
+    Level2Keys(Authorizations<ChainParameterVersion0>),
+    Protocol(ProtocolUpdate),
+    ElectionDifficulty(ElectionDifficulty),
+    EuroPerEnergy(ExchangeRate),
+    MicroCcdPerEnergy(ExchangeRate),
+    FoundationAccount(AccountIndex),
+    MintDistributionV0(MintDistribution<ChainParameterVersion0>),
+    MintDistributionV1(MintDistribution<ChainParameterVersion1>),
+    TransactionFeeDistribution(TransactionFeeDistribution),
+    GasRewards(GASRewards),
+    PoolParametersV0(BakerParameters),
+    PoolParametersV1(PoolParameters),
+    AddAnonymityRevoker(id::types::ArInfo<id::constants::ArCurve>),
+    AddIdentityProvider(id::types::IpInfo<id::constants::IpPairing>),
+    CooldownParameters(CooldownParameters),
+    TimeParameters(TimeParameters),
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct NextUpdateSequenceNumbers {
+    pub root_keys:                    UpdateSequenceNumber,
+    pub level_1_keys:                 UpdateSequenceNumber,
+    pub level_2_keys:                 UpdateSequenceNumber,
+    pub protocol:                     UpdateSequenceNumber,
+    pub election_difficulty:          UpdateSequenceNumber,
+    pub euro_per_energy:              UpdateSequenceNumber,
+    pub micro_ccd_per_euro:           UpdateSequenceNumber,
+    pub foundation_account:           UpdateSequenceNumber,
+    pub mint_distribution:            UpdateSequenceNumber,
+    pub transaction_fee_distribution: UpdateSequenceNumber,
+    pub gas_rewards:                  UpdateSequenceNumber,
+    pub pool_parameters:              UpdateSequenceNumber,
+    pub add_anonymity_revoker:        UpdateSequenceNumber,
+    pub add_identity_provider:        UpdateSequenceNumber,
+    pub cooldown_parameters:          UpdateSequenceNumber,
+    pub time_parameters:              UpdateSequenceNumber,
 }

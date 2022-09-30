@@ -2376,6 +2376,41 @@ impl TryFrom<BlockSpecialEvent> for super::types::SpecialTransactionOutcome {
     }
 }
 
+impl TryFrom<PendingUpdate> for super::types::queries::PendingUpdate {
+    type Error = tonic::Status;
+
+    fn try_from(message: PendingUpdate) -> Result<Self, Self::Error> { todo!() }
+}
+
+impl From<SequenceNumber> for super::types::UpdateSequenceNumber {
+    fn from(message: SequenceNumber) -> Self { message.value.into() }
+}
+
+impl TryFrom<NextUpdateSequenceNumbers> for super::types::queries::NextUpdateSequenceNumbers {
+    type Error = tonic::Status;
+
+    fn try_from(message: NextUpdateSequenceNumbers) -> Result<Self, Self::Error> {
+        Ok(Self {
+            root_keys:                    message.root_keys.require()?.into(),
+            level_1_keys:                 message.level1_keys.require()?.into(),
+            level_2_keys:                 message.level2_keys.require()?.into(),
+            protocol:                     message.protocol.require()?.into(),
+            election_difficulty:          message.election_difficulty.require()?.into(),
+            euro_per_energy:              message.euro_per_energy.require()?.into(),
+            micro_ccd_per_euro:           message.micro_ccd_per_euro.require()?.into(),
+            foundation_account:           message.foundation_account.require()?.into(),
+            mint_distribution:            message.mint_distribution.require()?.into(),
+            transaction_fee_distribution: message.transaction_fee_distribution.require()?.into(),
+            gas_rewards:                  message.gas_rewards.require()?.into(),
+            pool_parameters:              message.pool_parameters.require()?.into(),
+            add_anonymity_revoker:        message.add_anonymity_revoker.require()?.into(),
+            add_identity_provider:        message.add_identity_provider.require()?.into(),
+            cooldown_parameters:          message.cooldown_parameters.require()?.into(),
+            time_parameters:              message.time_parameters.require()?.into(),
+        })
+    }
+}
+
 #[cfg(test)]
 mod test {
 

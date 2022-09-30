@@ -782,6 +782,40 @@ impl Client {
             response: stream,
         })
     }
+
+    pub async fn get_block_pending_updates(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::queries::PendingUpdate, tonic::Status>>>,
+    > {
+        let response = self.client.get_block_pending_updates(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(update) => update.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_next_update_sequence_numbers(
+        &mut self,
+        block_id: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::queries::NextUpdateSequenceNumbers>> {
+        let response = self
+            .client
+            .get_next_update_sequence_numbers(block_id)
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::queries::NextUpdateSequenceNumbers::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
 }
 
 fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<BlockHash> {
