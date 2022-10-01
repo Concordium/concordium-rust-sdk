@@ -745,6 +745,37 @@ impl Client {
         });
         Ok(stream)
     }
+
+    /// Start a network dump if the feature is enabled on the node.
+    /// Return true if a network dump has been initiated.
+    ///
+    /// * file - The file to write to.
+    /// * raw - Whether raw packets should be included in the dump or not.
+    ///
+    /// Note. If the feature 'network_dump' is not enabled on the node then this
+    /// will return a 'Precondition failed' error.
+    pub async fn dump_start(&mut self, file: String, raw: bool) -> endpoints::RPCResult<bool> {
+        Ok(self
+            .client
+            .dump_start(generated::DumpRequest { file, raw })
+            .await?
+            .into_inner()
+            .value)
+    }
+
+    /// Stop an ongoing network dump.
+    /// Return true if it was successfully stopped otherwise false.
+    ///
+    /// Note. If the feature 'network_dump' is not enabled on the node then this
+    /// will return a 'Precondition failed' error.
+    pub async fn dump_stop(&mut self) -> endpoints::RPCResult<bool> {
+        Ok(self
+            .client
+            .dump_stop(generated::Empty::default())
+            .await?
+            .into_inner()
+            .value)
+    }
 }
 
 fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<BlockHash> {
