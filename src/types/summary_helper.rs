@@ -15,11 +15,13 @@ use super::{
     RejectReason, TransactionIndex, TransactionType, UpdatePayload, UrlText,
 };
 use crate::types::Address;
-use crypto_common::{
-    types::{Amount, Timestamp, TransactionTime},
-    SerdeDeserialize, SerdeSerialize,
+use concordium_base::{
+    common::{
+        types::{Amount, Timestamp, TransactionTime},
+        SerdeDeserialize, SerdeSerialize,
+    },
+    id::types::AccountAddress,
 };
-use id::types::AccountAddress;
 use std::convert::{TryFrom, TryInto};
 use thiserror::Error;
 
