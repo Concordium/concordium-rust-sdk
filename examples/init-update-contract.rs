@@ -4,17 +4,18 @@
 //! [icecream example contract](https://github.com/Concordium/concordium-rust-smart-contracts/blob/main/examples/icecream/src/lib.rs).
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_contracts_common::{
-    Amount, ContractAddress, OwnedContractName, OwnedReceiveName, Serial,
-};
 use concordium_rust_sdk::{
     common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize},
     endpoints,
     id::types::{AccountAddress, AccountKeys},
+    smart_contracts::common::{
+        self as contracts_common, Amount, ContractAddress, OwnedContractName, OwnedReceiveName,
+        Serial,
+    },
     types::{
         smart_contracts::{ModuleRef, Parameter},
         transactions::{send, BlockItem, InitContractPayload, UpdateContractPayload},
-        AccountInfo, Energy,
+        AccountInfo,
     },
 };
 use std::path::PathBuf;
@@ -121,7 +122,7 @@ async fn main() -> anyhow::Result<()> {
             weather,
             module_ref: mod_ref,
         } => {
-            let param = Parameter::from(concordium_contracts_common::to_bytes(&weather));
+            let param = Parameter::from(contracts_common::to_bytes(&weather));
             let payload = InitContractPayload {
                 amount: Amount::zero(),
                 mod_ref,
@@ -139,7 +140,7 @@ async fn main() -> anyhow::Result<()> {
             )
         }
         Action::Update { weather, address } => {
-            let message = Parameter::from(concordium_contracts_common::to_bytes(&weather));
+            let message = Parameter::from(contracts_common::to_bytes(&weather));
             let payload = UpdateContractPayload {
                 amount: Amount::zero(),
                 address,
