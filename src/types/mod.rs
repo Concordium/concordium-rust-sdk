@@ -2670,3 +2670,27 @@ mod transaction_fee_distribution {
         }
     }
 }
+
+/// Exposing ban like functionality
+pub mod bans {
+    use std::{net::IpAddr, str::FromStr};
+
+    // A banned peer identified by its IP address.
+    #[derive(Debug)]
+    pub struct BannedPeer(pub std::net::IpAddr);
+
+    impl TryFrom<crate::v2::generated::BannedPeer> for BannedPeer {
+        type Error = anyhow::Error;
+
+        fn try_from(value: crate::v2::generated::BannedPeer) -> Result<Self, Self::Error> {
+            Ok(BannedPeer(IpAddr::from_str(&value.ip_address)?))
+        }
+    }
+
+    // A peer to ban
+    #[derive(Debug)]
+    pub enum Peer {
+        IpAddr(IpAddr),
+        Id(String),
+    }
+}

@@ -3,6 +3,7 @@ use crate::{
     types::{
         self, hashes,
         hashes::{BlockHash, TransactionHash},
+        network::RemotePeerId,
         smart_contracts::{ContractContext, InstanceInfo, InvokeContractResult, ModuleRef},
         AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, TransactionStatus,
     },
@@ -11,7 +12,7 @@ use concordium_contracts_common::{AccountAddress, Amount, ContractAddress, Recei
 use futures::{Stream, StreamExt};
 use tonic::IntoRequest;
 
-mod generated;
+pub mod generated;
 
 #[derive(Clone, Debug)]
 /// Client that can perform queries.
@@ -744,6 +745,33 @@ impl Client {
             Err(err) => Err(err),
         });
         Ok(stream)
+    }
+
+    pub async fn get_banned_peers(
+        &mut self,
+    ) -> endpoints::RPCResult<Vec<super::types::bans::BannedPeer>> {
+        let response = self
+            .client
+            .get_banned_peers(generated::Empty::default())
+            .await?
+            .into_inner();
+        let banned_peers = response
+            .peers
+            .into_iter()
+            .map(|p| super::types::bans::BannedPeer::try_from(p)?)
+            .collect()?;
+        Ok(banned_peers)
+    }
+
+    pub async fn ban_peer(
+        &mut self,
+        peer_id: super::types::bans::Peer,
+    ) -> endpoints::RPCResult<bool> {
+        todo!()
+    }
+
+    pub async fn unban_peer(&mut self, banned_peer: super::types::bans::BannedPeer) -> endpoints::RPCResult<bool> {
+        todo!()
     }
 }
 
