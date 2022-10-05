@@ -745,6 +745,15 @@ impl Client {
         });
         Ok(stream)
     }
+
+    pub async fn shutdown(&mut self) -> endpoints::RPCResult<bool> {
+        Ok(self
+            .client
+            .shutdown(generated::Empty::default())
+            .await?
+            .into_inner()
+            .value)
+    }
 }
 
 fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<BlockHash> {
