@@ -776,7 +776,7 @@ impl Client {
     /// Returns whether the peer was unbanned or not.
     pub async fn unban_peer(
         &mut self,
-        banned_peer: super::types::bans::BannedPeer,
+        banned_peer: &super::types::bans::BannedPeer,
     ) -> endpoints::RPCResult<bool> {
         Ok(self
             .client
@@ -816,7 +816,7 @@ fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<Bl
 ///
 /// The main reason for needing this is that in proto3 all fields are optional,
 /// so it is up to the application to validate inputs if they are required.
-trait Require<E> {
+pub trait Require<E> {
     type A;
     fn require(self) -> Result<Self::A, E>;
 }

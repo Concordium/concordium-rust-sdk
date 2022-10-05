@@ -2673,6 +2673,7 @@ mod transaction_fee_distribution {
 
 /// Exposing ban like functionality
 pub mod bans {
+    use crate::v2::Require;
     use std::{net::IpAddr, str::FromStr};
     use tonic::IntoRequest;
 
@@ -2684,16 +2685,21 @@ pub mod bans {
         type Error = anyhow::Error;
 
         fn try_from(value: crate::v2::generated::BannedPeer) -> Result<Self, Self::Error> {
-            Ok(BannedPeer(IpAddr::from_str(&value.ip_address)?))
+            Ok(BannedPeer(IpAddr::from_str(
+                &value.ip_address.require()?.value,
+            )?))
         }
-        }
+    }
 
-        impl IntoRequest<generated::BannedPeer> for BannedPeer {
-            fn into_request(self) -> Request<crate::v2::generated::BannedPeer> {
-                
-            }
-                
+    impl IntoRequest<crate::v2::generated::BannedPeer> for &BannedPeer {
+        fn into_request(self) -> tonic::Request<crate::v2::generated::BannedPeer> {
+            tonic::Request::new(crate::v2::generated::BannedPeer {
+                ip_address: Some(crate::v2::generated::IpAddress {
+                    value: self.0.to_string(),
+                }),
+            })
         }
+    }
 
     /// A peer to ban identified by either its
     /// IP address or id.
@@ -2703,16 +2709,20 @@ pub mod bans {
         Id(String),
     }
 
-    impl IntoRequest<generated::PeerToban> for PeerToBan {
+    impl IntoRequest<crate::v2::generated::PeerToBan> for PeerToBan {
         fn into_request(self) -> tonic::Request<crate::v2::generated::PeerToBan> {
             tonic::Request::new(match self {
                 PeerToBan::IpAddr(ip_addr) => crate::v2::generated::PeerToBan {
-                    peer: Some(crate::v2::generated::IpAddress {
-                        value: ip_addr.to_string(),
-                    }),
+                    peer: Some(crate::v2::generated::peer_to_ban::Peer::IpAddress(
+                        crate::v2::generated::IpAddress {
+                            value: ip_addr.to_string(),
+                        },
+                    )),
                 },
                 PeerToBan::Id(value) => crate::v2::generated::PeerToBan {
-                    peer: Some(crate::v2::generated::PeerId { value }),
+                    peer: Some(crate::v2::generated::peer_to_ban::Peer::PeerId(
+                        crate::v2::generated::PeerId { value },
+                    )),
                 },
             })
         }
