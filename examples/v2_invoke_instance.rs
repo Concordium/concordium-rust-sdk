@@ -40,7 +40,7 @@ async fn main() -> anyhow::Result<()> {
         contract:  app.contract,
         amount:    Amount::zero(),
         method:    app.receive_name,
-        parameter: Vec::new().into(),
+        parameter: Default::default(),
         energy:    1000000.into(),
     };
 

@@ -104,8 +104,16 @@ impl TryFrom<VersionedModuleSource> for super::types::smart_contracts::WasmModul
     }
 }
 
-impl From<Parameter> for super::types::smart_contracts::Parameter {
-    fn from(value: Parameter) -> Self { value.value.into() }
+impl TryFrom<Parameter> for super::types::smart_contracts::Parameter {
+    type Error = tonic::Status;
+
+    fn try_from(value: Parameter) -> Result<Self, Self::Error> {
+        value.value.try_into().map_err(
+            |e: concordium_base::smart_contracts::ExceedsParameterSize| {
+                tonic::Status::invalid_argument(e.to_string())
+            },
+        )
+    }
 }
 
 impl TryFrom<InstanceInfo> for super::InstanceInfo {
@@ -1715,7 +1723,7 @@ impl TryFrom<InstanceUpdatedEvent> for super::types::InstanceUpdatedEvent {
             address:          value.address.require()?.into(),
             instigator:       value.instigator.require()?.try_into()?,
             amount:           value.amount.require()?.into(),
-            message:          value.parameter.require()?.into(),
+            message:          value.parameter.require()?.try_into()?,
             receive_name:     value.receive_name.require()?.try_into()?,
             events:           value.events.into_iter().map(Into::into).collect(),
         })
@@ -1778,7 +1786,7 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
                 reject_reason:    v.reject_reason,
                 contract_address: v.contract_address.require()?.into(),
                 receive_name:     v.receive_name.require()?.try_into()?,
-                parameter:        v.parameter.require()?.into(),
+                parameter:        v.parameter.require()?.try_into()?,
             },
             reject_reason::Reason::InvalidProof(_) => Self::InvalidProof,
             reject_reason::Reason::AlreadyABaker(v) => Self::AlreadyABaker { contents: v.into() },
