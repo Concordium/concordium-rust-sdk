@@ -7,4 +7,4 @@ pub use super::types::smart_contracts as types;
 pub use wasm_chain_integration as engine;
 
 /// Functionality that is common to on and off-chain smart contracts.
-pub use concordium_contracts_common as common;
+pub use concordium_base::contracts_common as common;

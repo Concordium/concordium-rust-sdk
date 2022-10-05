@@ -1,7 +1,8 @@
-//! Test the `GetInstanceInfo` endpoint.
+//! Test the `GetIdentityProviders` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{endpoints, smart_contracts::common::ContractAddress, v2};
+use concordium_rust_sdk::{endpoints::Endpoint, v2};
+use futures::StreamExt;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -11,9 +12,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: endpoints::Endpoint,
-    #[structopt(long = "address", help = "Contract address to query.")]
-    address:  ContractAddress,
+    endpoint: Endpoint,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -27,11 +26,13 @@ async fn main() -> anyhow::Result<()> {
     let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
-
-    let res = client
-        .get_instance_info(app.address, &v2::BlockIdentifier::Best)
+    let mut response = client
+        .get_identity_providers(&v2::BlockIdentifier::LastFinal)
         .await?;
-    println!("{:#?}", res);
 
+    println!("Blockhash: {}", response.block_hash);
+    while let Some(a) = response.response.next().await.transpose()? {
+        println!(" - {:?}", &a);
+    }
     Ok(())
 }

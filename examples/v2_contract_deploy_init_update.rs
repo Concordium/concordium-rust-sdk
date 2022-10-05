@@ -5,21 +5,22 @@
 //! [icecream example contract](https://github.com/Concordium/concordium-rust-smart-contracts/blob/main/examples/icecream/src/lib.rs).
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_contracts_common::{
-    Amount, ContractAddress, OwnedContractName, OwnedReceiveName, Serial,
-};
 use concordium_rust_sdk::{
-    common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize},
+    common::{self, types::TransactionTime, SerdeDeserialize, SerdeSerialize},
     endpoints,
     id::types::{AccountAddress, AccountKeys},
+    smart_contracts::{
+        common as contracts_common,
+        common::Amount,
+        types::{OwnedContractName, OwnedReceiveName},
+    },
     types::{
         smart_contracts::{ModuleRef, Parameter, WasmModule},
         transactions::{send, BlockItem, InitContractPayload, UpdateContractPayload},
-        AccountInfo,
+        AccountInfo, ContractAddress,
     },
     v2,
 };
-use crypto_common::Deserial;
 use std::path::PathBuf;
 use structopt::*;
 use thiserror::Error;
@@ -75,7 +76,7 @@ enum Action {
 
 // The order must match the enum defined in the contract code. Otherwise, the
 // serialization will be incorrect.
-#[derive(SerdeSerialize, SerdeDeserialize, Serial, StructOpt)]
+#[derive(SerdeSerialize, SerdeDeserialize, contracts_common::Serial, StructOpt)]
 enum Weather {
     Rainy,
     Sunny,
@@ -131,7 +132,7 @@ async fn main() -> anyhow::Result<()> {
             weather,
             module_ref: mod_ref,
         } => {
-            let param = Parameter::from(concordium_contracts_common::to_bytes(&weather));
+            let param = Parameter::try_from(contracts_common::to_bytes(&weather)).unwrap();
             let payload = InitContractPayload {
                 amount: Amount::zero(),
                 mod_ref,
@@ -149,7 +150,7 @@ async fn main() -> anyhow::Result<()> {
             )
         }
         Action::Update { weather, address } => {
-            let message = Parameter::from(concordium_contracts_common::to_bytes(&weather));
+            let message = Parameter::try_from(contracts_common::to_bytes(&weather)).unwrap();
             let payload = UpdateContractPayload {
                 amount: Amount::zero(),
                 address,
@@ -168,7 +169,8 @@ async fn main() -> anyhow::Result<()> {
         }
         Action::Deploy { module_path } => {
             let contents = std::fs::read(module_path).context("Could not read contract module.")?;
-            let payload: WasmModule = Deserial::deserial(&mut std::io::Cursor::new(contents))?;
+            let payload: WasmModule =
+                common::Deserial::deserial(&mut std::io::Cursor::new(contents))?;
             send::deploy_module(&keys.account_keys, keys.address, nonce, expiry, payload)
         }
     };

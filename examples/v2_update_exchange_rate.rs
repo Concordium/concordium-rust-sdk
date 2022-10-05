@@ -3,6 +3,7 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
+    common::types::TransactionTime,
     endpoints,
     types::{
         transactions::{update, BlockItem, Payload},
@@ -10,7 +11,6 @@ use concordium_rust_sdk::{
     },
     v2,
 };
-use crypto_common::types::TransactionTime;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -110,7 +110,7 @@ async fn main() -> anyhow::Result<()> {
     println!("Sending block item");
 
     let submission_id = client
-        .send_block_item_unencoded(&block_item)
+        .send_block_item(&block_item)
         .await
         .context("Could not send the update instruction.")?;
 

@@ -3,12 +3,11 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    common::SerdeSerialize,
-    endpoints,
+    common::{types::Amount, SerdeSerialize},
+    endpoints, id,
     id::types::AccountAddress,
     types::{hashes::BlockHash, AccountStakingInfo, CredentialType},
 };
-use crypto_common::types::Amount;
 use serde::Serializer;
 use std::path::PathBuf;
 use structopt::StructOpt;

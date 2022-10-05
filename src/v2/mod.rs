@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use crate::{
-    endpoints,
+    endpoints, id,
+    id::types::AccountCredentialMessage,
     types::{
         self, hashes,
         hashes::{BlockHash, TransactionHash, TransactionSignHash},
@@ -15,12 +16,17 @@ use crate::{
         RegisteredData, TransactionStatus, UpdateSequenceNumber,
     },
 };
-use concordium_contracts_common::{
-    AccountAddress, Amount, ContractAddress, OwnedContractName, OwnedReceiveName, ReceiveName,
+use concordium_base::{
+    common::{
+        self,
+        types::{TransactionSignature, TransactionTime},
+    },
+    contracts_common::{
+        AccountAddress, Amount, ContractAddress, OwnedContractName, OwnedReceiveName, ReceiveName,
+    },
+    transactions::PayloadLike,
 };
-use crypto_common::types::{TransactionSignature, TransactionTime};
 use futures::{Stream, StreamExt};
-use id::types::AccountCredentialMessage;
 use tonic::IntoRequest;
 
 mod generated;
@@ -100,7 +106,7 @@ impl IntoRequest<generated::BlockHashInput> for &BlockIdentifier {
 impl From<&AccountAddress> for generated::AccountAddress {
     fn from(addr: &AccountAddress) -> Self {
         generated::AccountAddress {
-            value: crypto_common::to_bytes(addr),
+            value: concordium_base::common::to_bytes(addr),
         }
     }
 }
@@ -108,7 +114,7 @@ impl From<&AccountAddress> for generated::AccountAddress {
 impl From<AccountAddress> for generated::AccountAddress {
     fn from(addr: AccountAddress) -> Self {
         generated::AccountAddress {
-            value: crypto_common::to_bytes(&addr),
+            value: common::to_bytes(&addr),
         }
     }
 }
@@ -130,7 +136,7 @@ impl From<&super::types::Address> for generated::Address {
 impl From<&Memo> for generated::Memo {
     fn from(v: &Memo) -> Self {
         Self {
-            value: v.get_ref().to_owned(),
+            value: v.as_ref().clone(),
         }
     }
 }
@@ -146,7 +152,7 @@ impl<'a> From<ReceiveName<'a>> for generated::ReceiveName {
 impl From<&RegisteredData> for generated::RegisteredData {
     fn from(v: &RegisteredData) -> Self {
         Self {
-            value: v.get_ref().to_owned(),
+            value: v.as_ref().clone(),
         }
     }
 }
@@ -166,7 +172,7 @@ impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
             }
             AccountIdentifier::CredId(credid) => {
                 let credid = generated::CredentialRegistrationId {
-                    value: crypto_common::to_bytes(credid),
+                    value: concordium_base::common::to_bytes(credid),
                 };
                 generated::account_identifier_input::AccountIdentifierInput::CredId(credid)
             }
@@ -197,14 +203,14 @@ impl From<&WasmModule> for generated::VersionedModuleSource {
                 types::smart_contracts::WasmVersion::V0 => {
                     generated::versioned_module_source::Module::V0(
                         generated::versioned_module_source::ModuleSourceV0 {
-                            value: v.source.get_ref().to_owned(),
+                            value: v.source.as_ref().clone(),
                         },
                     )
                 }
                 types::smart_contracts::WasmVersion::V1 => {
                     generated::versioned_module_source::Module::V1(
                         generated::versioned_module_source::ModuleSourceV1 {
-                            value: v.source.get_ref().to_owned(),
+                            value: v.source.as_ref().clone(),
                         },
                     )
                 }
@@ -232,7 +238,7 @@ impl From<&OwnedReceiveName> for generated::ReceiveName {
 impl From<&Parameter> for generated::Parameter {
     fn from(v: &Parameter) -> Self {
         Self {
-            value: v.get_ref().to_owned(),
+            value: v.as_ref().clone(),
         }
     }
 }
@@ -311,7 +317,7 @@ impl
         Self {
             message_expiry: Some(v.message_expiry.into()),
             payload:        Some(generated::credential_deployment::Payload::RawPayload(
-                crypto_common::to_bytes(&v.credential),
+                common::to_bytes(&v.credential),
             )),
         }
     }
@@ -338,7 +344,7 @@ impl From<&UpdateInstruction> for generated::UpdateInstruction {
             }),
             payload:    Some(generated::UpdateInstructionPayload {
                 payload: Some(generated::update_instruction_payload::Payload::RawPayload(
-                    crypto_common::to_bytes(&v.payload),
+                    common::to_bytes(&v.payload),
                 )),
             }),
         }
@@ -432,14 +438,20 @@ impl From<&transactions::TransactionHeader> for generated::AccountTransactionHea
 }
 
 impl From<transactions::EncodedPayload> for generated::AccountTransactionPayload {
-    fn from(v: transactions::EncodedPayload) -> Self { (&v).into() }
+    fn from(v: transactions::EncodedPayload) -> Self {
+        Self {
+            payload: Some(generated::account_transaction_payload::Payload::RawPayload(
+                v.into(),
+            )),
+        }
+    }
 }
 
 impl From<&transactions::EncodedPayload> for generated::AccountTransactionPayload {
     fn from(v: &transactions::EncodedPayload) -> Self {
         Self {
             payload: Some(generated::account_transaction_payload::Payload::RawPayload(
-                v.payload.clone(),
+                v.as_ref().clone(),
             )),
         }
     }
@@ -464,10 +476,9 @@ impl From<&transactions::Payload> for generated::AccountTransactionPayload {
                 }
                 Payload::Transfer { to_address, amount } => {
                     generated::account_transaction_payload::Payload::Transfer(
-                        generated::account_transaction_effects::AccountTransfer {
+                        generated::TransferPayload {
                             amount:   Some(amount.into()),
                             receiver: Some(to_address.into()),
-                            memo:     None,
                         },
                     )
                 }
@@ -478,16 +489,16 @@ impl From<&transactions::Payload> for generated::AccountTransactionPayload {
                     to_address,
                     memo,
                     amount,
-                } => generated::account_transaction_payload::Payload::Transfer(
-                    generated::account_transaction_effects::AccountTransfer {
+                } => generated::account_transaction_payload::Payload::TransferWithMemo(
+                    generated::TransferWithMemoPayload {
                         amount:   Some(amount.into()),
                         receiver: Some(to_address.into()),
                         memo:     Some(memo.into()),
                     },
                 ),
-                pl => generated::account_transaction_payload::Payload::RawPayload(
-                    crypto_common::to_bytes(&pl),
-                ),
+                pl => {
+                    generated::account_transaction_payload::Payload::RawPayload(pl.encode().into())
+                }
             }),
         }
     }
@@ -519,11 +530,11 @@ impl From<&TransactionSignature> for generated::AccountTransactionSignature {
     }
 }
 
-impl IntoRequest<generated::UnsignedAccountTransaction>
+impl IntoRequest<generated::PreAccountTransaction>
     for (&transactions::TransactionHeader, &transactions::Payload)
 {
-    fn into_request(self) -> tonic::Request<generated::UnsignedAccountTransaction> {
-        let request = generated::UnsignedAccountTransaction {
+    fn into_request(self) -> tonic::Request<generated::PreAccountTransaction> {
+        let request = generated::PreAccountTransaction {
             header:  Some(self.0.into()),
             payload: Some(self.1.into()),
         };
@@ -531,69 +542,37 @@ impl IntoRequest<generated::UnsignedAccountTransaction>
     }
 }
 
-// impl IntoRequest<generated::SendBlockItemRequest> for
-// &transactions::BlockItem<Payload> {     fn into_request(self) ->
-// tonic::Request<generated::SendBlockItemRequest> {         let request = match
-// self {             transactions::BlockItem::AccountTransaction(v) =>
-// generated::SendBlockItemRequest {                 block_item_type: Some(
-//
-// generated::send_block_item_request::BlockItemType::AccountTransaction(
-//                         generated::AccountTransaction {
-//                             signature: Some((&v.signature).into()),
-//                             header:    Some((&v.header).into()),
-//                             payload:   Some((&v.payload).into()),
-//                         },
-//                     ),
-//                 ),
-//             },
-//             transactions::BlockItem::CredentialDeployment(v) =>
-// generated::SendBlockItemRequest {                 block_item_type: Some(
-//
-// generated::send_block_item_request::BlockItemType::CredentialDeployment(
-//                         v.as_ref().into(),
-//                     ),
-//                 ),
-//             },
-//             transactions::BlockItem::UpdateInstruction(v) =>
-// generated::SendBlockItemRequest {                 block_item_type: Some(
-//
-// generated::send_block_item_request::BlockItemType::UpdateInstruction(v.
-// into()),                 ),
-//             },
-//         };
-//         tonic::Request::new(request)
-//     }
-// }
-
-impl<P: Into<generated::AccountTransactionPayload>> IntoRequest<generated::SendBlockItemRequest>
-    for &transactions::BlockItem<P>
-{
+impl<P: PayloadLike> IntoRequest<generated::SendBlockItemRequest> for &transactions::BlockItem<P> {
     fn into_request(self) -> tonic::Request<generated::SendBlockItemRequest> {
         let request = match self {
-            transactions::BlockItem::AccountTransaction(v) => generated::SendBlockItemRequest {
-                block_item_type: Some(
-                    generated::send_block_item_request::BlockItemType::AccountTransaction(
-                        generated::AccountTransaction {
-                            signature: Some((&v.signature).into()),
-                            header:    Some((&v.header).into()),
-                            payload:   {
-                                let atp: generated::AccountTransactionPayload = (&v.payload).into();
-                                Some(atp)
+            transactions::BlockItem::AccountTransaction(v) => {
+                generated::SendBlockItemRequest {
+                    block_item: Some(
+                        generated::send_block_item_request::BlockItem::AccountTransaction(
+                            generated::AccountTransaction {
+                                signature: Some((&v.signature).into()),
+                                header:    Some((&v.header).into()),
+                                payload:   {
+                                    let atp = generated::AccountTransactionPayload{
+                                    payload: Some(generated::account_transaction_payload::Payload::RawPayload(v.payload.encode().into())),
+                                };
+                                    Some(atp)
+                                },
                             },
-                        },
+                        ),
                     ),
-                ),
-            },
+                }
+            }
             transactions::BlockItem::CredentialDeployment(v) => generated::SendBlockItemRequest {
-                block_item_type: Some(
-                    generated::send_block_item_request::BlockItemType::CredentialDeployment(
+                block_item: Some(
+                    generated::send_block_item_request::BlockItem::CredentialDeployment(
                         v.as_ref().into(),
                     ),
                 ),
             },
             transactions::BlockItem::UpdateInstruction(v) => generated::SendBlockItemRequest {
-                block_item_type: Some(
-                    generated::send_block_item_request::BlockItemType::UpdateInstruction(v.into()),
+                block_item: Some(
+                    generated::send_block_item_request::BlockItem::UpdateInstruction(v.into()),
                 ),
             },
         };
@@ -851,7 +830,7 @@ impl Client {
         Ok(response)
     }
 
-    pub async fn send_block_item<P: Into<generated::AccountTransactionPayload>>(
+    pub async fn send_block_item<P: PayloadLike>(
         &mut self,
         bi: &transactions::BlockItem<P>,
     ) -> endpoints::RPCResult<TransactionHash> {
@@ -873,15 +852,6 @@ impl Client {
         Ok(response)
     }
 
-    // pub async fn send_block_item_unencoded(
-    //     &mut self,
-    //     bi: &transactions::BlockItem<Payload>,
-    // ) -> endpoints::RPCResult<TransactionHash> {
-    //     let response = self.client.send_block_item(bi).await?;
-    //     let response = TransactionHash::try_from(response.into_inner())?;
-    //     Ok(response)
-    // }
-
     /// Wait until the transaction is finalized. Returns
     /// [`NotFound`](QueryError::NotFound) in case the transaction is not
     /// known to the node. In case of success, the return value is a pair of the
@@ -892,6 +862,7 @@ impl Client {
     /// this function might wish to wrap it inside
     /// [`timeout`](tokio::time::timeout) handler and handle the resulting
     /// failure.
+    /// TODO: Make use of get_finalized_blocks.
     pub async fn wait_until_finalized(
         &mut self,
         hash: &types::hashes::TransactionHash,
@@ -1107,6 +1078,84 @@ impl Client {
             .await?;
         let response = types::queries::Branch::try_from(response.into_inner())?;
         Ok(response)
+    }
+
+    pub async fn get_election_info(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::BirkParameters>> {
+        let response = self.client.get_election_info(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::BirkParameters::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_identity_providers(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<
+            impl Stream<
+                Item = Result<
+                    crate::id::types::IpInfo<crate::id::constants::IpPairing>,
+                    tonic::Status,
+                >,
+            >,
+        >,
+    > {
+        let response = self.client.get_identity_providers(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(ip_info) => ip_info.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_anonymity_revokers(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<
+            impl Stream<
+                Item = Result<
+                    crate::id::types::ArInfo<crate::id::constants::ArCurve>,
+                    tonic::Status,
+                >,
+            >,
+        >,
+    > {
+        let response = self.client.get_anonymity_revokers(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(ar_info) => ar_info.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_account_non_finalized_transactions(
+        &mut self,
+        account_address: &AccountAddress,
+    ) -> endpoints::QueryResult<impl Stream<Item = Result<TransactionHash, tonic::Status>>> {
+        let response = self
+            .client
+            .get_account_non_finalized_transactions(account_address)
+            .await?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(transaction_hash) => transaction_hash.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(stream)
     }
 }
 

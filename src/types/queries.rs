@@ -1,7 +1,7 @@
 //! Types that appear in various queries of the node.
 
-use super::{basic::*, hashes::*, network::RemotePeerId};
-use crypto_common::{SerdeDeserialize, SerdeSerialize};
+use super::{hashes::*, network::RemotePeerId, *};
+use concordium_base::common::{SerdeDeserialize, SerdeSerialize};
 use std::net::IpAddr;
 
 #[derive(SerdeDeserialize, Debug, SerdeSerialize)]

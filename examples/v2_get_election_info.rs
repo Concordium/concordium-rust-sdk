@@ -1,8 +1,9 @@
-//! Test the `GetInstanceInfo` endpoint.
+//! Test the `GetElectionInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{endpoints, smart_contracts::common::ContractAddress, v2};
 use structopt::StructOpt;
+
+use concordium_rust_sdk::v2;
 
 #[derive(StructOpt)]
 struct App {
@@ -11,9 +12,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: endpoints::Endpoint,
-    #[structopt(long = "address", help = "Contract address to query.")]
-    address:  ContractAddress,
+    endpoint: tonic::transport::Endpoint,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -28,10 +27,17 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect.")?;
 
-    let res = client
-        .get_instance_info(app.address, &v2::BlockIdentifier::Best)
-        .await?;
-    println!("{:#?}", res);
+    {
+        let ai = client.get_election_info(&v2::BlockIdentifier::Best).await?;
+        println!("Best block {:#?}", ai);
+    }
+
+    {
+        let ai = client
+            .get_election_info(&v2::BlockIdentifier::LastFinal)
+            .await?;
+        println!("Last finalized {:#?}", ai);
+    }
 
     Ok(())
 }

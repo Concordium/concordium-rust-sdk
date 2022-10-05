@@ -164,7 +164,7 @@ async fn main() -> anyhow::Result<()> {
     println!("#:Transaction hash");
     println!("------------------");
     while let Some((address, item, keys, enc_key)) = rx.recv().await {
-        let transaction_hash = client.send_block_item_unencoded(&item).await?;
+        let transaction_hash = client.send_block_item(&item).await?;
         println!("{}:{}", count, transaction_hash);
         count += 1;
         serde_json::to_writer_pretty(

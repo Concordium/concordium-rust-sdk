@@ -3,12 +3,14 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize},
+    common::{
+        types::{Amount, TransactionTime},
+        SerdeDeserialize, SerdeSerialize,
+    },
     id::types::{AccountAddress, AccountKeys},
     types::transactions::{send, BlockItem},
     v2,
 };
-use crypto_common::types::Amount;
 use std::path::PathBuf;
 use structopt::*;
 
