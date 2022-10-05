@@ -1,9 +1,10 @@
 use crate::{
     endpoints,
     types::{
-        self, hashes,
+        self,
+        bans::BannedPeer,
+        hashes,
         hashes::{BlockHash, TransactionHash},
-        network::RemotePeerId,
         smart_contracts::{ContractContext, InstanceInfo, InvokeContractResult, ModuleRef},
         AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, TransactionStatus,
     },
@@ -747,31 +748,42 @@ impl Client {
         Ok(stream)
     }
 
+    /// Get a vector of the banned peers.
     pub async fn get_banned_peers(
         &mut self,
     ) -> endpoints::RPCResult<Vec<super::types::bans::BannedPeer>> {
-        let response = self
+        Ok(self
             .client
             .get_banned_peers(generated::Empty::default())
             .await?
-            .into_inner();
-        let banned_peers = response
+            .into_inner()
             .peers
             .into_iter()
-            .map(|p| super::types::bans::BannedPeer::try_from(p)?)
-            .collect()?;
-        Ok(banned_peers)
+            .map(super::types::bans::BannedPeer::try_from)
+            .collect::<anyhow::Result<Vec<BannedPeer>>>()?)
     }
 
+    /// Ban a peer
+    /// Returns whether the peer was banned or not.
     pub async fn ban_peer(
         &mut self,
-        peer_id: super::types::bans::Peer,
+        peer_to_ban: super::types::bans::PeerToBan,
     ) -> endpoints::RPCResult<bool> {
-        todo!()
+        Ok(self.client.ban_peer(peer_to_ban).await?.into_inner().value)
     }
 
-    pub async fn unban_peer(&mut self, banned_peer: super::types::bans::BannedPeer) -> endpoints::RPCResult<bool> {
-        todo!()
+    /// Unban a peer
+    /// Returns whether the peer was unbanned or not.
+    pub async fn unban_peer(
+        &mut self,
+        banned_peer: super::types::bans::BannedPeer,
+    ) -> endpoints::RPCResult<bool> {
+        Ok(self
+            .client
+            .unban_peer(banned_peer)
+            .await?
+            .into_inner()
+            .value)
     }
 }
 

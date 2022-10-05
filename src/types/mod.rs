@@ -2674,6 +2674,7 @@ mod transaction_fee_distribution {
 /// Exposing ban like functionality
 pub mod bans {
     use std::{net::IpAddr, str::FromStr};
+    use tonic::IntoRequest;
 
     // A banned peer identified by its IP address.
     #[derive(Debug)]
@@ -2685,12 +2686,35 @@ pub mod bans {
         fn try_from(value: crate::v2::generated::BannedPeer) -> Result<Self, Self::Error> {
             Ok(BannedPeer(IpAddr::from_str(&value.ip_address)?))
         }
-    }
+        }
 
-    // A peer to ban
+        impl IntoRequest<generated::BannedPeer> for BannedPeer {
+            fn into_request(self) -> Request<crate::v2::generated::BannedPeer> {
+                
+            }
+                
+        }
+
+    /// A peer to ban identified by either its
+    /// IP address or id.
     #[derive(Debug)]
-    pub enum Peer {
+    pub enum PeerToBan {
         IpAddr(IpAddr),
         Id(String),
+    }
+
+    impl IntoRequest<generated::PeerToban> for PeerToBan {
+        fn into_request(self) -> tonic::Request<crate::v2::generated::PeerToBan> {
+            tonic::Request::new(match self {
+                PeerToBan::IpAddr(ip_addr) => crate::v2::generated::PeerToBan {
+                    peer: Some(crate::v2::generated::IpAddress {
+                        value: ip_addr.to_string(),
+                    }),
+                },
+                PeerToBan::Id(value) => crate::v2::generated::PeerToBan {
+                    peer: Some(crate::v2::generated::PeerId { value }),
+                },
+            })
+        }
     }
 }
