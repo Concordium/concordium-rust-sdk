@@ -2672,9 +2672,9 @@ mod transaction_fee_distribution {
 }
 
 pub mod peers_info {
-    use crate::v2::Require;
-
     use super::*;
+    use crate::v2::Require;
+    use std::net::{IpAddr, SocketAddr};
 
     // A vector of the peers that
     // the node is connected to.
@@ -2694,6 +2694,8 @@ pub mod peers_info {
         pub catchup_status: CatchupStatus,
         // Network statistics for the peer.
         pub network_stats:  NetworkStats,
+        // The address of the peer
+        pub addr:           SocketAddr,
     }
 
     /// The catch up status of the peer.
@@ -2764,11 +2766,16 @@ pub mod peers_info {
                         packets_received: stats.packets_received,
                         latency:          stats.latency,
                     };
+                    let addr = SocketAddr::new(
+                        <IpAddr as std::str::FromStr>::from_str(&peer.ip)?,
+                        peer.port as u16,
+                    );
                     Ok(Peer {
                         peer_id: peer.peer_id,
                         peer_type,
                         catchup_status,
                         network_stats,
+                        addr,
                     })
                 })
                 .collect::<anyhow::Result<Vec<Peer>>>()?;
