@@ -1,0 +1,45 @@
+//! Example of how to instruct a node to connect/disconnect to a certain peer
+//! given by its IP and port.
+use anyhow::{ensure, Context};
+use clap::AppSettings;
+use concordium_rust_sdk::{endpoints, v2};
+use std::net::SocketAddr;
+use structopt::StructOpt;
+
+#[derive(StructOpt)]
+struct App {
+    #[structopt(
+        long = "node",
+        help = "GRPC interface of the node.",
+        default_value = "http://localhost:10001"
+    )]
+    endpoint: endpoints::Endpoint,
+    #[structopt(long = "peer", help = "peer to connect to")]
+    peer:     SocketAddr,
+}
+
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> anyhow::Result<()> {
+    let app = {
+        let app = App::clap().global_setting(AppSettings::ColoredHelp);
+        let matches = app.get_matches();
+        App::from_clap(&matches)
+    };
+
+    let mut client = v2::Client::new(app.endpoint)
+        .await
+        .context("Cannot connect.")?;
+
+    // Insert IP and port.
+    ensure!(
+        client.peer_connect(app.peer).await?,
+        "Should have connected to peer"
+    );
+    // We wait 10 seconds and drop the peer again.
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    ensure!(
+        client.peer_disconnect(app.peer).await?,
+        "Should have dropped the connection again"
+    );
+    Ok(())
+}

@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use crate::{
     endpoints,
     types::{
@@ -744,6 +746,40 @@ impl Client {
             Err(err) => Err(err),
         });
         Ok(stream)
+    }
+
+    pub async fn peer_connect(&mut self, addr: SocketAddr) -> endpoints::RPCResult<bool> {
+        let peer_connection = generated::PeerConnection {
+            ip:   Some(generated::IpAddress {
+                value: addr.ip().to_string(),
+            }),
+            port: Some(generated::Port {
+                value: addr.port() as u32,
+            }),
+        };
+        Ok(self
+            .client
+            .peer_connect(peer_connection)
+            .await?
+            .into_inner()
+            .value)
+    }
+
+    pub async fn peer_disconnect(&mut self, addr: SocketAddr) -> endpoints::RPCResult<bool> {
+        let peer_connection = generated::PeerConnection {
+            ip:   Some(generated::IpAddress {
+                value: addr.ip().to_string(),
+            }),
+            port: Some(generated::Port {
+                value: addr.port() as u32,
+            }),
+        };
+        Ok(self
+            .client
+            .peer_disconnect(peer_connection)
+            .await?
+            .into_inner()
+            .value)
     }
 }
 
