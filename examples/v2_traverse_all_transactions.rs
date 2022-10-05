@@ -4,7 +4,6 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{endpoints, types, v2};
-use serde_json;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]

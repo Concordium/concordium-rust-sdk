@@ -10,7 +10,7 @@ use crate::{
             ContractContext, InstanceInfo, InvokeContractResult, ModuleRef, Parameter, WasmModule,
         },
         transactions::{
-            self, InitContractPayload, Payload, UpdateContractPayload, UpdateInstruction,
+            self, InitContractPayload, UpdateContractPayload, UpdateInstruction,
         },
         AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, Energy, Memo, Nonce,
         RegisteredData, TransactionStatus, UpdateSequenceNumber,
@@ -437,73 +437,6 @@ impl From<&transactions::TransactionHeader> for generated::AccountTransactionHea
     }
 }
 
-impl From<transactions::EncodedPayload> for generated::AccountTransactionPayload {
-    fn from(v: transactions::EncodedPayload) -> Self {
-        Self {
-            payload: Some(generated::account_transaction_payload::Payload::RawPayload(
-                v.into(),
-            )),
-        }
-    }
-}
-
-impl From<&transactions::EncodedPayload> for generated::AccountTransactionPayload {
-    fn from(v: &transactions::EncodedPayload) -> Self {
-        Self {
-            payload: Some(generated::account_transaction_payload::Payload::RawPayload(
-                v.as_ref().clone(),
-            )),
-        }
-    }
-}
-
-impl From<transactions::Payload> for generated::AccountTransactionPayload {
-    fn from(v: transactions::Payload) -> Self { (&v).into() }
-}
-
-impl From<&transactions::Payload> for generated::AccountTransactionPayload {
-    fn from(v: &transactions::Payload) -> Self {
-        Self {
-            payload: Some(match v {
-                Payload::DeployModule { module } => {
-                    generated::account_transaction_payload::Payload::DeployModule(module.into())
-                }
-                Payload::InitContract { payload } => {
-                    generated::account_transaction_payload::Payload::InitContract(payload.into())
-                }
-                Payload::Update { payload } => {
-                    generated::account_transaction_payload::Payload::UpdateContract(payload.into())
-                }
-                Payload::Transfer { to_address, amount } => {
-                    generated::account_transaction_payload::Payload::Transfer(
-                        generated::TransferPayload {
-                            amount:   Some(amount.into()),
-                            receiver: Some(to_address.into()),
-                        },
-                    )
-                }
-                Payload::RegisterData { data } => {
-                    generated::account_transaction_payload::Payload::RegisterData(data.into())
-                }
-                Payload::TransferWithMemo {
-                    to_address,
-                    memo,
-                    amount,
-                } => generated::account_transaction_payload::Payload::TransferWithMemo(
-                    generated::TransferWithMemoPayload {
-                        amount:   Some(amount.into()),
-                        receiver: Some(to_address.into()),
-                        memo:     Some(memo.into()),
-                    },
-                ),
-                pl => {
-                    generated::account_transaction_payload::Payload::RawPayload(pl.encode().into())
-                }
-            }),
-        }
-    }
-}
-
 impl From<TransactionSignature> for generated::AccountTransactionSignature {
     fn from(v: TransactionSignature) -> Self { (&v).into() }
 }
@@ -536,7 +469,11 @@ impl IntoRequest<generated::PreAccountTransaction>
     fn into_request(self) -> tonic::Request<generated::PreAccountTransaction> {
         let request = generated::PreAccountTransaction {
             header:  Some(self.0.into()),
-            payload: Some(self.1.into()),
+            payload: Some(generated::AccountTransactionPayload {
+                payload: Some(generated::account_transaction_payload::Payload::RawPayload(
+                    self.1.encode().into(),
+                )),
+            }),
         };
         tonic::Request::new(request)
     }
