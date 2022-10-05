@@ -12,6 +12,8 @@
 - Implement `Display` and `FromStr` for `ContractAddress` formatted as `<index, subindex>`, E.g `<145,0>`.
 - Implement `Display` and `FromStr` for `Address`. The latter attempts to parse a contract address. If this fails it will attempt to parse an `AccountAddress`.
 - Implement `FromStr` for `OwnedReceiveName`.
+- Remove the `From<Vec<u8>>` implementation for `Parameter`. Instead a `TryFrom` is
+  provided that checks the length.
 
 ## 1.1.0
 
