@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use crate::{
-    endpoints, id,
+    endpoints::{self, QueryError},
+    id,
     id::types::AccountCredentialMessage,
     types::{
         self, hashes,
@@ -9,9 +10,7 @@ use crate::{
         smart_contracts::{
             ContractContext, InstanceInfo, InvokeContractResult, ModuleRef, Parameter, WasmModule,
         },
-        transactions::{
-            self, InitContractPayload, UpdateContractPayload, UpdateInstruction,
-        },
+        transactions::{self, InitContractPayload, UpdateContractPayload, UpdateInstruction},
         AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, Energy, Memo, Nonce,
         RegisteredData, TransactionStatus, UpdateSequenceNumber,
     },
@@ -799,18 +798,13 @@ impl Client {
     /// this function might wish to wrap it inside
     /// [`timeout`](tokio::time::timeout) handler and handle the resulting
     /// failure.
-    /// TODO: Make use of get_finalized_blocks.
     pub async fn wait_until_finalized(
         &mut self,
         hash: &types::hashes::TransactionHash,
     ) -> endpoints::QueryResult<(types::hashes::BlockHash, types::BlockItemSummary)> {
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(250));
-        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-        loop {
-            interval.tick().await;
-            if let types::TransactionStatus::Finalized(blocks) =
-                self.get_block_item_status(hash).await?
-            {
+        let hash = *hash;
+        let process_response = |response| {
+            if let types::TransactionStatus::Finalized(blocks) = response {
                 let mut iter = blocks.into_iter();
                 if let Some(rv) = iter.next() {
                     if iter.next().is_some() {
@@ -820,7 +814,7 @@ impl Client {
                         )
                         .into());
                     } else {
-                        return Ok(rv);
+                        return Ok::<_, QueryError>(Some(rv));
                     }
                 } else {
                     return Err(tonic::Status::internal(
@@ -828,6 +822,23 @@ impl Client {
                     )
                     .into());
                 }
+            } else {
+                Ok(None)
+            }
+        };
+
+        match process_response(self.get_block_item_status(&hash).await?)? {
+            Some(rv) => Ok(rv),
+            None => {
+                // if the first query did not succeed then start listening for finalized blocks.
+                // and on each new block try to query the status.
+                let mut blocks = self.get_finalized_blocks().await?;
+                while blocks.next().await.transpose()?.is_some() {
+                    if let Some(rv) = process_response(self.get_block_item_status(&hash).await?)? {
+                        return Ok(rv);
+                    }
+                }
+                Err(QueryError::NotFound)
             }
         }
     }
