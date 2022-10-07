@@ -274,83 +274,11 @@ impl IntoRequest<generated::BlocksAtHeightRequest> for &endpoints::BlocksAtHeigh
     }
 }
 
-/// The network info of a node informs of the following:
-/// * The node id. An id which it uses to identify itself to other peers and it
-///   is used for logging purposes internally. NB. The 'node_id' is spoofable
-///   and as such should not serve as a trust instrument.
-/// * 'peer_total_sent' is the total amount of packets sent by the node.
-/// * 'peer_total_received' is the total amount of packets received by the node.
-/// * 'avg_bps_in' is the average bytes per second received by the node.
-/// * 'avg_bps_out' is the average bytes per second transmitted by the node.
-#[derive(Debug)]
-pub struct NetworkInfo {
-    pub node_id:             String,
-    pub peer_total_sent:     u64,
-    pub peer_total_received: u64,
-    pub avg_bps_in:          u64,
-    pub avg_bps_out:         u64,
-}
-
-// Details of the consensus protocol running on the node.
-#[derive(Debug)]
-pub enum NodeConsensusStatus {
-    // The consensus protocol is not running on the node.
-    // This only occurs when the node does not support the protocol on the chain or the node is a
-    // 'Bootstrapper'.
-    ConsensusNotRunning,
-    // The node is a passive member of the consensus. This means:
-    // * The node is processing blocks.
-    // * The node is relaying transactions and blocks onto the network.
-    // * The node is responding to catch up messages from its peers.
-    // * In particular this means that the node is __not__ baking blocks.
-    ConsensusPassive,
-    // The node has been configured with baker keys however it is not currently baking and
-    // possilby never will.
-    NotInCommittee,
-    // The baker keys are registered however the baker is not in the committee
-    // for the current 'Epoch'.
-    AddedButNotActiveInCommittee,
-    // The node has been configured with baker keys that does not match the account.
-    AddedButWrongKeys,
-    // The node is member of the baking committee.
-    Baker(crate::types::BakerId),
-    // The node is member of the baking and finalization committee.
-    Finalizer(crate::types::BakerId),
-}
-
-/// Consensus related information for a node.
-#[derive(Debug)]
-pub enum NodeDetails {
-    // The node is a bootstrapper and does not
-    // run the consensus protocol.
-    Bootstrapper,
-    // The node is a regular node and is eligible for
-    // running the consensus protocol.
-    Node(NodeConsensusStatus),
-}
-
-#[derive(Debug)]
-/// The status of the requested node.
-pub struct NodeInfo {
-    // The version of the node.
-    pub version:      semver::Version,
-    // The local (UTC) time of the node.
-    pub local_time:   chrono::DateTime<chrono::Utc>,
-    // How long the node has been alive.
-    pub uptime:       chrono::Duration,
-    // Information related to the network for the node.
-    pub network_info: NetworkInfo,
-    // Information related to consensus for the node.
-    pub details:      NodeDetails,
-}
-
-impl TryFrom<generated::node_info::NetworkInfo> for NetworkInfo {
+impl TryFrom<generated::node_info::NetworkInfo> for types::NetworkInfo {
     type Error = anyhow::Error;
 
-    fn try_from(
-        network_info: generated::node_info::NetworkInfo,
-    ) -> Result<Self, Self::Error> {
-        Ok(NetworkInfo {
+    fn try_from(network_info: generated::node_info::NetworkInfo) -> Result<Self, Self::Error> {
+        Ok(types::NetworkInfo {
             node_id:             network_info.node_id.require()?.value,
             peer_total_sent:     network_info.peer_total_sent,
             peer_total_received: network_info.peer_total_received,
@@ -360,7 +288,7 @@ impl TryFrom<generated::node_info::NetworkInfo> for NetworkInfo {
     }
 }
 
-impl TryFrom<generated::NodeInfo> for NodeInfo {
+impl TryFrom<generated::NodeInfo> for types::NodeInfo {
     type Error = anyhow::Error;
 
     fn try_from(node_info: generated::NodeInfo) -> Result<Self, Self::Error> {
@@ -370,30 +298,34 @@ impl TryFrom<generated::NodeInfo> for NodeInfo {
         let uptime = types::DurationSeconds::from(node_info.peer_uptime.require()?.value).into();
         let network_info = node_info.network_info.require()?.try_into()?;
         let details = match node_info.details.require()? {
-            generated::node_info::Details::Bootstrapper(_) => NodeDetails::Bootstrapper,
+            generated::node_info::Details::Bootstrapper(_) => types::NodeDetails::Bootstrapper,
             generated::node_info::Details::Node(status) => {
                 let consensus_status = match status.consensus_status.require()? {
-                    generated::node_info::node::ConsensusStatus::NotRunning(_) => NodeConsensusStatus::ConsensusNotRunning,
-                    generated::node_info::node::ConsensusStatus::Passive(_) => NodeConsensusStatus::ConsensusPassive,
-                    generated::node_info::node::ConsensusStatus::Active(baker) =>{
+                    generated::node_info::node::ConsensusStatus::NotRunning(_) => {
+                        types::NodeConsensusStatus::ConsensusNotRunning
+                    }
+                    generated::node_info::node::ConsensusStatus::Passive(_) => {
+                        types::NodeConsensusStatus::ConsensusPassive
+                    }
+                    generated::node_info::node::ConsensusStatus::Active(baker) => {
                         match baker.status.require()? {
-                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(0) => NodeConsensusStatus::NotInCommittee,
-                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(1) => NodeConsensusStatus::AddedButNotActiveInCommittee,
-                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(2) => NodeConsensusStatus::AddedButWrongKeys,
+                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(0) => types::NodeConsensusStatus::NotInCommittee,
+                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(1) => types::NodeConsensusStatus::AddedButNotActiveInCommittee,
+                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(2) => types::NodeConsensusStatus::AddedButWrongKeys,
                             generated::node_info::baker_consensus_info::Status::ActiveBakerCommitteeInfo(active_baker) => {
-                                NodeConsensusStatus::Baker(active_baker.baker_id.require()?.into())
+                                types::NodeConsensusStatus::Baker(active_baker.baker_id.require()?.into())
                             },
                             generated::node_info::baker_consensus_info::Status::ActiveFinalizerCommitteeInfo(active_finalizer) => {
-                                NodeConsensusStatus::Finalizer(active_finalizer.baker_id.require()?.into())
+                                types::NodeConsensusStatus::Finalizer(active_finalizer.baker_id.require()?.into())
                             },
                             _ => anyhow::bail!("Malformed baker status")
                         }
-                    },
+                    }
                 };
-                NodeDetails::Node(consensus_status)
+                types::NodeDetails::Node(consensus_status)
             }
         };
-        Ok(NodeInfo {
+        Ok(types::NodeInfo {
             version,
             local_time,
             uptime,
@@ -402,7 +334,6 @@ impl TryFrom<generated::NodeInfo> for NodeInfo {
         })
     }
 }
-
 
 impl Client {
     pub async fn new<E: Into<tonic::transport::Endpoint>>(
@@ -712,12 +643,12 @@ impl Client {
         })
     }
 
-    pub async fn get_node_info(&mut self) -> endpoints::RPCResult<NodeInfo> {
+    pub async fn get_node_info(&mut self) -> endpoints::RPCResult<types::NodeInfo> {
         let response = self
             .client
             .get_node_info(generated::Empty::default())
             .await?;
-        let node_info = NodeInfo::try_from(response.into_inner())?;
+        let node_info = types::NodeInfo::try_from(response.into_inner())?;
         Ok(node_info)
     }
 }
