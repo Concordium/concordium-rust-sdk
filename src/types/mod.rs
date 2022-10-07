@@ -6,8 +6,8 @@ pub mod smart_contracts;
 mod summary_helper;
 pub mod transactions;
 
+use crate::constants::*;
 pub use crate::generated_types::PeerStatsResponse;
-use crate::{constants::*, v2::Require};
 pub use basic::*;
 use crypto_common::{
     derive::{Serial, Serialize},
@@ -2648,134 +2648,5 @@ mod transaction_fee_distribution {
                 Err("Transaction fee fractions exceed 100%.")
             }
         }
-    }
-}
-
-/// The network info of a node informs of the following:
-/// * The node id. An id which it uses to identify itself to other peers and it
-///   is used for logging purposes internally. NB. The 'node_id' is spoofable
-///   and as such should not serve as a trust instrument.
-/// * 'peer_total_sent' is the total amount of packets sent by the node.
-/// * 'peer_total_received' is the total amount of packets received by the node.
-/// * 'avg_bps_in' is the average bytes per second received by the node.
-/// * 'avg_bps_out' is the average bytes per second transmitted by the node.
-#[derive(Debug)]
-pub struct NetworkInfo {
-    pub node_id:             String,
-    pub peer_total_sent:     u64,
-    pub peer_total_received: u64,
-    pub avg_bps_in:          u64,
-    pub avg_bps_out:         u64,
-}
-
-// Details of the consensus protocol running on the node.
-#[derive(Debug)]
-pub enum NodeConsensusStatus {
-    // The consensus protocol is not running on the node.
-    // This only occurs when the node does not support the protocol on the chain or the node is a
-    // 'Bootstrapper'.
-    ConsensusNotRunning,
-    // The node is a passive member of the consensus. This means:
-    // * The node is processing blocks.
-    // * The node is relaying transactions and blocks onto the network.
-    // * The node is responding to catch up messages from its peers.
-    // * In particular this means that the node is __not__ baking blocks.
-    ConsensusPassive,
-    // The node has been configured with baker keys however it is not currently baking and
-    // possilby never will.
-    NotInCommittee,
-    // The baker keys are registered however the baker is not in the committee
-    // for the current 'Epoch'.
-    AddedButNotActiveInCommittee,
-    // The node has been configured with baker keys that does not match the account.
-    AddedButWrongKeys,
-    // The node is member of the baking committee.
-    Baker(crate::types::BakerId),
-    // The node is member of the baking and finalization committee.
-    Finalizer(crate::types::BakerId),
-}
-
-/// Consensus related information for a node.
-#[derive(Debug)]
-pub enum NodeDetails {
-    // The node is a bootstrapper and does not
-    // run the consensus protocol.
-    Bootstrapper,
-    // The node is a regular node and is eligible for
-    // running the consensus protocol.
-    Node(NodeConsensusStatus),
-}
-
-#[derive(Debug)]
-/// The status of the requested node.
-pub struct NodeInfo {
-    // The version of the node.
-    pub version:      semver::Version,
-    // The local (UTC) time of the node.
-    pub local_time:   chrono::DateTime<chrono::Utc>,
-    // How long the node has been alive.
-    pub uptime:       chrono::Duration,
-    // Information related to the network for the node.
-    pub network_info: NetworkInfo,
-    // Information related to consensus for the node.
-    pub details:      NodeDetails,
-}
-
-impl TryFrom<crate::v2::generated::node_info::NetworkInfo> for NetworkInfo {
-    type Error = anyhow::Error;
-
-    fn try_from(
-        network_info: crate::v2::generated::node_info::NetworkInfo,
-    ) -> Result<Self, Self::Error> {
-        Ok(NetworkInfo {
-            node_id:             network_info.node_id.require()?.value,
-            peer_total_sent:     network_info.peer_total_sent,
-            peer_total_received: network_info.peer_total_received,
-            avg_bps_in:          network_info.avg_bps_in,
-            avg_bps_out:         network_info.avg_bps_out,
-        })
-    }
-}
-
-impl TryFrom<crate::v2::generated::NodeInfo> for NodeInfo {
-    type Error = anyhow::Error;
-
-    fn try_from(node_info: crate::v2::generated::NodeInfo) -> Result<Self, Self::Error> {
-        let version = semver::Version::parse(&node_info.peer_version)?;
-        let local_time = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
-            + chrono::Duration::milliseconds(node_info.local_time.require()?.value as i64);
-        let uptime = DurationSeconds::from(node_info.peer_uptime.require()?.value).into();
-        let network_info = node_info.network_info.require()?.try_into()?;
-        let details = match node_info.details.require()? {
-            crate::v2::generated::node_info::Details::Bootstrapper(_) => NodeDetails::Bootstrapper,
-            crate::v2::generated::node_info::Details::Node(status) => {
-                let consensus_status = match status.consensus_status.require()? {
-                    crate::v2::generated::node_info::node::ConsensusStatus::NotRunning(_) => NodeConsensusStatus::ConsensusNotRunning,
-                    crate::v2::generated::node_info::node::ConsensusStatus::Passive(_) => NodeConsensusStatus::ConsensusPassive,
-                    crate::v2::generated::node_info::node::ConsensusStatus::Active(baker) =>{
-                        match baker.status.require()? {
-                            crate::v2::generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(0) => NodeConsensusStatus::NotInCommittee,
-                            crate::v2::generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(1) => NodeConsensusStatus::AddedButNotActiveInCommittee,
-                            crate::v2::generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(2) => NodeConsensusStatus::AddedButWrongKeys,
-                            crate::v2::generated::node_info::baker_consensus_info::Status::ActiveBakerCommitteeInfo(active_baker) => {
-                                NodeConsensusStatus::Baker(active_baker.baker_id.require()?.into())
-                            },
-                            crate::v2::generated::node_info::baker_consensus_info::Status::ActiveFinalizerCommitteeInfo(active_finalizer) => {
-                                NodeConsensusStatus::Finalizer(active_finalizer.baker_id.require()?.into())
-                            },
-                            _ => anyhow::bail!("Malformed baker status")
-                        }
-                    },
-                };
-                NodeDetails::Node(consensus_status)
-            }
-        };
-        Ok(NodeInfo {
-            version,
-            local_time,
-            uptime,
-            network_info,
-            details,
-        })
     }
 }
