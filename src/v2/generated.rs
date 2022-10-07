@@ -206,6 +206,19 @@ impl TryFrom<StateHash> for super::hashes::StateHash {
     }
 }
 
+impl TryFrom<LeadershipElectionNonce> for super::hashes::LeadershipElectionNonce {
+    type Error = tonic::Status;
+
+    fn try_from(value: LeadershipElectionNonce) -> Result<Self, Self::Error> {
+        match value.value.try_into() {
+            Ok(hash) => Ok(Self::new(hash)),
+            Err(_) => Err(tonic::Status::internal(
+                "Unexpected leadership election nonce format.",
+            )),
+        }
+    }
+}
+
 impl From<AbsoluteBlockHeight> for super::AbsoluteBlockHeight {
     fn from(abh: AbsoluteBlockHeight) -> Self { Self { height: abh.value } }
 }
@@ -780,6 +793,32 @@ impl From<Timestamp> for chrono::DateTime<chrono::Utc> {
     }
 }
 
+impl TryFrom<DelegatorInfo> for super::types::DelegatorInfo {
+    type Error = tonic::Status;
+
+    fn try_from(delegator: DelegatorInfo) -> Result<Self, Self::Error> {
+        Ok(Self {
+            account:        delegator.account.require()?.try_into()?,
+            stake:          delegator.stake.require()?.into(),
+            pending_change: delegator
+                .pending_change
+                .map(TryFrom::try_from)
+                .transpose()?,
+        })
+    }
+}
+
+impl TryFrom<DelegatorRewardPeriodInfo> for super::types::DelegatorRewardPeriodInfo {
+    type Error = tonic::Status;
+
+    fn try_from(delegator: DelegatorRewardPeriodInfo) -> Result<Self, Self::Error> {
+        Ok(Self {
+            account: delegator.account.require()?.try_into()?,
+            stake:   delegator.stake.require()?.into(),
+        })
+    }
+}
+
 impl TryFrom<AccountInfo> for super::types::AccountInfo {
     type Error = tonic::Status;
 
@@ -899,6 +938,23 @@ impl TryFrom<BlockItemSummary> for super::types::BlockItemSummary {
     }
 }
 
+impl TryFrom<ElectionDifficulty> for super::types::ElectionDifficulty {
+    type Error = tonic::Status;
+
+    fn try_from(value: ElectionDifficulty) -> Result<Self, Self::Error> {
+        Ok(Self {
+            parts_per_hundred_thousands: super::types::PartsPerHundredThousands::new(
+                value.value.require()?.parts_per_hundred_thousand,
+            )
+            .ok_or_else(|| {
+                tonic::Status::internal(
+                    "Invalid election difficulty. Above 100_000 parts per hundres thousands.",
+                )
+            })?,
+        })
+    }
+}
+
 impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
     type Error = tonic::Status;
 
@@ -913,17 +969,7 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
                 })
             }
             update_payload::Payload::ElectionDifficultyUpdate(v) => {
-                Self::ElectionDifficulty(super::types::ElectionDifficulty {
-                    parts_per_hundred_thousands: super::types::PartsPerHundredThousands::new(
-                        v.value.require()?.parts_per_hundred_thousand,
-                    )
-                    .ok_or_else(|| {
-                        tonic::Status::internal(
-                            "Invalid election difficulty. Above 100_000 parts per hundres \
-                             thousands.",
-                        )
-                    })?,
-                })
+                Self::ElectionDifficulty(v.try_into()?)
             }
             update_payload::Payload::EuroPerEnergyUpdate(v) => {
                 let value = v.value.require()?;
@@ -2174,5 +2220,128 @@ impl TryFrom<TokenomicsInfo> for super::types::RewardsOverview {
                 total_staked_capital: value.total_staked_capital.require()?.into(),
             }),
         }
+    }
+}
+
+impl TryFrom<Branch> for super::types::queries::Branch {
+    type Error = tonic::Status;
+
+    fn try_from(value: Branch) -> Result<Self, Self::Error> {
+        // Tracking the branches which to visit next.
+        let mut next = Vec::new();
+        // For building a depth first search order of the tree.
+        let mut dfs = Vec::new();
+
+        // First we build a depth first search order of the tree.
+        next.extend(value.children.iter());
+        dfs.push(&value);
+        while let Some(value) = next.pop() {
+            dfs.push(value);
+            next.extend(value.children.iter());
+        }
+
+        // Using depth first we build the new tree.
+        let mut nodes = Vec::new();
+        while let Some(value) = dfs.pop() {
+            let mut children = Vec::new();
+            for _ in 0..value.children.len() {
+                // If a node have children, they should already be pushed and this is safe.
+                children.push(nodes.pop().require()?);
+            }
+
+            let node = Self {
+                block_hash: value.block_hash.clone().require()?.try_into()?,
+                children,
+            };
+            nodes.push(node)
+        }
+
+        // Only one node should be left and is the root of the tree.
+        let root = nodes.pop().require()?;
+        Ok(root)
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    #[test]
+    fn test_try_from_branch() {
+        use crate::types::queries::Branch as QBranch;
+
+        let from = Branch {
+            block_hash: Some(BlockHash {
+                value: vec![0u8; 32],
+            }),
+            children:   vec![
+                Branch {
+                    block_hash: Some(BlockHash {
+                        value: vec![1u8; 32],
+                    }),
+                    children:   vec![],
+                },
+                Branch {
+                    block_hash: Some(BlockHash {
+                        value: vec![2u8; 32],
+                    }),
+                    children:   vec![Branch {
+                        block_hash: Some(BlockHash {
+                            value: vec![3u8; 32],
+                        }),
+                        children:   vec![],
+                    }],
+                },
+            ],
+        };
+
+        let to_target = QBranch {
+            block_hash: [0u8; 32].into(),
+            children:   vec![
+                QBranch {
+                    block_hash: [2u8; 32].into(),
+                    children:   vec![QBranch {
+                        block_hash: [3u8; 32].into(),
+                        children:   vec![],
+                    }],
+                },
+                QBranch {
+                    block_hash: [1u8; 32].into(),
+                    children:   vec![],
+                },
+            ],
+        };
+        let to = QBranch::try_from(from).expect("Failed to convert branch");
+
+        assert_eq!(to, to_target);
+    }
+}
+
+impl TryFrom<election_info::Baker> for super::types::BirkBaker {
+    type Error = tonic::Status;
+
+    fn try_from(info: election_info::Baker) -> Result<Self, Self::Error> {
+        Ok(Self {
+            baker_id:            info.baker.require()?.into(),
+            baker_lottery_power: info.lottery_power,
+            baker_account:       info.account.require()?.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<ElectionInfo> for super::types::BirkParameters {
+    type Error = tonic::Status;
+
+    fn try_from(info: ElectionInfo) -> Result<Self, Self::Error> {
+        Ok(Self {
+            election_difficulty: info.election_difficulty.require()?.try_into()?,
+            election_nonce:      info.election_nonce.require()?.try_into()?,
+            bakers:              info
+                .baker_election_info
+                .into_iter()
+                .map(|c| c.try_into())
+                .collect::<Result<_, _>>()?,
+        })
     }
 }

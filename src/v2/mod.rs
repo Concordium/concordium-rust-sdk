@@ -274,6 +274,85 @@ impl IntoRequest<generated::BlocksAtHeightRequest> for &endpoints::BlocksAtHeigh
     }
 }
 
+impl IntoRequest<generated::GetPoolDelegatorsRequest> for (&BlockIdentifier, types::BakerId) {
+    fn into_request(self) -> tonic::Request<generated::GetPoolDelegatorsRequest> {
+        let req = generated::GetPoolDelegatorsRequest {
+            block_hash: Some(self.0.into()),
+            baker:      Some(self.1.into()),
+        };
+        tonic::Request::new(req)
+    }
+}
+
+impl TryFrom<generated::IpSocketAddress> for std::net::SocketAddr {
+    type Error = anyhow::Error;
+
+    fn try_from(value: generated::IpSocketAddress) -> Result<Self, Self::Error> {
+        Ok(std::net::SocketAddr::new(
+            <std::net::IpAddr as std::str::FromStr>::from_str(&value.ip.require()?.value)?,
+            value.port.require()?.value as u16,
+        ))
+    }
+}
+
+impl From<generated::PeerId> for types::network::PeerId {
+    fn from(value: generated::PeerId) -> Self { types::network::PeerId(value.value) }
+}
+
+impl TryFrom<generated::PeersInfo> for types::network::PeersInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(peers_info: generated::PeersInfo) -> Result<Self, Self::Error> {
+        // Get information of the peers that the node is connected to.
+        // Note. If one peer contains malformed data then this function does not
+        // return any information about the others.
+        // This should only happen in cases where the sdk and node is not on the same
+        // major version.
+        let peers = peers_info
+            .peers
+            .into_iter()
+            .map(|peer| {
+                // Parse the catchup status of the peer.
+                let peer_consensus_info = match peer.consensus_info.require()? {
+                    generated::peers_info::peer::ConsensusInfo::Bootstrapper(_) => {
+                        types::network::PeerConsensusInfo::Bootstrapper
+                    }
+                    generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(0) => {
+                        types::network::PeerConsensusInfo::Node(
+                            types::network::PeerCatchupStatus::UpToDate,
+                        )
+                    }
+                    generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(1) => {
+                        types::network::PeerConsensusInfo::Node(
+                            types::network::PeerCatchupStatus::Pending,
+                        )
+                    }
+                    generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(2) => {
+                        types::network::PeerConsensusInfo::Node(
+                            types::network::PeerCatchupStatus::CatchingUp,
+                        )
+                    }
+                    _ => anyhow::bail!("Malformed catchup status from peer."),
+                };
+                // Parse the network statistics for the peer.
+                let stats = peer.network_stats.require()?;
+                let network_stats = types::network::NetworkStats {
+                    packets_sent:     stats.packets_sent,
+                    packets_received: stats.packets_received,
+                    latency:          stats.latency,
+                };
+                Ok(types::network::Peer {
+                    peer_id: peer.peer_id.require()?.into(),
+                    consensus_info: peer_consensus_info,
+                    network_stats,
+                    addr: peer.socket_address.require()?.try_into()?,
+                })
+            })
+            .collect::<anyhow::Result<Vec<types::network::Peer>>>()?;
+        Ok(types::network::PeersInfo { peers })
+    }
+}
+
 impl TryFrom<generated::node_info::NetworkInfo> for types::NetworkInfo {
     type Error = anyhow::Error;
 
@@ -643,6 +722,169 @@ impl Client {
         })
     }
 
+    pub async fn get_pool_delegators(
+        &mut self,
+        bi: &BlockIdentifier,
+        baker_id: types::BakerId,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::DelegatorInfo, tonic::Status>>>,
+    > {
+        let response = self.client.get_pool_delegators((bi, baker_id)).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(delegator) => delegator.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_pool_delegators_reward_period(
+        &mut self,
+        bi: &BlockIdentifier,
+        baker_id: types::BakerId,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::DelegatorRewardPeriodInfo, tonic::Status>>>,
+    > {
+        let response = self
+            .client
+            .get_pool_delegators_reward_period((bi, baker_id))
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(delegator) => delegator.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_passive_delegators(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::DelegatorInfo, tonic::Status>>>,
+    > {
+        let response = self.client.get_passive_delegators(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(delegator) => delegator.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_passive_delegators_reward_period(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::DelegatorRewardPeriodInfo, tonic::Status>>>,
+    > {
+        let response = self.client.get_passive_delegators_reward_period(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(delegator) => delegator.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_branches(&mut self) -> endpoints::QueryResult<types::queries::Branch> {
+        let response = self
+            .client
+            .get_branches(generated::Empty::default())
+            .await?;
+        let response = types::queries::Branch::try_from(response.into_inner())?;
+        Ok(response)
+    }
+
+    pub async fn get_election_info(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::BirkParameters>> {
+        let response = self.client.get_election_info(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::BirkParameters::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_identity_providers(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<
+            impl Stream<Item = Result<id::types::IpInfo<id::constants::IpPairing>, tonic::Status>>,
+        >,
+    > {
+        let response = self.client.get_identity_providers(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(ip_info) => ip_info.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_anonymity_revokers(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<
+            impl Stream<Item = Result<id::types::ArInfo<id::constants::ArCurve>, tonic::Status>>,
+        >,
+    > {
+        let response = self.client.get_anonymity_revokers(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(ar_info) => ar_info.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_account_non_finalized_transactions(
+        &mut self,
+        account_address: &AccountAddress,
+    ) -> endpoints::QueryResult<impl Stream<Item = Result<TransactionHash, tonic::Status>>> {
+        let response = self
+            .client
+            .get_account_non_finalized_transactions(account_address)
+            .await?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(transaction_hash) => transaction_hash.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(stream)
+    }
+
+    pub async fn get_peers_info(&mut self) -> endpoints::RPCResult<types::network::PeersInfo> {
+        let response = self
+            .client
+            .get_peers_info(generated::Empty::default())
+            .await?;
+        let peers_info = types::network::PeersInfo::try_from(response.into_inner())?;
+        Ok(peers_info)
+    }
+
     pub async fn get_node_info(&mut self) -> endpoints::RPCResult<types::NodeInfo> {
         let response = self
             .client
@@ -682,7 +924,7 @@ fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<Bl
 ///
 /// The main reason for needing this is that in proto3 all fields are optional,
 /// so it is up to the application to validate inputs if they are required.
-pub trait Require<E> {
+trait Require<E> {
     type A;
     fn require(self) -> Result<Self::A, E>;
 }
