@@ -1,8 +1,7 @@
 //! Test the `GetInstanceInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_contracts_common::ContractAddress;
-use concordium_rust_sdk::{endpoints, v2};
+use concordium_rust_sdk::{endpoints, smart_contracts::common::ContractAddress, v2};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]

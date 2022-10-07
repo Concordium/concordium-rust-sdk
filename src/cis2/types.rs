@@ -103,7 +103,7 @@ impl Serial for TokenAmount {
 }
 
 impl Deserial for TokenAmount {
-    fn deserial<R: Read>(source: &mut R) -> concordium_contracts_common::ParseResult<Self> {
+    fn deserial<R: Read>(source: &mut R) -> concordium_base::contracts_common::ParseResult<Self> {
         let mut result = BigUint::zero();
         for i in 0..37 {
             let byte = source.read_u8()?;
@@ -114,7 +114,7 @@ impl Deserial for TokenAmount {
                 return Ok(TokenAmount::from(result));
             }
         }
-        Err(concordium_contracts_common::ParseError {})
+        Err(concordium_base::contracts_common::ParseError {})
     }
 }
 

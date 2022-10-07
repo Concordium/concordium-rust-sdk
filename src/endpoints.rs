@@ -13,12 +13,14 @@ use crate::{
     },
 };
 use anyhow::anyhow;
-use crypto_common::{types::TransactionSignature, Serial, Versioned};
-use derive_more::From;
-use id::{
-    constants::{ArCurve, IpPairing},
-    types::{ArInfo, GlobalContext, IpInfo},
+use concordium_base::{
+    common::{types::TransactionSignature, Serial, Versioned},
+    id::{
+        constants::{ArCurve, IpPairing},
+        types::{ArInfo, GlobalContext, IpInfo},
+    },
 };
+use derive_more::From;
 use sha2::Digest;
 use std::{
     borrow::Borrow,
@@ -474,7 +476,7 @@ impl Client {
     pub async fn get_account_list(
         &mut self,
         bh: &types::hashes::BlockHash,
-    ) -> QueryResult<Vec<id::types::AccountAddress>> {
+    ) -> QueryResult<Vec<crate::id::types::AccountAddress>> {
         let request = self.construct_request(BlockHash {
             block_hash: bh.to_string(),
         })?;
@@ -500,7 +502,7 @@ impl Client {
     /// returned.
     pub async fn get_account_info(
         &mut self,
-        addr: impl Borrow<id::types::AccountAddress>,
+        addr: impl Borrow<crate::id::types::AccountAddress>,
         bh: &types::hashes::BlockHash,
     ) -> QueryResult<types::AccountInfo> {
         let res = self.get_account_info_raw(addr, bh).await?;
@@ -517,7 +519,7 @@ impl Client {
     /// [AccountInfo](types::AccountInfo)
     pub async fn get_account_info_raw(
         &mut self,
-        addr: impl Borrow<id::types::AccountAddress>,
+        addr: impl Borrow<crate::id::types::AccountAddress>,
         bh: &types::hashes::BlockHash,
     ) -> QueryResult<serde_json::Value> {
         let request = self.construct_request(GetAddressInfoRequest {
@@ -720,7 +722,7 @@ impl Client {
     /// If the account does not exist an empty list will be returned.
     pub async fn get_account_non_finalized_transactions(
         &mut self,
-        addr: &id::types::AccountAddress,
+        addr: &crate::id::types::AccountAddress,
     ) -> RPCResult<Vec<types::hashes::TransactionHash>> {
         let request = self.construct_request(AccountAddress {
             account_address: addr.to_string(),
@@ -797,7 +799,7 @@ impl Client {
     /// information is.
     pub async fn get_next_account_nonce(
         &mut self,
-        addr: &id::types::AccountAddress,
+        addr: &crate::id::types::AccountAddress,
     ) -> RPCResult<queries::AccountNonceResponse> {
         let request = self.construct_request(AccountAddress {
             account_address: addr.to_string(),
@@ -835,10 +837,9 @@ impl Client {
     ) -> RPCResult<types::hashes::TransactionHash> {
         let request = self.construct_request(SendTransactionRequest {
             network_id: u32::from(u16::from(DEFAULT_NETWORK_ID)),
-            payload:    crypto_common::to_bytes(&crypto_common::Versioned::new(
-                crypto_common::VERSION_0,
-                bi,
-            )),
+            payload:    concordium_base::common::to_bytes(
+                &concordium_base::common::Versioned::new(concordium_base::common::VERSION_0, bi),
+            ),
         })?;
         let response = self.client.send_transaction(request).await?;
         if response.into_inner().value {
@@ -864,7 +865,7 @@ impl Client {
         let mut data = Vec::with_capacity(
             body.len() + transactions::construct::TRANSACTION_HEADER_SIZE as usize,
         );
-        crypto_common::VERSION_0.serial(&mut data); // outer version number
+        concordium_base::common::VERSION_0.serial(&mut data); // outer version number
         0u8.serial(&mut data); // tag for account transaction
         signatures.serial(&mut data); // signatures
         data.extend_from_slice(body); // header + payload

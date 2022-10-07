@@ -3,13 +3,13 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
+    common::types::TransactionTime,
     endpoints,
     types::{
         transactions::{update, BlockItem, Payload},
         BlockSummary, ExchangeRate, TransactionStatus, UpdateKeyPair, UpdatePayload,
     },
 };
-use crypto_common::types::TransactionTime;
 use std::path::PathBuf;
 use structopt::StructOpt;
 

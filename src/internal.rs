@@ -46,8 +46,10 @@ pub(crate) mod byte_array_hex {
 }
 
 pub(crate) mod account_amounts {
-    use crypto_common::{types::Amount, SerdeDeserialize, SerdeSerialize};
-    use id::types::AccountAddress;
+    use concordium_base::{
+        common::{types::Amount, SerdeDeserialize, SerdeSerialize},
+        id::types::AccountAddress,
+    };
     use serde::de::Error;
     use std::collections::BTreeMap;
 
@@ -96,24 +98,6 @@ pub(crate) mod account_amounts {
             }
         }
         des.deserialize_seq(AccountAmountsVisitor)
-    }
-}
-
-/// Module to help checking that a value is not default during serialization.
-/// This is particularly interesting for various integer types, where the
-/// default value is 0.
-pub(crate) mod deserialize_non_default {
-    use crypto_common::SerdeDeserialize;
-
-    pub fn deserialize<'de, D, A>(des: D) -> Result<A, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-        A: SerdeDeserialize<'de> + Default + PartialEq + Eq, {
-        let s = A::deserialize(des)?;
-        if s == A::default() {
-            return Err(serde::de::Error::custom("Expected a non-default value."));
-        }
-        Ok(s)
     }
 }
 
