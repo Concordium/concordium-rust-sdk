@@ -1,3 +1,5 @@
+use std::net::IpAddr;
+
 use crate::{
     endpoints,
     types::{
@@ -284,6 +286,16 @@ impl IntoRequest<generated::GetPoolDelegatorsRequest> for (&BlockIdentifier, typ
     }
 }
 
+impl TryFrom<crate::v2::generated::BannedPeer> for types::network::BannedPeer {
+    type Error = anyhow::Error;
+
+    fn try_from(value: crate::v2::generated::BannedPeer) -> Result<Self, Self::Error> {
+        Ok(types::network::BannedPeer(
+            <IpAddr as std::str::FromStr>::from_str(&value.ip_address.require()?.value)?,
+        ))
+    }
+}
+
 impl TryFrom<generated::IpSocketAddress> for std::net::SocketAddr {
     type Error = anyhow::Error;
 
@@ -292,6 +304,16 @@ impl TryFrom<generated::IpSocketAddress> for std::net::SocketAddr {
             <std::net::IpAddr as std::str::FromStr>::from_str(&value.ip.require()?.value)?,
             value.port.require()?.value as u16,
         ))
+    }
+}
+
+impl IntoRequest<crate::v2::generated::BannedPeer> for &types::network::BannedPeer {
+    fn into_request(self) -> tonic::Request<crate::v2::generated::BannedPeer> {
+        tonic::Request::new(crate::v2::generated::BannedPeer {
+            ip_address: Some(crate::v2::generated::IpAddress {
+                value: self.0.to_string(),
+            }),
+        })
     }
 }
 
@@ -363,6 +385,18 @@ impl TryFrom<generated::node_info::NetworkInfo> for types::NetworkInfo {
             peer_total_received: network_info.peer_total_received,
             avg_bps_in:          network_info.avg_bps_in,
             avg_bps_out:         network_info.avg_bps_out,
+        })
+    }
+}
+
+impl IntoRequest<crate::v2::generated::PeerToBan> for types::network::PeerToBan {
+    fn into_request(self) -> tonic::Request<crate::v2::generated::PeerToBan> {
+        tonic::Request::new(match self {
+            types::network::PeerToBan::IpAddr(ip_addr) => crate::v2::generated::PeerToBan {
+                ip_address: Some(crate::v2::generated::IpAddress {
+                    value: ip_addr.to_string(),
+                }),
+            },
         })
     }
 }
@@ -876,6 +910,41 @@ impl Client {
         Ok(stream)
     }
 
+    /// Get a vector of the banned peers.
+    pub async fn get_banned_peers(
+        &mut self,
+    ) -> endpoints::RPCResult<Vec<super::types::network::BannedPeer>> {
+        Ok(self
+            .client
+            .get_banned_peers(generated::Empty::default())
+            .await?
+            .into_inner()
+            .peers
+            .into_iter()
+            .map(super::types::network::BannedPeer::try_from)
+            .collect::<anyhow::Result<Vec<super::types::network::BannedPeer>>>()?)
+    }
+
+    /// Ban a peer
+    /// Returns whether the peer was banned or not.
+    pub async fn ban_peer(
+        &mut self,
+        peer_to_ban: super::types::network::PeerToBan,
+    ) -> endpoints::RPCResult<()> {
+        self.client.ban_peer(peer_to_ban).await?;
+        Ok(())
+    }
+
+    /// Unban a peer
+    /// Returns whether the peer was unbanned or not.
+    pub async fn unban_peer(
+        &mut self,
+        banned_peer: &super::types::network::BannedPeer,
+    ) -> endpoints::RPCResult<()> {
+        self.client.unban_peer(banned_peer).await?;
+        Ok(())
+    }
+
     /// Start a network dump if the feature is enabled on the node.
     /// Return true if a network dump has been initiated.
     ///
@@ -900,7 +969,7 @@ impl Client {
         self.client.dump_stop(generated::Empty::default()).await?;
         Ok(())
     }
-    
+
     pub async fn get_peers_info(&mut self) -> endpoints::RPCResult<types::network::PeersInfo> {
         let response = self
             .client

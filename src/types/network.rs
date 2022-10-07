@@ -42,6 +42,16 @@ pub struct NetworkId {
     pub(crate) network_id: u16,
 }
 
+// A banned peer identified by its IP address.
+#[derive(Debug)]
+pub struct BannedPeer(pub std::net::IpAddr);
+
+/// A peer to ban identified by its IP address.
+#[derive(Debug)]
+pub enum PeerToBan {
+    IpAddr(IpAddr),
+}
+
 // A vector of the peers that
 // the node is connected to.
 #[derive(Debug)]
