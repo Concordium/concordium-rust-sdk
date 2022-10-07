@@ -26,16 +26,10 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect.")?;
 
-    if client.dump_start("myfile".to_string(), true).await? {
-        println!("Successfully started network dump");
-        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-        if client.dump_stop().await? {
-            println!("Successfully stopped network dump.");
-        } else {
-            println!("Failed to stop network dump.");
-        }
-    } else {
-        println!("Dump failed to start.");
-    }
+    client.dump_start("myfile".to_string(), true).await?;
+    println!("Successfully started network dump");
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    client.dump_stop().await?;
+    println!("Successfully stopped network dump.");
     Ok(())
 }

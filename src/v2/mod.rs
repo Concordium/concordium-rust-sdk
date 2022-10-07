@@ -754,13 +754,11 @@ impl Client {
     ///
     /// Note. If the feature 'network_dump' is not enabled on the node then this
     /// will return a 'Precondition failed' error.
-    pub async fn dump_start(&mut self, file: String, raw: bool) -> endpoints::RPCResult<bool> {
-        Ok(self
-            .client
+    pub async fn dump_start(&mut self, file: String, raw: bool) -> endpoints::RPCResult<()> {
+        self.client
             .dump_start(generated::DumpRequest { file, raw })
-            .await?
-            .into_inner()
-            .value)
+            .await?;
+        Ok(())
     }
 
     /// Stop an ongoing network dump.
@@ -768,13 +766,9 @@ impl Client {
     ///
     /// Note. If the feature 'network_dump' is not enabled on the node then this
     /// will return a 'Precondition failed' error.
-    pub async fn dump_stop(&mut self) -> endpoints::RPCResult<bool> {
-        Ok(self
-            .client
-            .dump_stop(generated::Empty::default())
-            .await?
-            .into_inner()
-            .value)
+    pub async fn dump_stop(&mut self) -> endpoints::RPCResult<()> {
+        self.client.dump_stop(generated::Empty::default()).await?;
+        Ok(())
     }
 }
 
