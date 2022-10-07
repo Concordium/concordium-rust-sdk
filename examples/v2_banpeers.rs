@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use anyhow::{ensure, Context};
 use clap::AppSettings;
-use concordium_rust_sdk::{types::bans::PeerToBan, v2};
+use concordium_rust_sdk::{types::network::PeerToBan, v2};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -34,7 +34,8 @@ async fn main() -> anyhow::Result<()> {
     );
     let ip_to_ban = std::net::IpAddr::from_str("192.0.2.0")?;
     let peer_to_ban = PeerToBan::IpAddr(ip_to_ban);
-    ensure!(client.ban_peer(peer_to_ban).await?, "Peer should be banned");
+    client.ban_peer(peer_to_ban).await?;
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
     let banned_peers = client.get_banned_peers().await?;
     ensure!(
         banned_peers.len() == 1,
@@ -49,12 +50,7 @@ async fn main() -> anyhow::Result<()> {
         "Unexpected peer in the ban list"
     );
     let foo = banned_peers.get(0).context("Expected a peer")?;
-    ensure!(
-        client
-            .unban_peer(foo)
-            .await?,
-        "Peer should be unbanned"
-    );
+    client.unban_peer(foo).await?;
 
     Ok(())
 }

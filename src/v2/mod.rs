@@ -1,9 +1,9 @@
+use std::net::IpAddr;
+
 use crate::{
     endpoints,
     types::{
-        self,
-        bans::BannedPeer,
-        hashes,
+        self, hashes,
         hashes::{BlockHash, TransactionHash},
         smart_contracts::{ContractContext, InstanceInfo, InvokeContractResult, ModuleRef},
         AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, TransactionStatus,
@@ -13,7 +13,7 @@ use concordium_contracts_common::{AccountAddress, Amount, ContractAddress, Recei
 use futures::{Stream, StreamExt};
 use tonic::IntoRequest;
 
-pub mod generated;
+mod generated;
 
 #[derive(Clone, Debug)]
 /// Client that can perform queries.
@@ -283,6 +283,38 @@ impl IntoRequest<generated::GetPoolDelegatorsRequest> for (&BlockIdentifier, typ
             baker:      Some(self.1.into()),
         };
         tonic::Request::new(req)
+    }
+}
+
+impl TryFrom<crate::v2::generated::BannedPeer> for types::network::BannedPeer {
+    type Error = anyhow::Error;
+
+    fn try_from(value: crate::v2::generated::BannedPeer) -> Result<Self, Self::Error> {
+        Ok(types::network::BannedPeer(
+            <IpAddr as std::str::FromStr>::from_str(&value.ip_address.require()?.value)?,
+        ))
+    }
+}
+
+impl IntoRequest<crate::v2::generated::BannedPeer> for &types::network::BannedPeer {
+    fn into_request(self) -> tonic::Request<crate::v2::generated::BannedPeer> {
+        tonic::Request::new(crate::v2::generated::BannedPeer {
+            ip_address: Some(crate::v2::generated::IpAddress {
+                value: self.0.to_string(),
+            }),
+        })
+    }
+}
+
+impl IntoRequest<crate::v2::generated::PeerToBan> for types::network::PeerToBan {
+    fn into_request(self) -> tonic::Request<crate::v2::generated::PeerToBan> {
+        tonic::Request::new(match self {
+            types::network::PeerToBan::IpAddr(ip_addr) => crate::v2::generated::PeerToBan {
+                ip_address: Some(crate::v2::generated::IpAddress {
+                    value: ip_addr.to_string(),
+                }),
+            },
+        })
     }
 }
 
@@ -751,7 +783,7 @@ impl Client {
     /// Get a vector of the banned peers.
     pub async fn get_banned_peers(
         &mut self,
-    ) -> endpoints::RPCResult<Vec<super::types::bans::BannedPeer>> {
+    ) -> endpoints::RPCResult<Vec<super::types::network::BannedPeer>> {
         Ok(self
             .client
             .get_banned_peers(generated::Empty::default())
@@ -759,31 +791,28 @@ impl Client {
             .into_inner()
             .peers
             .into_iter()
-            .map(super::types::bans::BannedPeer::try_from)
-            .collect::<anyhow::Result<Vec<BannedPeer>>>()?)
+            .map(super::types::network::BannedPeer::try_from)
+            .collect::<anyhow::Result<Vec<super::types::network::BannedPeer>>>()?)
     }
 
     /// Ban a peer
     /// Returns whether the peer was banned or not.
     pub async fn ban_peer(
         &mut self,
-        peer_to_ban: super::types::bans::PeerToBan,
-    ) -> endpoints::RPCResult<bool> {
-        Ok(self.client.ban_peer(peer_to_ban).await?.into_inner().value)
+        peer_to_ban: super::types::network::PeerToBan,
+    ) -> endpoints::RPCResult<()> {
+        self.client.ban_peer(peer_to_ban).await?;
+        Ok(())
     }
 
     /// Unban a peer
     /// Returns whether the peer was unbanned or not.
     pub async fn unban_peer(
         &mut self,
-        banned_peer: &super::types::bans::BannedPeer,
-    ) -> endpoints::RPCResult<bool> {
-        Ok(self
-            .client
-            .unban_peer(banned_peer)
-            .await?
-            .into_inner()
-            .value)
+        banned_peer: &super::types::network::BannedPeer,
+    ) -> endpoints::RPCResult<()> {
+        self.client.unban_peer(banned_peer).await?;
+        Ok(())
     }
 }
 
@@ -816,7 +845,7 @@ fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<Bl
 ///
 /// The main reason for needing this is that in proto3 all fields are optional,
 /// so it is up to the application to validate inputs if they are required.
-pub trait Require<E> {
+trait Require<E> {
     type A;
     fn require(self) -> Result<Self::A, E>;
 }
