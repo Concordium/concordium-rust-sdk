@@ -908,6 +908,11 @@ impl Client {
         Ok(stream)
     }
 
+    pub async fn shutdown(&mut self) -> endpoints::RPCResult<()> {
+        self.client.shutdown(generated::Empty::default()).await?;
+        Ok(())
+    }
+
     // Try connect to a peer with the provided address.
     pub async fn peer_connect(&mut self, addr: std::net::SocketAddr) -> endpoints::RPCResult<()> {
         let peer_connection = generated::IpSocketAddress {
