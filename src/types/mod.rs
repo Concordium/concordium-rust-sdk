@@ -2671,115 +2671,60 @@ mod transaction_fee_distribution {
     }
 }
 
-pub mod peers_info {
-    use super::*;
-    use crate::v2::Require;
-    use std::net::{IpAddr, SocketAddr};
+// A vector of the peers that
+// the node is connected to.
+#[derive(Debug)]
+pub struct PeersInfo {
+    pub peers: Vec<Peer>,
+}
 
-    // A vector of the peers that
-    // the node is connected to.
-    #[derive(Debug)]
-    pub struct PeersInfo {
-        pub peers: Vec<Peer>,
-    }
+// A peer id
+#[derive(Debug)]
+pub struct PeerId(pub String);
 
-    /// A peer that the node is connected to
-    #[derive(Debug)]
-    pub struct Peer {
-        // The id of the peer.
-        pub peer_id:        String,
-        // Type of the peer.
-        pub peer_type:      PeerType,
-        // Catchup status of the peer.
-        pub catchup_status: CatchupStatus,
-        // Network statistics for the peer.
-        pub network_stats:  NetworkStats,
-        // The address of the peer
-        pub addr:           SocketAddr,
-    }
+/// A peer that the node is connected to
+#[derive(Debug)]
+pub struct Peer {
+    // The id of the peer.
+    pub peer_id:        PeerId,
+    // Catchup status of the peer.
+    pub consensus_info: PeerConsensusInfo,
+    // Network statistics for the peer.
+    pub network_stats:  NetworkStats,
+    // The address of the peer
+    pub addr:           std::net::SocketAddr,
+}
 
-    /// The catch up status of the peer.
-    #[derive(Debug)]
-    pub enum CatchupStatus {
-        // The peer is up to date.
-        UpToDate,
-        // We do not know the status of the peer,
-        // e.g. the node just established a connection with
-        // the peer.
-        Pending,
-        // The peer is catching up on the chain.
-        CatchingUp,
-    }
+// Consensus info related to a peer.
+#[derive(Debug)]
+pub enum PeerConsensusInfo {
+    // Bootstrappers do not run consensus thus 
+    // no catchup status.
+    Bootstrapper, 
+    // Regular nodes do have a catchup status.
+    Node(CatchupStatus)
+}
 
-    /// Type of the peer.
-    #[derive(Debug)]
-    pub enum PeerType {
-        // The peer is a bootstrapper and does not participate in
-        // consensus. A bootstrapper merely relay peers.
-        Bootstrapper,
-        // The peer is a normal node participating in
-        // consensus either passively or actively baking blocks.
-        Node,
-    }
+/// The catch up status of the peer.
+#[derive(Debug)]
+pub enum CatchupStatus {
+    // The peer is up to date.
+    UpToDate,
+    // We do not know the status of the peer,
+    // e.g. the node just established a connection with
+    // the peer.
+    Pending,
+    // The peer is catching up on the chain.
+    CatchingUp,
+}
 
-    /// Network statistics for the peer.
-    #[derive(Debug)]
-    pub struct NetworkStats {
-        // How many packets the peer has sent to the node.
-        pub packets_sent:     u64,
-        // How many packets the peer has received from the node.
-        pub packets_received: u64,
-        // The connection latency aka. 'ping' time (measured in milliseconds).
-        pub latency:          u64,
-    }
-
-    impl TryFrom<crate::v2::generated::PeersInfo> for PeersInfo {
-        type Error = anyhow::Error;
-
-        fn try_from(peers_info: crate::v2::generated::PeersInfo) -> Result<Self, Self::Error> {
-            // Get information of the peers that the node is connected to.
-            // Note. If one peer contains malformed data then this function does not
-            // return any information about the others.
-            // This should only happen in cases where the sdk and node is not on the same
-            // major version.
-            let peers = peers_info
-                .peers
-                .into_iter()
-                .map(|peer| {
-                    // Parse the type of the peer.
-                    let peer_type = match peer.peer_type {
-                        0 => PeerType::Bootstrapper,
-                        1 => PeerType::Node,
-                        _ => anyhow::bail!("Malformed peer type"),
-                    };
-                    // Parse the catchup status of the peer.
-                    let catchup_status = match peer.catchup_status {
-                        0 => CatchupStatus::UpToDate,
-                        1 => CatchupStatus::Pending,
-                        2 => CatchupStatus::CatchingUp,
-                        _ => anyhow::bail!("Malformed catchup status from peer."),
-                    };
-                    // Parse the network statistics for the peer.
-                    let stats = peer.network_stats.require()?;
-                    let network_stats = NetworkStats {
-                        packets_sent:     stats.packets_sent,
-                        packets_received: stats.packets_received,
-                        latency:          stats.latency,
-                    };
-                    let addr = SocketAddr::new(
-                        <IpAddr as std::str::FromStr>::from_str(&peer.ip)?,
-                        peer.port as u16,
-                    );
-                    Ok(Peer {
-                        peer_id: peer.peer_id,
-                        peer_type,
-                        catchup_status,
-                        network_stats,
-                        addr,
-                    })
-                })
-                .collect::<anyhow::Result<Vec<Peer>>>()?;
-            Ok(PeersInfo { peers })
-        }
-    }
+/// Network statistics for the peer.
+#[derive(Debug)]
+pub struct NetworkStats {
+    // How many packets the peer has sent to the node.
+    pub packets_sent:     u64,
+    // How many packets the peer has received from the node.
+    pub packets_received: u64,
+    // The connection latency aka. 'ping' time (measured in milliseconds).
+    pub latency:          u64,
 }

@@ -11,7 +11,7 @@ use concordium_contracts_common::{AccountAddress, Amount, ContractAddress, Recei
 use futures::{Stream, StreamExt};
 use tonic::IntoRequest;
 
-pub mod generated;
+mod generated;
 
 #[derive(Clone, Debug)]
 /// Client that can perform queries.
@@ -281,6 +281,69 @@ impl IntoRequest<generated::GetPoolDelegatorsRequest> for (&BlockIdentifier, typ
             baker:      Some(self.1.into()),
         };
         tonic::Request::new(req)
+    }
+}
+
+impl TryFrom<generated::IpSocketAddress> for std::net::SocketAddr {
+    type Error = anyhow::Error;
+
+    fn try_from(value: generated::IpSocketAddress) -> Result<Self, Self::Error> {
+        Ok(std::net::SocketAddr::new(
+            <std::net::IpAddr as std::str::FromStr>::from_str(&value.ip.require()?.value)?,
+            value.port.require()?.value as u16,
+        ))
+    }
+}
+
+impl From<generated::PeerId> for types::PeerId {
+    fn from(value: generated::PeerId) -> Self { types::PeerId(value.value) }
+}
+
+impl TryFrom<generated::PeersInfo> for types::PeersInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(peers_info: generated::PeersInfo) -> Result<Self, Self::Error> {
+        // Get information of the peers that the node is connected to.
+        // Note. If one peer contains malformed data then this function does not
+        // return any information about the others.
+        // This should only happen in cases where the sdk and node is not on the same
+        // major version.
+        let peers = peers_info
+            .peers
+            .into_iter()
+            .map(|peer| {
+                // Parse the catchup status of the peer.
+                let peer_consensus_info = match peer.consensus_info.require()? {
+                    generated::peers_info::peer::ConsensusInfo::Bootstrapper(_) => {
+                        types::PeerConsensusInfo::Bootstrapper
+                    }
+                    generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(0) => {
+                        types::PeerConsensusInfo::Node(types::CatchupStatus::UpToDate)
+                    }
+                    generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(1) => {
+                        types::PeerConsensusInfo::Node(types::CatchupStatus::Pending)
+                    }
+                    generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(2) => {
+                        types::PeerConsensusInfo::Node(types::CatchupStatus::CatchingUp)
+                    }
+                    _ => anyhow::bail!("Malformed catchup status from peer."),
+                };
+                // Parse the network statistics for the peer.
+                let stats = peer.network_stats.require()?;
+                let network_stats = types::NetworkStats {
+                    packets_sent:     stats.packets_sent,
+                    packets_received: stats.packets_received,
+                    latency:          stats.latency,
+                };
+                Ok(types::Peer {
+                    peer_id: peer.peer_id.require()?.into(),
+                    consensus_info: peer_consensus_info,
+                    network_stats,
+                    addr: peer.socket_address.require()?.try_into()?,
+                })
+            })
+            .collect::<anyhow::Result<Vec<types::Peer>>>()?;
+        Ok(types::PeersInfo { peers })
     }
 }
 
@@ -746,12 +809,12 @@ impl Client {
         Ok(stream)
     }
 
-    pub async fn get_peers_info(&mut self) -> endpoints::RPCResult<types::peers_info::PeersInfo> {
+    pub async fn get_peers_info(&mut self) -> endpoints::RPCResult<types::PeersInfo> {
         let response = self
             .client
             .get_peers_info(generated::Empty::default())
             .await?;
-        let peers_info = types::peers_info::PeersInfo::try_from(response.into_inner())?;
+        let peers_info = types::PeersInfo::try_from(response.into_inner())?;
         Ok(peers_info)
     }
 }
@@ -785,7 +848,7 @@ fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<Bl
 ///
 /// The main reason for needing this is that in proto3 all fields are optional,
 /// so it is up to the application to validate inputs if they are required.
-pub trait Require<E> {
+trait Require<E> {
     type A;
     fn require(self) -> Result<Self::A, E>;
 }
