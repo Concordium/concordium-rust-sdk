@@ -8,7 +8,7 @@ use crate::{
         TransactionStatus,
     },
 };
-use concordium_contracts_common::{AccountAddress, Amount, ContractAddress, ReceiveName};
+use concordium_base::contracts_common::{AccountAddress, Amount, ContractAddress, ReceiveName};
 use futures::{Stream, StreamExt};
 use tonic::IntoRequest;
 
@@ -89,7 +89,7 @@ impl IntoRequest<generated::BlockHashInput> for &BlockIdentifier {
 impl From<&AccountAddress> for generated::AccountAddress {
     fn from(addr: &AccountAddress) -> Self {
         generated::AccountAddress {
-            value: crypto_common::to_bytes(addr),
+            value: concordium_base::common::to_bytes(addr),
         }
     }
 }
@@ -157,7 +157,7 @@ impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
             }
             AccountIdentifier::CredId(credid) => {
                 let credid = generated::CredentialRegistrationId {
-                    value: crypto_common::to_bytes(credid),
+                    value: concordium_base::common::to_bytes(credid),
                 };
                 generated::account_identifier_input::AccountIdentifierInput::CredId(credid)
             }
@@ -697,7 +697,12 @@ impl Client {
         bi: &BlockIdentifier,
     ) -> endpoints::QueryResult<
         QueryResponse<
-            impl Stream<Item = Result<id::types::IpInfo<id::constants::IpPairing>, tonic::Status>>,
+            impl Stream<
+                Item = Result<
+                    crate::id::types::IpInfo<crate::id::constants::IpPairing>,
+                    tonic::Status,
+                >,
+            >,
         >,
     > {
         let response = self.client.get_identity_providers(bi).await?;
@@ -717,7 +722,12 @@ impl Client {
         bi: &BlockIdentifier,
     ) -> endpoints::QueryResult<
         QueryResponse<
-            impl Stream<Item = Result<id::types::ArInfo<id::constants::ArCurve>, tonic::Status>>,
+            impl Stream<
+                Item = Result<
+                    crate::id::types::ArInfo<crate::id::constants::ArCurve>,
+                    tonic::Status,
+                >,
+            >,
         >,
     > {
         let response = self.client.get_anonymity_revokers(bi).await?;

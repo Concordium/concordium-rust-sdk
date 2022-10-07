@@ -3,8 +3,11 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::{
-        derive::Serialize, to_bytes, Buffer, Deserial, ParseResult, ReadBytesExt, SerdeDeserialize,
-        SerdeSerialize, Serial,
+        base16_encode_string,
+        derive::Serialize,
+        to_bytes,
+        types::{Amount, TransactionTime},
+        Buffer, Deserial, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
     },
     endpoints::{self, Client},
     types::{
@@ -13,10 +16,6 @@ use concordium_rust_sdk::{
         Epoch, InclusiveRange, LeverageFactor, OpenStatus, PoolParameters, ProtocolUpdate,
         ProtocolVersion, TimeParameters, UpdateKeyPair, UpdatePayload,
     },
-};
-use crypto_common::{
-    base16_encode_string,
-    types::{Amount, TransactionTime},
 };
 use std::path::PathBuf;
 use structopt::StructOpt;

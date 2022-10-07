@@ -56,24 +56,24 @@ pub mod types;
 pub mod cis2;
 
 /// Re-export of the identity library.
-pub use id;
+pub use concordium_base::id;
 
 /// Re-export of common helper functionality.
-pub use crypto_common as common;
+pub use concordium_base::common;
 
 /// Re-export of functionality for constructing and verifying encrypted
 /// transfers.
-pub use encrypted_transfers;
+pub use concordium_base::encrypted_transfers;
 
 /// Re-export of functionality for constructing and verifying aggregate
 /// signatures. This is useful for constructing baker transactions.
-pub use aggregate_sig;
+pub use concordium_base::aggregate_sig;
 
 /// Re-export of Elgamal encryption.
-pub use eddsa_ed25519;
+pub use concordium_base::eddsa_ed25519;
 
 /// Re-export the VRF function implementation.
-pub use ecvrf;
+pub use concordium_base::ecvrf;
 
 /// Version 2 GRPC API.
 pub mod v2;

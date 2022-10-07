@@ -1,11 +1,11 @@
 //! Types that appear in various queries of the node.
 
-use super::{
-    basic::*, hashes::*, network::RemotePeerId, Authorizations, BakerParameters,
-    CooldownParameters, GASRewards, HigherLevelAccessStructure, Level1KeysKind, PoolParameters,
-    ProtocolUpdate, RootKeysKind, TimeParameters, TransactionFeeDistribution,
+use super::{hashes::*, network::RemotePeerId, *};
+use crate::id;
+use concordium_base::{
+    base::*,
+    common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize},
 };
-use crypto_common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize};
 use std::net::IpAddr;
 
 #[derive(SerdeDeserialize, Debug, SerdeSerialize)]
@@ -234,21 +234,25 @@ pub enum BanMethod {
 }
 
 #[derive(Debug, Clone)]
+/// A scheduled pending update.
 pub struct PendingUpdate {
-    effective_time: TransactionTime,
-    effect:         PendingUpdateEffect,
+    /// Time when it will become effective.
+    pub effective_time: TransactionTime,
+    /// The effect the udpate will have.
+    pub effect:         PendingUpdateEffect,
 }
 
 #[derive(Debug, Clone)]
 pub enum PendingUpdateEffect {
     RootKeys(HigherLevelAccessStructure<RootKeysKind>),
     Level1Keys(HigherLevelAccessStructure<Level1KeysKind>),
-    Level2Keys(Authorizations<ChainParameterVersion0>),
+    Level2KeysCPV0(Authorizations<ChainParameterVersion0>),
+    Level2KeysCPV1(Authorizations<ChainParameterVersion1>),
     Protocol(ProtocolUpdate),
     ElectionDifficulty(ElectionDifficulty),
     EuroPerEnergy(ExchangeRate),
     MicroCcdPerEnergy(ExchangeRate),
-    FoundationAccount(AccountIndex),
+    FoundationAccount(AccountAddress),
     MintDistributionV0(MintDistribution<ChainParameterVersion0>),
     MintDistributionV1(MintDistribution<ChainParameterVersion1>),
     TransactionFeeDistribution(TransactionFeeDistribution),
@@ -256,7 +260,7 @@ pub enum PendingUpdateEffect {
     PoolParametersV0(BakerParameters),
     PoolParametersV1(PoolParameters),
     AddAnonymityRevoker(id::types::ArInfo<id::constants::ArCurve>),
-    AddIdentityProvider(id::types::IpInfo<id::constants::IpPairing>),
+    AddIdentityProvider(Box<id::types::IpInfo<id::constants::IpPairing>>),
     CooldownParameters(CooldownParameters),
     TimeParameters(TimeParameters),
 }
