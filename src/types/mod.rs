@@ -2671,3 +2671,72 @@ mod transaction_fee_distribution {
     }
 }
 
+/// The network info of a node informs of the following:
+/// * The node id. An id which it uses to identify itself to other peers and it
+///   is used for logging purposes internally. NB. The 'node_id' is spoofable
+///   and as such should not serve as a trust instrument.
+/// * 'peer_total_sent' is the total amount of packets sent by the node.
+/// * 'peer_total_received' is the total amount of packets received by the node.
+/// * 'avg_bps_in' is the average bytes per second received by the node.
+/// * 'avg_bps_out' is the average bytes per second transmitted by the node.
+#[derive(Debug)]
+pub struct NetworkInfo {
+    pub node_id:             String,
+    pub peer_total_sent:     u64,
+    pub peer_total_received: u64,
+    pub avg_bps_in:          u64,
+    pub avg_bps_out:         u64,
+}
+
+// Details of the consensus protocol running on the node.
+#[derive(Debug)]
+pub enum NodeConsensusStatus {
+    // The consensus protocol is not running on the node.
+    // This only occurs when the node does not support the protocol on the chain or the node is a
+    // 'Bootstrapper'.
+    ConsensusNotRunning,
+    // The node is a passive member of the consensus. This means:
+    // * The node is processing blocks.
+    // * The node is relaying transactions and blocks onto the network.
+    // * The node is responding to catch up messages from its peers.
+    // * In particular this means that the node is __not__ baking blocks.
+    ConsensusPassive,
+    // The node has been configured with baker keys however it is not currently baking and
+    // possilby never will.
+    NotInCommittee,
+    // The baker keys are registered however the baker is not in the committee
+    // for the current 'Epoch'.
+    AddedButNotActiveInCommittee,
+    // The node has been configured with baker keys that does not match the account.
+    AddedButWrongKeys,
+    // The node is member of the baking committee.
+    Baker(crate::types::BakerId),
+    // The node is member of the baking and finalization committee.
+    Finalizer(crate::types::BakerId),
+}
+
+/// Consensus related information for a node.
+#[derive(Debug)]
+pub enum NodeDetails {
+    // The node is a bootstrapper and does not
+    // run the consensus protocol.
+    Bootstrapper,
+    // The node is a regular node and is eligible for
+    // running the consensus protocol.
+    Node(NodeConsensusStatus),
+}
+
+#[derive(Debug)]
+/// The status of the requested node.
+pub struct NodeInfo {
+    // The version of the node.
+    pub version:      semver::Version,
+    // The local (UTC) time of the node.
+    pub local_time:   chrono::DateTime<chrono::Utc>,
+    // How long the node has been alive.
+    pub uptime:       chrono::Duration,
+    // Information related to the network for the node.
+    pub network_info: NetworkInfo,
+    // Information related to consensus for the node.
+    pub details:      NodeDetails,
+}
