@@ -982,29 +982,29 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
             }
             update_payload::Payload::RootUpdate(v) => {
                 Self::Root(match v.update_type.require()? {
-                    update_payload::root_update_payload::UpdateType::RootKeysUpdate(u) => {
+                    root_update::UpdateType::RootKeysUpdate(u) => {
                         super::types::RootUpdate::RootKeysUpdate(u.try_into()?)
                     }
-                    update_payload::root_update_payload::UpdateType::Level1KeysUpdate(u) => {
+                    root_update::UpdateType::Level1KeysUpdate(u) => {
                         super::types::RootUpdate::Level1KeysUpdate(u.try_into()?)
                     }
-                    update_payload::root_update_payload::UpdateType::Level2KeysUpdateV0(u) => {
+                    root_update::UpdateType::Level2KeysUpdateV0(u) => {
                         super::types::RootUpdate::Level2KeysUpdate(Box::new(u.try_into()?))
                     }
-                    update_payload::root_update_payload::UpdateType::Level2KeysUpdateV1(u) => {
+                    root_update::UpdateType::Level2KeysUpdateV1(u) => {
                         super::types::RootUpdate::Level2KeysUpdateV1(Box::new(u.try_into()?))
                     }
                 })
             }
             update_payload::Payload::Level1Update(v) => {
                 Self::Level1(match v.update_type.require()? {
-                    update_payload::level1_update_payload::UpdateType::Level1KeysUpdate(u) => {
+                    level1_update::UpdateType::Level1KeysUpdate(u) => {
                         super::types::Level1Update::Level1KeysUpdate(u.try_into()?)
                     }
-                    update_payload::level1_update_payload::UpdateType::Level2KeysUpdateV0(u) => {
+                    level1_update::UpdateType::Level2KeysUpdateV0(u) => {
                         super::types::Level1Update::Level2KeysUpdate(Box::new(u.try_into()?))
                     }
-                    update_payload::level1_update_payload::UpdateType::Level2KeysUpdateV1(u) => {
+                    level1_update::UpdateType::Level2KeysUpdateV1(u) => {
                         super::types::Level1Update::Level2KeysUpdateV1(Box::new(u.try_into()?))
                     }
                 })
@@ -2263,10 +2263,10 @@ impl<K> TryFrom<HigherLevelKeys> for updates::HigherLevelAccessStructure<K> {
     }
 }
 
-impl TryFrom<update_payload::ProtocolUpdatePayload> for updates::ProtocolUpdate {
+impl TryFrom<ProtocolUpdate> for updates::ProtocolUpdate {
     type Error = tonic::Status;
 
-    fn try_from(value: update_payload::ProtocolUpdatePayload) -> Result<Self, Self::Error> {
+    fn try_from(value: ProtocolUpdate) -> Result<Self, Self::Error> {
         let message = value.message;
         let specification_url = value.specification_url;
         let specification_hash = value.specification_hash.require()?.try_into()?;
@@ -2290,11 +2290,11 @@ impl TryFrom<ExchangeRate> for base::ExchangeRate {
     }
 }
 
-impl TryFrom<update_payload::MintDistributionCpv0UpdatePayload> for base::MintDistributionV0 {
+impl TryFrom<MintDistributionCpv0> for base::MintDistributionV0 {
     type Error = tonic::Status;
 
     fn try_from(
-        value: update_payload::MintDistributionCpv0UpdatePayload,
+        value: MintDistributionCpv0,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             mint_per_slot:       value.mint_per_slot.require()?.try_into()?,
@@ -2304,11 +2304,11 @@ impl TryFrom<update_payload::MintDistributionCpv0UpdatePayload> for base::MintDi
     }
 }
 
-impl TryFrom<update_payload::MintDistributionCpv1UpdatePayload> for base::MintDistributionV1 {
+impl TryFrom<MintDistributionCpv1> for base::MintDistributionV1 {
     type Error = tonic::Status;
 
     fn try_from(
-        value: update_payload::MintDistributionCpv1UpdatePayload,
+        value: MintDistributionCpv1,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             baking_reward:       value.baking_reward.require()?.into(),
@@ -2317,13 +2317,13 @@ impl TryFrom<update_payload::MintDistributionCpv1UpdatePayload> for base::MintDi
     }
 }
 
-impl TryFrom<update_payload::TransactionFeeDistributionUpdatePayload>
+impl TryFrom<TransactionFeeDistribution>
     for updates::TransactionFeeDistribution
 {
     type Error = tonic::Status;
 
     fn try_from(
-        value: update_payload::TransactionFeeDistributionUpdatePayload,
+        value: TransactionFeeDistribution,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             baker:       value.baker.require()?.into(),
@@ -2332,10 +2332,10 @@ impl TryFrom<update_payload::TransactionFeeDistributionUpdatePayload>
     }
 }
 
-impl TryFrom<update_payload::GasRewardsUpdatePayload> for updates::GASRewards {
+impl TryFrom<GasRewards> for updates::GASRewards {
     type Error = tonic::Status;
 
-    fn try_from(value: update_payload::GasRewardsUpdatePayload) -> Result<Self, Self::Error> {
+    fn try_from(value: GasRewards) -> Result<Self, Self::Error> {
         Ok(Self {
             baker:              value.baker.require()?.into(),
             finalization_proof: value.finalization_proof.require()?.into(),
@@ -2345,11 +2345,11 @@ impl TryFrom<update_payload::GasRewardsUpdatePayload> for updates::GASRewards {
     }
 }
 
-impl TryFrom<update_payload::PoolParametersCpv1UpdatePayload> for updates::PoolParameters {
+impl TryFrom<PoolParametersCpv1> for updates::PoolParameters {
     type Error = tonic::Status;
 
     fn try_from(
-        value: update_payload::PoolParametersCpv1UpdatePayload,
+        value: PoolParametersCpv1,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             passive_finalization_commission: value
@@ -2388,11 +2388,11 @@ impl TryFrom<CommissionRanges> for super::types::CommissionRanges {
     }
 }
 
-impl TryFrom<update_payload::BakerStakeThresholdUpdatePayload> for updates::BakerParameters {
+impl TryFrom<BakerStakeThreshold> for updates::BakerParameters {
     type Error = tonic::Status;
 
     fn try_from(
-        value: update_payload::BakerStakeThresholdUpdatePayload,
+        value: BakerStakeThreshold,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             minimum_threshold_for_baking: value.baker_stake_threshold.require()?.into(),
@@ -2400,11 +2400,11 @@ impl TryFrom<update_payload::BakerStakeThresholdUpdatePayload> for updates::Bake
     }
 }
 
-impl TryFrom<update_payload::CooldownParametersCpv1UpdatePayload> for updates::CooldownParameters {
+impl TryFrom<CooldownParametersCpv1> for updates::CooldownParameters {
     type Error = tonic::Status;
 
     fn try_from(
-        value: update_payload::CooldownParametersCpv1UpdatePayload,
+        value: CooldownParametersCpv1,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             pool_owner_cooldown: value.pool_owner_cooldown.require()?.into(),
@@ -2413,11 +2413,11 @@ impl TryFrom<update_payload::CooldownParametersCpv1UpdatePayload> for updates::C
     }
 }
 
-impl TryFrom<update_payload::TimeParametersCpv1UpdatePayload> for updates::TimeParameters {
+impl TryFrom<TimeParametersCpv1> for updates::TimeParameters {
     type Error = tonic::Status;
 
     fn try_from(
-        value: update_payload::TimeParametersCpv1UpdatePayload,
+        value: TimeParametersCpv1,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             reward_period_length: value.reward_period_length.require()?.try_into()?,
