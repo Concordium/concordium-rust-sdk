@@ -1014,6 +1014,7 @@ impl Client {
         Ok(())
     }
 
+    /// Retrieve information about the peers that the node is connected to.
     pub async fn get_peers_info(&mut self) -> endpoints::RPCResult<types::network::PeersInfo> {
         let response = self
             .client
@@ -1023,6 +1024,7 @@ impl Client {
         Ok(peers_info)
     }
 
+    /// Retrieve [types::NodeInfo] from the node. 
     pub async fn get_node_info(&mut self) -> endpoints::RPCResult<types::NodeInfo> {
         let response = self
             .client
