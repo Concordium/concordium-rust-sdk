@@ -30,16 +30,10 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect.")?;
 
-    // Insert IP and port.
-    ensure!(
-        client.peer_connect(app.peer).await?,
-        "Should have connected to peer"
-    );
+    client.peer_connect(app.peer).await?;
     // We wait 10 seconds and drop the peer again.
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-    ensure!(
-        client.peer_disconnect(app.peer).await?,
-        "Should have dropped the connection again"
-    );
+    client.peer_disconnect(app.peer).await?;
+
     Ok(())
 }
