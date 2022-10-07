@@ -295,11 +295,11 @@ impl TryFrom<generated::IpSocketAddress> for std::net::SocketAddr {
     }
 }
 
-impl From<generated::PeerId> for types::PeerId {
-    fn from(value: generated::PeerId) -> Self { types::PeerId(value.value) }
+impl From<generated::PeerId> for types::network::PeerId {
+    fn from(value: generated::PeerId) -> Self { types::network::PeerId(value.value) }
 }
 
-impl TryFrom<generated::PeersInfo> for types::PeersInfo {
+impl TryFrom<generated::PeersInfo> for types::network::PeersInfo {
     type Error = anyhow::Error;
 
     fn try_from(peers_info: generated::PeersInfo) -> Result<Self, Self::Error> {
@@ -315,35 +315,102 @@ impl TryFrom<generated::PeersInfo> for types::PeersInfo {
                 // Parse the catchup status of the peer.
                 let peer_consensus_info = match peer.consensus_info.require()? {
                     generated::peers_info::peer::ConsensusInfo::Bootstrapper(_) => {
-                        types::PeerConsensusInfo::Bootstrapper
+                        types::network::PeerConsensusInfo::Bootstrapper
                     }
                     generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(0) => {
-                        types::PeerConsensusInfo::Node(types::CatchupStatus::UpToDate)
+                        types::network::PeerConsensusInfo::Node(
+                            types::network::PeerCatchupStatus::UpToDate,
+                        )
                     }
                     generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(1) => {
-                        types::PeerConsensusInfo::Node(types::CatchupStatus::Pending)
+                        types::network::PeerConsensusInfo::Node(
+                            types::network::PeerCatchupStatus::Pending,
+                        )
                     }
                     generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(2) => {
-                        types::PeerConsensusInfo::Node(types::CatchupStatus::CatchingUp)
+                        types::network::PeerConsensusInfo::Node(
+                            types::network::PeerCatchupStatus::CatchingUp,
+                        )
                     }
                     _ => anyhow::bail!("Malformed catchup status from peer."),
                 };
                 // Parse the network statistics for the peer.
                 let stats = peer.network_stats.require()?;
-                let network_stats = types::NetworkStats {
+                let network_stats = types::network::NetworkStats {
                     packets_sent:     stats.packets_sent,
                     packets_received: stats.packets_received,
                     latency:          stats.latency,
                 };
-                Ok(types::Peer {
+                Ok(types::network::Peer {
                     peer_id: peer.peer_id.require()?.into(),
                     consensus_info: peer_consensus_info,
                     network_stats,
                     addr: peer.socket_address.require()?.try_into()?,
                 })
             })
-            .collect::<anyhow::Result<Vec<types::Peer>>>()?;
-        Ok(types::PeersInfo { peers })
+            .collect::<anyhow::Result<Vec<types::network::Peer>>>()?;
+        Ok(types::network::PeersInfo { peers })
+    }
+}
+
+impl TryFrom<generated::node_info::NetworkInfo> for types::NetworkInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(network_info: generated::node_info::NetworkInfo) -> Result<Self, Self::Error> {
+        Ok(types::NetworkInfo {
+            node_id:             network_info.node_id.require()?.value,
+            peer_total_sent:     network_info.peer_total_sent,
+            peer_total_received: network_info.peer_total_received,
+            avg_bps_in:          network_info.avg_bps_in,
+            avg_bps_out:         network_info.avg_bps_out,
+        })
+    }
+}
+
+impl TryFrom<generated::NodeInfo> for types::NodeInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(node_info: generated::NodeInfo) -> Result<Self, Self::Error> {
+        let version = semver::Version::parse(&node_info.peer_version)?;
+        let local_time = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
+            + chrono::Duration::milliseconds(node_info.local_time.require()?.value as i64);
+        let uptime = types::DurationSeconds::from(node_info.peer_uptime.require()?.value).into();
+        let network_info = node_info.network_info.require()?.try_into()?;
+        let details = match node_info.details.require()? {
+            generated::node_info::Details::Bootstrapper(_) => types::NodeDetails::Bootstrapper,
+            generated::node_info::Details::Node(status) => {
+                let consensus_status = match status.consensus_status.require()? {
+                    generated::node_info::node::ConsensusStatus::NotRunning(_) => {
+                        types::NodeConsensusStatus::ConsensusNotRunning
+                    }
+                    generated::node_info::node::ConsensusStatus::Passive(_) => {
+                        types::NodeConsensusStatus::ConsensusPassive
+                    }
+                    generated::node_info::node::ConsensusStatus::Active(baker) => {
+                        match baker.status.require()? {
+                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(0) => types::NodeConsensusStatus::NotInCommittee,
+                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(1) => types::NodeConsensusStatus::AddedButNotActiveInCommittee,
+                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(2) => types::NodeConsensusStatus::AddedButWrongKeys,
+                            generated::node_info::baker_consensus_info::Status::ActiveBakerCommitteeInfo(active_baker) => {
+                                types::NodeConsensusStatus::Baker(active_baker.baker_id.require()?.into())
+                            },
+                            generated::node_info::baker_consensus_info::Status::ActiveFinalizerCommitteeInfo(active_finalizer) => {
+                                types::NodeConsensusStatus::Finalizer(active_finalizer.baker_id.require()?.into())
+                            },
+                            _ => anyhow::bail!("Malformed baker status")
+                        }
+                    }
+                };
+                types::NodeDetails::Node(consensus_status)
+            }
+        };
+        Ok(types::NodeInfo {
+            version,
+            local_time,
+            uptime,
+            network_info,
+            details,
+        })
     }
 }
 
@@ -809,13 +876,22 @@ impl Client {
         Ok(stream)
     }
 
-    pub async fn get_peers_info(&mut self) -> endpoints::RPCResult<types::PeersInfo> {
+    pub async fn get_peers_info(&mut self) -> endpoints::RPCResult<types::network::PeersInfo> {
         let response = self
             .client
             .get_peers_info(generated::Empty::default())
             .await?;
-        let peers_info = types::PeersInfo::try_from(response.into_inner())?;
+        let peers_info = types::network::PeersInfo::try_from(response.into_inner())?;
         Ok(peers_info)
+    }
+
+    pub async fn get_node_info(&mut self) -> endpoints::RPCResult<types::NodeInfo> {
+        let response = self
+            .client
+            .get_node_info(generated::Empty::default())
+            .await?;
+        let node_info = types::NodeInfo::try_from(response.into_inner())?;
+        Ok(node_info)
     }
 }
 
