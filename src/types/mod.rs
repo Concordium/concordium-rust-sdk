@@ -2668,38 +2668,9 @@ pub struct NetworkInfo {
     pub avg_bps_out:         u64,
 }
 
-/// A node can either be a 'Bootstrapper' or 'Node'.
-/// The 'Bootstrapper' is a special kind of node that does not participate
-/// in consensus but merely relay peers.
-/// The 'Node' is a node that participates in consensus either passively (only
-/// processing incoming blocks) or actively i.e. by being a baker.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Display, From, TryInto)]
-pub enum NodeType {
-    Bootstrapper,
-    Node,
-}
-
-impl TryFrom<i32> for NodeType {
-    type Error = anyhow::Error;
-
-    // Parse the node type.
-    // The node type is specified via an enum:
-    // * 0 => The node is a bootstrapper and is simply relaying peers.
-    // * 1 => The node is participating in consensus either actively (baking) or
-    //   passively (solely processing blocks).
-    // If the result is none of the above we return an error "Malformed node type."
-    fn try_from(v: i32) -> Result<Self, Self::Error> {
-        match v {
-            x if x == NodeType::Bootstrapper as i32 => Ok(NodeType::Bootstrapper),
-            x if x == NodeType::Node as i32 => Ok(NodeType::Node),
-            _ => Err(anyhow::anyhow!("Malformed node type")),
-        }
-    }
-}
-
+// Details of the consensus protocol running on the node.
 #[derive(Debug)]
-/// Consensus related information for a node.
-pub enum ConsensusInfo {
+pub enum NodeConsensusStatus {
     // The consensus protocol is not running on the node.
     // This only occurs when the node does not support the protocol on the chain or the node is a
     // 'Bootstrapper'.
@@ -2724,34 +2695,45 @@ pub enum ConsensusInfo {
     Finalizer(crate::types::BakerId),
 }
 
+/// Consensus related information for a node.
+#[derive(Debug)]
+pub enum NodeDetails {
+    // The node is a bootstrapper and does not
+    // run the consensus protocol.
+    Bootstrapper,
+    // The node is a regular node and is eligible for
+    // running the consensus protocol.
+    Node(NodeConsensusStatus),
+}
+
 #[derive(Debug)]
 /// The status of the requested node.
 pub struct NodeInfo {
     // The version of the node.
-    // Note. if the returned version from the node does
-    // not conform to semantic versioning then the parsing will fail.
-    pub version:        semver::Version,
-    // Type of the node, see [NodeType]
-    pub node_type:      NodeType,
+    pub version:      semver::Version,
     // The local (UTC) time of the node.
-    pub local_time:     chrono::DateTime<chrono::Utc>,
+    pub local_time:   chrono::DateTime<chrono::Utc>,
     // How long the node has been alive.
-    pub uptime:         chrono::Duration,
+    pub uptime:       chrono::Duration,
     // Information related to the network for the node.
-    pub network_info:   NetworkInfo,
+    pub network_info: NetworkInfo,
     // Information related to consensus for the node.
-    pub consensus_info: ConsensusInfo,
+    pub details:      NodeDetails,
 }
 
-impl From<crate::v2::generated::node_info::NetworkInfo> for NetworkInfo {
-    fn from(network_info: crate::v2::generated::node_info::NetworkInfo) -> Self {
-        NetworkInfo {
-            node_id:             network_info.node_id,
+impl TryFrom<crate::v2::generated::node_info::NetworkInfo> for NetworkInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(
+        network_info: crate::v2::generated::node_info::NetworkInfo,
+    ) -> Result<Self, Self::Error> {
+        Ok(NetworkInfo {
+            node_id:             network_info.node_id.require()?.value,
             peer_total_sent:     network_info.peer_total_sent,
             peer_total_received: network_info.peer_total_received,
             avg_bps_in:          network_info.avg_bps_in,
             avg_bps_out:         network_info.avg_bps_out,
-        }
+        })
     }
 }
 
@@ -2760,33 +2742,40 @@ impl TryFrom<crate::v2::generated::NodeInfo> for NodeInfo {
 
     fn try_from(node_info: crate::v2::generated::NodeInfo) -> Result<Self, Self::Error> {
         let version = semver::Version::parse(&node_info.peer_version)?;
-        let node_type = node_info.node_type.try_into()?;
         let local_time = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
             + chrono::Duration::milliseconds(node_info.local_time.require()?.value as i64);
         let uptime = DurationSeconds::from(node_info.peer_uptime.require()?.value).into();
-        let network_info = node_info.network_info.require()?.into();
-        let consensus_info = match node_info.consensus_info.require()? {
-            crate::v2::generated::node_info::ConsensusInfo::NoBaker(0) => ConsensusInfo::ConsensusNotRunning,
-            crate::v2::generated::node_info::ConsensusInfo::NoBaker(1) => ConsensusInfo::ConsensusPassive,
-            crate::v2::generated::node_info::ConsensusInfo::BakerConsensusInfo(baking_info) => {
-                match baking_info.committee_info.require()? {
-                    crate::v2::generated::node_info::baker_consensus_info::CommitteeInfo::PassiveCommitteeInfo(0) => ConsensusInfo::NotInCommittee,
-                    crate::v2::generated::node_info::baker_consensus_info::CommitteeInfo::PassiveCommitteeInfo(1) => ConsensusInfo::AddedButNotActiveInCommittee,
-                    crate::v2::generated::node_info::baker_consensus_info::CommitteeInfo::PassiveCommitteeInfo(2) => ConsensusInfo::AddedButWrongKeys,
-                    crate::v2::generated::node_info::baker_consensus_info::CommitteeInfo::ActiveBakerCommitteeInfo(active_baker) => ConsensusInfo::Baker(active_baker.baker_id.require()?.into()),
-                    crate::v2::generated::node_info::baker_consensus_info::CommitteeInfo::ActiveFinalizerCommitteeInfo(active_baker) => ConsensusInfo::Finalizer(active_baker.baker_id.require()?.into()),
-                    _ => anyhow::bail!("Malformed committee info"),
-                }
-            },
-            _ => anyhow::bail!("Malformed consensus info.")
+        let network_info = node_info.network_info.require()?.try_into()?;
+        let details = match node_info.details.require()? {
+            crate::v2::generated::node_info::Details::Bootstrapper(_) => NodeDetails::Bootstrapper,
+            crate::v2::generated::node_info::Details::Node(status) => {
+                let consensus_status = match status.consensus_status.require()? {
+                    crate::v2::generated::node_info::node::ConsensusStatus::NotRunning(_) => NodeConsensusStatus::ConsensusNotRunning,
+                    crate::v2::generated::node_info::node::ConsensusStatus::Passive(_) => NodeConsensusStatus::ConsensusPassive,
+                    crate::v2::generated::node_info::node::ConsensusStatus::Active(baker) =>{
+                        match baker.status.require()? {
+                            crate::v2::generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(0) => NodeConsensusStatus::NotInCommittee,
+                            crate::v2::generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(1) => NodeConsensusStatus::AddedButNotActiveInCommittee,
+                            crate::v2::generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(2) => NodeConsensusStatus::AddedButWrongKeys,
+                            crate::v2::generated::node_info::baker_consensus_info::Status::ActiveBakerCommitteeInfo(active_baker) => {
+                                NodeConsensusStatus::Baker(active_baker.baker_id.require()?.into())
+                            },
+                            crate::v2::generated::node_info::baker_consensus_info::Status::ActiveFinalizerCommitteeInfo(active_finalizer) => {
+                                NodeConsensusStatus::Finalizer(active_finalizer.baker_id.require()?.into())
+                            },
+                            _ => anyhow::bail!("Malformed baker status")
+                        }
+                    },
+                };
+                NodeDetails::Node(consensus_status)
+            }
         };
         Ok(NodeInfo {
             version,
-            node_type,
             local_time,
             uptime,
             network_info,
-            consensus_info,
+            details,
         })
     }
 }

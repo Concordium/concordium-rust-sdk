@@ -11,7 +11,7 @@ use concordium_contracts_common::{AccountAddress, Amount, ContractAddress, Recei
 use futures::{Stream, StreamExt};
 use tonic::IntoRequest;
 
-pub mod generated;
+pub(crate) mod generated;
 
 #[derive(Clone, Debug)]
 /// Client that can perform queries.
@@ -621,7 +621,7 @@ fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<Bl
 ///
 /// The main reason for needing this is that in proto3 all fields are optional,
 /// so it is up to the application to validate inputs if they are required.
-pub trait Require<E> {
+pub(crate) trait Require<E> {
     type A;
     fn require(self) -> Result<Self::A, E>;
 }
