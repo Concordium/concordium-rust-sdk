@@ -1917,31 +1917,6 @@ pub enum RejectReason {
     PoolClosed,
 }
 
-mod transaction_fee_distribution {
-    use super::*;
-    #[derive(SerdeDeserialize)]
-    #[serde(rename_all = "camelCase")]
-    pub struct TransactionFeeDistributionUnchecked {
-        baker:       AmountFraction,
-        gas_account: AmountFraction,
-    }
-
-    impl TryFrom<TransactionFeeDistributionUnchecked> for TransactionFeeDistribution {
-        type Error = &'static str;
-
-        fn try_from(value: TransactionFeeDistributionUnchecked) -> Result<Self, Self::Error> {
-            if (value.baker + value.gas_account).is_some() {
-                Ok(TransactionFeeDistribution {
-                    baker:       value.baker,
-                    gas_account: value.gas_account,
-                })
-            } else {
-                Err("Transaction fee fractions exceed 100%.")
-            }
-        }
-    }
-}
-
 /// The network info of a node informs of the following:
 /// * The node id. An id which it uses to identify itself to other peers and it
 ///   is used for logging purposes internally. NB. The 'node_id' is spoofable
