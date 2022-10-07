@@ -1,7 +1,9 @@
-//! Get the 'NodeInfo' of the given node.
-use anyhow::Context;
+//! Example of how to instruct a node to connect/disconnect to a certain peer
+//! given by its IP and port.
+use anyhow::{ensure, Context};
 use clap::AppSettings;
 use concordium_rust_sdk::{endpoints, v2};
+use std::net::SocketAddr;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -12,6 +14,8 @@ struct App {
         default_value = "http://localhost:10001"
     )]
     endpoint: endpoints::Endpoint,
+    #[structopt(long = "peer", help = "peer to connect to")]
+    peer:     SocketAddr,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -24,8 +28,12 @@ async fn main() -> anyhow::Result<()> {
 
     let mut client = v2::Client::new(app.endpoint)
         .await
-        .context("Cannot connect to the node.")?;
-    let node_info = client.get_node_info().await?;
-    println!("{:?}", node_info);
+        .context("Cannot connect.")?;
+
+    client.peer_connect(app.peer).await?;
+    // We wait 10 seconds and drop the peer again.
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    client.peer_disconnect(app.peer).await?;
+
     Ok(())
 }

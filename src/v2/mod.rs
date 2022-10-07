@@ -1,5 +1,3 @@
-use std::net::IpAddr;
-
 use crate::{
     endpoints,
     types::{
@@ -291,7 +289,7 @@ impl TryFrom<crate::v2::generated::BannedPeer> for types::network::BannedPeer {
 
     fn try_from(value: crate::v2::generated::BannedPeer) -> Result<Self, Self::Error> {
         Ok(types::network::BannedPeer(
-            <IpAddr as std::str::FromStr>::from_str(&value.ip_address.require()?.value)?,
+            <std::net::IpAddr as std::str::FromStr>::from_str(&value.ip_address.require()?.value)?,
         ))
     }
 }
@@ -908,6 +906,37 @@ impl Client {
             Err(err) => Err(err),
         });
         Ok(stream)
+    }
+
+    // Try connect to a peer with the provided address.
+    pub async fn peer_connect(&mut self, addr: std::net::SocketAddr) -> endpoints::RPCResult<()> {
+        let peer_connection = generated::IpSocketAddress {
+            ip:   Some(generated::IpAddress {
+                value: addr.ip().to_string(),
+            }),
+            port: Some(generated::Port {
+                value: addr.port() as u32,
+            }),
+        };
+        self.client.peer_connect(peer_connection).await?;
+        Ok(())
+    }
+
+    // Disconnect a peer at the given address.
+    pub async fn peer_disconnect(
+        &mut self,
+        addr: std::net::SocketAddr,
+    ) -> endpoints::RPCResult<()> {
+        let peer_connection = generated::IpSocketAddress {
+            ip:   Some(generated::IpAddress {
+                value: addr.ip().to_string(),
+            }),
+            port: Some(generated::Port {
+                value: addr.port() as u32,
+            }),
+        };
+        self.client.peer_disconnect(peer_connection).await?;
+        Ok(())
     }
 
     /// Get a vector of the banned peers.
