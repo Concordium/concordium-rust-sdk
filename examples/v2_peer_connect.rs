@@ -1,6 +1,6 @@
 //! Example of how to instruct a node to connect/disconnect to a certain peer
 //! given by its IP and port.
-use anyhow::{ensure, Context};
+use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{endpoints, v2};
 use std::net::SocketAddr;
@@ -31,9 +31,11 @@ async fn main() -> anyhow::Result<()> {
         .context("Cannot connect.")?;
 
     client.peer_connect(app.peer).await?;
+    println!("Connected to {:#?}", app.peer);
     // We wait 10 seconds and drop the peer again.
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
     client.peer_disconnect(app.peer).await?;
+    println!("Dropped {:#?}", app.peer);
 
     Ok(())
 }

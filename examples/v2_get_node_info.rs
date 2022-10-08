@@ -26,6 +26,6 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect to the node.")?;
     let node_info = client.get_node_info().await?;
-    println!("{:?}", node_info);
+    println!("{:#?}", node_info);
     Ok(())
 }

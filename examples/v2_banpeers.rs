@@ -51,6 +51,10 @@ async fn main() -> anyhow::Result<()> {
     );
     let foo = banned_peers.get(0).context("Expected a peer")?;
     client.unban_peer(foo).await?;
+    ensure!(
+        client.get_banned_peers().await?.is_empty(),
+        "Ban list should be empty now."
+    );
 
     Ok(())
 }
