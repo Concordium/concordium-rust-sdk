@@ -419,16 +419,13 @@ impl TryFrom<generated::NodeInfo> for types::NodeInfo {
                         types::NodeConsensusStatus::ConsensusPassive
                     }
                     generated::node_info::node::ConsensusStatus::Active(baker) => {
+                        let baker_id = baker.baker_id.require()?.into();
                         match baker.status.require()? {
-                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(0) => types::NodeConsensusStatus::NotInCommittee,
-                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(1) => types::NodeConsensusStatus::AddedButNotActiveInCommittee,
-                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(2) => types::NodeConsensusStatus::AddedButWrongKeys,
-                            generated::node_info::baker_consensus_info::Status::ActiveBakerCommitteeInfo(active_baker) => {
-                                types::NodeConsensusStatus::Baker(active_baker.baker_id.require()?.into())
-                            },
-                            generated::node_info::baker_consensus_info::Status::ActiveFinalizerCommitteeInfo(active_finalizer) => {
-                                types::NodeConsensusStatus::Finalizer(active_finalizer.baker_id.require()?.into())
-                            },
+                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(0) => types::NodeConsensusStatus::NotInCommittee(baker_id),
+                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(1) => types::NodeConsensusStatus::AddedButNotActiveInCommittee(baker_id),
+                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(2) => types::NodeConsensusStatus::AddedButWrongKeys(baker_id),
+                            generated::node_info::baker_consensus_info::Status::ActiveBakerCommitteeInfo(_) => types::NodeConsensusStatus::Baker(baker_id),
+                            generated::node_info::baker_consensus_info::Status::ActiveFinalizerCommitteeInfo(_) => types::NodeConsensusStatus::Finalizer(baker_id),
                             _ => anyhow::bail!("Malformed baker status")
                         }
                     }
@@ -1024,7 +1021,7 @@ impl Client {
         Ok(peers_info)
     }
 
-    /// Retrieve [types::NodeInfo] from the node. 
+    /// Retrieve [types::NodeInfo] from the node.
     pub async fn get_node_info(&mut self) -> endpoints::RPCResult<types::NodeInfo> {
         let response = self
             .client

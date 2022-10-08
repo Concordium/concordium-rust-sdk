@@ -1949,12 +1949,12 @@ pub enum NodeConsensusStatus {
     ConsensusPassive,
     // The node has been configured with baker keys however it is not currently baking and
     // possilby never will.
-    NotInCommittee,
+    NotInCommittee(crate::types::BakerId),
     // The baker keys are registered however the baker is not in the committee
     // for the current 'Epoch'.
-    AddedButNotActiveInCommittee,
+    AddedButNotActiveInCommittee(crate::types::BakerId),
     // The node has been configured with baker keys that does not match the account.
-    AddedButWrongKeys,
+    AddedButWrongKeys(crate::types::BakerId),
     // The node is member of the baking committee.
     Baker(crate::types::BakerId),
     // The node is member of the baking and finalization committee.
