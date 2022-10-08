@@ -1916,6 +1916,74 @@ impl TryFrom<CryptographicParameters> for super::types::CryptographicParameters 
     }
 }
 
+impl TryFrom<CredentialsPerBlockLimit> for super::types::CredentialsPerBlockLimit {
+    type Error = tonic::Status;
+
+    fn try_from(value: CredentialsPerBlockLimit) -> Result<Self, Self::Error> {
+        Ok(Self {
+            limit: value.value.try_into().map_err(|_| {
+                tonic::Status::internal("Unexpectedly large account creation limit")
+            })?,
+        })
+    }
+}
+
+impl TryFrom<ChainParametersV0> for super::ChainParametersV0 {
+    type Error = tonic::Status;
+
+    fn try_from(value: ChainParametersV0) -> Result<Self, Self::Error> {
+        Ok(Self {
+            election_difficulty:          value.election_difficulty.require()?.try_into()?,
+            euro_per_energy:              value.euro_per_energy.require()?.try_into()?,
+            micro_ccd_per_euro:           value.micro_ccd_per_euro.require()?.try_into()?,
+            baker_cooldown_epochs:        value.baker_cooldown_epochs.require()?.into(),
+            account_creation_limit:       value.account_creation_limit.require()?.try_into()?,
+            mint_distribution:            value.mint_distribution.require()?.try_into()?,
+            transaction_fee_distribution: value
+                .transaction_fee_distribution
+                .require()?
+                .try_into()?,
+            gas_rewards:                  value.gas_rewards.require()?.try_into()?,
+            foundation_account:           value.foundation_account.require()?.try_into()?,
+            minimum_threshold_for_baking: value.minimum_threshold_for_baking.require()?.into(),
+        })
+    }
+}
+
+impl TryFrom<ChainParametersV1> for super::ChainParametersV1 {
+    type Error = tonic::Status;
+
+    fn try_from(value: ChainParametersV1) -> Result<Self, Self::Error> {
+        Ok(Self {
+            election_difficulty:          value.election_difficulty.require()?.try_into()?,
+            euro_per_energy:              value.euro_per_energy.require()?.try_into()?,
+            micro_ccd_per_euro:           value.micro_ccd_per_euro.require()?.try_into()?,
+            pool_parameters:              value.pool_parameters.require()?.try_into()?,
+            account_creation_limit:       value.account_creation_limit.require()?.try_into()?,
+            mint_distribution:            value.mint_distribution.require()?.try_into()?,
+            transaction_fee_distribution: value
+                .transaction_fee_distribution
+                .require()?
+                .try_into()?,
+            gas_rewards:                  value.gas_rewards.require()?.try_into()?,
+            foundation_account:           value.foundation_account.require()?.try_into()?,
+            time_parameters:              value.time_parameters.require()?.try_into()?,
+            cooldown_parameters:          value.cooldown_parameters.require()?.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<ChainParameters> for super::ChainParameters {
+    type Error = tonic::Status;
+
+    fn try_from(value: ChainParameters) -> Result<Self, Self::Error> {
+        match value.parameters.require()? {
+            chain_parameters::Parameters::V0(v0) => Ok(Self::V0(v0.try_into()?)),
+            chain_parameters::Parameters::V1(v1) => Ok(Self::V1(v1.try_into()?)),
+        }
+    }
+}
+
 impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
     type Error = tonic::Status;
 
@@ -2293,9 +2361,7 @@ impl TryFrom<ExchangeRate> for base::ExchangeRate {
 impl TryFrom<MintDistributionCpv0> for base::MintDistributionV0 {
     type Error = tonic::Status;
 
-    fn try_from(
-        value: MintDistributionCpv0,
-    ) -> Result<Self, Self::Error> {
+    fn try_from(value: MintDistributionCpv0) -> Result<Self, Self::Error> {
         Ok(Self {
             mint_per_slot:       value.mint_per_slot.require()?.try_into()?,
             baking_reward:       value.baking_reward.require()?.into(),
@@ -2307,9 +2373,7 @@ impl TryFrom<MintDistributionCpv0> for base::MintDistributionV0 {
 impl TryFrom<MintDistributionCpv1> for base::MintDistributionV1 {
     type Error = tonic::Status;
 
-    fn try_from(
-        value: MintDistributionCpv1,
-    ) -> Result<Self, Self::Error> {
+    fn try_from(value: MintDistributionCpv1) -> Result<Self, Self::Error> {
         Ok(Self {
             baking_reward:       value.baking_reward.require()?.into(),
             finalization_reward: value.finalization_reward.require()?.into(),
@@ -2317,14 +2381,10 @@ impl TryFrom<MintDistributionCpv1> for base::MintDistributionV1 {
     }
 }
 
-impl TryFrom<TransactionFeeDistribution>
-    for updates::TransactionFeeDistribution
-{
+impl TryFrom<TransactionFeeDistribution> for updates::TransactionFeeDistribution {
     type Error = tonic::Status;
 
-    fn try_from(
-        value: TransactionFeeDistribution,
-    ) -> Result<Self, Self::Error> {
+    fn try_from(value: TransactionFeeDistribution) -> Result<Self, Self::Error> {
         Ok(Self {
             baker:       value.baker.require()?.into(),
             gas_account: value.gas_account.require()?.into(),
@@ -2348,9 +2408,7 @@ impl TryFrom<GasRewards> for updates::GASRewards {
 impl TryFrom<PoolParametersCpv1> for updates::PoolParameters {
     type Error = tonic::Status;
 
-    fn try_from(
-        value: PoolParametersCpv1,
-    ) -> Result<Self, Self::Error> {
+    fn try_from(value: PoolParametersCpv1) -> Result<Self, Self::Error> {
         Ok(Self {
             passive_finalization_commission: value
                 .passive_finalization_commission
@@ -2391,9 +2449,7 @@ impl TryFrom<CommissionRanges> for super::types::CommissionRanges {
 impl TryFrom<BakerStakeThreshold> for updates::BakerParameters {
     type Error = tonic::Status;
 
-    fn try_from(
-        value: BakerStakeThreshold,
-    ) -> Result<Self, Self::Error> {
+    fn try_from(value: BakerStakeThreshold) -> Result<Self, Self::Error> {
         Ok(Self {
             minimum_threshold_for_baking: value.baker_stake_threshold.require()?.into(),
         })
@@ -2403,9 +2459,7 @@ impl TryFrom<BakerStakeThreshold> for updates::BakerParameters {
 impl TryFrom<CooldownParametersCpv1> for updates::CooldownParameters {
     type Error = tonic::Status;
 
-    fn try_from(
-        value: CooldownParametersCpv1,
-    ) -> Result<Self, Self::Error> {
+    fn try_from(value: CooldownParametersCpv1) -> Result<Self, Self::Error> {
         Ok(Self {
             pool_owner_cooldown: value.pool_owner_cooldown.require()?.into(),
             delegator_cooldown:  value.delegator_cooldown.require()?.into(),
@@ -2416,9 +2470,7 @@ impl TryFrom<CooldownParametersCpv1> for updates::CooldownParameters {
 impl TryFrom<TimeParametersCpv1> for updates::TimeParameters {
     type Error = tonic::Status;
 
-    fn try_from(
-        value: TimeParametersCpv1,
-    ) -> Result<Self, Self::Error> {
+    fn try_from(value: TimeParametersCpv1) -> Result<Self, Self::Error> {
         Ok(Self {
             reward_period_length: value.reward_period_length.require()?.try_into()?,
             mint_per_payday:      value.mint_per_payday.require()?.try_into()?,

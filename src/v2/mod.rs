@@ -8,7 +8,16 @@ use crate::{
         TransactionStatus,
     },
 };
-use concordium_base::contracts_common::{AccountAddress, Amount, ContractAddress, ReceiveName};
+use concordium_base::{
+    base::{
+        CredentialsPerBlockLimit, ElectionDifficulty, Epoch, ExchangeRate, MintDistributionV0,
+        MintDistributionV1,
+    },
+    contracts_common::{AccountAddress, Amount, ContractAddress, ReceiveName},
+    updates::{
+        CooldownParameters, GASRewards, PoolParameters, TimeParameters, TransactionFeeDistribution,
+    },
+};
 use futures::{Stream, StreamExt};
 use tonic::IntoRequest;
 
@@ -57,6 +66,101 @@ pub enum AccountIdentifier {
 pub struct FinalizedBlockInfo {
     pub block_hash: BlockHash,
     pub height:     AbsoluteBlockHeight,
+}
+
+#[derive(Debug, Clone)]
+/// Values of chain parameters that can be updated via chain updates.
+/// This applies to protocol version 1-3.
+pub struct ChainParametersV0 {
+    /// Election difficulty for consensus lottery.
+    pub election_difficulty:          ElectionDifficulty,
+    /// Euro per energy exchange rate.
+    pub euro_per_energy:              ExchangeRate,
+    /// Micro ccd per euro exchange rate.
+    pub micro_ccd_per_euro:           ExchangeRate,
+    /// Extra number of epochs before reduction in stake, or baker
+    /// deregistration is completed.
+    pub baker_cooldown_epochs:        Epoch,
+    /// The limit for the number of account creations in a block.
+    pub account_creation_limit:       CredentialsPerBlockLimit,
+    /// Parameters related to the distribution of newly minted CCD.
+    pub mint_distribution:            MintDistributionV0,
+    /// Parameters related to the distribution of transaction fees.
+    pub transaction_fee_distribution: TransactionFeeDistribution,
+    /// Parameters related to the distribution of the GAS account.
+    pub gas_rewards:                  GASRewards,
+    /// Address of the foundation account.
+    pub foundation_account:           AccountAddress,
+    /// Minimum threshold for becoming a baker.
+    pub minimum_threshold_for_baking: Amount,
+}
+
+#[derive(Debug, Clone)]
+/// Values of chain parameters that can be updated via chain updates.
+/// This applies to protocol version 4 and up.
+pub struct ChainParametersV1 {
+    /// Election difficulty for consensus lottery.
+    pub election_difficulty:          ElectionDifficulty,
+    /// Euro per energy exchange rate.
+    pub euro_per_energy:              ExchangeRate,
+    /// Micro ccd per euro exchange rate.
+    pub micro_ccd_per_euro:           ExchangeRate,
+    pub cooldown_parameters:          CooldownParameters,
+    pub time_parameters:              TimeParameters,
+    /// The limit for the number of account creations in a block.
+    pub account_creation_limit:       CredentialsPerBlockLimit,
+    /// Parameters related to the distribution of newly minted CCD.
+    pub mint_distribution:            MintDistributionV1,
+    /// Parameters related to the distribution of transaction fees.
+    pub transaction_fee_distribution: TransactionFeeDistribution,
+    /// Parameters related to the distribution of the GAS account.
+    pub gas_rewards:                  GASRewards,
+    /// Address of the foundation account.
+    pub foundation_account:           AccountAddress,
+    /// Parameters for baker pools.
+    pub pool_parameters:              PoolParameters,
+}
+
+/// Chain parameters. See [`ChainParametersV0`] and [`ChainParametersV1`] for
+/// details. `V0` parameters apply to protocol version `1..=3`, and `V1`
+/// parameters apply to protocol versions `4` and up.
+#[derive(Debug, Clone)]
+pub enum ChainParameters {
+    V0(ChainParametersV0),
+    V1(ChainParametersV1),
+}
+
+impl ChainParameters {
+    /// Compute the exchange rate between `microCCD` and `NRG`.
+    pub fn micro_ccd_per_energy(&self) -> num::rational::Ratio<u128> {
+        let (num, denom) = match self {
+            ChainParameters::V0(v0) => {
+                let x = v0.micro_ccd_per_euro;
+                let y = v0.euro_per_energy;
+                (
+                    u128::from(x.numerator) * u128::from(y.numerator),
+                    u128::from(y.denominator) * u128::from(y.denominator),
+                )
+            }
+            ChainParameters::V1(v1) => {
+                let x = v1.micro_ccd_per_euro;
+                let y = v1.euro_per_energy;
+                (
+                    u128::from(x.numerator) * u128::from(y.numerator),
+                    u128::from(y.denominator) * u128::from(y.denominator),
+                )
+            }
+        };
+        num::rational::Ratio::new(num, denom)
+    }
+
+    /// The foundation account that gets the foundation tax.
+    pub fn foundation_account(&self) -> AccountAddress {
+        match self {
+            ChainParameters::V0(v0) => v0.foundation_account,
+            ChainParameters::V1(v1) => v1.foundation_account,
+        }
+    }
 }
 
 impl From<&BlockIdentifier> for generated::BlockHashInput {
@@ -821,6 +925,19 @@ impl Client {
             .await?;
         let block_hash = extract_metadata(&response)?;
         let response = types::queries::NextUpdateSequenceNumbers::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_block_chain_parameters(
+        &mut self,
+        block_id: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<ChainParameters>> {
+        let response = self.client.get_block_chain_parameters(block_id).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = ChainParameters::try_from(response.into_inner())?;
         Ok(QueryResponse {
             block_hash,
             response,
