@@ -1,6 +1,8 @@
 #![allow(clippy::large_enum_variant, clippy::enum_variant_names)]
 tonic::include_proto!("concordium.v2");
 
+use crate::types::UpdateKeysCollectionSkeleton;
+
 use super::Require;
 use concordium_base::{
     base,
@@ -191,6 +193,19 @@ impl TryFrom<TransactionHash> for super::hashes::TransactionHash {
             Ok(hash) => Ok(Self::new(hash)),
             Err(_) => Err(tonic::Status::internal(
                 "Unexpected transaction hash format.",
+            )),
+        }
+    }
+}
+
+impl TryFrom<AccountTransactionSignHash> for super::hashes::TransactionSignHash {
+    type Error = tonic::Status;
+
+    fn try_from(value: AccountTransactionSignHash) -> Result<Self, Self::Error> {
+        match value.value.try_into() {
+            Ok(hash) => Ok(Self::new(hash)),
+            Err(_) => Err(tonic::Status::internal(
+                "Unexpected account transaction sign hash format.",
             )),
         }
     }
@@ -1933,19 +1948,24 @@ impl TryFrom<ChainParametersV0> for super::ChainParametersV0 {
 
     fn try_from(value: ChainParametersV0) -> Result<Self, Self::Error> {
         Ok(Self {
-            election_difficulty:          value.election_difficulty.require()?.try_into()?,
-            euro_per_energy:              value.euro_per_energy.require()?.try_into()?,
-            micro_ccd_per_euro:           value.micro_ccd_per_euro.require()?.try_into()?,
-            baker_cooldown_epochs:        value.baker_cooldown_epochs.require()?.into(),
-            account_creation_limit:       value.account_creation_limit.require()?.try_into()?,
-            mint_distribution:            value.mint_distribution.require()?.try_into()?,
+            election_difficulty: value.election_difficulty.require()?.try_into()?,
+            euro_per_energy: value.euro_per_energy.require()?.try_into()?,
+            micro_ccd_per_euro: value.micro_ccd_per_euro.require()?.try_into()?,
+            baker_cooldown_epochs: value.baker_cooldown_epochs.require()?.into(),
+            account_creation_limit: value.account_creation_limit.require()?.try_into()?,
+            mint_distribution: value.mint_distribution.require()?.try_into()?,
             transaction_fee_distribution: value
                 .transaction_fee_distribution
                 .require()?
                 .try_into()?,
-            gas_rewards:                  value.gas_rewards.require()?.try_into()?,
-            foundation_account:           value.foundation_account.require()?.try_into()?,
+            gas_rewards: value.gas_rewards.require()?.try_into()?,
+            foundation_account: value.foundation_account.require()?.try_into()?,
             minimum_threshold_for_baking: value.minimum_threshold_for_baking.require()?.into(),
+            keys: UpdateKeysCollectionSkeleton {
+                root_keys:    value.root_keys.require()?.try_into()?,
+                level_1_keys: value.level1_keys.require()?.try_into()?,
+                level_2_keys: value.level2_keys.require()?.try_into()?,
+            },
         })
     }
 }
@@ -1955,20 +1975,25 @@ impl TryFrom<ChainParametersV1> for super::ChainParametersV1 {
 
     fn try_from(value: ChainParametersV1) -> Result<Self, Self::Error> {
         Ok(Self {
-            election_difficulty:          value.election_difficulty.require()?.try_into()?,
-            euro_per_energy:              value.euro_per_energy.require()?.try_into()?,
-            micro_ccd_per_euro:           value.micro_ccd_per_euro.require()?.try_into()?,
-            pool_parameters:              value.pool_parameters.require()?.try_into()?,
-            account_creation_limit:       value.account_creation_limit.require()?.try_into()?,
-            mint_distribution:            value.mint_distribution.require()?.try_into()?,
+            election_difficulty: value.election_difficulty.require()?.try_into()?,
+            euro_per_energy: value.euro_per_energy.require()?.try_into()?,
+            micro_ccd_per_euro: value.micro_ccd_per_euro.require()?.try_into()?,
+            pool_parameters: value.pool_parameters.require()?.try_into()?,
+            account_creation_limit: value.account_creation_limit.require()?.try_into()?,
+            mint_distribution: value.mint_distribution.require()?.try_into()?,
             transaction_fee_distribution: value
                 .transaction_fee_distribution
                 .require()?
                 .try_into()?,
-            gas_rewards:                  value.gas_rewards.require()?.try_into()?,
-            foundation_account:           value.foundation_account.require()?.try_into()?,
-            time_parameters:              value.time_parameters.require()?.try_into()?,
-            cooldown_parameters:          value.cooldown_parameters.require()?.try_into()?,
+            gas_rewards: value.gas_rewards.require()?.try_into()?,
+            foundation_account: value.foundation_account.require()?.try_into()?,
+            time_parameters: value.time_parameters.require()?.try_into()?,
+            cooldown_parameters: value.cooldown_parameters.require()?.try_into()?,
+            keys: UpdateKeysCollectionSkeleton {
+                root_keys:    value.root_keys.require()?.try_into()?,
+                level_1_keys: value.level1_keys.require()?.try_into()?,
+                level_2_keys: value.level2_keys.require()?.try_into()?,
+            },
         })
     }
 }
@@ -1997,9 +2022,7 @@ impl TryFrom<FinalizationSummaryParty> for super::types::FinalizationSummaryPart
 }
 
 impl From<FinalizationIndex> for super::types::FinalizationIndex {
-    fn from(value: FinalizationIndex) -> Self {
-        value.value.into()
-    }
+    fn from(value: FinalizationIndex) -> Self { value.value.into() }
 }
 
 impl TryFrom<BlockFinalizationSummary> for Option<super::types::FinalizationSummary> {
@@ -2008,16 +2031,18 @@ impl TryFrom<BlockFinalizationSummary> for Option<super::types::FinalizationSumm
     fn try_from(value: BlockFinalizationSummary) -> Result<Self, Self::Error> {
         match value.summary.require()? {
             block_finalization_summary::Summary::None(_) => Ok(None),
-            block_finalization_summary::Summary::Record(r) => Ok(Some(super::types::FinalizationSummary {
-                block_pointer:      r.block.require()?.try_into()?,
-                index:      r.index.require()?.into(),
-                delay:      r.delay.require()?.into(),
-                finalizers: r
-                    .finalizers
-                    .into_iter()
-                    .map(super::types::FinalizationSummaryParty::try_from)
-                    .collect::<Result<_, tonic::Status>>()?,
-            })),
+            block_finalization_summary::Summary::Record(r) => {
+                Ok(Some(super::types::FinalizationSummary {
+                    block_pointer: r.block.require()?.try_into()?,
+                    index:         r.index.require()?.into(),
+                    delay:         r.delay.require()?.into(),
+                    finalizers:    r
+                        .finalizers
+                        .into_iter()
+                        .map(super::types::FinalizationSummaryParty::try_from)
+                        .collect::<Result<_, tonic::Status>>()?,
+                }))
+            }
         }
     }
 }

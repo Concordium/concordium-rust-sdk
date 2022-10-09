@@ -32,7 +32,10 @@ async fn main() -> anyhow::Result<()> {
         let mut response = client
             .get_block_special_events(&v.block_hash.into())
             .await?;
-        assert_eq!(response.block_hash, v.block_hash, "Querying for a given block should return data for the block.");
+        assert_eq!(
+            response.block_hash, v.block_hash,
+            "Querying for a given block should return data for the block."
+        );
         println!("Blockhash: {}", response.block_hash);
         while let Some(a) = response.response.next().await.transpose()? {
             println!(" - {:#?}", &a);
