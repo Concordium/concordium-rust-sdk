@@ -4,10 +4,20 @@ use crate::{
         self, hashes,
         hashes::{BlockHash, TransactionHash},
         smart_contracts::{ContractContext, InstanceInfo, InvokeContractResult, ModuleRef},
-        AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, TransactionStatus,
+        AbsoluteBlockHeight, AccountInfo, BlockItemSummary, CredentialRegistrationID,
+        FinalizationSummary, TransactionStatus,
     },
 };
-use concordium_base::contracts_common::{AccountAddress, Amount, ContractAddress, ReceiveName};
+use concordium_base::{
+    base::{
+        CredentialsPerBlockLimit, ElectionDifficulty, Epoch, ExchangeRate, MintDistributionV0,
+        MintDistributionV1,
+    },
+    contracts_common::{AccountAddress, Amount, ContractAddress, ReceiveName},
+    updates::{
+        CooldownParameters, GASRewards, PoolParameters, TimeParameters, TransactionFeeDistribution,
+    },
+};
 use futures::{Stream, StreamExt};
 use tonic::IntoRequest;
 
@@ -56,6 +66,101 @@ pub enum AccountIdentifier {
 pub struct FinalizedBlockInfo {
     pub block_hash: BlockHash,
     pub height:     AbsoluteBlockHeight,
+}
+
+#[derive(Debug, Clone)]
+/// Values of chain parameters that can be updated via chain updates.
+/// This applies to protocol version 1-3.
+pub struct ChainParametersV0 {
+    /// Election difficulty for consensus lottery.
+    pub election_difficulty:          ElectionDifficulty,
+    /// Euro per energy exchange rate.
+    pub euro_per_energy:              ExchangeRate,
+    /// Micro ccd per euro exchange rate.
+    pub micro_ccd_per_euro:           ExchangeRate,
+    /// Extra number of epochs before reduction in stake, or baker
+    /// deregistration is completed.
+    pub baker_cooldown_epochs:        Epoch,
+    /// The limit for the number of account creations in a block.
+    pub account_creation_limit:       CredentialsPerBlockLimit,
+    /// Parameters related to the distribution of newly minted CCD.
+    pub mint_distribution:            MintDistributionV0,
+    /// Parameters related to the distribution of transaction fees.
+    pub transaction_fee_distribution: TransactionFeeDistribution,
+    /// Parameters related to the distribution of the GAS account.
+    pub gas_rewards:                  GASRewards,
+    /// Address of the foundation account.
+    pub foundation_account:           AccountAddress,
+    /// Minimum threshold for becoming a baker.
+    pub minimum_threshold_for_baking: Amount,
+}
+
+#[derive(Debug, Clone)]
+/// Values of chain parameters that can be updated via chain updates.
+/// This applies to protocol version 4 and up.
+pub struct ChainParametersV1 {
+    /// Election difficulty for consensus lottery.
+    pub election_difficulty:          ElectionDifficulty,
+    /// Euro per energy exchange rate.
+    pub euro_per_energy:              ExchangeRate,
+    /// Micro ccd per euro exchange rate.
+    pub micro_ccd_per_euro:           ExchangeRate,
+    pub cooldown_parameters:          CooldownParameters,
+    pub time_parameters:              TimeParameters,
+    /// The limit for the number of account creations in a block.
+    pub account_creation_limit:       CredentialsPerBlockLimit,
+    /// Parameters related to the distribution of newly minted CCD.
+    pub mint_distribution:            MintDistributionV1,
+    /// Parameters related to the distribution of transaction fees.
+    pub transaction_fee_distribution: TransactionFeeDistribution,
+    /// Parameters related to the distribution of the GAS account.
+    pub gas_rewards:                  GASRewards,
+    /// Address of the foundation account.
+    pub foundation_account:           AccountAddress,
+    /// Parameters for baker pools.
+    pub pool_parameters:              PoolParameters,
+}
+
+/// Chain parameters. See [`ChainParametersV0`] and [`ChainParametersV1`] for
+/// details. `V0` parameters apply to protocol version `1..=3`, and `V1`
+/// parameters apply to protocol versions `4` and up.
+#[derive(Debug, Clone)]
+pub enum ChainParameters {
+    V0(ChainParametersV0),
+    V1(ChainParametersV1),
+}
+
+impl ChainParameters {
+    /// Compute the exchange rate between `microCCD` and `NRG`.
+    pub fn micro_ccd_per_energy(&self) -> num::rational::Ratio<u128> {
+        let (num, denom) = match self {
+            ChainParameters::V0(v0) => {
+                let x = v0.micro_ccd_per_euro;
+                let y = v0.euro_per_energy;
+                (
+                    u128::from(x.numerator) * u128::from(y.numerator),
+                    u128::from(y.denominator) * u128::from(y.denominator),
+                )
+            }
+            ChainParameters::V1(v1) => {
+                let x = v1.micro_ccd_per_euro;
+                let y = v1.euro_per_energy;
+                (
+                    u128::from(x.numerator) * u128::from(y.numerator),
+                    u128::from(y.denominator) * u128::from(y.denominator),
+                )
+            }
+        };
+        num::rational::Ratio::new(num, denom)
+    }
+
+    /// The foundation account that gets the foundation tax.
+    pub fn foundation_account(&self) -> AccountAddress {
+        match self {
+            ChainParameters::V0(v0) => v0.foundation_account,
+            ChainParameters::V1(v1) => v1.foundation_account,
+        }
+    }
 }
 
 impl From<&BlockIdentifier> for generated::BlockHashInput {
@@ -754,6 +859,207 @@ impl Client {
             Err(err) => Err(err),
         });
         Ok(stream)
+    }
+
+    pub async fn get_block_transaction_events(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<BlockItemSummary, tonic::Status>>>,
+    > {
+        let response = self.client.get_block_transaction_events(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(summary) => summary.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_block_special_events(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::SpecialTransactionOutcome, tonic::Status>>>,
+    > {
+        let response = self.client.get_block_special_events(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(summary) => summary.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_block_pending_updates(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::queries::PendingUpdate, tonic::Status>>>,
+    > {
+        let response = self.client.get_block_pending_updates(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(update) => update.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_next_update_sequence_numbers(
+        &mut self,
+        block_id: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::queries::NextUpdateSequenceNumbers>> {
+        let response = self
+            .client
+            .get_next_update_sequence_numbers(block_id)
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::queries::NextUpdateSequenceNumbers::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_block_chain_parameters(
+        &mut self,
+        block_id: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<ChainParameters>> {
+        let response = self.client.get_block_chain_parameters(block_id).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = ChainParameters::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_block_finalization_summary(
+        &mut self,
+        block_id: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<Option<FinalizationSummary>>> {
+        let response = self.client.get_block_finalization_summary(block_id).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = response.into_inner().try_into()?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_finalized_blocks_from(
+        &mut self,
+        start_height: AbsoluteBlockHeight,
+    ) -> endpoints::QueryResult<FinalizedBlocksStream> {
+        let mut fin_height = self.get_consensus_info().await?.last_finalized_block_height;
+        let (sender, receiver) = tokio::sync::mpsc::channel(100);
+        let mut client = self.clone();
+        let handle = tokio::spawn(async move {
+            let mut height = start_height;
+            loop {
+                if height > fin_height {
+                    fin_height = client
+                        .get_consensus_info()
+                        .await?
+                        .last_finalized_block_height;
+                    if height > fin_height {
+                        break;
+                    }
+                } else {
+                    let mut bi = client.get_blocks_at_height(&height.into()).await?;
+                    let block_hash = bi.pop().ok_or(endpoints::QueryError::NotFound)?;
+                    let info = FinalizedBlockInfo { block_hash, height };
+                    if sender.send(info).await.is_err() {
+                        return Ok(());
+                    }
+                    height = height.next();
+                }
+            }
+            let mut stream = client.get_finalized_blocks().await?;
+            while let Some(fbi) = stream.next().await.transpose()? {
+                // recover missed blocks.
+                while height < fbi.height {
+                    let mut bi = client.get_blocks_at_height(&height.into()).await?;
+                    let block_hash = bi.pop().ok_or(endpoints::QueryError::NotFound)?;
+                    let info = FinalizedBlockInfo { block_hash, height };
+                    if sender.send(info).await.is_err() {
+                        return Ok(());
+                    }
+                    height = height.next();
+                }
+                if sender.send(fbi).await.is_err() {
+                    return Ok(());
+                }
+                height = height.next();
+            }
+            Ok(())
+        });
+        Ok(FinalizedBlocksStream { handle, receiver })
+    }
+}
+
+/// A stream of finalized blocks. This contains a background task that polls
+/// for new finalized blocks indefinitely. The task can be stopped by dropping
+/// the object.
+pub struct FinalizedBlocksStream {
+    handle:   tokio::task::JoinHandle<endpoints::QueryResult<()>>,
+    receiver: tokio::sync::mpsc::Receiver<FinalizedBlockInfo>,
+}
+
+// Make sure to abort the background task so that those resources are cleaned up
+// before we drop the handle.
+impl Drop for FinalizedBlocksStream {
+    fn drop(&mut self) { self.handle.abort(); }
+}
+
+impl FinalizedBlocksStream {
+    /// Get the next finalized block in the stream. Or [`None`] if the there are
+    /// no more. This function blocks until a finalized block becomes available.
+    pub async fn next(&mut self) -> Option<FinalizedBlockInfo> { self.receiver.recv().await }
+
+    /// Get the next chunk of blocks. If the finalized block poller has been
+    /// disconnected this will return `Err(blocks)` where `blocks` are the
+    /// finalized blocks that were retrieved before closure. In that case
+    /// all further calls will return `Err(Vec::new())`.
+    ///
+    /// In case of success up to `max(1, n)` elements will be returned. This
+    /// function will block so it always returns at least one element, and
+    /// will retrieve as many elements as it can without blocking further
+    /// once at least one element has been acquired.
+    pub async fn next_chunk(
+        &mut self,
+        n: usize,
+    ) -> Result<Vec<FinalizedBlockInfo>, Vec<FinalizedBlockInfo>> {
+        let mut out = Vec::with_capacity(n);
+        let first = self.receiver.recv().await;
+        match first {
+            Some(v) => out.push(v),
+            None => {
+                return Err(out);
+            }
+        }
+        for _ in 1..n {
+            match self.receiver.try_recv() {
+                Ok(v) => {
+                    out.push(v);
+                }
+                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {
+                    break;
+                }
+                Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return Err(out),
+            }
+        }
+        Ok(out)
     }
 }
 
