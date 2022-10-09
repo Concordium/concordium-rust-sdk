@@ -1,7 +1,7 @@
 //! A simple script to check how many bytes in an address are needed to
 //! distinguish accounts. The script gets the account list from the node.
 use clap::AppSettings;
-use concordium_rust_sdk::{endpoints, id::types::AccountAddress};
+use concordium_rust_sdk::{endpoints::{self, Endpoint}, id::types::AccountAddress};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -11,7 +11,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10000"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: Endpoint,
 }
 
 #[tokio::main(flavor = "multi_thread")]

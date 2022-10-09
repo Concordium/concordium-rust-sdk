@@ -1,9 +1,8 @@
-//! Test the `GetBlockInfo` endpoint.
+//! Example of how to shut down a node via the sdk.
 use anyhow::Context;
 use clap::AppSettings;
-use structopt::StructOpt;
-
 use concordium_rust_sdk::{v2, endpoints::Endpoint};
+use structopt::StructOpt;
 
 #[derive(StructOpt)]
 struct App {
@@ -26,18 +25,9 @@ async fn main() -> anyhow::Result<()> {
     let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
-
-    {
-        let ai = client.get_block_info(&v2::BlockIdentifier::Best).await?;
-        println!("Best block {:#?}", ai);
-    }
-
-    {
-        let ai = client
-            .get_block_info(&v2::BlockIdentifier::LastFinal)
-            .await?;
-        println!("Last finalized {:#?}", ai);
-    }
-
+    client
+        .shutdown()
+        .await
+        .context("Cannot shutdown the node.")?;
     Ok(())
 }

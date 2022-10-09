@@ -4,7 +4,7 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::types::TransactionTime,
-    endpoints,
+    endpoints::{self, Endpoint},
     types::{
         transactions::{update, BlockItem, Payload},
         BlockSummary, ExchangeRate, TransactionStatus, UpdateKeyPair, UpdatePayload,
@@ -20,7 +20,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10000"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: Endpoint,
     #[structopt(
         long = "rpc-token",
         help = "GRPC interface access token for accessing all the nodes.",

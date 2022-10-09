@@ -1,9 +1,8 @@
-//! Test the `GetBlockInfo` endpoint.
+//! Test the `network_dump` feature related endpoints.
 use anyhow::Context;
 use clap::AppSettings;
-use structopt::StructOpt;
-
 use concordium_rust_sdk::{v2, endpoints::Endpoint};
+use structopt::StructOpt;
 
 #[derive(StructOpt)]
 struct App {
@@ -27,17 +26,10 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect.")?;
 
-    {
-        let ai = client.get_block_info(&v2::BlockIdentifier::Best).await?;
-        println!("Best block {:#?}", ai);
-    }
-
-    {
-        let ai = client
-            .get_block_info(&v2::BlockIdentifier::LastFinal)
-            .await?;
-        println!("Last finalized {:#?}", ai);
-    }
-
+    client.dump_start("/some/accessible/path/dump".to_string(), true).await?;
+    println!("Successfully started network dump");
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    client.dump_stop().await?;
+    println!("Successfully stopped network dump.");
     Ok(())
 }

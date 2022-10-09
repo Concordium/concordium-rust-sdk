@@ -1,9 +1,8 @@
-//! Test the `GetBlockInfo` endpoint.
+//! Test the `GetPeersInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use structopt::StructOpt;
-
 use concordium_rust_sdk::{v2, endpoints::Endpoint};
+use structopt::StructOpt;
 
 #[derive(StructOpt)]
 struct App {
@@ -27,17 +26,7 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect.")?;
 
-    {
-        let ai = client.get_block_info(&v2::BlockIdentifier::Best).await?;
-        println!("Best block {:#?}", ai);
-    }
-
-    {
-        let ai = client
-            .get_block_info(&v2::BlockIdentifier::LastFinal)
-            .await?;
-        println!("Last finalized {:#?}", ai);
-    }
-
+    let peers_info = client.get_peers_info().await?;
+    println!("{:#?}", peers_info);
     Ok(())
 }

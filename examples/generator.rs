@@ -5,7 +5,7 @@ use concordium_rust_sdk::{
         types::{Amount, TransactionTime},
         SerdeDeserialize, SerdeSerialize,
     },
-    endpoints,
+    endpoints::{self, Endpoint},
     id::types::{AccountAddress, AccountKeys},
     types::{
         self,
@@ -22,7 +22,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10000"
     )]
-    endpoint:  tonic::transport::Endpoint,
+    endpoint:  Endpoint,
     #[structopt(long = "sender")]
     account:   PathBuf,
     #[structopt(long = "receivers")]

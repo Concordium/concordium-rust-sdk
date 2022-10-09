@@ -1,9 +1,8 @@
-//! Test the `GetBlockInfo` endpoint.
+//! Get the 'NodeInfo' of the given node.
 use anyhow::Context;
 use clap::AppSettings;
+use concordium_rust_sdk::{endpoints, v2};
 use structopt::StructOpt;
-
-use concordium_rust_sdk::{v2, endpoints::Endpoint};
 
 #[derive(StructOpt)]
 struct App {
@@ -12,7 +11,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: Endpoint,
+    endpoint: endpoints::Endpoint,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -25,19 +24,8 @@ async fn main() -> anyhow::Result<()> {
 
     let mut client = v2::Client::new(app.endpoint)
         .await
-        .context("Cannot connect.")?;
-
-    {
-        let ai = client.get_block_info(&v2::BlockIdentifier::Best).await?;
-        println!("Best block {:#?}", ai);
-    }
-
-    {
-        let ai = client
-            .get_block_info(&v2::BlockIdentifier::LastFinal)
-            .await?;
-        println!("Last finalized {:#?}", ai);
-    }
-
+        .context("Cannot connect to the node.")?;
+    let node_info = client.get_node_info().await?;
+    println!("{:#?}", node_info);
     Ok(())
 }

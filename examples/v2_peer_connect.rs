@@ -1,9 +1,10 @@
-//! Test the `GetBlockInfo` endpoint.
+//! Example of how to instruct a node to connect/disconnect to a certain peer
+//! given by its IP and port.
 use anyhow::Context;
 use clap::AppSettings;
+use concordium_rust_sdk::{endpoints, v2};
+use std::net::SocketAddr;
 use structopt::StructOpt;
-
-use concordium_rust_sdk::{v2, endpoints::Endpoint};
 
 #[derive(StructOpt)]
 struct App {
@@ -12,7 +13,9 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: Endpoint,
+    endpoint: endpoints::Endpoint,
+    #[structopt(long = "peer", help = "peer to connect to")]
+    peer:     SocketAddr,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -27,17 +30,12 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect.")?;
 
-    {
-        let ai = client.get_block_info(&v2::BlockIdentifier::Best).await?;
-        println!("Best block {:#?}", ai);
-    }
-
-    {
-        let ai = client
-            .get_block_info(&v2::BlockIdentifier::LastFinal)
-            .await?;
-        println!("Last finalized {:#?}", ai);
-    }
+    client.peer_connect(app.peer).await?;
+    println!("Connected to {:#?}", app.peer);
+    // We wait 10 seconds and drop the peer again.
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    client.peer_disconnect(app.peer).await?;
+    println!("Dropped {:#?}", app.peer);
 
     Ok(())
 }
