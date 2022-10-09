@@ -1984,6 +1984,44 @@ impl TryFrom<ChainParameters> for super::ChainParameters {
     }
 }
 
+impl TryFrom<FinalizationSummaryParty> for super::types::FinalizationSummaryParty {
+    type Error = tonic::Status;
+
+    fn try_from(value: FinalizationSummaryParty) -> Result<Self, Self::Error> {
+        Ok(Self {
+            baker_id: value.baker.require()?.into(),
+            weight:   value.weight,
+            signed:   value.signed,
+        })
+    }
+}
+
+impl From<FinalizationIndex> for super::types::FinalizationIndex {
+    fn from(value: FinalizationIndex) -> Self {
+        value.value.into()
+    }
+}
+
+impl TryFrom<BlockFinalizationSummary> for Option<super::types::FinalizationSummary> {
+    type Error = tonic::Status;
+
+    fn try_from(value: BlockFinalizationSummary) -> Result<Self, Self::Error> {
+        match value.summary.require()? {
+            block_finalization_summary::Summary::None(_) => Ok(None),
+            block_finalization_summary::Summary::Record(r) => Ok(Some(super::types::FinalizationSummary {
+                block_pointer:      r.block.require()?.try_into()?,
+                index:      r.index.require()?.into(),
+                delay:      r.delay.require()?.into(),
+                finalizers: r
+                    .finalizers
+                    .into_iter()
+                    .map(super::types::FinalizationSummaryParty::try_from)
+                    .collect::<Result<_, tonic::Status>>()?,
+            })),
+        }
+    }
+}
+
 impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
     type Error = tonic::Status;
 

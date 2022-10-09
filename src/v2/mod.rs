@@ -5,7 +5,7 @@ use crate::{
         hashes::{BlockHash, TransactionHash},
         smart_contracts::{ContractContext, InstanceInfo, InvokeContractResult, ModuleRef},
         AbsoluteBlockHeight, AccountInfo, BlockItemSummary, CredentialRegistrationID,
-        TransactionStatus,
+        FinalizationSummary, TransactionStatus,
     },
 };
 use concordium_base::{
@@ -942,6 +942,124 @@ impl Client {
             block_hash,
             response,
         })
+    }
+
+    pub async fn get_block_finalization_summary(
+        &mut self,
+        block_id: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<Option<FinalizationSummary>>> {
+        let response = self.client.get_block_finalization_summary(block_id).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = response.into_inner().try_into()?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_finalized_blocks_from(
+        &mut self,
+        start_height: AbsoluteBlockHeight,
+    ) -> endpoints::QueryResult<FinalizedBlocksStream> {
+        let mut fin_height = self.get_consensus_info().await?.last_finalized_block_height;
+        let (sender, receiver) = tokio::sync::mpsc::channel(100);
+        let mut client = self.clone();
+        let handle = tokio::spawn(async move {
+            let mut height = start_height;
+            loop {
+                if height > fin_height {
+                    fin_height = client
+                        .get_consensus_info()
+                        .await?
+                        .last_finalized_block_height;
+                    if height > fin_height {
+                        break;
+                    }
+                } else {
+                    let mut bi = client.get_blocks_at_height(&height.into()).await?;
+                    let block_hash = bi.pop().ok_or(endpoints::QueryError::NotFound)?;
+                    let info = FinalizedBlockInfo { block_hash, height };
+                    if sender.send(info).await.is_err() {
+                        return Ok(());
+                    }
+                    height = height.next();
+                }
+            }
+            let mut stream = client.get_finalized_blocks().await?;
+            while let Some(fbi) = stream.next().await.transpose()? {
+                // recover missed blocks.
+                while height < fbi.height {
+                    let mut bi = client.get_blocks_at_height(&height.into()).await?;
+                    let block_hash = bi.pop().ok_or(endpoints::QueryError::NotFound)?;
+                    let info = FinalizedBlockInfo { block_hash, height };
+                    if sender.send(info).await.is_err() {
+                        return Ok(());
+                    }
+                    height = height.next();
+                }
+                if sender.send(fbi).await.is_err() {
+                    return Ok(());
+                }
+                height = height.next();
+            }
+            Ok(())
+        });
+        Ok(FinalizedBlocksStream { handle, receiver })
+    }
+}
+
+/// A stream of finalized blocks. This contains a background task that polls
+/// for new finalized blocks indefinitely. The task can be stopped by dropping
+/// the object.
+pub struct FinalizedBlocksStream {
+    handle:   tokio::task::JoinHandle<endpoints::QueryResult<()>>,
+    receiver: tokio::sync::mpsc::Receiver<FinalizedBlockInfo>,
+}
+
+// Make sure to abort the background task so that those resources are cleaned up
+// before we drop the handle.
+impl Drop for FinalizedBlocksStream {
+    fn drop(&mut self) { self.handle.abort(); }
+}
+
+impl FinalizedBlocksStream {
+    /// Get the next finalized block in the stream. Or [`None`] if the there are
+    /// no more. This function blocks until a finalized block becomes available.
+    pub async fn next(&mut self) -> Option<FinalizedBlockInfo> { self.receiver.recv().await }
+
+    /// Get the next chunk of blocks. If the finalized block poller has been
+    /// disconnected this will return `Err(blocks)` where `blocks` are the
+    /// finalized blocks that were retrieved before closure. In that case
+    /// all further calls will return `Err(Vec::new())`.
+    ///
+    /// In case of success up to `max(1, n)` elements will be returned. This
+    /// function will block so it always returns at least one element, and
+    /// will retrieve as many elements as it can without blocking further
+    /// once at least one element has been acquired.
+    pub async fn next_chunk(
+        &mut self,
+        n: usize,
+    ) -> Result<Vec<FinalizedBlockInfo>, Vec<FinalizedBlockInfo>> {
+        let mut out = Vec::with_capacity(n);
+        let first = self.receiver.recv().await;
+        match first {
+            Some(v) => out.push(v),
+            None => {
+                return Err(out);
+            }
+        }
+        for _ in 1..n {
+            match self.receiver.try_recv() {
+                Ok(v) => {
+                    out.push(v);
+                }
+                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {
+                    break;
+                }
+                Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return Err(out),
+            }
+        }
+        Ok(out)
     }
 }
 
