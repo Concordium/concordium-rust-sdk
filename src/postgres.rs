@@ -2,9 +2,11 @@ use crate::types::{
     hashes::BlockHash, AbsoluteBlockHeight, BlockItemSummary, ContractAddress,
     SpecialTransactionOutcome,
 };
-use crypto_common::{types::Timestamp, SerdeDeserialize, SerdeSerialize};
+use concordium_base::{
+    common::{types::Timestamp, SerdeDeserialize, SerdeSerialize},
+    id::types::AccountAddress,
+};
 use futures::StreamExt;
-use id::types::AccountAddress;
 use std::convert::TryInto;
 use tokio::task::{JoinError, JoinHandle};
 use tokio_postgres::{
