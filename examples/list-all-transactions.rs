@@ -4,7 +4,7 @@ use anyhow::Context;
 use chrono::Utc;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    endpoints,
+    endpoints::{self, Endpoint},
     types::{
         queries::BlockInfo, AbsoluteBlockHeight, AccountTransactionEffects,
         BlockItemSummaryDetails, BlockSummary, TransactionType,
@@ -20,7 +20,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10000"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: Endpoint,
     #[structopt(
         long = "num",
         help = "How many queries to make in parallel.",

@@ -2,7 +2,7 @@
 //! and total liquid amount of accounts. Additionally list contracts with at
 //! most CCD owned.
 use clap::AppSettings;
-use concordium_rust_sdk::{common::types::Amount, endpoints, types::hashes::BlockHash};
+use concordium_rust_sdk::{common::types::Amount, endpoints::{self, Endpoint}, types::hashes::BlockHash};
 use futures::Future;
 use structopt::StructOpt;
 
@@ -13,7 +13,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10000"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: Endpoint,
     #[structopt(
         long = "block",
         help = "Block to query the data in. Defaults to last finalized block."

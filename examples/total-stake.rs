@@ -2,7 +2,7 @@
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::types::Amount,
-    endpoints,
+    endpoints::{self, Endpoint},
     types::{hashes::BlockHash, BakerPoolStatus, PoolStatus},
 };
 use structopt::StructOpt;
@@ -14,7 +14,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10000"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: Endpoint,
     #[structopt(
         long = "block",
         help = "Block to query the data in. Defaults to last finalized block."

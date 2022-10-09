@@ -2,7 +2,7 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    endpoints,
+    endpoints::{self, Endpoint},
     types::{AbsoluteBlockHeight, AccountInfo},
 };
 use std::{collections::BTreeSet, io::Write, path::PathBuf};
@@ -15,7 +15,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10000"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: Endpoint,
     #[structopt(
         long = "start",
         help = "Timestamp to start at. This is inclusive and defaults to genesis time."

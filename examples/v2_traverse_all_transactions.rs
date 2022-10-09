@@ -3,7 +3,7 @@
 //! the node.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{endpoints, types, v2};
+use concordium_rust_sdk::{endpoints::{self, Endpoint}, types, v2};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -13,13 +13,13 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10000"
     )]
-    endpoint_v1: tonic::transport::Endpoint,
+    endpoint_v1: Endpoint,
     #[structopt(
         long = "node-v2",
         help = "GRPC2 interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint_v2: tonic::transport::Endpoint,
+    endpoint_v2: Endpoint,
     #[structopt(long = "block")]
     start_block: Option<types::hashes::BlockHash>,
 }

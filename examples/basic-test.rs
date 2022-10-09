@@ -2,7 +2,7 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::{SerdeDeserialize, SerdeSerialize},
-    endpoints,
+    endpoints::{self, Endpoint},
     id::types::{AccountAddress, AccountKeys},
     types,
 };
@@ -16,7 +16,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10000"
     )]
-    endpoint:    tonic::transport::Endpoint,
+    endpoint:    Endpoint,
     #[structopt(long = "block")]
     start_block: Option<types::hashes::BlockHash>,
 }

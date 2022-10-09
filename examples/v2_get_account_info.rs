@@ -1,7 +1,7 @@
 //! Test the `GetAccountInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::id::types::AccountAddress;
+use concordium_rust_sdk::{id::types::AccountAddress, endpoints::Endpoint};
 use structopt::StructOpt;
 
 use concordium_rust_sdk::v2;
@@ -13,7 +13,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: Endpoint,
     #[structopt(long = "address", help = "Account address to query.")]
     address:  AccountAddress,
 }

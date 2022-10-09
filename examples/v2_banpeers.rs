@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use anyhow::{ensure, Context};
 use clap::AppSettings;
-use concordium_rust_sdk::{types::network::PeerToBan, v2};
+use concordium_rust_sdk::{types::network::PeerToBan, v2, endpoints::Endpoint};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -13,7 +13,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: Endpoint,
 }
 
 #[tokio::main(flavor = "multi_thread")]
