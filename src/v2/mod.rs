@@ -27,7 +27,7 @@ use concordium_base::{
     contracts_common::{
         AccountAddress, Amount, ContractAddress, OwnedContractName, OwnedReceiveName, ReceiveName,
     },
-    transactions::PayloadLike,
+    transactions::{BlockItem, EncodedPayload, PayloadLike},
     updates::{
         AuthorizationsV0, CooldownParameters, GASRewards, PoolParameters, TimeParameters,
         TransactionFeeDistribution,
@@ -1222,6 +1222,24 @@ impl Client {
             Err(err) => Err(err),
         });
         Ok(stream)
+    }
+
+    pub async fn get_block_items(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<BlockItem<EncodedPayload>, tonic::Status>>>,
+    > {
+        let response = self.client.get_block_items(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(summary) => summary.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
     }
 
     pub async fn get_block_transaction_events(
