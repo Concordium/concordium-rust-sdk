@@ -920,7 +920,7 @@ impl Client {
         Ok(())
     }
 
-    // Try connect to a peer with the provided address.
+    /// Try connect to a peer with the provided address.
     pub async fn peer_connect(&mut self, addr: std::net::SocketAddr) -> endpoints::RPCResult<()> {
         let peer_connection = generated::IpSocketAddress {
             ip:   Some(generated::IpAddress {
@@ -934,7 +934,7 @@ impl Client {
         Ok(())
     }
 
-    // Disconnect a peer at the given address.
+    /// Disconnect a peer at the given address.
     pub async fn peer_disconnect(
         &mut self,
         addr: std::net::SocketAddr,
@@ -1021,7 +1021,16 @@ impl Client {
         Ok(peers_info)
     }
 
-    /// Retrieve [types::NodeInfo] from the node.
+    /// Retrieve information about the node.
+    /// The response contains meta information about the node
+    /// such as the version of the software, the local time of the node etc.
+    /// The response also yields network related information such as the node
+    /// ID, bytes sent/received etc.
+    /// Finally depending on the type of the node (regular node or
+    /// 'bootstrapper') the response also yields baking information if
+    /// the node is configured with baker credentials.
+    /// Bootstrappers do no reveal any consensus information as they do not run
+    /// the consensus protocol.
     pub async fn get_node_info(&mut self) -> endpoints::RPCResult<types::NodeInfo> {
         let response = self
             .client
