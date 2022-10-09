@@ -1,13 +1,39 @@
+use std::collections::HashMap;
+
 use crate::{
-    endpoints,
+    endpoints::{self, QueryError},
+    id,
+    id::types::AccountCredentialMessage,
     types::{
         self, hashes,
-        hashes::{BlockHash, TransactionHash},
-        smart_contracts::{ContractContext, InstanceInfo, InvokeContractResult, ModuleRef},
-        AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, TransactionStatus,
+        hashes::{BlockHash, TransactionHash, TransactionSignHash},
+        smart_contracts::{
+            ContractContext, InstanceInfo, InvokeContractResult, ModuleRef, Parameter, WasmModule,
+        },
+        transactions::{self, InitContractPayload, UpdateContractPayload, UpdateInstruction},
+        AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, Energy, Memo, Nonce,
+        RegisteredData, TransactionStatus, UpdateSequenceNumber,
     },
 };
-use concordium_base::contracts_common::{AccountAddress, Amount, ContractAddress, ReceiveName};
+use concordium_base::{
+    base::{
+        ChainParameterVersion0, ChainParameterVersion1, CredentialsPerBlockLimit,
+        ElectionDifficulty, Epoch, ExchangeRate, MintDistributionV0, MintDistributionV1,
+    },
+    common::{
+        self,
+        types::{TransactionSignature, TransactionTime},
+    },
+    contracts_common::{
+        AccountAddress, Amount, ContractAddress, OwnedContractName, OwnedReceiveName, ReceiveName,
+    },
+    transactions::PayloadLike,
+    updates::{
+        AuthorizationsV0, CooldownParameters, GASRewards, PoolParameters, TimeParameters,
+        TransactionFeeDistribution,
+    },
+};
+
 use futures::{Stream, StreamExt};
 use tonic::IntoRequest;
 
@@ -58,6 +84,115 @@ pub struct FinalizedBlockInfo {
     pub height:     AbsoluteBlockHeight,
 }
 
+#[derive(Debug, Clone)]
+/// Values of chain parameters that can be updated via chain updates.
+/// This applies to protocol version 1-3.
+pub struct ChainParametersV0 {
+    /// Election difficulty for consensus lottery.
+    pub election_difficulty: ElectionDifficulty,
+    /// Euro per energy exchange rate.
+    pub euro_per_energy: ExchangeRate,
+    /// Micro ccd per euro exchange rate.
+    pub micro_ccd_per_euro: ExchangeRate,
+    /// Extra number of epochs before reduction in stake, or baker
+    /// deregistration is completed.
+    pub baker_cooldown_epochs: Epoch,
+    /// The limit for the number of account creations in a block.
+    pub account_creation_limit: CredentialsPerBlockLimit,
+    /// Parameters related to the distribution of newly minted CCD.
+    pub mint_distribution: MintDistributionV0,
+    /// Parameters related to the distribution of transaction fees.
+    pub transaction_fee_distribution: TransactionFeeDistribution,
+    /// Parameters related to the distribution of the GAS account.
+    pub gas_rewards: GASRewards,
+    /// Address of the foundation account.
+    pub foundation_account: AccountAddress,
+    /// Minimum threshold for becoming a baker.
+    pub minimum_threshold_for_baking: Amount,
+    /// Keys allowed to do updates.
+    pub keys: types::UpdateKeysCollection<ChainParameterVersion0>,
+}
+
+#[derive(Debug, Clone)]
+/// Values of chain parameters that can be updated via chain updates.
+/// This applies to protocol version 4 and up.
+pub struct ChainParametersV1 {
+    /// Election difficulty for consensus lottery.
+    pub election_difficulty: ElectionDifficulty,
+    /// Euro per energy exchange rate.
+    pub euro_per_energy: ExchangeRate,
+    /// Micro ccd per euro exchange rate.
+    pub micro_ccd_per_euro: ExchangeRate,
+    pub cooldown_parameters: CooldownParameters,
+    pub time_parameters: TimeParameters,
+    /// The limit for the number of account creations in a block.
+    pub account_creation_limit: CredentialsPerBlockLimit,
+    /// Parameters related to the distribution of newly minted CCD.
+    pub mint_distribution: MintDistributionV1,
+    /// Parameters related to the distribution of transaction fees.
+    pub transaction_fee_distribution: TransactionFeeDistribution,
+    /// Parameters related to the distribution of the GAS account.
+    pub gas_rewards: GASRewards,
+    /// Address of the foundation account.
+    pub foundation_account: AccountAddress,
+    /// Parameters for baker pools.
+    pub pool_parameters: PoolParameters,
+    /// Keys allowed to do updates.
+    pub keys: types::UpdateKeysCollection<ChainParameterVersion1>,
+}
+
+/// Chain parameters. See [`ChainParametersV0`] and [`ChainParametersV1`] for
+/// details. `V0` parameters apply to protocol version `1..=3`, and `V1`
+/// parameters apply to protocol versions `4` and up.
+#[derive(Debug, Clone)]
+pub enum ChainParameters {
+    V0(ChainParametersV0),
+    V1(ChainParametersV1),
+}
+
+impl ChainParameters {
+    /// Get the keys for parameter updates that are common to all versions.
+    pub fn common_update_keys(&self) -> &AuthorizationsV0 {
+        match self {
+            Self::V0(data) => &data.keys.level_2_keys,
+            Self::V1(data) => &data.keys.level_2_keys.v0,
+        }
+    }
+}
+
+impl ChainParameters {
+    /// Compute the exchange rate between `microCCD` and `NRG`.
+    pub fn micro_ccd_per_energy(&self) -> num::rational::Ratio<u128> {
+        let (num, denom) = match self {
+            ChainParameters::V0(v0) => {
+                let x = v0.micro_ccd_per_euro;
+                let y = v0.euro_per_energy;
+                (
+                    u128::from(x.numerator) * u128::from(y.numerator),
+                    u128::from(y.denominator) * u128::from(y.denominator),
+                )
+            }
+            ChainParameters::V1(v1) => {
+                let x = v1.micro_ccd_per_euro;
+                let y = v1.euro_per_energy;
+                (
+                    u128::from(x.numerator) * u128::from(y.numerator),
+                    u128::from(y.denominator) * u128::from(y.denominator),
+                )
+            }
+        };
+        num::rational::Ratio::new(num, denom)
+    }
+
+    /// The foundation account that gets the foundation tax.
+    pub fn foundation_account(&self) -> AccountAddress {
+        match self {
+            ChainParameters::V0(v0) => v0.foundation_account,
+            ChainParameters::V1(v1) => v1.foundation_account,
+        }
+    }
+}
+
 impl From<&BlockIdentifier> for generated::BlockHashInput {
     fn from(bi: &BlockIdentifier) -> Self {
         let block_hash_input = match bi {
@@ -93,6 +228,14 @@ impl From<&AccountAddress> for generated::AccountAddress {
     }
 }
 
+impl From<AccountAddress> for generated::AccountAddress {
+    fn from(addr: AccountAddress) -> Self {
+        generated::AccountAddress {
+            value: common::to_bytes(&addr),
+        }
+    }
+}
+
 impl From<&super::types::Address> for generated::Address {
     fn from(addr: &super::types::Address) -> Self {
         let ty = match addr {
@@ -107,14 +250,10 @@ impl From<&super::types::Address> for generated::Address {
     }
 }
 
-impl From<&ModuleRef> for generated::ModuleRef {
-    fn from(mr: &ModuleRef) -> Self { generated::ModuleRef { value: mr.to_vec() } }
-}
-
-impl From<Amount> for generated::Amount {
-    fn from(a: Amount) -> Self {
-        generated::Amount {
-            value: a.micro_ccd(),
+impl From<&Memo> for generated::Memo {
+    fn from(v: &Memo) -> Self {
+        Self {
+            value: v.as_ref().clone(),
         }
     }
 }
@@ -127,25 +266,19 @@ impl<'a> From<ReceiveName<'a>> for generated::ReceiveName {
     }
 }
 
+impl From<&RegisteredData> for generated::RegisteredData {
+    fn from(v: &RegisteredData) -> Self {
+        Self {
+            value: v.as_ref().clone(),
+        }
+    }
+}
 impl From<&[u8]> for generated::Parameter {
     fn from(a: &[u8]) -> Self { generated::Parameter { value: a.to_vec() } }
 }
 
-impl From<types::Energy> for generated::Energy {
-    fn from(a: types::Energy) -> Self { generated::Energy { value: a.into() } }
-}
-
 impl From<&TransactionHash> for generated::TransactionHash {
     fn from(th: &TransactionHash) -> Self { generated::TransactionHash { value: th.to_vec() } }
-}
-
-impl From<&ContractAddress> for generated::ContractAddress {
-    fn from(ca: &ContractAddress) -> Self {
-        generated::ContractAddress {
-            index:    ca.index,
-            subindex: ca.subindex,
-        }
-    }
 }
 
 impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
@@ -168,6 +301,169 @@ impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
         };
         generated::AccountIdentifierInput {
             account_identifier_input: Some(account_identifier_input),
+        }
+    }
+}
+
+impl From<&ModuleRef> for generated::ModuleRef {
+    fn from(mr: &ModuleRef) -> Self { Self { value: mr.to_vec() } }
+}
+
+impl From<ModuleRef> for generated::ModuleRef {
+    fn from(mr: ModuleRef) -> Self { Self { value: mr.to_vec() } }
+}
+
+impl From<&WasmModule> for generated::VersionedModuleSource {
+    fn from(v: &WasmModule) -> Self {
+        Self {
+            module: Some(match v.version {
+                types::smart_contracts::WasmVersion::V0 => {
+                    generated::versioned_module_source::Module::V0(
+                        generated::versioned_module_source::ModuleSourceV0 {
+                            value: v.source.as_ref().clone(),
+                        },
+                    )
+                }
+                types::smart_contracts::WasmVersion::V1 => {
+                    generated::versioned_module_source::Module::V1(
+                        generated::versioned_module_source::ModuleSourceV1 {
+                            value: v.source.as_ref().clone(),
+                        },
+                    )
+                }
+            }),
+        }
+    }
+}
+
+impl From<&OwnedContractName> for generated::InitName {
+    fn from(v: &OwnedContractName) -> Self {
+        Self {
+            value: v.as_contract_name().get_chain_name().to_string(),
+        }
+    }
+}
+
+impl From<&OwnedReceiveName> for generated::ReceiveName {
+    fn from(v: &OwnedReceiveName) -> Self {
+        Self {
+            value: v.as_receive_name().get_chain_name().to_string(),
+        }
+    }
+}
+
+impl From<&Parameter> for generated::Parameter {
+    fn from(v: &Parameter) -> Self {
+        Self {
+            value: v.as_ref().clone(),
+        }
+    }
+}
+
+impl From<&InitContractPayload> for generated::InitContractPayload {
+    fn from(v: &InitContractPayload) -> Self {
+        Self {
+            amount:     Some(v.amount.into()),
+            module_ref: Some(v.mod_ref.into()),
+            init_name:  Some((&v.init_name).into()),
+            parameter:  Some((&v.param).into()),
+        }
+    }
+}
+
+impl From<&UpdateContractPayload> for generated::UpdateContractPayload {
+    fn from(v: &UpdateContractPayload) -> Self {
+        Self {
+            amount:       Some(v.amount.into()),
+            address:      Some(v.address.into()),
+            receive_name: Some((&v.receive_name).into()),
+            parameter:    Some((&v.message).into()),
+        }
+    }
+}
+
+impl From<&ContractAddress> for generated::ContractAddress {
+    fn from(ca: &ContractAddress) -> Self {
+        Self {
+            index:    ca.index,
+            subindex: ca.subindex,
+        }
+    }
+}
+
+impl From<Nonce> for generated::SequenceNumber {
+    fn from(v: Nonce) -> Self { generated::SequenceNumber { value: v.nonce } }
+}
+
+impl From<UpdateSequenceNumber> for generated::UpdateSequenceNumber {
+    fn from(v: UpdateSequenceNumber) -> Self { generated::UpdateSequenceNumber { value: v.number } }
+}
+
+impl From<Energy> for generated::Energy {
+    fn from(v: Energy) -> Self { generated::Energy { value: v.energy } }
+}
+
+impl From<TransactionTime> for generated::TransactionTime {
+    fn from(v: TransactionTime) -> Self { generated::TransactionTime { value: v.seconds } }
+}
+
+impl From<&Amount> for generated::Amount {
+    fn from(v: &Amount) -> Self { Self { value: v.micro_ccd } }
+}
+
+impl From<Amount> for generated::Amount {
+    fn from(v: Amount) -> Self { Self { value: v.micro_ccd } }
+}
+
+impl
+    From<
+        &AccountCredentialMessage<
+            id::constants::IpPairing,
+            id::constants::ArCurve,
+            id::constants::AttributeKind,
+        >,
+    > for generated::CredentialDeployment
+{
+    fn from(
+        v: &AccountCredentialMessage<
+            id::constants::IpPairing,
+            id::constants::ArCurve,
+            id::constants::AttributeKind,
+        >,
+    ) -> Self {
+        Self {
+            message_expiry: Some(v.message_expiry.into()),
+            payload:        Some(generated::credential_deployment::Payload::RawPayload(
+                common::to_bytes(&v.credential),
+            )),
+        }
+    }
+}
+
+impl From<&UpdateInstruction> for generated::UpdateInstruction {
+    fn from(v: &UpdateInstruction) -> Self {
+        Self {
+            signatures: Some(generated::SignatureMap {
+                signatures: {
+                    let mut hm = HashMap::new();
+                    for (key_idx, sig) in v.signatures.signatures.iter() {
+                        hm.insert(key_idx.index.into(), generated::Signature {
+                            value: sig.sig.to_owned(),
+                        });
+                    }
+                    hm
+                },
+            }),
+            header:     Some(generated::UpdateInstructionHeader {
+                sequence_number: Some(v.header.seq_number.into()),
+                effective_time:  Some(v.header.effective_time.into()),
+                timeout:         Some(v.header.timeout.into()),
+            }),
+            payload:    Some(generated::UpdateInstructionPayload {
+                payload: Some(generated::update_instruction_payload::Payload::RawPayload(
+                    common::to_bytes(&v.payload),
+                )),
+            }),
         }
     }
 }
@@ -240,6 +536,101 @@ impl IntoRequest<generated::AccountIdentifierInput> for &AccountIdentifier {
 impl IntoRequest<generated::AccountAddress> for &AccountAddress {
     fn into_request(self) -> tonic::Request<generated::AccountAddress> {
         tonic::Request::new(self.into())
+    }
+}
+
+impl From<transactions::TransactionHeader> for generated::AccountTransactionHeader {
+    fn from(v: transactions::TransactionHeader) -> Self { (&v).into() }
+}
+
+impl From<&transactions::TransactionHeader> for generated::AccountTransactionHeader {
+    fn from(v: &transactions::TransactionHeader) -> Self {
+        Self {
+            sender:          Some(generated::AccountAddress::from(v.sender)),
+            sequence_number: Some(v.nonce.into()),
+            energy_amount:   Some(v.energy_amount.into()),
+            expiry:          Some(v.expiry.into()),
+        }
+    }
+}
+
+impl From<TransactionSignature> for generated::AccountTransactionSignature {
+    fn from(v: TransactionSignature) -> Self { (&v).into() }
+}
+
+impl From<&TransactionSignature> for generated::AccountTransactionSignature {
+    fn from(v: &TransactionSignature) -> Self {
+        Self {
+            signatures: {
+                let mut cred_map: HashMap<u32, generated::AccountSignatureMap> = HashMap::new();
+                for (cred_idx, sig_map) in v.signatures.iter() {
+                    let mut acc_sig_map: HashMap<u32, generated::Signature> = HashMap::new();
+                    for (key_idx, sig) in sig_map.iter() {
+                        acc_sig_map.insert(key_idx.0.into(), generated::Signature {
+                            value: sig.sig.to_owned(),
+                        });
+                    }
+                    cred_map.insert(cred_idx.index.into(), generated::AccountSignatureMap {
+                        signatures: acc_sig_map,
+                    });
+                }
+                cred_map
+            },
+        }
+    }
+}
+
+impl IntoRequest<generated::PreAccountTransaction>
+    for (&transactions::TransactionHeader, &transactions::Payload)
+{
+    fn into_request(self) -> tonic::Request<generated::PreAccountTransaction> {
+        let request = generated::PreAccountTransaction {
+            header:  Some(self.0.into()),
+            payload: Some(generated::AccountTransactionPayload {
+                payload: Some(generated::account_transaction_payload::Payload::RawPayload(
+                    self.1.encode().into(),
+                )),
+            }),
+        };
+        tonic::Request::new(request)
+    }
+}
+
+impl<P: PayloadLike> IntoRequest<generated::SendBlockItemRequest> for &transactions::BlockItem<P> {
+    fn into_request(self) -> tonic::Request<generated::SendBlockItemRequest> {
+        let request = match self {
+            transactions::BlockItem::AccountTransaction(v) => {
+                generated::SendBlockItemRequest {
+                    block_item: Some(
+                        generated::send_block_item_request::BlockItem::AccountTransaction(
+                            generated::AccountTransaction {
+                                signature: Some((&v.signature).into()),
+                                header:    Some((&v.header).into()),
+                                payload:   {
+                                    let atp = generated::AccountTransactionPayload{
+                                    payload: Some(generated::account_transaction_payload::Payload::RawPayload(v.payload.encode().into())),
+                                };
+                                    Some(atp)
+                                },
+                            },
+                        ),
+                    ),
+                }
+            }
+            transactions::BlockItem::CredentialDeployment(v) => generated::SendBlockItemRequest {
+                block_item: Some(
+                    generated::send_block_item_request::BlockItem::CredentialDeployment(
+                        v.as_ref().into(),
+                    ),
+                ),
+            },
+            transactions::BlockItem::UpdateInstruction(v) => generated::SendBlockItemRequest {
+                block_item: Some(
+                    generated::send_block_item_request::BlockItem::UpdateInstruction(v.into()),
+                ),
+            },
+        };
+        tonic::Request::new(request)
     }
 }
 
@@ -652,6 +1043,83 @@ impl Client {
         Ok(response)
     }
 
+    pub async fn send_block_item<P: PayloadLike>(
+        &mut self,
+        bi: &transactions::BlockItem<P>,
+    ) -> endpoints::RPCResult<TransactionHash> {
+        let response = self.client.send_block_item(bi).await?;
+        let response = TransactionHash::try_from(response.into_inner())?;
+        Ok(response)
+    }
+
+    pub async fn get_account_transaction_sign_hash(
+        &mut self,
+        header: &transactions::TransactionHeader,
+        payload: &transactions::Payload,
+    ) -> endpoints::RPCResult<TransactionSignHash> {
+        let response = self
+            .client
+            .get_account_transaction_sign_hash((header, payload))
+            .await?;
+        let response = TransactionSignHash::try_from(response.into_inner())?;
+        Ok(response)
+    }
+
+    /// Wait until the transaction is finalized. Returns
+    /// [`NotFound`](QueryError::NotFound) in case the transaction is not
+    /// known to the node. In case of success, the return value is a pair of the
+    /// block hash of the block that contains the transactions, and its
+    /// outcome in the block.
+    ///
+    /// Since this can take an indefinite amount of time in general, users of
+    /// this function might wish to wrap it inside
+    /// [`timeout`](tokio::time::timeout) handler and handle the resulting
+    /// failure.
+    pub async fn wait_until_finalized(
+        &mut self,
+        hash: &types::hashes::TransactionHash,
+    ) -> endpoints::QueryResult<(types::hashes::BlockHash, types::BlockItemSummary)> {
+        let hash = *hash;
+        let process_response = |response| {
+            if let types::TransactionStatus::Finalized(blocks) = response {
+                let mut iter = blocks.into_iter();
+                if let Some(rv) = iter.next() {
+                    if iter.next().is_some() {
+                        return Err(tonic::Status::internal(
+                            "Finalized transaction finalized into multiple blocks. This cannot \
+                             happen.",
+                        )
+                        .into());
+                    } else {
+                        return Ok::<_, QueryError>(Some(rv));
+                    }
+                } else {
+                    return Err(tonic::Status::internal(
+                        "Finalized transaction finalized into no blocks. This cannot happen.",
+                    )
+                    .into());
+                }
+            } else {
+                Ok(None)
+            }
+        };
+
+        match process_response(self.get_block_item_status(&hash).await?)? {
+            Some(rv) => Ok(rv),
+            None => {
+                // if the first query did not succeed then start listening for finalized blocks.
+                // and on each new block try to query the status.
+                let mut blocks = self.get_finalized_blocks().await?;
+                while blocks.next().await.transpose()?.is_some() {
+                    if let Some(rv) = process_response(self.get_block_item_status(&hash).await?)? {
+                        return Ok(rv);
+                    }
+                }
+                Err(QueryError::NotFound)
+            }
+        }
+    }
+
     pub async fn invoke_instance(
         &mut self,
         bi: &BlockIdentifier,
@@ -1038,6 +1506,207 @@ impl Client {
             .await?;
         let node_info = types::NodeInfo::try_from(response.into_inner())?;
         Ok(node_info)
+    }
+
+    pub async fn get_block_transaction_events(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::BlockItemSummary, tonic::Status>>>,
+    > {
+        let response = self.client.get_block_transaction_events(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(summary) => summary.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_block_special_events(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::SpecialTransactionOutcome, tonic::Status>>>,
+    > {
+        let response = self.client.get_block_special_events(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(summary) => summary.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_block_pending_updates(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::queries::PendingUpdate, tonic::Status>>>,
+    > {
+        let response = self.client.get_block_pending_updates(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(update) => update.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    pub async fn get_next_update_sequence_numbers(
+        &mut self,
+        block_id: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::queries::NextUpdateSequenceNumbers>> {
+        let response = self
+            .client
+            .get_next_update_sequence_numbers(block_id)
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = types::queries::NextUpdateSequenceNumbers::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_block_chain_parameters(
+        &mut self,
+        block_id: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<ChainParameters>> {
+        let response = self.client.get_block_chain_parameters(block_id).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = ChainParameters::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_block_finalization_summary(
+        &mut self,
+        block_id: &BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<Option<types::FinalizationSummary>>> {
+        let response = self.client.get_block_finalization_summary(block_id).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = response.into_inner().try_into()?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_finalized_blocks_from(
+        &mut self,
+        start_height: AbsoluteBlockHeight,
+    ) -> endpoints::QueryResult<FinalizedBlocksStream> {
+        let mut fin_height = self.get_consensus_info().await?.last_finalized_block_height;
+        let (sender, receiver) = tokio::sync::mpsc::channel(100);
+        let mut client = self.clone();
+        let handle = tokio::spawn(async move {
+            let mut height = start_height;
+            loop {
+                if height > fin_height {
+                    fin_height = client
+                        .get_consensus_info()
+                        .await?
+                        .last_finalized_block_height;
+                    if height > fin_height {
+                        break;
+                    }
+                } else {
+                    let mut bi = client.get_blocks_at_height(&height.into()).await?;
+                    let block_hash = bi.pop().ok_or(endpoints::QueryError::NotFound)?;
+                    let info = FinalizedBlockInfo { block_hash, height };
+                    if sender.send(info).await.is_err() {
+                        return Ok(());
+                    }
+                    height = height.next();
+                }
+            }
+            let mut stream = client.get_finalized_blocks().await?;
+            while let Some(fbi) = stream.next().await.transpose()? {
+                // recover missed blocks.
+                while height < fbi.height {
+                    let mut bi = client.get_blocks_at_height(&height.into()).await?;
+                    let block_hash = bi.pop().ok_or(endpoints::QueryError::NotFound)?;
+                    let info = FinalizedBlockInfo { block_hash, height };
+                    if sender.send(info).await.is_err() {
+                        return Ok(());
+                    }
+                    height = height.next();
+                }
+                if sender.send(fbi).await.is_err() {
+                    return Ok(());
+                }
+                height = height.next();
+            }
+            Ok(())
+        });
+        Ok(FinalizedBlocksStream { handle, receiver })
+    }
+}
+
+/// A stream of finalized blocks. This contains a background task that polls
+/// for new finalized blocks indefinitely. The task can be stopped by dropping
+/// the object.
+pub struct FinalizedBlocksStream {
+    handle:   tokio::task::JoinHandle<endpoints::QueryResult<()>>,
+    receiver: tokio::sync::mpsc::Receiver<FinalizedBlockInfo>,
+}
+
+// Make sure to abort the background task so that those resources are cleaned up
+// before we drop the handle.
+impl Drop for FinalizedBlocksStream {
+    fn drop(&mut self) { self.handle.abort(); }
+}
+
+impl FinalizedBlocksStream {
+    /// Get the next finalized block in the stream. Or [`None`] if the there are
+    /// no more. This function blocks until a finalized block becomes available.
+    pub async fn next(&mut self) -> Option<FinalizedBlockInfo> { self.receiver.recv().await }
+
+    /// Get the next chunk of blocks. If the finalized block poller has been
+    /// disconnected this will return `Err(blocks)` where `blocks` are the
+    /// finalized blocks that were retrieved before closure. In that case
+    /// all further calls will return `Err(Vec::new())`.
+    ///
+    /// In case of success up to `max(1, n)` elements will be returned. This
+    /// function will block so it always returns at least one element, and
+    /// will retrieve as many elements as it can without blocking further
+    /// once at least one element has been acquired.
+    pub async fn next_chunk(
+        &mut self,
+        n: usize,
+    ) -> Result<Vec<FinalizedBlockInfo>, Vec<FinalizedBlockInfo>> {
+        let mut out = Vec::with_capacity(n);
+        let first = self.receiver.recv().await;
+        match first {
+            Some(v) => out.push(v),
+            None => {
+                return Err(out);
+            }
+        }
+        for _ in 1..n {
+            match self.receiver.try_recv() {
+                Ok(v) => {
+                    out.push(v);
+                }
+                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {
+                    break;
+                }
+                Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return Err(out),
+            }
+        }
+        Ok(out)
     }
 }
 
