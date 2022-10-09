@@ -4,12 +4,12 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::types::TransactionTime,
-    endpoints,
+    endpoints::{self, Endpoint},
     types::{
         transactions::{update, BlockItem, Payload},
         BlockSummary, TransactionStatus, UpdateKeyPair, UpdatePayload,
     },
-    v2,
+    v2::{self, BlockIdentifier},
 };
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -17,19 +17,13 @@ use structopt::StructOpt;
 #[derive(StructOpt)]
 struct App {
     #[structopt(
-        long = "node-v1",
-        help = "GRPC v1 interface of the node.",
-        default_value = "http://localhost:10000"
-    )]
-    endpoint_v1: tonic::transport::Endpoint,
-    #[structopt(
-        long = "node-v2",
-        help = "GRPC v2 interface of the node.",
+        long = "node",
+        help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint_v2: tonic::transport::Endpoint,
+    endpoint: Endpoint,
     #[structopt(long = "key", help = "Path to update keys to use.")]
-    keys:        Vec<PathBuf>,
+    keys:     Vec<PathBuf>,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -49,55 +43,36 @@ async fn main() -> anyhow::Result<()> {
         })
         .collect::<anyhow::Result<_>>()?;
 
-    let mut client = v2::Client::new(app.endpoint_v2)
+    let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect to v2")?;
 
     // Get the key indices, as well as the next sequence number from the last
     // finalized block.
-    // TODO: Use v2 client once chain parameter endpoint is implemented.
-    let summary: BlockSummary = {
-        let mut client_v1 = endpoints::Client::connect(app.endpoint_v1, "rpcadmin")
-            .await
-            .context("Cannot connect to v1")?;
-
-        let consensus_status = client_v1
-            .get_consensus_status()
-            .await
-            .context("Could not obtain status of consensus.")?;
-
-        // Get the key indices, as well as the next sequence number from the last
-        // finalized block.
-        client_v1
-            .get_block_summary(&consensus_status.last_finalized_block)
-            .await
-            .context("Could not obtain last finalized block")?
-    };
+    let params = client
+        .get_block_chain_parameters(&BlockIdentifier::LastFinal)
+        .await
+        .context("Could not obtain chain parameters")?;
 
     // find the key indices to sign with
-    let signer = summary
+    let signer = params
+        .response
         .common_update_keys()
-        .construct_update_signer(&summary.common_update_keys().micro_gtu_per_euro, kps)
+        .construct_update_signer(
+            &params.response.common_update_keys().micro_gtu_per_euro,
+            kps,
+        )
         .context("Invalid keys supplied.")?;
 
-    let seq_number = match &summary {
-        BlockSummary::V0 { data, .. } => {
-            data.updates
-                .update_queues
-                .micro_gtu_per_euro
-                .next_sequence_number
-        }
-        BlockSummary::V1 { data, .. } => {
-            data.updates
-                .update_queues
-                .micro_gtu_per_euro
-                .next_sequence_number
-        }
-    };
+    let seq_number = client
+        .get_next_update_sequence_numbers(&params.block_hash.into())
+        .await?
+        .response
+        .micro_ccd_per_euro;
 
-    let exchange_rate = match &summary {
-        BlockSummary::V0 { data, .. } => data.updates.chain_parameters.micro_gtu_per_euro,
-        BlockSummary::V1 { data, .. } => data.updates.chain_parameters.micro_gtu_per_euro,
+    let exchange_rate = match &params.response {
+        v2::ChainParameters::V0(v0) => v0.micro_ccd_per_euro,
+        v2::ChainParameters::V1(v1) => v1.micro_ccd_per_euro,
     };
 
     let effective_time = 0.into(); // immediate effect

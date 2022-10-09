@@ -1,6 +1,8 @@
 #![allow(clippy::large_enum_variant, clippy::enum_variant_names)]
 tonic::include_proto!("concordium.v2");
 
+use crate::types::UpdateKeysCollectionSkeleton;
+
 use super::Require;
 use concordium_base::{
     base,
@@ -1946,19 +1948,24 @@ impl TryFrom<ChainParametersV0> for super::ChainParametersV0 {
 
     fn try_from(value: ChainParametersV0) -> Result<Self, Self::Error> {
         Ok(Self {
-            election_difficulty:          value.election_difficulty.require()?.try_into()?,
-            euro_per_energy:              value.euro_per_energy.require()?.try_into()?,
-            micro_ccd_per_euro:           value.micro_ccd_per_euro.require()?.try_into()?,
-            baker_cooldown_epochs:        value.baker_cooldown_epochs.require()?.into(),
-            account_creation_limit:       value.account_creation_limit.require()?.try_into()?,
-            mint_distribution:            value.mint_distribution.require()?.try_into()?,
+            election_difficulty: value.election_difficulty.require()?.try_into()?,
+            euro_per_energy: value.euro_per_energy.require()?.try_into()?,
+            micro_ccd_per_euro: value.micro_ccd_per_euro.require()?.try_into()?,
+            baker_cooldown_epochs: value.baker_cooldown_epochs.require()?.into(),
+            account_creation_limit: value.account_creation_limit.require()?.try_into()?,
+            mint_distribution: value.mint_distribution.require()?.try_into()?,
             transaction_fee_distribution: value
                 .transaction_fee_distribution
                 .require()?
                 .try_into()?,
-            gas_rewards:                  value.gas_rewards.require()?.try_into()?,
-            foundation_account:           value.foundation_account.require()?.try_into()?,
+            gas_rewards: value.gas_rewards.require()?.try_into()?,
+            foundation_account: value.foundation_account.require()?.try_into()?,
             minimum_threshold_for_baking: value.minimum_threshold_for_baking.require()?.into(),
+            keys: UpdateKeysCollectionSkeleton {
+                root_keys:    value.root_keys.require()?.try_into()?,
+                level_1_keys: value.level1_keys.require()?.try_into()?,
+                level_2_keys: value.level2_keys.require()?.try_into()?,
+            },
         })
     }
 }
@@ -1968,20 +1975,25 @@ impl TryFrom<ChainParametersV1> for super::ChainParametersV1 {
 
     fn try_from(value: ChainParametersV1) -> Result<Self, Self::Error> {
         Ok(Self {
-            election_difficulty:          value.election_difficulty.require()?.try_into()?,
-            euro_per_energy:              value.euro_per_energy.require()?.try_into()?,
-            micro_ccd_per_euro:           value.micro_ccd_per_euro.require()?.try_into()?,
-            pool_parameters:              value.pool_parameters.require()?.try_into()?,
-            account_creation_limit:       value.account_creation_limit.require()?.try_into()?,
-            mint_distribution:            value.mint_distribution.require()?.try_into()?,
+            election_difficulty: value.election_difficulty.require()?.try_into()?,
+            euro_per_energy: value.euro_per_energy.require()?.try_into()?,
+            micro_ccd_per_euro: value.micro_ccd_per_euro.require()?.try_into()?,
+            pool_parameters: value.pool_parameters.require()?.try_into()?,
+            account_creation_limit: value.account_creation_limit.require()?.try_into()?,
+            mint_distribution: value.mint_distribution.require()?.try_into()?,
             transaction_fee_distribution: value
                 .transaction_fee_distribution
                 .require()?
                 .try_into()?,
-            gas_rewards:                  value.gas_rewards.require()?.try_into()?,
-            foundation_account:           value.foundation_account.require()?.try_into()?,
-            time_parameters:              value.time_parameters.require()?.try_into()?,
-            cooldown_parameters:          value.cooldown_parameters.require()?.try_into()?,
+            gas_rewards: value.gas_rewards.require()?.try_into()?,
+            foundation_account: value.foundation_account.require()?.try_into()?,
+            time_parameters: value.time_parameters.require()?.try_into()?,
+            cooldown_parameters: value.cooldown_parameters.require()?.try_into()?,
+            keys: UpdateKeysCollectionSkeleton {
+                root_keys:    value.root_keys.require()?.try_into()?,
+                level_1_keys: value.level1_keys.require()?.try_into()?,
+                level_2_keys: value.level2_keys.require()?.try_into()?,
+            },
         })
     }
 }

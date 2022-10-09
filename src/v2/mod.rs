@@ -17,8 +17,8 @@ use crate::{
 };
 use concordium_base::{
     base::{
-        CredentialsPerBlockLimit, ElectionDifficulty, Epoch, ExchangeRate, MintDistributionV0,
-        MintDistributionV1,
+        ChainParameterVersion0, ChainParameterVersion1, CredentialsPerBlockLimit,
+        ElectionDifficulty, Epoch, ExchangeRate, MintDistributionV0, MintDistributionV1,
     },
     common::{
         self,
@@ -29,7 +29,8 @@ use concordium_base::{
     },
     transactions::PayloadLike,
     updates::{
-        CooldownParameters, GASRewards, PoolParameters, TimeParameters, TransactionFeeDistribution,
+        AuthorizationsV0, CooldownParameters, GASRewards, PoolParameters, TimeParameters,
+        TransactionFeeDistribution,
     },
 };
 
@@ -88,26 +89,28 @@ pub struct FinalizedBlockInfo {
 /// This applies to protocol version 1-3.
 pub struct ChainParametersV0 {
     /// Election difficulty for consensus lottery.
-    pub election_difficulty:          ElectionDifficulty,
+    pub election_difficulty: ElectionDifficulty,
     /// Euro per energy exchange rate.
-    pub euro_per_energy:              ExchangeRate,
+    pub euro_per_energy: ExchangeRate,
     /// Micro ccd per euro exchange rate.
-    pub micro_ccd_per_euro:           ExchangeRate,
+    pub micro_ccd_per_euro: ExchangeRate,
     /// Extra number of epochs before reduction in stake, or baker
     /// deregistration is completed.
-    pub baker_cooldown_epochs:        Epoch,
+    pub baker_cooldown_epochs: Epoch,
     /// The limit for the number of account creations in a block.
-    pub account_creation_limit:       CredentialsPerBlockLimit,
+    pub account_creation_limit: CredentialsPerBlockLimit,
     /// Parameters related to the distribution of newly minted CCD.
-    pub mint_distribution:            MintDistributionV0,
+    pub mint_distribution: MintDistributionV0,
     /// Parameters related to the distribution of transaction fees.
     pub transaction_fee_distribution: TransactionFeeDistribution,
     /// Parameters related to the distribution of the GAS account.
-    pub gas_rewards:                  GASRewards,
+    pub gas_rewards: GASRewards,
     /// Address of the foundation account.
-    pub foundation_account:           AccountAddress,
+    pub foundation_account: AccountAddress,
     /// Minimum threshold for becoming a baker.
     pub minimum_threshold_for_baking: Amount,
+    /// Keys allowed to do updates.
+    pub keys: types::UpdateKeysCollection<ChainParameterVersion0>,
 }
 
 #[derive(Debug, Clone)]
@@ -115,25 +118,27 @@ pub struct ChainParametersV0 {
 /// This applies to protocol version 4 and up.
 pub struct ChainParametersV1 {
     /// Election difficulty for consensus lottery.
-    pub election_difficulty:          ElectionDifficulty,
+    pub election_difficulty: ElectionDifficulty,
     /// Euro per energy exchange rate.
-    pub euro_per_energy:              ExchangeRate,
+    pub euro_per_energy: ExchangeRate,
     /// Micro ccd per euro exchange rate.
-    pub micro_ccd_per_euro:           ExchangeRate,
-    pub cooldown_parameters:          CooldownParameters,
-    pub time_parameters:              TimeParameters,
+    pub micro_ccd_per_euro: ExchangeRate,
+    pub cooldown_parameters: CooldownParameters,
+    pub time_parameters: TimeParameters,
     /// The limit for the number of account creations in a block.
-    pub account_creation_limit:       CredentialsPerBlockLimit,
+    pub account_creation_limit: CredentialsPerBlockLimit,
     /// Parameters related to the distribution of newly minted CCD.
-    pub mint_distribution:            MintDistributionV1,
+    pub mint_distribution: MintDistributionV1,
     /// Parameters related to the distribution of transaction fees.
     pub transaction_fee_distribution: TransactionFeeDistribution,
     /// Parameters related to the distribution of the GAS account.
-    pub gas_rewards:                  GASRewards,
+    pub gas_rewards: GASRewards,
     /// Address of the foundation account.
-    pub foundation_account:           AccountAddress,
+    pub foundation_account: AccountAddress,
     /// Parameters for baker pools.
-    pub pool_parameters:              PoolParameters,
+    pub pool_parameters: PoolParameters,
+    /// Keys allowed to do updates.
+    pub keys: types::UpdateKeysCollection<ChainParameterVersion1>,
 }
 
 /// Chain parameters. See [`ChainParametersV0`] and [`ChainParametersV1`] for
@@ -143,6 +148,16 @@ pub struct ChainParametersV1 {
 pub enum ChainParameters {
     V0(ChainParametersV0),
     V1(ChainParametersV1),
+}
+
+impl ChainParameters {
+    /// Get the keys for parameter updates that are common to all versions.
+    pub fn common_update_keys(&self) -> &AuthorizationsV0 {
+        match self {
+            Self::V0(data) => &data.keys.level_2_keys,
+            Self::V1(data) => &data.keys.level_2_keys.v0,
+        }
+    }
 }
 
 impl ChainParameters {
