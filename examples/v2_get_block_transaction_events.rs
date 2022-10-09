@@ -26,13 +26,20 @@ async fn main() -> anyhow::Result<()> {
     let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
-    let mut response = client
-        .get_block_transaction_events(&v2::BlockIdentifier::LastFinal)
-        .await?;
 
-    println!("Blockhash: {}", response.block_hash);
-    while let Some(a) = response.response.next().await.transpose()? {
-        println!(" - {:#?}", &a);
+    let mut receiver = client.get_finalized_blocks_from(0u64.into()).await?;
+    while let Some(v) = receiver.next().await {
+        let mut response = client
+            .get_block_transaction_events(&v.block_hash.into())
+            .await?;
+        assert_eq!(
+            response.block_hash, v.block_hash,
+            "Querying for a given block should return data for the block."
+        );
+        println!("Blockhash: {}", response.block_hash);
+        while let Some(a) = response.response.next().await.transpose()? {
+            println!(" - {:#?}", &a);
+        }
     }
     Ok(())
 }

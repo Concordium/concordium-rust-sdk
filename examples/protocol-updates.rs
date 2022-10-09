@@ -169,7 +169,7 @@ async fn main() -> anyhow::Result<()> {
             },
             minimum_equity_capital:          Amount::from_ccd(14_000),
             capital_bound:                   "0.1".parse()?,
-            leverage_bound:                  LeverageFactor::new(3),
+            leverage_bound:                  LeverageFactor::new_integral(3),
         },
     };
 
