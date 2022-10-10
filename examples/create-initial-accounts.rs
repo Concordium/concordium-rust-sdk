@@ -8,7 +8,8 @@ use concordium_rust_sdk::{
         self,
         types::{KeyIndex, TransactionTime},
     },
-    endpoints::{self, Endpoint}, id,
+    endpoints::{self, Endpoint},
+    id,
     id::{
         constants::{ArCurve, IpPairing},
         curve_arithmetic::Curve,

@@ -2,9 +2,10 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
+    endpoints::Endpoint,
     smart_contracts::{common, engine},
     types::hashes::BlockHash,
-    v2, endpoints::Endpoint,
+    v2,
 };
 use structopt::StructOpt;
 

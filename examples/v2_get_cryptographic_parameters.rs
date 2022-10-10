@@ -1,7 +1,10 @@
 //! Test the `GetCryptographicParameters` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{v2::{self, BlockIdentifier}, endpoints::Endpoint};
+use concordium_rust_sdk::{
+    endpoints::Endpoint,
+    v2::{self, BlockIdentifier},
+};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]

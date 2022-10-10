@@ -3,7 +3,10 @@
 //! the node.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{endpoints::{self, Endpoint}, types, v2};
+use concordium_rust_sdk::{
+    endpoints::{self, Endpoint},
+    types, v2,
+};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]

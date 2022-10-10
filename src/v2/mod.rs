@@ -27,7 +27,7 @@ use concordium_base::{
     contracts_common::{
         AccountAddress, Amount, ContractAddress, OwnedContractName, OwnedReceiveName, ReceiveName,
     },
-    transactions::PayloadLike,
+    transactions::{BlockItem, EncodedPayload, PayloadLike},
     updates::{
         AuthorizationsV0, CooldownParameters, GASRewards, PoolParameters, TimeParameters,
         TransactionFeeDistribution,
@@ -1085,19 +1085,19 @@ impl Client {
                 let mut iter = blocks.into_iter();
                 if let Some(rv) = iter.next() {
                     if iter.next().is_some() {
-                        return Err(tonic::Status::internal(
+                        Err(tonic::Status::internal(
                             "Finalized transaction finalized into multiple blocks. This cannot \
                              happen.",
                         )
-                        .into());
+                        .into())
                     } else {
-                        return Ok::<_, QueryError>(Some(rv));
+                        Ok::<_, QueryError>(Some(rv))
                     }
                 } else {
-                    return Err(tonic::Status::internal(
+                    Err(tonic::Status::internal(
                         "Finalized transaction finalized into no blocks. This cannot happen.",
                     )
-                    .into());
+                    .into())
                 }
             } else {
                 Ok(None)
@@ -1381,6 +1381,24 @@ impl Client {
             Err(err) => Err(err),
         });
         Ok(stream)
+    }
+
+    pub async fn get_block_items(
+        &mut self,
+        bi: &BlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<BlockItem<EncodedPayload>, tonic::Status>>>,
+    > {
+        let response = self.client.get_block_items(bi).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(summary) => summary.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
     }
 
     pub async fn shutdown(&mut self) -> endpoints::RPCResult<()> {

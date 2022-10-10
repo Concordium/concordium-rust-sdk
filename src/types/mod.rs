@@ -1938,8 +1938,8 @@ pub struct NetworkInfo {
 #[derive(Debug)]
 pub enum NodeConsensusStatus {
     /// The consensus protocol is not running on the node.
-    /// This only occurs when the node does not support the protocol on the chain or the node is a
-    /// 'Bootstrapper'.
+    /// This only occurs when the node does not support the protocol on the
+    /// chain or the node is a 'Bootstrapper'.
     ConsensusNotRunning,
     /// The node is a passive member of the consensus. This means:
     /// * The node is processing blocks.
@@ -1947,13 +1947,14 @@ pub enum NodeConsensusStatus {
     /// * The node is responding to catch up messages from its peers.
     /// * In particular this means that the node is __not__ baking blocks.
     ConsensusPassive,
-    /// The node has been configured with baker keys however it is not currently baking and
-    /// possilby never will.
+    /// The node has been configured with baker keys however it is not currently
+    /// baking and possilby never will.
     NotInCommittee(crate::types::BakerId),
     /// The baker keys are registered however the baker is not in the committee
     /// for the current 'Epoch'.
     AddedButNotActiveInCommittee(crate::types::BakerId),
-    /// The node has been configured with baker keys that does not match the account.
+    /// The node has been configured with baker keys that does not match the
+    /// account.
     AddedButWrongKeys(crate::types::BakerId),
     /// The node is member of the baking committee.
     Baker(crate::types::BakerId),

@@ -1,7 +1,7 @@
 //! Test the `network_dump` feature related endpoints.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{v2, endpoints::Endpoint};
+use concordium_rust_sdk::{endpoints::Endpoint, v2};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -26,7 +26,9 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect.")?;
 
-    client.dump_start("/some/accessible/path/dump".to_string(), true).await?;
+    client
+        .dump_start("/some/accessible/path/dump".to_string(), true)
+        .await?;
     println!("Successfully started network dump");
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
     client.dump_stop().await?;

@@ -1,7 +1,7 @@
 //! Test the `GetAccountInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{id::types::AccountAddress, endpoints::Endpoint};
+use concordium_rust_sdk::{endpoints::Endpoint, id::types::AccountAddress};
 use structopt::StructOpt;
 
 use concordium_rust_sdk::v2;

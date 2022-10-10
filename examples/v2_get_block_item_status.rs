@@ -1,7 +1,7 @@
 /// Test the `BlockItemStatus` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{types::hashes::TransactionHash, endpoints::Endpoint};
+use concordium_rust_sdk::{endpoints::Endpoint, types::hashes::TransactionHash};
 use structopt::StructOpt;
 
 use concordium_rust_sdk::v2;

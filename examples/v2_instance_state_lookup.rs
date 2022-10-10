@@ -1,7 +1,9 @@
 /// Test the `InstanceStateLookup` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{smart_contracts::common, types::hashes::BlockHash, v2, endpoints::Endpoint};
+use concordium_rust_sdk::{
+    endpoints::Endpoint, smart_contracts::common, types::hashes::BlockHash, v2,
+};
 use futures::StreamExt;
 use structopt::StructOpt;
 

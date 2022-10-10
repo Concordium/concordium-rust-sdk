@@ -2,7 +2,11 @@
 //! and total liquid amount of accounts. Additionally list contracts with at
 //! most CCD owned.
 use clap::AppSettings;
-use concordium_rust_sdk::{common::types::Amount, endpoints::{self, Endpoint}, types::hashes::BlockHash};
+use concordium_rust_sdk::{
+    common::types::Amount,
+    endpoints::{self, Endpoint},
+    types::hashes::BlockHash,
+};
 use futures::Future;
 use structopt::StructOpt;
 

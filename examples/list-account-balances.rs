@@ -4,7 +4,8 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::{types::Amount, SerdeSerialize},
-    endpoints::{self, Endpoint}, id,
+    endpoints::{self, Endpoint},
+    id,
     id::types::AccountAddress,
     types::{hashes::BlockHash, AccountStakingInfo, CredentialType},
 };

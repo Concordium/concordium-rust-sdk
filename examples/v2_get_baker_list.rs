@@ -1,7 +1,7 @@
 //! Test the `GetBakerList` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{v2, endpoints::Endpoint};
+use concordium_rust_sdk::{endpoints::Endpoint, v2};
 use futures::StreamExt;
 use structopt::StructOpt;
 

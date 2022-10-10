@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use anyhow::{ensure, Context};
 use clap::AppSettings;
-use concordium_rust_sdk::{types::network::PeerToBan, v2, endpoints::Endpoint};
+use concordium_rust_sdk::{endpoints::Endpoint, types::network::PeerToBan, v2};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]

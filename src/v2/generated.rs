@@ -921,6 +921,235 @@ impl TryFrom<BlockItemStatus> for super::types::TransactionStatus {
     }
 }
 
+impl TryFrom<AccountTransactionPayload> for concordium_base::transactions::EncodedPayload {
+    type Error = tonic::Status;
+
+    fn try_from(value: AccountTransactionPayload) -> Result<Self, Self::Error> {
+        use concordium_base::transactions::PayloadLike;
+        match value.payload.require()? {
+            account_transaction_payload::Payload::RawPayload(rp) => {
+                Self::try_from(rp).map_err(|_| {
+                    tonic::Status::invalid_argument("Payload size exceeds maximum allowed.")
+                })
+            }
+            account_transaction_payload::Payload::DeployModule(dm) => {
+                let module = match dm.module.require()? {
+                    versioned_module_source::Module::V0(source) => {
+                        concordium_base::smart_contracts::WasmModule {
+                            version: concordium_base::smart_contracts::WasmVersion::V0,
+                            source:  source.value.into(),
+                        }
+                    }
+                    versioned_module_source::Module::V1(source) => {
+                        concordium_base::smart_contracts::WasmModule {
+                            version: concordium_base::smart_contracts::WasmVersion::V1,
+                            source:  source.value.into(),
+                        }
+                    }
+                };
+                Ok(concordium_base::transactions::Payload::DeployModule { module }.encode())
+            }
+            account_transaction_payload::Payload::InitContract(ic) => {
+                let payload = concordium_base::transactions::InitContractPayload {
+                    amount:    ic.amount.require()?.into(),
+                    mod_ref:   ic.module_ref.require()?.try_into()?,
+                    init_name: ic.init_name.require()?.try_into()?,
+                    param:     ic.parameter.require()?.try_into()?,
+                };
+                Ok(concordium_base::transactions::Payload::InitContract { payload }.encode())
+            }
+            account_transaction_payload::Payload::UpdateContract(uc) => {
+                let payload = concordium_base::transactions::UpdateContractPayload {
+                    amount:       uc.amount.require()?.into(),
+                    address:      uc.address.require()?.into(),
+                    receive_name: uc.receive_name.require()?.try_into()?,
+                    message:      uc.parameter.require()?.try_into()?,
+                };
+                Ok(concordium_base::transactions::Payload::Update { payload }.encode())
+            }
+            account_transaction_payload::Payload::Transfer(t) => {
+                let payload = concordium_base::transactions::Payload::Transfer {
+                    to_address: t.receiver.require()?.try_into()?,
+                    amount:     t.amount.require()?.into(),
+                };
+                Ok(payload.encode())
+            }
+            account_transaction_payload::Payload::TransferWithMemo(t) => {
+                let payload = concordium_base::transactions::Payload::TransferWithMemo {
+                    to_address: t.receiver.require()?.try_into()?,
+                    amount:     t.amount.require()?.into(),
+                    memo:       t.memo.require()?.try_into()?,
+                };
+                Ok(payload.encode())
+            }
+            account_transaction_payload::Payload::RegisterData(t) => {
+                let payload = concordium_base::transactions::Payload::RegisterData {
+                    data: t.try_into()?,
+                };
+                Ok(payload.encode())
+            }
+        }
+    }
+}
+
+impl TryFrom<Signature> for concordium_base::common::types::Signature {
+    type Error = tonic::Status;
+
+    fn try_from(value: Signature) -> Result<Self, Self::Error> {
+        if value.value.len() <= usize::from(u16::MAX) {
+            Ok(Self { sig: value.value })
+        } else {
+            Err(tonic::Status::invalid_argument("Signature is too large."))
+        }
+    }
+}
+
+impl TryFrom<AccountTransactionSignature> for concordium_base::common::types::TransactionSignature {
+    type Error = tonic::Status;
+
+    fn try_from(value: AccountTransactionSignature) -> Result<Self, Self::Error> {
+        let signatures = value
+            .signatures
+            .into_iter()
+            .map(|(ci, m)| {
+                let ci = u8::try_from(ci)
+                    .map_err(|_| tonic::Status::invalid_argument("Invalid credential index."))?;
+                let cred_sigs = m
+                    .signatures
+                    .into_iter()
+                    .map(|(ki, sig)| {
+                        let ki = u8::try_from(ki)
+                            .map_err(|_| tonic::Status::invalid_argument("Invalid key index."))?;
+                        let sig = sig.try_into()?;
+                        Ok::<_, tonic::Status>((ki.into(), sig))
+                    })
+                    .collect::<Result<_, _>>()?;
+                Ok::<_, tonic::Status>((ci.into(), cred_sigs))
+            })
+            .collect::<Result<_, _>>()?;
+        Ok(Self { signatures })
+    }
+}
+
+impl TryFrom<AccountTransaction>
+    for concordium_base::transactions::AccountTransaction<
+        concordium_base::transactions::EncodedPayload,
+    >
+{
+    type Error = tonic::Status;
+
+    fn try_from(value: AccountTransaction) -> Result<Self, Self::Error> {
+        let payload: concordium_base::transactions::EncodedPayload =
+            value.payload.require()?.try_into()?;
+        let payload_size = payload.size();
+        let header = {
+            let header = value.header.require()?;
+            let sender = header.sender.require()?.try_into()?;
+            let nonce = header.sequence_number.require()?.into();
+            let energy_amount = header.energy_amount.require()?.into();
+            let expiry = header.expiry.require()?.into();
+            concordium_base::transactions::TransactionHeader {
+                sender,
+                nonce,
+                energy_amount,
+                payload_size,
+                expiry,
+            }
+        };
+        Ok(Self {
+            signature: value.signature.require()?.try_into()?,
+            header,
+            payload,
+        })
+    }
+}
+
+impl TryFrom<CredentialDeployment>
+    for crate::id::types::AccountCredentialMessage<
+        crate::id::constants::IpPairing,
+        crate::id::constants::ArCurve,
+        crate::id::constants::AttributeKind,
+    >
+{
+    type Error = tonic::Status;
+
+    fn try_from(value: CredentialDeployment) -> Result<Self, Self::Error> {
+        let message_expiry = value.message_expiry.require()?.into();
+        let credential_deployment::Payload::RawPayload(data) = value.payload.require()?;
+        let credential = consume(&data)?;
+        Ok(Self {
+            message_expiry,
+            credential,
+        })
+    }
+}
+
+impl TryFrom<SignatureMap> for concordium_base::updates::UpdateInstructionSignature {
+    type Error = tonic::Status;
+
+    fn try_from(value: SignatureMap) -> Result<Self, Self::Error> {
+        let signatures = value
+            .signatures
+            .into_iter()
+            .map(|(k, sig)| {
+                let k = u16::try_from(k)
+                    .map_err(|_| tonic::Status::invalid_argument("Update key index too large."))?;
+                let sig = sig.try_into()?;
+                Ok::<_, tonic::Status>((k.into(), sig))
+            })
+            .collect::<Result<_, _>>()?;
+        Ok(Self { signatures })
+    }
+}
+
+impl TryFrom<UpdateInstruction> for concordium_base::updates::UpdateInstruction {
+    type Error = tonic::Status;
+
+    fn try_from(value: UpdateInstruction) -> Result<Self, Self::Error> {
+        let header = value.header.require()?;
+        let update_instruction_payload::Payload::RawPayload(payload) =
+            value.payload.require()?.payload.require()?;
+        let header = concordium_base::updates::UpdateHeader {
+            seq_number:     header.sequence_number.require()?.into(),
+            effective_time: header.effective_time.require()?.into(),
+            timeout:        header.timeout.require()?.into(),
+            payload_size:   (payload.len() as u32).into(), /* as is safe since
+                                                            * this is coming from the node, from
+                                                            * a block */
+        };
+        let signatures: concordium_base::updates::UpdateInstructionSignature =
+            value.signatures.require()?.try_into()?;
+
+        let payload = consume(&payload)?;
+
+        Ok(Self {
+            header,
+            payload,
+            signatures,
+        })
+    }
+}
+
+impl TryFrom<BlockItem>
+    for concordium_base::transactions::BlockItem<concordium_base::transactions::EncodedPayload>
+{
+    type Error = tonic::Status;
+
+    fn try_from(value: BlockItem) -> Result<Self, Self::Error> {
+        match value.block_item.require()? {
+            block_item::BlockItem::AccountTransaction(at) => {
+                Ok(Self::AccountTransaction(at.try_into()?))
+            }
+            block_item::BlockItem::CredentialDeployment(cd) => {
+                Ok(Self::CredentialDeployment(Box::new(cd.try_into()?)))
+            }
+            block_item::BlockItem::UpdateInstruction(ui) => {
+                Ok(Self::UpdateInstruction(ui.try_into()?))
+            }
+        }
+    }
+}
+
 impl TryFrom<BlockItemSummary> for super::types::BlockItemSummary {
     type Error = tonic::Status;
 
@@ -2657,6 +2886,10 @@ impl TryFrom<PendingUpdate> for super::types::queries::PendingUpdate {
 
 impl From<SequenceNumber> for super::types::UpdateSequenceNumber {
     fn from(message: SequenceNumber) -> Self { message.value.into() }
+}
+
+impl From<UpdateSequenceNumber> for super::types::UpdateSequenceNumber {
+    fn from(message: UpdateSequenceNumber) -> Self { message.value.into() }
 }
 
 impl TryFrom<NextUpdateSequenceNumbers> for super::types::queries::NextUpdateSequenceNumbers {
