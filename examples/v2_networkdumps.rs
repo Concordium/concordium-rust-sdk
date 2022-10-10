@@ -1,8 +1,7 @@
-//! Test the `GetAccountList` endpoint.
+//! Test the `network_dump` feature related endpoints.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{endpoints::Endpoint, v2};
-use futures::StreamExt;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -26,12 +25,13 @@ async fn main() -> anyhow::Result<()> {
     let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
-    let mut al = client
-        .get_account_list(&v2::BlockIdentifier::LastFinal)
+
+    client
+        .dump_start("/some/accessible/path/dump".to_string(), true)
         .await?;
-    println!("Blockhash: {}", al.block_hash);
-    while let Some(a) = al.response.next().await {
-        println!("{}", a?);
-    }
+    println!("Successfully started network dump");
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    client.dump_stop().await?;
+    println!("Successfully stopped network dump.");
     Ok(())
 }

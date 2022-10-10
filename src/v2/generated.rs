@@ -1075,10 +1075,8 @@ impl TryFrom<CredentialDeployment>
 
     fn try_from(value: CredentialDeployment) -> Result<Self, Self::Error> {
         let message_expiry = value.message_expiry.require()?.into();
-        let serialized_credential = match value.payload.require()? {
-            credential_deployment::Payload::RawPayload(data) => data,
-        };
-        let credential = consume(&serialized_credential)?;
+        let credential_deployment::Payload::RawPayload(data) = value.payload.require()?;
+        let credential = consume(&data)?;
         Ok(Self {
             message_expiry,
             credential,

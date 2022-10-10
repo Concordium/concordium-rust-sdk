@@ -8,7 +8,8 @@ use concordium_rust_sdk::{
         self,
         types::{KeyIndex, TransactionTime},
     },
-    endpoints, id,
+    endpoints::{self, Endpoint},
+    id,
     id::{
         constants::{ArCurve, IpPairing},
         curve_arithmetic::Curve,
@@ -38,7 +39,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10000"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: Endpoint,
     #[structopt(long = "identity-provider")]
     idp:      PathBuf,
     #[structopt(long = "tps")]

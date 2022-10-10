@@ -1,8 +1,7 @@
-//! Test the `GetAccountList` endpoint.
+//! Test the `GetPeersInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{endpoints::Endpoint, v2};
-use futures::StreamExt;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -26,12 +25,8 @@ async fn main() -> anyhow::Result<()> {
     let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
-    let mut al = client
-        .get_account_list(&v2::BlockIdentifier::LastFinal)
-        .await?;
-    println!("Blockhash: {}", al.block_hash);
-    while let Some(a) = al.response.next().await {
-        println!("{}", a?);
-    }
+
+    let peers_info = client.get_peers_info().await?;
+    println!("{:#?}", peers_info);
     Ok(())
 }

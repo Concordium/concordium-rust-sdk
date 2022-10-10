@@ -9,7 +9,7 @@ use concordium_rust_sdk::{
         types::{Amount, TransactionTime},
         Buffer, Deserial, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
     },
-    endpoints::{self, Client},
+    endpoints::{self, Client, Endpoint},
     types::{
         transactions::{update, BlockItem, Payload},
         AccessStructure, BlockSummary, CommissionRanges, CommissionRates, CooldownParameters,
@@ -27,7 +27,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10000"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: Endpoint,
     #[structopt(
         long = "rpc-token",
         help = "GRPC interface access token for accessing the node.",

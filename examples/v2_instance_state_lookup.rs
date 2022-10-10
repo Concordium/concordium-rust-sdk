@@ -1,7 +1,9 @@
 /// Test the `InstanceStateLookup` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{smart_contracts::common, types::hashes::BlockHash, v2};
+use concordium_rust_sdk::{
+    endpoints::Endpoint, smart_contracts::common, types::hashes::BlockHash, v2,
+};
 use futures::StreamExt;
 use structopt::StructOpt;
 
@@ -12,7 +14,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: Endpoint,
     #[structopt(long = "index", help = "Index of the smart contract to query.")]
     index:    common::ContractIndex,
     #[structopt(long = "block", help = "Hash of the block in which to query.")]

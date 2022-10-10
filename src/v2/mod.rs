@@ -675,6 +675,165 @@ impl IntoRequest<generated::GetPoolDelegatorsRequest> for (&BlockIdentifier, typ
     }
 }
 
+impl TryFrom<crate::v2::generated::BannedPeer> for types::network::BannedPeer {
+    type Error = anyhow::Error;
+
+    fn try_from(value: crate::v2::generated::BannedPeer) -> Result<Self, Self::Error> {
+        Ok(types::network::BannedPeer(
+            <std::net::IpAddr as std::str::FromStr>::from_str(&value.ip_address.require()?.value)?,
+        ))
+    }
+}
+
+impl TryFrom<generated::IpSocketAddress> for std::net::SocketAddr {
+    type Error = anyhow::Error;
+
+    fn try_from(value: generated::IpSocketAddress) -> Result<Self, Self::Error> {
+        Ok(std::net::SocketAddr::new(
+            <std::net::IpAddr as std::str::FromStr>::from_str(&value.ip.require()?.value)?,
+            value.port.require()?.value as u16,
+        ))
+    }
+}
+
+impl IntoRequest<crate::v2::generated::BannedPeer> for &types::network::BannedPeer {
+    fn into_request(self) -> tonic::Request<crate::v2::generated::BannedPeer> {
+        tonic::Request::new(crate::v2::generated::BannedPeer {
+            ip_address: Some(crate::v2::generated::IpAddress {
+                value: self.0.to_string(),
+            }),
+        })
+    }
+}
+
+impl From<generated::PeerId> for types::network::PeerId {
+    fn from(value: generated::PeerId) -> Self { types::network::PeerId(value.value) }
+}
+
+impl TryFrom<generated::PeersInfo> for types::network::PeersInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(peers_info: generated::PeersInfo) -> Result<Self, Self::Error> {
+        // Get information of the peers that the node is connected to.
+        // Note. If one peer contains malformed data then this function does not
+        // return any information about the others.
+        // This should only happen in cases where the sdk and node is not on the same
+        // major version.
+        let peers = peers_info
+            .peers
+            .into_iter()
+            .map(|peer| {
+                // Parse the catchup status of the peer.
+                let peer_consensus_info = match peer.consensus_info.require()? {
+                    generated::peers_info::peer::ConsensusInfo::Bootstrapper(_) => {
+                        types::network::PeerConsensusInfo::Bootstrapper
+                    }
+                    generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(0) => {
+                        types::network::PeerConsensusInfo::Node(
+                            types::network::PeerCatchupStatus::UpToDate,
+                        )
+                    }
+                    generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(1) => {
+                        types::network::PeerConsensusInfo::Node(
+                            types::network::PeerCatchupStatus::Pending,
+                        )
+                    }
+                    generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(2) => {
+                        types::network::PeerConsensusInfo::Node(
+                            types::network::PeerCatchupStatus::CatchingUp,
+                        )
+                    }
+                    _ => anyhow::bail!("Malformed catchup status from peer."),
+                };
+                // Parse the network statistics for the peer.
+                let stats = peer.network_stats.require()?;
+                let network_stats = types::network::NetworkStats {
+                    packets_sent:     stats.packets_sent,
+                    packets_received: stats.packets_received,
+                    latency:          stats.latency,
+                };
+                Ok(types::network::Peer {
+                    peer_id: peer.peer_id.require()?.into(),
+                    consensus_info: peer_consensus_info,
+                    network_stats,
+                    addr: peer.socket_address.require()?.try_into()?,
+                })
+            })
+            .collect::<anyhow::Result<Vec<types::network::Peer>>>()?;
+        Ok(types::network::PeersInfo { peers })
+    }
+}
+
+impl TryFrom<generated::node_info::NetworkInfo> for types::NetworkInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(network_info: generated::node_info::NetworkInfo) -> Result<Self, Self::Error> {
+        Ok(types::NetworkInfo {
+            node_id:             network_info.node_id.require()?.value,
+            peer_total_sent:     network_info.peer_total_sent,
+            peer_total_received: network_info.peer_total_received,
+            avg_bps_in:          network_info.avg_bps_in,
+            avg_bps_out:         network_info.avg_bps_out,
+        })
+    }
+}
+
+impl IntoRequest<crate::v2::generated::PeerToBan> for types::network::PeerToBan {
+    fn into_request(self) -> tonic::Request<crate::v2::generated::PeerToBan> {
+        tonic::Request::new(match self {
+            types::network::PeerToBan::IpAddr(ip_addr) => crate::v2::generated::PeerToBan {
+                ip_address: Some(crate::v2::generated::IpAddress {
+                    value: ip_addr.to_string(),
+                }),
+            },
+        })
+    }
+}
+
+impl TryFrom<generated::NodeInfo> for types::NodeInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(node_info: generated::NodeInfo) -> Result<Self, Self::Error> {
+        let version = semver::Version::parse(&node_info.peer_version)?;
+        let local_time = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
+            + chrono::Duration::milliseconds(node_info.local_time.require()?.value as i64);
+        let uptime = types::DurationSeconds::from(node_info.peer_uptime.require()?.value).into();
+        let network_info = node_info.network_info.require()?.try_into()?;
+        let details = match node_info.details.require()? {
+            generated::node_info::Details::Bootstrapper(_) => types::NodeDetails::Bootstrapper,
+            generated::node_info::Details::Node(status) => {
+                let consensus_status = match status.consensus_status.require()? {
+                    generated::node_info::node::ConsensusStatus::NotRunning(_) => {
+                        types::NodeConsensusStatus::ConsensusNotRunning
+                    }
+                    generated::node_info::node::ConsensusStatus::Passive(_) => {
+                        types::NodeConsensusStatus::ConsensusPassive
+                    }
+                    generated::node_info::node::ConsensusStatus::Active(baker) => {
+                        let baker_id = baker.baker_id.require()?.into();
+                        match baker.status.require()? {
+                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(0) => types::NodeConsensusStatus::NotInCommittee(baker_id),
+                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(1) => types::NodeConsensusStatus::AddedButNotActiveInCommittee(baker_id),
+                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(2) => types::NodeConsensusStatus::AddedButWrongKeys(baker_id),
+                            generated::node_info::baker_consensus_info::Status::ActiveBakerCommitteeInfo(_) => types::NodeConsensusStatus::Baker(baker_id),
+                            generated::node_info::baker_consensus_info::Status::ActiveFinalizerCommitteeInfo(_) => types::NodeConsensusStatus::Finalizer(baker_id),
+                            _ => anyhow::bail!("Malformed baker status")
+                        }
+                    }
+                };
+                types::NodeDetails::Node(consensus_status)
+            }
+        };
+        Ok(types::NodeInfo {
+            version,
+            local_time,
+            uptime,
+            network_info,
+            details,
+        })
+    }
+}
+
 impl Client {
     pub async fn new<E: Into<tonic::transport::Endpoint>>(
         endpoint: E,
@@ -926,19 +1085,19 @@ impl Client {
                 let mut iter = blocks.into_iter();
                 if let Some(rv) = iter.next() {
                     if iter.next().is_some() {
-                        return Err(tonic::Status::internal(
+                        Err(tonic::Status::internal(
                             "Finalized transaction finalized into multiple blocks. This cannot \
                              happen.",
                         )
-                        .into());
+                        .into())
                     } else {
-                        return Ok::<_, QueryError>(Some(rv));
+                        Ok::<_, QueryError>(Some(rv))
                     }
                 } else {
-                    return Err(tonic::Status::internal(
+                    Err(tonic::Status::internal(
                         "Finalized transaction finalized into no blocks. This cannot happen.",
                     )
-                    .into());
+                    .into())
                 }
             } else {
                 Ok(None)
@@ -1240,6 +1399,131 @@ impl Client {
             block_hash,
             response: stream,
         })
+    }
+
+    pub async fn shutdown(&mut self) -> endpoints::RPCResult<()> {
+        self.client.shutdown(generated::Empty::default()).await?;
+        Ok(())
+    }
+
+    /// Try connect to a peer with the provided address.
+    pub async fn peer_connect(&mut self, addr: std::net::SocketAddr) -> endpoints::RPCResult<()> {
+        let peer_connection = generated::IpSocketAddress {
+            ip:   Some(generated::IpAddress {
+                value: addr.ip().to_string(),
+            }),
+            port: Some(generated::Port {
+                value: addr.port() as u32,
+            }),
+        };
+        self.client.peer_connect(peer_connection).await?;
+        Ok(())
+    }
+
+    /// Disconnect a peer at the given address.
+    pub async fn peer_disconnect(
+        &mut self,
+        addr: std::net::SocketAddr,
+    ) -> endpoints::RPCResult<()> {
+        let peer_connection = generated::IpSocketAddress {
+            ip:   Some(generated::IpAddress {
+                value: addr.ip().to_string(),
+            }),
+            port: Some(generated::Port {
+                value: addr.port() as u32,
+            }),
+        };
+        self.client.peer_disconnect(peer_connection).await?;
+        Ok(())
+    }
+
+    /// Get a vector of the banned peers.
+    pub async fn get_banned_peers(
+        &mut self,
+    ) -> endpoints::RPCResult<Vec<super::types::network::BannedPeer>> {
+        Ok(self
+            .client
+            .get_banned_peers(generated::Empty::default())
+            .await?
+            .into_inner()
+            .peers
+            .into_iter()
+            .map(super::types::network::BannedPeer::try_from)
+            .collect::<anyhow::Result<Vec<super::types::network::BannedPeer>>>()?)
+    }
+
+    /// Ban a peer
+    /// Returns whether the peer was banned or not.
+    pub async fn ban_peer(
+        &mut self,
+        peer_to_ban: super::types::network::PeerToBan,
+    ) -> endpoints::RPCResult<()> {
+        self.client.ban_peer(peer_to_ban).await?;
+        Ok(())
+    }
+
+    /// Unban a peer
+    /// Returns whether the peer was unbanned or not.
+    pub async fn unban_peer(
+        &mut self,
+        banned_peer: &super::types::network::BannedPeer,
+    ) -> endpoints::RPCResult<()> {
+        self.client.unban_peer(banned_peer).await?;
+        Ok(())
+    }
+
+    /// Start a network dump if the feature is enabled on the node.
+    /// Return true if a network dump has been initiated.
+    ///
+    /// * file - The file to write to.
+    /// * raw - Whether raw packets should be included in the dump or not.
+    ///
+    /// Note. If the feature 'network_dump' is not enabled on the node then this
+    /// will return a 'Precondition failed' error.
+    pub async fn dump_start(&mut self, file: String, raw: bool) -> endpoints::RPCResult<()> {
+        self.client
+            .dump_start(generated::DumpRequest { file, raw })
+            .await?;
+        Ok(())
+    }
+
+    /// Stop an ongoing network dump.
+    /// Return true if it was successfully stopped otherwise false.
+    ///
+    /// Note. If the feature 'network_dump' is not enabled on the node then this
+    /// will return a 'Precondition failed' error.
+    pub async fn dump_stop(&mut self) -> endpoints::RPCResult<()> {
+        self.client.dump_stop(generated::Empty::default()).await?;
+        Ok(())
+    }
+
+    /// Retrieve information about the peers that the node is connected to.
+    pub async fn get_peers_info(&mut self) -> endpoints::RPCResult<types::network::PeersInfo> {
+        let response = self
+            .client
+            .get_peers_info(generated::Empty::default())
+            .await?;
+        let peers_info = types::network::PeersInfo::try_from(response.into_inner())?;
+        Ok(peers_info)
+    }
+
+    /// Retrieve information about the node.
+    /// The response contains meta information about the node
+    /// such as the version of the software, the local time of the node etc.
+    /// The response also yields network related information such as the node
+    /// ID, bytes sent/received etc.
+    /// Finally depending on the type of the node (regular node or
+    /// 'bootstrapper') the response also yields baking information if
+    /// the node is configured with baker credentials.
+    /// Bootstrappers do no reveal any consensus information as they do not run
+    /// the consensus protocol.
+    pub async fn get_node_info(&mut self) -> endpoints::RPCResult<types::NodeInfo> {
+        let response = self
+            .client
+            .get_node_info(generated::Empty::default())
+            .await?;
+        let node_info = types::NodeInfo::try_from(response.into_inner())?;
+        Ok(node_info)
     }
 
     pub async fn get_block_transaction_events(

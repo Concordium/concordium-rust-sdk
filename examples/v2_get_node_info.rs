@@ -1,8 +1,7 @@
-//! Test the `GetAccountList` endpoint.
+//! Get the 'NodeInfo' of the given node.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{endpoints::Endpoint, v2};
-use futures::StreamExt;
+use concordium_rust_sdk::{endpoints, v2};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -12,7 +11,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: Endpoint,
+    endpoint: endpoints::Endpoint,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -25,13 +24,8 @@ async fn main() -> anyhow::Result<()> {
 
     let mut client = v2::Client::new(app.endpoint)
         .await
-        .context("Cannot connect.")?;
-    let mut al = client
-        .get_account_list(&v2::BlockIdentifier::LastFinal)
-        .await?;
-    println!("Blockhash: {}", al.block_hash);
-    while let Some(a) = al.response.next().await {
-        println!("{}", a?);
-    }
+        .context("Cannot connect to the node.")?;
+    let node_info = client.get_node_info().await?;
+    println!("{:#?}", node_info);
     Ok(())
 }

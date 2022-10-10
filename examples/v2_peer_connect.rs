@@ -1,8 +1,9 @@
-//! Test the `GetAccountList` endpoint.
+//! Example of how to instruct a node to connect/disconnect to a certain peer
+//! given by its IP and port.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{endpoints::Endpoint, v2};
-use futures::StreamExt;
+use concordium_rust_sdk::{endpoints, v2};
+use std::net::SocketAddr;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -12,7 +13,9 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: Endpoint,
+    endpoint: endpoints::Endpoint,
+    #[structopt(long = "peer", help = "peer to connect to")]
+    peer:     SocketAddr,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -26,12 +29,13 @@ async fn main() -> anyhow::Result<()> {
     let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
-    let mut al = client
-        .get_account_list(&v2::BlockIdentifier::LastFinal)
-        .await?;
-    println!("Blockhash: {}", al.block_hash);
-    while let Some(a) = al.response.next().await {
-        println!("{}", a?);
-    }
+
+    client.peer_connect(app.peer).await?;
+    println!("Connected to {:#?}", app.peer);
+    // We wait 10 seconds and drop the peer again.
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    client.peer_disconnect(app.peer).await?;
+    println!("Dropped {:#?}", app.peer);
+
     Ok(())
 }
