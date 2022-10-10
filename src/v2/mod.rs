@@ -37,6 +37,7 @@ use concordium_base::{
 use futures::{Stream, StreamExt};
 use tonic::IntoRequest;
 
+mod conversions;
 mod generated;
 
 #[derive(Clone, Debug)]
