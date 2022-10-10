@@ -7,7 +7,7 @@ various aspects of the chain and the node itself.
 
 ## Minimum supported Rust version
 
-The current minimal version is 1.56. A MSRV bump will be accompanied by a minor
+The current minimal version is 1.57. A MSRV bump will be accompanied by a minor
 version bump of the SDK.
 
 ## Add it to your project

@@ -16,7 +16,7 @@ on:
 
 env:
   RUST_FMT: nightly-2022-06-09-x86_64-unknown-linux-gnu
-  RUST_VERSION: 1.56
+  RUST_VERSION: 1.57
 
 jobs:
   "lint_fmt":
@@ -44,17 +44,15 @@ jobs:
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     steps:
-      - name: Install system packages
+      - name: Install protobuf
         run: |
-          sudo apt-get update
-          sudo apt-get -y install protobuf-compiler
+          wget https://github.com/protocolbuffers/protobuf/releases/download/v3.15.3/protoc-3.15.3-linux-x86_64.zip
+          unzip protoc-3.15.3-linux-x86_64.zip
+          sudo mv ./bin/protoc /usr/bin/protoc
       - name: Checkout
         uses: actions/checkout@v2
         with:
           submodules: recursive
-      - name: Install system packages
-        run: |
-          sudo apt-get update && sudo apt-get -y install protobuf-compiler
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -74,15 +72,13 @@ jobs:
     steps:
       - name: Install system packages
         run: |
-          sudo apt-get update
-          sudo apt-get -y install protobuf-compiler
+          wget https://github.com/protocolbuffers/protobuf/releases/download/v3.15.3/protoc-3.15.3-linux-x86_64.zip
+          unzip protoc-3.15.3-linux-x86_64.zip
+          sudo mv ./bin/protoc /usr/bin/protoc
       - name: Checkout
         uses: actions/checkout@v2
         with:
           submodules: recursive
-      - name: Install system packages
-        run: |
-          sudo apt-get update && sudo apt-get -y install protobuf-compiler
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:

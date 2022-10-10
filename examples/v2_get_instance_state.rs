@@ -38,7 +38,7 @@ async fn main() -> anyhow::Result<()> {
         .block
         .map_or(v2::BlockIdentifier::LastFinal, v2::BlockIdentifier::Given);
     let al = client
-        .get_instance_state(common::ContractAddress::new(app.index, 0u64.into()), &block)
+        .get_instance_state(common::ContractAddress::new(app.index, 0u64), &block)
         .await?;
     println!("{}", al.block_hash);
     // reconstruct the state from the key-value pairs.
