@@ -12,8 +12,11 @@ pub use crate::generated_types::PeerStatsResponse;
 pub use concordium_base::base::*;
 use concordium_base::{
     common::{
+        self,
+        derive::Serialize,
         types::{Amount, CredentialIndex, Timestamp, TransactionTime},
-        SerdeDeserialize, SerdeSerialize, Versioned,
+        Buffer, Deserial, Get, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
+        Versioned,
     },
     id::{
         constants::{ArCurve, AttributeKind},
@@ -1572,9 +1575,30 @@ pub struct UpdateKeysCollectionSkeleton<Auths> {
     pub level_2_keys: Auths,
 }
 
+impl<Auths: Serial> Serial for UpdateKeysCollectionSkeleton<Auths> {
+    fn serial<B: Buffer>(&self, out: &mut B) {
+        self.root_keys.serial(out);
+        self.level_1_keys.serial(out);
+        self.level_2_keys.serial(out);
+    }
+}
+
+impl<Auths: Deserial> Deserial for UpdateKeysCollectionSkeleton<Auths> {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let root_keys = source.get()?;
+        let level_1_keys = source.get()?;
+        let level_2_keys = source.get()?;
+        Ok(Self {
+            root_keys,
+            level_1_keys,
+            level_2_keys,
+        })
+    }
+}
+
 pub type UpdateKeysCollection<CPV> = UpdateKeysCollectionSkeleton<Authorizations<CPV>>;
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Serialize, Debug, SerdeSerialize, SerdeDeserialize)]
 #[serde(rename_all = "camelCase")]
 /// Values of chain parameters that can be updated via chain updates.
 pub struct ChainParametersV0 {
@@ -1598,7 +1622,7 @@ pub struct ChainParametersV0 {
     pub minimum_threshold_for_baking: Amount,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(Serialize, Debug, SerdeSerialize, SerdeDeserialize)]
 #[serde(rename_all = "camelCase")]
 /// Values of chain parameters that can be updated via chain updates.
 pub struct ChainParametersV1 {
@@ -1646,6 +1670,27 @@ pub struct RewardParametersSkeleton<MD> {
     pub transaction_fee_distribution: TransactionFeeDistribution,
     #[serde(rename = "gASRewards")]
     pub gas_rewards:                  GASRewards,
+}
+
+impl<MD: common::Serial> common::Serial for RewardParametersSkeleton<MD> {
+    fn serial<B: Buffer>(&self, out: &mut B) {
+        self.mint_distribution.serial(out);
+        self.transaction_fee_distribution.serial(out);
+        self.gas_rewards.serial(out)
+    }
+}
+
+impl<MD: common::Deserial> common::Deserial for RewardParametersSkeleton<MD> {
+    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
+        let mint_distribution = source.get()?;
+        let transaction_fee_distribution = source.get()?;
+        let gas_rewards = source.get()?;
+        Ok(Self {
+            mint_distribution,
+            transaction_fee_distribution,
+            gas_rewards,
+        })
+    }
 }
 
 pub type RewardParameters<CPV> = RewardParametersSkeleton<MintDistribution<CPV>>;
