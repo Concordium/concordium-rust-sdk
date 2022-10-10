@@ -812,7 +812,7 @@ impl Client {
     /// Invoke a contract in the given context and get the response.
     /// Note that this is purely node-local transient operation and no
     /// transaction or payment is involved. Use
-    /// [`send_transaction`](Self::send_transaction) if you need to update
+    /// [`send_block_item`](Self::send_block_item) if you need to update
     /// the state of the contract on the chain.
     pub async fn invoke_contract(
         &mut self,
