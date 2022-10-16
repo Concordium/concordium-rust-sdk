@@ -3,20 +3,19 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::{
-        derive::Serialize, to_bytes, Buffer, Deserial, ParseResult, ReadBytesExt, SerdeDeserialize,
-        SerdeSerialize, Serial,
+        base16_encode_string,
+        derive::Serialize,
+        to_bytes,
+        types::{Amount, TransactionTime},
+        Buffer, Deserial, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
     },
-    endpoints::{self, Client},
+    endpoints::{self, Client, Endpoint},
     types::{
         transactions::{update, BlockItem, Payload},
         AccessStructure, BlockSummary, CommissionRanges, CommissionRates, CooldownParameters,
         Epoch, InclusiveRange, LeverageFactor, OpenStatus, PoolParameters, ProtocolUpdate,
         ProtocolVersion, TimeParameters, UpdateKeyPair, UpdatePayload,
     },
-};
-use crypto_common::{
-    base16_encode_string,
-    types::{Amount, TransactionTime},
 };
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -28,7 +27,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10000"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: Endpoint,
     #[structopt(
         long = "rpc-token",
         help = "GRPC interface access token for accessing the node.",
@@ -170,7 +169,7 @@ async fn main() -> anyhow::Result<()> {
             },
             minimum_equity_capital:          Amount::from_ccd(14_000),
             capital_bound:                   "0.1".parse()?,
-            leverage_bound:                  LeverageFactor::new(3),
+            leverage_bound:                  LeverageFactor::new_integral(3),
         },
     };
 

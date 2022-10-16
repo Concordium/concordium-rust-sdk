@@ -3,12 +3,12 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    common::SerdeSerialize,
-    endpoints,
+    common::{types::Amount, SerdeSerialize},
+    endpoints::{self, Endpoint},
+    id,
     id::types::AccountAddress,
     types::{hashes::BlockHash, AccountStakingInfo, CredentialType},
 };
-use crypto_common::types::Amount;
 use serde::Serializer;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -20,7 +20,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10000"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: Endpoint,
     #[structopt(
         long = "block",
         help = "Block to query the data in. Defaults to last finalized block."

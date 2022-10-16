@@ -1,8 +1,8 @@
 //! This module contains types and functions for interacting with smart
 //! contracts following the [CIS-2](https://proposals.concordium.software/CIS/cis-2.html) specification.
 //!
-//! The type [Cis2Contract](Cis2Contract) act as a wrapper around the
-//! [Client](crate::endpoints::Client) and a contract address providing
+//! The type [`Cis2Contract`](crate::cis2::Cis2Contract) act as a wrapper around
+//! the [Client](crate::endpoints::Client) and a contract address providing
 //! functions for querying and making transactions to smart contract.
 mod types;
 
@@ -161,7 +161,9 @@ impl Cis2Contract {
                 amount: transaction_metadata.amount,
                 address: self.address,
                 receive_name,
-                message: smart_contracts::Parameter::from(bytes),
+                message: smart_contracts::Parameter::try_from(bytes).map_err(|_| {
+                    Cis2TransactionError::InvalidTransferParams(NewTransferParamsError)
+                })?,
             },
         };
         let tx = transactions::send::make_and_sign_transaction(
@@ -209,7 +211,9 @@ impl Cis2Contract {
                 amount: transaction_metadata.amount,
                 address: self.address,
                 receive_name,
-                message: smart_contracts::Parameter::from(bytes),
+                message: smart_contracts::Parameter::try_from(bytes).map_err(|_| {
+                    Cis2TransactionError::InvalidUpdateOperatorParams(NewUpdateOperatorParamsError)
+                })?,
             },
         };
         let tx = transactions::send::make_and_sign_transaction(
@@ -251,7 +255,9 @@ impl Cis2Contract {
             contract:  self.address,
             amount:    common::types::Amount::from_micro_ccd(0),
             method:    receive_name,
-            parameter: smart_contracts::Parameter::from(bytes),
+            parameter: smart_contracts::Parameter::try_from(bytes).map_err(|_| {
+                Cis2QueryError::InvalidBalanceOfParams(NewBalanceOfQueryParamsError)
+            })?,
             energy:    smart_contracts::MAX_ALLOWED_INVOKE_ENERGY,
         };
 
@@ -299,7 +305,9 @@ impl Cis2Contract {
             contract:  self.address,
             amount:    common::types::Amount::from_micro_ccd(0),
             method:    receive_name,
-            parameter: smart_contracts::Parameter::from(bytes),
+            parameter: smart_contracts::Parameter::try_from(bytes).map_err(|_| {
+                Cis2QueryError::InvalidOperatorOfParams(NewOperatorOfQueryParamsError)
+            })?,
             energy:    smart_contracts::MAX_ALLOWED_INVOKE_ENERGY,
         };
 
@@ -349,7 +357,9 @@ impl Cis2Contract {
             contract:  self.address,
             amount:    common::types::Amount::from_micro_ccd(0),
             method:    receive_name,
-            parameter: smart_contracts::Parameter::from(bytes),
+            parameter: smart_contracts::Parameter::try_from(bytes).map_err(|_| {
+                Cis2QueryError::InvalidTokenMetadataParams(NewTokenMetadataQueryParamsError)
+            })?,
             energy:    smart_contracts::MAX_ALLOWED_INVOKE_ENERGY,
         };
 

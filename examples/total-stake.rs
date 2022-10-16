@@ -1,10 +1,10 @@
 //! List total equity, total delegated stake, and effective stake.
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    endpoints,
-    types::{hashes::BlockHash, PoolStatus},
+    common::types::Amount,
+    endpoints::{self, Endpoint},
+    types::{hashes::BlockHash, BakerPoolStatus, PoolStatus},
 };
-use crypto_common::types::Amount;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -14,7 +14,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10000"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: Endpoint,
     #[structopt(
         long = "block",
         help = "Block to query the data in. Defaults to last finalized block."
@@ -48,8 +48,11 @@ async fn main() -> anyhow::Result<()> {
     for baker in birk_params.bakers {
         let pool = client.get_pool_status(Some(baker.baker_id), &block).await?;
         if let PoolStatus::BakerPool {
-            current_payday_status: Some(current_payday_status),
-            ..
+            status:
+                BakerPoolStatus {
+                    current_payday_status: Some(current_payday_status),
+                    ..
+                },
         } = pool
         {
             active_bakers += 1;

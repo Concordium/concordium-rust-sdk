@@ -2,7 +2,7 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    endpoints,
+    endpoints::{self, Endpoint},
     types::{
         queries::BlockInfo, AbsoluteBlockHeight, BlockItemSummary, BlockItemSummaryDetails,
         BlockSummary, CredentialType,
@@ -17,7 +17,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10000"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: Endpoint,
     #[structopt(
         long = "num",
         help = "Number of parallel queries to make.",
