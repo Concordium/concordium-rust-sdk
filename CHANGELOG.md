@@ -14,6 +14,8 @@
 - Implement `FromStr` for `OwnedReceiveName`.
 - Remove the `From<Vec<u8>>` implementation for `Parameter`. Instead a `TryFrom` is
   provided that checks the length.
+- Add support for the node's GRPC V2 interface.
+- Bump minimum supported Rust version to 1.57.
 
 ## 1.1.0
 
