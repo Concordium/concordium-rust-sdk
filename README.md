@@ -38,7 +38,7 @@ The core structure of the SDK is the
 which maintains a connection to the node and supports querying the node and
 sending messages to it. This client is cheaply clonable.
 
-The `Client` is constructed using the [connect](http://developer.concordium.software/concordium-rust-sdk/concordium_rust_sdk/v2/struct.Client.html#method.new) method.
+The `Client` is constructed using the [new](http://developer.concordium.software/concordium-rust-sdk/concordium_rust_sdk/v2/struct.Client.html#method.new) method.
 
 ```rust
 use concordium_rust_sdk::*;
