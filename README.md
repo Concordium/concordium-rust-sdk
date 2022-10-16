@@ -46,7 +46,7 @@ use concordium_rust_sdk::*;
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
     // Establish a connection to the node running locally and listening on port 20000
-    let mut client = v2::Client::new("http://localhost:20000"").await?;
+    let mut client = v2::Client::new(v2::Endpoint::from_str("http://localhost:20000")?).await?;
 
     // Query consensus information and print it as JSON
     let consensus_info = client.get_consensus_info().await?;
