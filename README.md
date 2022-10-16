@@ -100,3 +100,23 @@ cargo build --release --example $NAME
 
 where `$NAME` is the name of the file (without the `.rs` extension). The name of
 the file, and its header should briefly explain what the example does
+
+
+## Migration from V1 to V2
+
+The endpoints in V1 and V2 APIs for the most part mirror each other. However
+some endpoints were split in the V2 API to make it possible to only query data
+that is commonly needed faster. The main differences are
+
+- The `V1` endpoint `get_block_summary` has been split into
+  - `get_block_events` (for transaction events, i.e., outcomes of transactions
+    sent by users)
+  - `get_block_special_events` (for special events such as CCD minting, and delegation/baker rewards)
+  - `get_chain_parameters` for chain parameters
+  - `get_update_next_sequence_numbers` for sequence numbers of update instructions
+  - `get_finalization_summary` for the details of finalization records in a
+    block.
+
+- The node information has been consolidated into two endpoints,
+  `get_node_info`, and `get_peers_info`, the latter of which now returns both
+  the list of peers and their details.

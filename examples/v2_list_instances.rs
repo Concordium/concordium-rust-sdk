@@ -53,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
 
     instances
         .response
-        .map_err(|e| anyhow::anyhow!("RPC error: {e}"))
+        .map_err(|e| anyhow::anyhow!("RPC error: {}", e))
         .try_for_each_concurrent(Some(app.num), |ia| {
             let mut client = client.clone();
             let v0_instances = v0_instances.clone();
