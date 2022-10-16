@@ -1,8 +1,9 @@
-use std::collections::HashMap;
+//! This module exposes [Client](v2::Client) which is a wrapper around the
+//! generated gRPC rust client, providing a more ergonomic interface than the
+//! generated client. See [Client](v2::Client) for documentation of how to use.
 
 use crate::{
-    endpoints::{self, QueryError},
-    id,
+    endpoints, id,
     id::types::AccountCredentialMessage,
     types::{
         self, hashes,
@@ -33,28 +34,64 @@ use concordium_base::{
         TransactionFeeDistribution,
     },
 };
-
+pub use endpoints::{QueryError, QueryResult, RPCError, RPCResult};
 use futures::{Stream, StreamExt};
+use std::collections::HashMap;
 use tonic::IntoRequest;
+pub use tonic::{transport::Endpoint, Status};
 
 mod conversions;
 mod generated;
 
-#[derive(Clone, Debug)]
-/// Client that can perform queries.
+/// A client for gRPC API v2 of the Concordium node. Can be used to control the
+/// node, send transactions and query information about the node and the state
+/// of the chain.
+///
+/// # Connecting to a Concordium node
+///
+/// Creates a new client connection to a Concordium node.
+/// Make sure to have access to the gRPC API v2 endpoint of a running node.
+///
+/// ```no_run
+/// # tokio_test::block_on(async {
+/// use concordium_rust_sdk::v2::{Client, Endpoint};
+/// use std::str::FromStr;
+///
+/// // Assumes the node is running locally and gRPC API v2 can be accessed on port 20001.
+/// let node_endpoint = Endpoint::from_str("http://localhost:20001")?;
+/// let mut client = Client::new(node_endpoint).await?;
+///
+/// // Verify the connection to the node by printing node information.
+/// let node_info = client.get_node_info().await?;
+/// println!("{:#?}", node_info);
+/// # Ok::<(), anyhow::Error>(())
+/// # });
+/// ```
+///
+/// # Concurrent use of the client
+///
 /// All endpoints take a `&mut self` as an argument which means that a single
 /// instance cannot be used concurrently. However instead of putting the Client
 /// behind a Mutex, the intended way to use it is to clone it. Cloning is very
 /// cheap and will reuse the underlying connection.
+#[derive(Clone, Debug)]
 pub struct Client {
     client: generated::queries_client::QueriesClient<tonic::transport::Channel>,
 }
 
+/// A query response with the addition of the block hash used by the query.
+/// The block hash used for querying might be unknown when providing the block
+/// as [BlockIdentifier::Best] or [BlockIdentifier::LastFinal].
 #[derive(Clone, Copy, Debug)]
 pub struct QueryResponse<A> {
     /// Block hash for which the query applies.
     pub block_hash: BlockHash,
+    /// The result of the query.
     pub response:   A,
+}
+
+impl<A> AsRef<A> for QueryResponse<A> {
+    fn as_ref(&self) -> &A { &self.response }
 }
 
 /// A block identifier used in queries.
@@ -69,6 +106,7 @@ pub enum BlockIdentifier {
     Given(BlockHash),
 }
 
+/// An account identifier used in queries.
 #[derive(Copy, Clone, Debug, derive_more::From)]
 pub enum AccountIdentifier {
     /// Identify an account by an address.
@@ -79,9 +117,12 @@ pub enum AccountIdentifier {
     Index(crate::types::AccountIndex),
 }
 
+/// Information of a finalized block.
 #[derive(Copy, Clone, Debug)]
 pub struct FinalizedBlockInfo {
+    /// The block hash for the finalized block.
     pub block_hash: BlockHash,
+    /// The absolute block height for the finalized block.
     pub height:     AbsoluteBlockHeight,
 }
 
@@ -836,6 +877,23 @@ impl TryFrom<generated::NodeInfo> for types::NodeInfo {
 }
 
 impl Client {
+    /// Construct a new client connection to a concordium node.
+    ///
+    /// # Example
+    /// Creates a new client. Note the example assumes access to a local running
+    /// node.
+    ///
+    /// ```no_run
+    /// # tokio_test::block_on(async {
+    /// use concordium_rust_sdk::{endpoints::Endpoint, v2::Client};
+    /// use std::str::FromStr;
+    ///
+    /// let node_endpoint = Endpoint::from_str("http://localhost:20001")?;
+    /// let mut client = Client::new(node_endpoint).await?;
+    ///
+    /// # Ok::<(), anyhow::Error>(())
+    /// # });
+    /// ```
     pub async fn new<E: Into<tonic::transport::Endpoint>>(
         endpoint: E,
     ) -> Result<Self, tonic::transport::Error> {
@@ -843,6 +901,9 @@ impl Client {
         Ok(Self { client })
     }
 
+    /// Get the information for the given account in the given block. If either
+    /// the block or the account do not exist [`QueryError::NotFound`] is
+    /// returned.
     pub async fn get_account_info(
         &mut self,
         acc: &AccountIdentifier,
@@ -857,6 +918,8 @@ impl Client {
         })
     }
 
+    /// Get the next sequence number for the account, with information on how
+    /// reliable the information is.
     pub async fn get_next_account_sequence_number(
         &mut self,
         account_address: &AccountAddress,
@@ -869,6 +932,8 @@ impl Client {
         Ok(response)
     }
 
+    /// Get information about the current state of consensus. This is an
+    /// overview of the node's current view of the chain.
     pub async fn get_consensus_info(
         &mut self,
     ) -> endpoints::QueryResult<types::queries::ConsensusInfo> {
@@ -880,6 +945,8 @@ impl Client {
         Ok(response)
     }
 
+    /// Get the currently used cryptographic parameters. If the block does
+    /// not exist [`QueryError::NotFound`] is returned.
     pub async fn get_cryptographic_parameters(
         &mut self,
         bi: &BlockIdentifier,
@@ -893,6 +960,10 @@ impl Client {
         })
     }
 
+    /// Get the list of accounts in the given block.
+    /// The stream will end when all accounts that exist in the state at the end
+    /// of the given block have been returned. If the block does not exist
+    /// [`QueryError::NotFound`] is returned.
     pub async fn get_account_list(
         &mut self,
         bi: &BlockIdentifier,
@@ -908,6 +979,10 @@ impl Client {
         })
     }
 
+    /// Get a list of all smart contract modules. The stream will end
+    /// when all modules that exist in the state at the end of the given
+    /// block have been returned.
+    /// If the block does not exist [`QueryError::NotFound`] is returned.
     pub async fn get_module_list(
         &mut self,
         bi: &BlockIdentifier,
@@ -922,6 +997,9 @@ impl Client {
         })
     }
 
+    /// Get the source of a smart contract module.
+    /// If the block or module does not exist [`QueryError::NotFound`] is
+    /// returned.
     pub async fn get_module_source(
         &mut self,
         module_ref: &ModuleRef,
@@ -936,6 +1014,10 @@ impl Client {
         })
     }
 
+    /// Get the list of smart contract instances in a given block.
+    /// The stream will end when all instances that exist in the state at the
+    /// end of the given block have been returned. If the block does not
+    /// exist [`QueryError::NotFound`] is returned.
     pub async fn get_instance_list(
         &mut self,
         bi: &BlockIdentifier,
@@ -951,6 +1033,9 @@ impl Client {
         })
     }
 
+    /// Get information about a smart contract instance as it appears at the end
+    /// of the given block. If the block or instance does not exist
+    /// [`QueryError::NotFound`] is returned.
     pub async fn get_instance_info(
         &mut self,
         address: ContractAddress,
@@ -965,13 +1050,16 @@ impl Client {
         })
     }
 
+    /// Get a stream of ancestors for the provided block.
+    /// Starting with the provided block itself, moving backwards until no more
+    /// ancestors or the requested number of ancestors have been returned.
     pub async fn get_ancestors(
         &mut self,
         bi: &BlockIdentifier,
-        amount: u64,
+        limit: u64,
     ) -> endpoints::QueryResult<QueryResponse<impl Stream<Item = Result<BlockHash, tonic::Status>>>>
     {
-        let response = self.client.get_ancestors((bi, amount)).await?;
+        let response = self.client.get_ancestors((bi, limit)).await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|x| x.and_then(TryFrom::try_from));
         Ok(QueryResponse {
@@ -980,6 +1068,13 @@ impl Client {
         })
     }
 
+    /// Return a stream of blocks that are finalized from the time the query is
+    /// made onward.
+    /// This can be used to listen for newly finalized blocks.
+    ///
+    /// Note: There is no guarantee that blocks will not be skipped if the
+    /// client is too slow in processing the stream, however blocks will
+    /// always be sent by increasing block height.
     pub async fn get_finalized_blocks(
         &mut self,
     ) -> endpoints::QueryResult<impl Stream<Item = Result<FinalizedBlockInfo, tonic::Status>>> {
@@ -998,6 +1093,11 @@ impl Client {
         Ok(stream)
     }
 
+    /// Get the exact state of a specific contract instance, streamed as a list
+    /// of key-value pairs. The list is streamed in lexicographic order of
+    /// keys.
+    /// If the block or instance does not exist [`QueryError::NotFound`] is
+    /// returned.
     pub async fn get_instance_state(
         &mut self,
         ca: ContractAddress,
@@ -1021,6 +1121,11 @@ impl Client {
         })
     }
 
+    /// Get the value at a specific key of a contract state. In contrast to
+    /// [`get_instance_state`](Self::get_instance_state) this is more efficient,
+    /// but requires the user to know the specific key to look for.
+    /// If the block or instance does not exist [`QueryError::NotFound`] is
+    /// returned.
     pub async fn instance_state_lookup(
         &mut self,
         ca: ContractAddress,
@@ -1035,6 +1140,9 @@ impl Client {
         })
     }
 
+    /// Get the status of and information about a specific block item
+    /// (transaction). If the block item does not exist
+    /// [`QueryError::NotFound`] is returned.
     pub async fn get_block_item_status(
         &mut self,
         th: &TransactionHash,
@@ -1044,6 +1152,12 @@ impl Client {
         Ok(response)
     }
 
+    /// Send a block item. A block item is either an `AccountTransaction`, which
+    /// is a transaction signed and paid for by an account, a
+    /// `CredentialDeployment`, which creates a new account, or
+    /// `UpdateInstruction`, which is an instruction to change some
+    /// parameters of the chain. Update instructions can only be sent by the
+    /// governance committee.
     pub async fn send_block_item<P: PayloadLike>(
         &mut self,
         bi: &transactions::BlockItem<P>,
@@ -1053,6 +1167,27 @@ impl Client {
         Ok(response)
     }
 
+    /// Send an account transaction. This is just a helper around
+    /// [`send_block_item`](Self::send_block_item) block item for convenience.
+    pub async fn send_account_transaction<P: PayloadLike>(
+        &mut self,
+        at: transactions::AccountTransaction<P>,
+    ) -> endpoints::RPCResult<TransactionHash> {
+        self.send_block_item(&at.into()).await
+    }
+
+    /// Get the hash to be signed for an account transaction from the node. The
+    /// hash returned can then be used for signing when constructing
+    /// [`TransactionSignature`] as part of calling [`Client::send_block_item`].
+    ///
+    /// This is provided as a convenience to support cases where the right SDK
+    /// is not available for interacting with the node.
+    ///
+    /// This SDK can compute the hash off-line and it is not recommended to use
+    /// this endpoint, instead use [`compute_transaction_sign_hash`].
+    ///
+    /// [`compute_transaction_sign_hash`]:
+    /// types::transactions::compute_transaction_sign_hash
     pub async fn get_account_transaction_sign_hash(
         &mut self,
         header: &transactions::TransactionHeader,
@@ -1121,6 +1256,9 @@ impl Client {
         }
     }
 
+    /// Run the smart contract instance entrypoint in a given context and in the
+    /// state at the end of the given block and return the results.
+    /// If the block does not exist [`QueryError::NotFound`] is returned.
     pub async fn invoke_instance(
         &mut self,
         bi: &BlockIdentifier,
@@ -1135,6 +1273,9 @@ impl Client {
         })
     }
 
+    /// Get information, such as height, timings, and transaction counts for the
+    /// given block. If the block does not exist [`QueryError::NotFound`] is
+    /// returned.
     pub async fn get_block_info(
         &mut self,
         bi: &BlockIdentifier,
@@ -1148,6 +1289,8 @@ impl Client {
         })
     }
 
+    /// Get all the bakers at the end of the given block.
+    /// If the block does not exist [`QueryError::NotFound`] is returned.
     pub async fn get_baker_list(
         &mut self,
         bi: &BlockIdentifier,
@@ -1163,6 +1306,9 @@ impl Client {
         })
     }
 
+    /// Get information about a given pool at the end of a given block.
+    /// If the block or baker ID does not exist [`QueryError::NotFound`] is
+    /// returned.
     pub async fn get_pool_info(
         &mut self,
         block_id: &BlockIdentifier,
@@ -1177,6 +1323,9 @@ impl Client {
         })
     }
 
+    /// Get information about the passive delegators at the end of a given
+    /// block. If the block does not exist [`QueryError::NotFound`] is
+    /// returned.
     pub async fn get_passive_delegation_info(
         &mut self,
         block_id: &BlockIdentifier,
@@ -1190,6 +1339,7 @@ impl Client {
         })
     }
 
+    /// Get a list of live blocks at a given height.
     pub async fn get_blocks_at_height(
         &mut self,
         blocks_at_height_input: &endpoints::BlocksAtHeightInput,
@@ -1207,6 +1357,8 @@ impl Client {
         Ok(blocks)
     }
 
+    /// Get information about tokenomics at the end of a given block.
+    /// If the block does not exist [`QueryError::NotFound`] is returned.
     pub async fn get_tokenomics_info(
         &mut self,
         block_id: &BlockIdentifier,
@@ -1220,6 +1372,16 @@ impl Client {
         })
     }
 
+    /// Get the registered delegators of a given pool at the end of a given
+    /// block. If the block or baker ID does not exist [`QueryError::NotFound`]
+    /// is returned. The stream will end when all the delegators have been
+    /// returned for the given block.
+    ///
+    /// In contrast to the [Client::get_pool_delegators_reward_period] which
+    /// returns delegators that are fixed for the reward period of the
+    /// block, this endpoint returns the list of delegators that are
+    /// registered in the block. Any changes to delegators are immediately
+    /// visible in this list.
     pub async fn get_pool_delegators(
         &mut self,
         bi: &BlockIdentifier,
@@ -1239,6 +1401,15 @@ impl Client {
         })
     }
 
+    /// Get the fixed delegators of a given pool for the reward period of the
+    /// given block. If the block or baker ID does not exist
+    /// [`QueryError::NotFound`] is returned. The stream will end when all the
+    /// delegators have been returned.
+    ///
+    /// In contracts to the [Client::get_pool_delegators] which
+    /// returns delegators registered for the given block, this endpoint
+    /// returns the fixed delegators contributing stake in the reward period
+    /// containing the given block.
     pub async fn get_pool_delegators_reward_period(
         &mut self,
         bi: &BlockIdentifier,
@@ -1261,6 +1432,15 @@ impl Client {
         })
     }
 
+    /// Get the registered passive delegators at the end of a given block. If
+    /// the block does not exist [`QueryError::NotFound`] is returned. The
+    /// stream will end when all the delegators have been returned.
+    ///
+    /// In contrast to the [`Client::get_passive_delegators_reward_period`]
+    /// which returns delegators that are fixed for the reward period of the
+    /// block, this endpoint returns the list of delegators that are
+    /// registered in the block. Any changes to delegators are immediately
+    /// visible in this list.
     pub async fn get_passive_delegators(
         &mut self,
         bi: &BlockIdentifier,
@@ -1279,6 +1459,15 @@ impl Client {
         })
     }
 
+    /// Get the fixed passive delegators for the reward period of the given
+    /// block. If the block does not exist [`QueryError::NotFound`] is
+    /// returned. The stream will end when all the delegators have been
+    /// returned.
+    ///
+    /// In contracts to the `GetPassiveDelegators` which returns delegators
+    /// registered for the given block, this endpoint returns the fixed
+    /// delegators contributing stake in the reward period containing the
+    /// given block.
     pub async fn get_passive_delegators_reward_period(
         &mut self,
         bi: &BlockIdentifier,
@@ -1297,6 +1486,12 @@ impl Client {
         })
     }
 
+    /// Get the current branches of blocks starting from and including the last
+    /// finalized block.
+    ///
+    /// Branches are all live blocks that are successors of the last finalized
+    /// block. In particular this means that blocks which do not have a
+    /// parent are not included in this response.
     pub async fn get_branches(&mut self) -> endpoints::QueryResult<types::queries::Branch> {
         let response = self
             .client
@@ -1306,6 +1501,8 @@ impl Client {
         Ok(response)
     }
 
+    /// Get information related to the baker election for a particular block.
+    /// If the block does not exist [`QueryError::NotFound`] is returned.
     pub async fn get_election_info(
         &mut self,
         bi: &BlockIdentifier,
@@ -1319,6 +1516,9 @@ impl Client {
         })
     }
 
+    /// Get the identity providers registered as of the end of a given block.
+    /// If the block does not exist [`QueryError::NotFound`] is returned.
+    /// The stream will end when all the identity providers have been returned.
     pub async fn get_identity_providers(
         &mut self,
         bi: &BlockIdentifier,
@@ -1344,6 +1544,9 @@ impl Client {
         })
     }
 
+    /// Get the list of anonymity revokers in the given block.
+    /// If the block does not exist [`QueryError::NotFound`] is returned.
+    /// The stream will end when all the anonymity revokers have been returned.
     pub async fn get_anonymity_revokers(
         &mut self,
         bi: &BlockIdentifier,
@@ -1369,6 +1572,15 @@ impl Client {
         })
     }
 
+    /// Get the list of transactions hashes for transactions that claim to be
+    /// from the given account, but which are not yet finalized.
+    /// They are either committed to a block or still pending.
+    /// The stream will end when all the non-finalized transaction hashes have
+    /// been returned. If the account does not exist an empty list will be
+    /// returned.
+    ///
+    /// This endpoint is not expected to return a large amount of data in most
+    /// cases, but in bad network condtions it might.
     pub async fn get_account_non_finalized_transactions(
         &mut self,
         account_address: &AccountAddress,
@@ -1384,6 +1596,10 @@ impl Client {
         Ok(stream)
     }
 
+    /// Get the block items included in a given block.
+    /// If the block does not exist [`QueryError::NotFound`] is returned.
+    /// The stream will end when all the block items in the given block have
+    /// been returned.
     pub async fn get_block_items(
         &mut self,
         bi: &BlockIdentifier,
@@ -1402,12 +1618,20 @@ impl Client {
         })
     }
 
+    /// Shut down the node.
+    /// Return a GRPC error if the shutdown failed.
     pub async fn shutdown(&mut self) -> endpoints::RPCResult<()> {
         self.client.shutdown(generated::Empty::default()).await?;
         Ok(())
     }
 
-    /// Try connect to a peer with the provided address.
+    /// Suggest a peer to connect to the submitted peer details.
+    /// This, if successful, adds the peer to the list of given addresses.
+    /// Otherwise return a GRPC error.
+    ///
+    /// Note: The peer might not be connected to instantly, in that case
+    /// the node will try to establish the connection in near future. This
+    /// function returns a GRPC status 'Ok' in this case.
     pub async fn peer_connect(&mut self, addr: std::net::SocketAddr) -> endpoints::RPCResult<()> {
         let peer_connection = generated::IpSocketAddress {
             ip:   Some(generated::IpAddress {
@@ -1421,7 +1645,9 @@ impl Client {
         Ok(())
     }
 
-    /// Disconnect a peer at the given address.
+    /// Disconnect from the peer and remove them from the given addresses list
+    /// if they are on it. Return if the request was processed successfully.
+    /// Otherwise return a GRPC error.
     pub async fn peer_disconnect(
         &mut self,
         addr: std::net::SocketAddr,
@@ -1453,8 +1679,9 @@ impl Client {
             .collect::<anyhow::Result<Vec<super::types::network::BannedPeer>>>()?)
     }
 
-    /// Ban a peer
-    /// Returns whether the peer was banned or not.
+    /// Ban a peer.
+    /// When successful return `Ok(())`, and otherwise return an error
+    /// describing the issue.
     pub async fn ban_peer(
         &mut self,
         peer_to_ban: super::types::network::PeerToBan,
@@ -1463,8 +1690,9 @@ impl Client {
         Ok(())
     }
 
-    /// Unban a peer
-    /// Returns whether the peer was unbanned or not.
+    /// Unban a peer.
+    /// When successful return `Ok(())`, and otherwise return an error
+    /// describing the issue.
     pub async fn unban_peer(
         &mut self,
         banned_peer: &super::types::network::BannedPeer,
@@ -1474,22 +1702,38 @@ impl Client {
     }
 
     /// Start a network dump if the feature is enabled on the node.
-    /// Return true if a network dump has been initiated.
+    /// This writes all the network packets into the given file.
+    /// Return `Ok(())` if a network dump has been initiated, and an error
+    /// otherwise.
     ///
     /// * file - The file to write to.
     /// * raw - Whether raw packets should be included in the dump or not.
     ///
     /// Note. If the feature 'network_dump' is not enabled on the node then this
     /// will return a 'Precondition failed' error.
-    pub async fn dump_start(&mut self, file: String, raw: bool) -> endpoints::RPCResult<()> {
+    pub async fn dump_start(
+        &mut self,
+        file: &std::path::Path,
+        raw: bool,
+    ) -> endpoints::RPCResult<()> {
+        let file_str = file.to_str().ok_or_else(|| {
+            tonic::Status::invalid_argument(
+                "The provided path cannot is not a valid UTF8 string, so cannot be used.",
+            )
+        })?;
+
         self.client
-            .dump_start(generated::DumpRequest { file, raw })
+            .dump_start(generated::DumpRequest {
+                file: file_str.to_string(),
+                raw,
+            })
             .await?;
         Ok(())
     }
 
     /// Stop an ongoing network dump.
-    /// Return true if it was successfully stopped otherwise false.
+    /// Return nothing if it was successfully stopped, and otherwise return an
+    /// error.
     ///
     /// Note. If the feature 'network_dump' is not enabled on the node then this
     /// will return a 'Precondition failed' error.
@@ -1498,7 +1742,8 @@ impl Client {
         Ok(())
     }
 
-    /// Retrieve information about the peers that the node is connected to.
+    /// Get a list of the peers that the node is connected to and associated
+    /// network related information for each peer.
     pub async fn get_peers_info(&mut self) -> endpoints::RPCResult<types::network::PeersInfo> {
         let response = self
             .client
@@ -1511,11 +1756,14 @@ impl Client {
     /// Retrieve information about the node.
     /// The response contains meta information about the node
     /// such as the version of the software, the local time of the node etc.
+    ///
     /// The response also yields network related information such as the node
     /// ID, bytes sent/received etc.
+    ///
     /// Finally depending on the type of the node (regular node or
     /// 'bootstrapper') the response also yields baking information if
     /// the node is configured with baker credentials.
+    ///
     /// Bootstrappers do no reveal any consensus information as they do not run
     /// the consensus protocol.
     pub async fn get_node_info(&mut self) -> endpoints::RPCResult<types::NodeInfo> {
@@ -1527,6 +1775,9 @@ impl Client {
         Ok(node_info)
     }
 
+    /// Get the transaction events in a given block. If the block does not exist
+    /// [`QueryError::NotFound`] is returned. The stream will end when all the
+    /// transaction events for a given block have been returned.
     pub async fn get_block_transaction_events(
         &mut self,
         bi: &BlockIdentifier,
@@ -1545,6 +1796,12 @@ impl Client {
         })
     }
 
+    /// Get a the special events in a given block. If the block does not exist
+    /// [`QueryError::NotFound`] is returned. The stream will end when all the
+    /// special events for a given block have been returned.
+    ///
+    /// These are events generated by the protocol, such as minting and reward
+    /// payouts. They are not directly generated by any transaction.
     pub async fn get_block_special_events(
         &mut self,
         bi: &BlockIdentifier,
@@ -1563,6 +1820,10 @@ impl Client {
         })
     }
 
+    /// Get the pending updates to chain parameters at the end of a given block.
+    /// If the block does not exist [`QueryError::NotFound`] is returned.
+    /// The stream will end when all the pending updates for a given block have
+    /// been returned.
     pub async fn get_block_pending_updates(
         &mut self,
         bi: &BlockIdentifier,
@@ -1581,6 +1842,9 @@ impl Client {
         })
     }
 
+    /// Get next available sequence numbers for updating chain parameters after
+    /// a given block. If the block does not exist then [`QueryError::NotFound`]
+    /// is returned.
     pub async fn get_next_update_sequence_numbers(
         &mut self,
         block_id: &BlockIdentifier,
@@ -1597,6 +1861,8 @@ impl Client {
         })
     }
 
+    /// Get the chain parameters in effect after a given block.
+    /// If the block does not exist [`QueryError::NotFound`] is returned.
     pub async fn get_block_chain_parameters(
         &mut self,
         block_id: &BlockIdentifier,
@@ -1610,6 +1876,12 @@ impl Client {
         })
     }
 
+    /// Get the information about a finalization record in a block.
+    /// A block can contain zero or one finalization record. If a record is
+    /// contained then this query will return information about the finalization
+    /// session that produced it, including the finalizers eligible for the
+    /// session, their power, and whether they signed this particular record. If
+    /// the block does not exist [`QueryError::NotFound`] is returned.
     pub async fn get_block_finalization_summary(
         &mut self,
         block_id: &BlockIdentifier,
@@ -1623,6 +1895,10 @@ impl Client {
         })
     }
 
+    /// Get a continous stream of finalized blocks starting from a given height.
+    /// This function starts a background task (a `tokio` task) that listens for
+    /// new finalized blocks. This task is killed when the
+    /// [`FinalizedBlocksStream`] is dropped.
     pub async fn get_finalized_blocks_from(
         &mut self,
         start_height: AbsoluteBlockHeight,
@@ -1690,8 +1966,18 @@ impl Drop for FinalizedBlocksStream {
 
 impl FinalizedBlocksStream {
     /// Get the next finalized block in the stream. Or [`None`] if the there are
-    /// no more. This function blocks until a finalized block becomes available.
+    /// no more. This function blocks until a finalized block becomes available,
+    /// so in general it is a good idea to c
     pub async fn next(&mut self) -> Option<FinalizedBlockInfo> { self.receiver.recv().await }
+
+    /// Like [`FinalizedBlocksStream::next`], but only waits at most the
+    /// specified duration.
+    pub async fn next_timeout(
+        &mut self,
+        duration: std::time::Duration,
+    ) -> Result<Option<FinalizedBlockInfo>, tokio::time::error::Elapsed> {
+        tokio::time::timeout(duration, async move { self.next().await }).await
+    }
 
     /// Get the next chunk of blocks. If the finalized block poller has been
     /// disconnected this will return `Err(blocks)` where `blocks` are the
@@ -1700,8 +1986,8 @@ impl FinalizedBlocksStream {
     ///
     /// In case of success up to `max(1, n)` elements will be returned. This
     /// function will block so it always returns at least one element, and
-    /// will retrieve as many elements as it can without blocking further
-    /// once at least one element has been acquired.
+    /// will retrieve up to `n` elements without blocking further once at least
+    /// one element has been acquired.
     pub async fn next_chunk(
         &mut self,
         n: usize,

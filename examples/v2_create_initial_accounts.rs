@@ -39,7 +39,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(long = "identity-provider")]
     idp:      PathBuf,
     #[structopt(long = "tps")]

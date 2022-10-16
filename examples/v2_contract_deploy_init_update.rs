@@ -7,7 +7,6 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::{self, types::TransactionTime, SerdeDeserialize, SerdeSerialize},
-    endpoints,
     id::types::{AccountAddress, AccountKeys},
     smart_contracts::{
         common as contracts_common,
@@ -32,7 +31,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint:  endpoints::Endpoint,
+    endpoint:  v2::Endpoint,
     #[structopt(long = "account", help = "Path to the account key file.")]
     keys_path: PathBuf,
     #[structopt(subcommand, help = "The action you want to perform.")]

@@ -1,7 +1,7 @@
 //! Test the `GetAncestors` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{endpoints, types::hashes::BlockHash, v2, v2::BlockIdentifier};
+use concordium_rust_sdk::{types::hashes::BlockHash, v2, v2::BlockIdentifier};
 use futures::StreamExt;
 use structopt::StructOpt;
 
@@ -12,7 +12,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: endpoints::Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(
         long = "block_hash",
         help = "Block hash to query. Default: \"best\" block."

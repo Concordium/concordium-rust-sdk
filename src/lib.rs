@@ -11,10 +11,14 @@
 //!
 //! The library is structured around multiple modules.
 //!
-//! - [`endpoints`] contains the main entrypoint to the library. In particular
-//!   it contains the [`Client`](endpoints::Client) struct
+//! - [`v2`] contains the main entrypoint to the library. In particular it
+//!   contains the [`Client`](v2::Client) struct
 //! which maintains a connection to the node, and supports queries and node
-//! manipulation.
+//! manipulation. This client uses gRPC API version 2 of the Concordium node.
+//! - [`endpoints`] contains a [`Client`](endpoints::Client) struct
+//! which maintains a connection to the node, and supports queries and node
+//! manipulation. This client uses gRPC API version 1 of the Concordium node and
+//! should not be used in new code. It exists to retain backwards compatibility.
 //! - [`constants`] contains a number of constants and type definitions that are
 //!   relevant when using the chain. In particular
 //!   [`DEFAULT_NETWORK_ID`](constants::DEFAULT_NETWORK_ID).
@@ -75,7 +79,7 @@ pub use concordium_base::eddsa_ed25519;
 /// Re-export the VRF function implementation.
 pub use concordium_base::ecvrf;
 
-/// Version 2 GRPC API.
+/// A [client](v2::Client) for the concordium node gRPC API version 2.
 pub mod v2;
 
 /// Functionality related to smart contracts.

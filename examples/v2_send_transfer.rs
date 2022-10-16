@@ -8,7 +8,7 @@ use concordium_rust_sdk::{
         SerdeDeserialize, SerdeSerialize,
     },
     id::types::{AccountAddress, AccountKeys},
-    types::transactions::{send, BlockItem},
+    types::transactions::send,
     v2,
 };
 use std::path::PathBuf;
@@ -30,7 +30,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint:  tonic::transport::Endpoint,
+    endpoint:  v2::Endpoint,
     #[structopt(long = "account", help = "Path to the account key file.")]
     keys_path: PathBuf,
     #[structopt(
@@ -92,14 +92,13 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    let item = BlockItem::AccountTransaction(tx);
     // submit the transaction to the chain
     if let Some(memo) = app.memo {
         println!("Sending transfer with memo: \"{}\"", memo);
     } else {
         println!("Sending transfer");
     }
-    let transaction_hash = client.send_block_item(&item).await?;
+    let transaction_hash = client.send_account_transaction(tx).await?;
     println!(
         "Transaction {} submitted (nonce = {}).",
         transaction_hash, nonce,
