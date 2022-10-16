@@ -1,10 +1,8 @@
 //! Test the `GetAccountInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{endpoints::Endpoint, id::types::AccountAddress};
+use concordium_rust_sdk::{id::types::AccountAddress, v2};
 use structopt::StructOpt;
-
-use concordium_rust_sdk::v2;
 
 #[derive(StructOpt)]
 struct App {
@@ -13,7 +11,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(long = "address", help = "Account address to query.")]
     address:  AccountAddress,
 }

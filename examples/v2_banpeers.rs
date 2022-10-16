@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use anyhow::{ensure, Context};
 use clap::AppSettings;
-use concordium_rust_sdk::{endpoints::Endpoint, types::network::PeerToBan, v2};
+use concordium_rust_sdk::{types::network::PeerToBan, v2};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -13,7 +13,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: Endpoint,
+    endpoint: v2::Endpoint,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -49,8 +49,8 @@ async fn main() -> anyhow::Result<()> {
             == ip_to_ban,
         "Unexpected peer in the ban list"
     );
-    let foo = banned_peers.get(0).context("Expected a peer")?;
-    client.unban_peer(foo).await?;
+    let banned_peer_0 = banned_peers.get(0).context("Expected a peer")?;
+    client.unban_peer(banned_peer_0).await?;
     ensure!(
         client.get_banned_peers().await?.is_empty(),
         "Ban list should be empty now."

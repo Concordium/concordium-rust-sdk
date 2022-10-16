@@ -30,7 +30,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint:  tonic::transport::Endpoint,
+    endpoint:  v2::Endpoint,
     #[structopt(long = "account", help = "Path to the account key file.")]
     keys_path: PathBuf,
     #[structopt(

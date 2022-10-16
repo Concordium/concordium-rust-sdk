@@ -1,7 +1,7 @@
 //! Test the `GetAccountNonFinalizedTransactions` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{common::types::AccountAddress, endpoints::Endpoint, v2};
+use concordium_rust_sdk::{common::types::AccountAddress, v2};
 use futures::StreamExt;
 use structopt::StructOpt;
 
@@ -12,7 +12,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(
         long = "account",
         help = "Account address to get non-finalized transactions for.",

@@ -2,7 +2,6 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    endpoints,
     smart_contracts::common::{Amount, ContractAddress, OwnedReceiveName},
     types::smart_contracts::ContractContext,
     v2::{self, BlockIdentifier},
@@ -16,7 +15,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint:     endpoints::Endpoint,
+    endpoint:     v2::Endpoint,
     #[structopt(long = "contract", help = "The address of the contract to invoke")]
     contract:     ContractAddress,
     #[structopt(long = "entrypoint", help = "The entrypoint of the contract to invoke")]

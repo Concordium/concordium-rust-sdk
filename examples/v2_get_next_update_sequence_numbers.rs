@@ -12,7 +12,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: tonic::transport::Endpoint,
+    endpoint: v2::Endpoint,
 }
 
 #[tokio::main(flavor = "multi_thread")]

@@ -3,7 +3,7 @@ use anyhow::Context;
 use clap::AppSettings;
 use structopt::StructOpt;
 
-use concordium_rust_sdk::{endpoints::Endpoint, v2};
+use concordium_rust_sdk::v2;
 
 #[derive(StructOpt)]
 struct App {
@@ -12,7 +12,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: Endpoint,
+    endpoint: v2::Endpoint,
 }
 
 #[tokio::main(flavor = "multi_thread")]

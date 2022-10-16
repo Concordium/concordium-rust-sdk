@@ -4,10 +4,9 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::types::TransactionTime,
-    endpoints::{self, Endpoint},
     types::{
         transactions::{update, BlockItem, Payload},
-        BlockSummary, TransactionStatus, UpdateKeyPair, UpdatePayload,
+        TransactionStatus, UpdateKeyPair, UpdatePayload,
     },
     v2::{self, BlockIdentifier},
 };
@@ -21,7 +20,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(long = "key", help = "Path to update keys to use.")]
     keys:     Vec<PathBuf>,
 }

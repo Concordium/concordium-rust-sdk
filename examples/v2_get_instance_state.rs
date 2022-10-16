@@ -2,7 +2,6 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    endpoints::Endpoint,
     smart_contracts::{common, engine},
     types::hashes::BlockHash,
     v2,
@@ -16,7 +15,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(long = "index", help = "Index of the smart contract to query.")]
     index:    common::ContractIndex,
     #[structopt(long = "block", help = "Hash of the block in which to query.")]

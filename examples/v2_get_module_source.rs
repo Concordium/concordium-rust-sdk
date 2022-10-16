@@ -1,7 +1,7 @@
 //! Test the `GetModuleSource` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{endpoints, types::smart_contracts::ModuleRef, v2};
+use concordium_rust_sdk::{types::smart_contracts::ModuleRef, v2};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -12,7 +12,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:10001"
     )]
-    endpoint: endpoints::Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(long = "module", help = "Module reference to query.")]
     module:   ModuleRef,
     #[structopt(long = "out", help = "File path to write the module into.")]

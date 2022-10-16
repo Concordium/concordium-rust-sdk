@@ -91,10 +91,10 @@ impl From<serde_json::Error> for QueryError {
 pub type RPCResult<A> = Result<A, RPCError>;
 
 /// Result a GRPC query where the item lookup might fail.
-/// This is a simple alias for [std::Result](https://doc.rust-lang.org/std/result/enum.Result.html) that fixes the error type to be [QueryResult].
+/// This is a simple alias for [std::Result](https://doc.rust-lang.org/std/result/enum.Result.html) that fixes the error type to be [`QueryError`].
 pub type QueryResult<A> = Result<A, QueryError>;
 
-/// Input to the [Client::get_blocks_at_height] query.
+/// Input to the [`Client::get_blocks_at_height`] query.
 #[derive(Clone, Copy, Debug, From)]
 pub enum BlocksAtHeightInput {
     Absolute {
