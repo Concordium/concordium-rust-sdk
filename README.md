@@ -79,6 +79,19 @@ They can be found in the [examples](./examples) directory.
 As a basic example, see [v2_send_transfer](./examples/v2_send_transfer.rs) for a
 complete example of constructing a transfer transaction and sending it.
 
+All examples can be compiled with
+
+```shell
+cargo build --release --example $NAME
+```
+
+for example
+
+
+```shell
+cargo build --release --example v2_send_transfer
+```
+
 ## Optional features
 
 The SDK has an optional `postgres` feature which enables functionality to
@@ -88,19 +101,6 @@ affected account.
 ## Documentation
 
 The rendered documentation is available at http://developer.concordium.software/concordium-rust-sdk/
-
-## Examples
-
-A number of examples of usage are available in the [examples](./examples)
-directory. They can be compiled with
-
-```shell
-cargo build --release --example $NAME
-```
-
-where `$NAME` is the name of the file (without the `.rs` extension). The name of
-the file, and its header should briefly explain what the example does
-
 
 ## Migration from V1 to V2
 
