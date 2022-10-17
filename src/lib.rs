@@ -20,8 +20,7 @@
 //! manipulation. This client uses gRPC API version 1 of the Concordium node and
 //! should not be used in new code. It exists to retain backwards compatibility.
 //! - [`constants`] contains a number of constants and type definitions that are
-//!   relevant when using the chain. In particular
-//!   [`DEFAULT_NETWORK_ID`](constants::DEFAULT_NETWORK_ID).
+//!   relevant when using the chain.
 //! - [`types`] contains most type definitions to model responses as well as
 //!   types defining transactions.
 //! The latter are in a submodule [`types::transactions`].
