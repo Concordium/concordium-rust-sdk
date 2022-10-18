@@ -2013,6 +2013,39 @@ impl FinalizedBlocksStream {
         }
         Ok(out)
     }
+
+    /// Like [`next_chunk`](Self::next_chunk), but waits no more than the given
+    /// duration for the block. The boolean signifies whether an error
+    /// occurred (it is `true` if an error occurred) while getting blocks.
+    /// If that is the case further calls will always yield an error.
+    ///
+    /// If no blocks are available in time an `Err` is returned.
+    pub async fn next_chunk_timeout(
+        &mut self,
+        n: usize,
+        duration: std::time::Duration,
+    ) -> Result<(bool, Vec<FinalizedBlockInfo>), tokio::time::error::Elapsed> {
+        let mut out = Vec::with_capacity(n);
+        let first = self.next_timeout(duration).await?;
+        match first {
+            Some(v) => out.push(v),
+            None => return Ok((true, out)),
+        }
+        for _ in 1..n {
+            match self.receiver.try_recv() {
+                Ok(v) => {
+                    out.push(v);
+                }
+                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {
+                    break;
+                }
+                Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => {
+                    return Ok((true, out))
+                }
+            }
+        }
+        Ok((false, out))
+    }
 }
 
 fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<BlockHash> {
