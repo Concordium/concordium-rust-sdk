@@ -944,6 +944,49 @@ impl BlockItemSummary {
         }
     }
 
+    /// If the block item is a smart contract init transaction then
+    /// return the initialization data.
+    pub fn contract_init(&self) -> Option<&ContractInitializedEvent> {
+        if let BlockItemSummaryDetails::AccountTransaction(at) = &self.details {
+            match &at.effects {
+                AccountTransactionEffects::ContractInitialized { data } => Some(data),
+                AccountTransactionEffects::ContractUpdateIssued { .. } => None,
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    /// If the block item is a smart contract update transaction then return
+    /// an iterator over pairs of a contract address that was affected, and the
+    /// logs that were produced.
+    pub fn contract_update_logs(
+        &self,
+    ) -> Option<impl Iterator<Item = (ContractAddress, &[smart_contracts::ContractEvent])>> {
+        if let BlockItemSummaryDetails::AccountTransaction(at) = &self.details {
+            match &at.effects {
+                AccountTransactionEffects::ContractInitialized { .. } => None,
+                AccountTransactionEffects::ContractUpdateIssued { effects } => {
+                    let iter = effects.iter().flat_map(|effect| match effect {
+                        ContractTraceElement::Updated { data } => {
+                            Some((data.address, &data.events[..]))
+                        }
+                        ContractTraceElement::Transferred { .. } => None,
+                        ContractTraceElement::Interrupted { address, events } => {
+                            Some((*address, &events[..]))
+                        }
+                        ContractTraceElement::Resumed { .. } => None,
+                    });
+                    Some(iter)
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
     /// Return the list of addresses affected by the block summary.
     pub fn affected_addresses(&self) -> Vec<AccountAddress> {
         if let BlockItemSummaryDetails::AccountTransaction(at) = &self.details {

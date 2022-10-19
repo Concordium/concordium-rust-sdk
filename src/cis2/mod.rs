@@ -6,7 +6,10 @@
 //! functions for querying and making transactions to smart contract.
 mod types;
 
-use crate::{common, endpoints::Client, id, types as sdk_types};
+use crate::{
+    common, id, types as sdk_types,
+    v2::{BlockIdentifier, Client},
+};
 use sdk_types::{smart_contracts, transactions, ContractAddress};
 use smart_contracts::concordium_contracts_common;
 use std::{
@@ -80,7 +83,7 @@ pub enum Cis2QueryError {
 
     /// A general RPC error occured.
     #[error("RPC error: {0}")]
-    RPCError(#[from] crate::endpoints::RPCError),
+    RPCError(#[from] super::v2::QueryError),
 
     /// The returned bytes from invoking the smart contract could not be parsed.
     #[error("Failed parsing the response.")]
@@ -241,7 +244,7 @@ impl Cis2Contract {
     /// * `queries` - A list queries to execute.
     pub async fn balance_of(
         &mut self,
-        block_hash: &sdk_types::hashes::BlockHash,
+        bi: &BlockIdentifier,
         queries: Vec<BalanceOfQuery>,
     ) -> Result<BalanceOfQueryResponse, Cis2QueryError> {
         let parameter = BalanceOfQueryParams::new(queries)?;
@@ -261,12 +264,9 @@ impl Cis2Contract {
             energy:    smart_contracts::MAX_ALLOWED_INVOKE_ENERGY,
         };
 
-        let invoke_result = self
-            .client
-            .invoke_contract(block_hash, &contract_context)
-            .await?;
+        let invoke_result = self.client.invoke_instance(bi, &contract_context).await?;
 
-        match invoke_result {
+        match invoke_result.response {
             smart_contracts::InvokeContractResult::Success { return_value, .. } => {
                 let bytes: smart_contracts::ReturnValue = return_value.ok_or(
                     Cis2QueryError::ResponseParseError(concordium_contracts_common::ParseError {}),
@@ -291,7 +291,7 @@ impl Cis2Contract {
     /// * `queries` - A list queries to execute.
     pub async fn operator_of(
         &mut self,
-        block_hash: &sdk_types::hashes::BlockHash,
+        bi: &BlockIdentifier,
         queries: Vec<OperatorOfQuery>,
     ) -> Result<OperatorOfQueryResponse, Cis2QueryError> {
         let parameter = OperatorOfQueryParams::new(queries)?;
@@ -311,12 +311,9 @@ impl Cis2Contract {
             energy:    smart_contracts::MAX_ALLOWED_INVOKE_ENERGY,
         };
 
-        let invoke_result = self
-            .client
-            .invoke_contract(block_hash, &contract_context)
-            .await?;
+        let invoke_result = self.client.invoke_instance(bi, &contract_context).await?;
 
-        match invoke_result {
+        match invoke_result.response {
             smart_contracts::InvokeContractResult::Success { return_value, .. } => {
                 let bytes: smart_contracts::ReturnValue = return_value.ok_or(
                     Cis2QueryError::ResponseParseError(concordium_contracts_common::ParseError {}),
@@ -341,7 +338,7 @@ impl Cis2Contract {
     /// * `queries` - A list queries to execute.
     pub async fn token_metadata(
         &mut self,
-        block_hash: &sdk_types::hashes::BlockHash,
+        bi: &BlockIdentifier,
         queries: Vec<TokenId>,
     ) -> Result<TokenMetadataQueryResponse, Cis2QueryError> {
         let parameter = TokenMetadataQueryParams::new(queries)?;
@@ -363,12 +360,9 @@ impl Cis2Contract {
             energy:    smart_contracts::MAX_ALLOWED_INVOKE_ENERGY,
         };
 
-        let invoke_result = self
-            .client
-            .invoke_contract(block_hash, &contract_context)
-            .await?;
+        let invoke_result = self.client.invoke_instance(bi, &contract_context).await?;
 
-        match invoke_result {
+        match invoke_result.response {
             smart_contracts::InvokeContractResult::Success { return_value, .. } => {
                 let bytes: smart_contracts::ReturnValue = return_value.ok_or(
                     Cis2QueryError::ResponseParseError(concordium_contracts_common::ParseError {}),
