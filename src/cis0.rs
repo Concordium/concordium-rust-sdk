@@ -159,6 +159,7 @@ impl contracts_common::Serial for StandardIdentifier {
 }
 
 #[derive(Error, Debug)]
+/// Errors that may occur when querying a contract.
 pub enum SupportsError {
     #[error("The name of the contract is not valid and thus the contract does not support CIS0.")]
     ContractNameInvalid,
@@ -176,11 +177,16 @@ pub enum SupportsError {
     InvalidResponse,
 }
 
-pub async fn supports_multi<'a>(
+/// Return whether the contract supports standards in the list
+/// at the end of the given block.
+///
+/// In case of success the return list of [`SupportsQueryResponse`] values
+/// will have the same length as the input list of `ids`.
+pub async fn supports_multi(
     client: &mut super::v2::Client,
     bi: &BlockIdentifier,
     addr: ContractAddress,
-    name: ContractName<'a>,
+    name: ContractName<'_>,
     ids: &[StandardIdentifier],
 ) -> Result<super::v2::QueryResponse<SupportsQueryResponse>, SupportsError> {
     use contracts_common::{Deserial, Serial};
@@ -224,11 +230,13 @@ pub async fn supports_multi<'a>(
     }
 }
 
-pub async fn supports<'a>(
+/// A simplified version of [`supports_multi`] that only supports
+/// querying for a single standard, but has a simpler API.
+pub async fn supports(
     client: &mut super::v2::Client,
     bi: &BlockIdentifier,
     addr: ContractAddress,
-    name: ContractName<'a>,
+    name: ContractName<'_>,
     ids: StandardIdentifier,
 ) -> Result<super::v2::QueryResponse<SupportResult>, SupportsError> {
     let mut response = supports_multi(client, bi, addr, name, &[ids]).await?;

@@ -5,7 +5,7 @@ use crate::types::{
     hashes::Hash,
     smart_contracts::concordium_contracts_common::{
         deserial_vector_no_length, serial_vector_no_length, AccountAddress, Address,
-        ContractAddress, Deserial, OwnedReceiveName, ParseError, Read, Serial, Write,
+        ContractAddress, Cursor, Deserial, OwnedReceiveName, ParseError, Read, Serial, Write,
     },
 };
 use derive_more::{AsRef, Display, From, Into};
@@ -22,6 +22,11 @@ use thiserror::*;
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, From, Display)]
 #[repr(transparent)]
 pub struct TokenAmount(pub BigUint);
+
+impl TokenAmount {
+    /// Check whether the amount is 0.
+    pub fn is_zero(&self) -> bool { self.0.is_zero() }
+}
 
 impl From<TokenAmount> for BigUint {
     fn from(v: TokenAmount) -> BigUint { v.0 }
@@ -858,32 +863,49 @@ impl Deserial for Event {
     fn deserial<R: Read>(source: &mut R) -> Result<Self, ParseError> {
         let discriminant = u8::deserial(source)?;
         match discriminant {
-            0 => Ok(Event::Transfer {
+            255 => Ok(Event::Transfer {
                 token_id: TokenId::deserial(source)?,
                 amount:   TokenAmount::deserial(source)?,
                 from:     Address::deserial(source)?,
                 to:       Address::deserial(source)?,
             }),
-            1 => Ok(Event::Mint {
+            254 => Ok(Event::Mint {
                 token_id: TokenId::deserial(source)?,
                 amount:   TokenAmount::deserial(source)?,
                 owner:    Address::deserial(source)?,
             }),
-            2 => Ok(Event::Burn {
+            253 => Ok(Event::Burn {
                 token_id: TokenId::deserial(source)?,
                 amount:   TokenAmount::deserial(source)?,
                 owner:    Address::deserial(source)?,
             }),
-            3 => Ok(Event::UpdateOperator {
+            252 => Ok(Event::UpdateOperator {
                 update:   OperatorUpdate::deserial(source)?,
                 owner:    Address::deserial(source)?,
                 operator: Address::deserial(source)?,
             }),
-            4 => Ok(Event::TokenMetadata {
+            251 => Ok(Event::TokenMetadata {
                 token_id:     TokenId::deserial(source)?,
                 metadata_url: MetadataUrl::deserial(source)?,
             }),
             _ => Ok(Event::Unknown),
+        }
+    }
+}
+
+/// Attempt to parse the contract event into an event. This requires that the
+/// entire input is consumed if it is a known CIS2 event.
+impl<'a> TryFrom<&'a super::smart_contracts::ContractEvent> for Event {
+    type Error = ParseError;
+
+    fn try_from(value: &'a super::smart_contracts::ContractEvent) -> Result<Self, Self::Error> {
+        let data = value.as_ref();
+        let mut cursor = Cursor::new(data);
+        let res = Self::deserial(&mut cursor)?;
+        if cursor.offset == data.len() || matches!(&res, Self::Unknown) {
+            Ok(res)
+        } else {
+            Err(ParseError {})
         }
     }
 }
