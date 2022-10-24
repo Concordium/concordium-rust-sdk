@@ -16,6 +16,9 @@
   provided that checks the length.
 - Add support for the node's GRPC V2 interface.
 - Bump minimum supported Rust version to 1.57.
+- Add support for CIS0 standard.
+- The CIS2 support now uses the V2 node API. This has led so small changes in
+  the API.
 
 ## 1.1.0
 
