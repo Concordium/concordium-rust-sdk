@@ -15,7 +15,7 @@ use std::convert::{From, TryFrom};
 use thiserror::*;
 
 /// The query result type for whether a smart contract supports a standard.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SupportResult {
     /// The standard is not supported.
     NoSupport,
@@ -68,7 +68,7 @@ impl contracts_common::Deserial for SupportResult {
 /// The response which is sent back when calling the contract function
 /// `supports`. It consists of a list of results corresponding to the list of
 /// queries.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SupportsQueryResponse {
     /// List of support results corresponding to the list of queries.
     pub results: Vec<SupportResult>,
@@ -161,7 +161,7 @@ impl contracts_common::Serial for StandardIdentifier {
 #[derive(Error, Debug)]
 /// Errors that may occur when querying a contract.
 pub enum SupportsError {
-    #[error("The name of the contract is not valid and thus the contract does not support CIS0.")]
+    #[error("The name of the contract is not valid and thus the contract does not support CIS-0.")]
     ContractNameInvalid,
     #[error("Parameter size exceeds maximum allowed. Too many ids.")]
     InvalidParameter,
@@ -169,7 +169,7 @@ pub enum SupportsError {
     QueryError(#[from] super::v2::QueryError),
     #[error("Contract reject.")]
     ContractReject,
-    #[error("No return. This is a V0 contract.")]
+    #[error("No return. This is a V0 contract, and V0 contracts do not support CIS-0.")]
     NoReturn,
     #[error("Parsing result failed.")]
     ParseError(#[from] ParseError),
