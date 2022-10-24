@@ -415,6 +415,7 @@ impl From<ProtocolVersion> for super::types::ProtocolVersion {
             ProtocolVersion::ProtocolVersion2 => super::types::ProtocolVersion::P2,
             ProtocolVersion::ProtocolVersion3 => super::types::ProtocolVersion::P3,
             ProtocolVersion::ProtocolVersion4 => super::types::ProtocolVersion::P4,
+            ProtocolVersion::ProtocolVersion5 => super::types::ProtocolVersion::P5,
         }
     }
 }
@@ -1665,6 +1666,13 @@ impl TryFrom<ContractTraceElement> for super::types::ContractTraceElement {
                 super::types::ContractTraceElement::Resumed {
                     address: r.address.require()?.into(),
                     success: r.success,
+                }
+            }
+            contract_trace_element::Element::Upgraded(r) => {
+                super::types::ContractTraceElement::Upgraded {
+                    address: r.address.require()?.into(),
+                    from:    r.from.require()?.try_into()?,
+                    to:      r.to.require()?.try_into()?,
                 }
             }
         })

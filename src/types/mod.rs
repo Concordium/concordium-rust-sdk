@@ -757,7 +757,7 @@ mod block_summary_parser {
                         data,
                     })
                 }
-                P4 => {
+                P4 | P5 => {
                     let updates: super::Updates<super::ChainParameterVersion1> =
                         serde_json::from_value(value.data.updates)?;
                     let data = super::BlockSummaryData {
@@ -933,6 +933,7 @@ impl BlockItemSummary {
                             ContractTraceElement::Transferred { .. } => (),
                             ContractTraceElement::Interrupted { .. } => (),
                             ContractTraceElement::Resumed { .. } => (),
+                            ContractTraceElement::Upgraded { .. } => (),
                         }
                     }
                     addresses
@@ -977,6 +978,7 @@ impl BlockItemSummary {
                             Some((*address, &events[..]))
                         }
                         ContractTraceElement::Resumed { .. } => None,
+                        ContractTraceElement::Upgraded { .. } => None,
                     });
                     Some(iter)
                 }
@@ -1008,6 +1010,7 @@ impl BlockItemSummary {
                             }
                             ContractTraceElement::Interrupted { .. } => (),
                             ContractTraceElement::Resumed { .. } => (),
+                            ContractTraceElement::Upgraded { .. } => (),
                         }
                     }
                     addresses
@@ -1167,6 +1170,14 @@ pub enum ContractTraceElement {
     Resumed {
         address: ContractAddress,
         success: bool,
+    },
+    Upgraded {
+        /// Address of the instance that was upgraded.
+        address: ContractAddress,
+        /// The existing module reference that is in effect before the upgrade.
+        from:    smart_contracts::ModuleRef,
+        /// The new module reference that is in effect after the upgrade.
+        to:      smart_contracts::ModuleRef,
     },
 }
 
