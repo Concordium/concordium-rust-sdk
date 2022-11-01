@@ -2,7 +2,7 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::{
-        types::{Amount, Timestamp, TransactionTime},
+        types::{Amount, TransactionTime},
         SerdeDeserialize, SerdeSerialize,
     },
     endpoints::{self, Endpoint},
@@ -12,7 +12,6 @@ use concordium_rust_sdk::{
         transactions::{send, BlockItem},
     },
 };
-use rand::Rng;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -96,18 +95,13 @@ async fn main() -> anyhow::Result<()> {
         loop {
             let expiry: TransactionTime =
                 TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
-            let start = expiry.seconds * 1000;
-            let schedule = (0..rand::thread_rng().gen_range::<_, u64, u64>(1, 200))
-                .into_iter()
-                .map(|ts| (Timestamp::from(start + 250 * ts), Amount::from_micro_ccd(1)))
-                .collect::<Vec<_>>();
-            let tx = send::transfer_with_schedule(
+            let tx = send::transfer(
                 &keys.account_keys,
                 keys.address,
                 nonce,
                 expiry,
                 accounts[count % accounts.len()],
-                schedule, // transfer_amount,
+                transfer_amount,
             );
             nonce.next_mut();
             count += 1;
