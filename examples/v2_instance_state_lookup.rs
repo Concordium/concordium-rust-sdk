@@ -49,9 +49,7 @@ async fn main() -> anyhow::Result<()> {
             async move {
                 s.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
                 let mut client = client.clone();
-                let value = client
-                    .instance_state_lookup(addr, k, &al.block_hash.into())
-                    .await?;
+                let value = client.instance_state_lookup(addr, k, al.block_hash).await?;
                 assert_eq!(value.response, v, "Different value.");
                 Ok(())
             }

@@ -31,9 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut receiver = client.get_finalized_blocks_from(0u64.into()).await?;
     while let Some(v) = receiver.next().await {
-        let fin_data = client
-            .get_block_finalization_summary(&v.block_hash.into())
-            .await?;
+        let fin_data = client.get_block_finalization_summary(v.block_hash).await?;
         println!(
             "{}: {}: {}",
             v.height,
