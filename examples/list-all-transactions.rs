@@ -4,11 +4,10 @@ use anyhow::Context;
 use chrono::Utc;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    cis2,
     endpoints::{self, Endpoint},
     types::{
-        queries::BlockInfo, AbsoluteBlockHeight, AccountTransactionEffects, BlockItemSummary,
-        BlockItemSummaryDetails, BlockSummary, ContractAddress, TransactionType,
+        queries::BlockInfo, AbsoluteBlockHeight, AccountTransactionEffects,
+        BlockItemSummaryDetails, BlockSummary, TransactionType,
     },
 };
 use std::collections::HashSet;
@@ -38,23 +37,6 @@ struct App {
                 types are displayed."
     )]
     types:    Vec<String>,
-}
-
-fn get_cis2_events(
-    bi: &BlockItemSummary,
-) -> Option<impl Iterator<Item = (ContractAddress, Vec<cis2::Event>)> + '_> {
-    let log_iter = bi.contract_update_logs()?;
-    let ret = log_iter.flat_map(|(ca, logs)| {
-        match logs
-            .iter()
-            .map(cis2::Event::try_from)
-            .collect::<Result<Vec<cis2::Event>, _>>()
-        {
-            Ok(events) => Some((ca, events)),
-            Err(_) => None,
-        }
-    });
-    Some(ret)
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -159,10 +141,8 @@ async fn main() -> anyhow::Result<()> {
                                 let type_string = at
                                     .transaction_type()
                                     .map_or_else(|| "N/A".into(), |tt| tt.to_string());
-                                let events = get_cis2_events(&bisummary)
-                                    .map_or(false, |mut x| x.next().is_some());
                                 println!(
-                                    "{}, {}, {}, {}, {}, {events}",
+                                    "{}, {}, {}, {}, {}",
                                     bi.block_slot_time,
                                     bi.block_hash,
                                     bisummary.hash,
