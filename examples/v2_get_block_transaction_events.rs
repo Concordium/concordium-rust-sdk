@@ -1,7 +1,7 @@
 //! Test the `GetBlockTransactionEvents` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::v2;
+use concordium_rust_sdk::{types::AbsoluteBlockHeight, v2};
 use futures::StreamExt;
 use structopt::StructOpt;
 
@@ -10,9 +10,15 @@ struct App {
     #[structopt(
         long = "node",
         help = "GRPC interface of the node.",
-        default_value = "http://localhost:10001"
+        default_value = "http://localhost:20000"
     )]
     endpoint: v2::Endpoint,
+    #[structopt(
+        long = "height",
+        help = "Starting height, defaults to 0.",
+        default_value = "0"
+    )]
+    height:   AbsoluteBlockHeight,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -27,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect.")?;
 
-    let mut receiver = client.get_finalized_blocks_from(0u64.into()).await?;
+    let mut receiver = client.get_finalized_blocks_from(app.height).await?;
     while let Some(v) = receiver.next().await {
         let mut response = client.get_block_transaction_events(v.block_hash).await?;
         assert_eq!(

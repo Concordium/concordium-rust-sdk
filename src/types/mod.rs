@@ -80,7 +80,7 @@ pub struct EncryptedAmountDecryptionContext<'a> {
 
 impl<'a> EncryptedAmountDecryptionContext<'a> {
     /// Construct the decryption context from cryptographic parameters.
-    /// It is crucial that the cryptographic parameters are for the rigth chain.
+    /// It is crucial that the cryptographic parameters are for the right chain.
     /// Otherwise decryption with the constructed context will not
     /// terminate.
     pub fn new(
