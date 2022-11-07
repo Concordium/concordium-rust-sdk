@@ -19,6 +19,7 @@
 - Add support for CIS0 standard.
 - The CIS2 support now uses the V2 node API. This has led so small changes in
   the API.
+- Add support for protocol version 5 events and limitations.
 
 ## 1.1.0
 
