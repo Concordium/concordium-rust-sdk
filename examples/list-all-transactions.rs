@@ -142,8 +142,12 @@ async fn main() -> anyhow::Result<()> {
                                     .transaction_type()
                                     .map_or_else(|| "N/A".into(), |tt| tt.to_string());
                                 println!(
-                                    "{}, {}, {}, {}",
-                                    bi.block_hash, bisummary.hash, is_success, type_string
+                                    "{}, {}, {}, {}, {}",
+                                    bi.block_slot_time,
+                                    bi.block_hash,
+                                    bisummary.hash,
+                                    is_success,
+                                    type_string
                                 )
                             }
                         }

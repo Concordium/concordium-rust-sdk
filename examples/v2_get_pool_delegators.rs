@@ -31,9 +31,7 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     println!("Blockhash: {}", res.block_hash);
     while let Some(a) = res.response.next().await.transpose()? {
-        let mut response_delegators = client
-            .get_pool_delegators(&v2::BlockIdentifier::Given(res.block_hash), a)
-            .await?;
+        let mut response_delegators = client.get_pool_delegators(res.block_hash, a).await?;
         println!("Baker {:?}", &a);
 
         while let Some(a) = response_delegators.response.next().await.transpose()? {

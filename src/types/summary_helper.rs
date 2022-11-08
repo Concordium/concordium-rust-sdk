@@ -345,6 +345,15 @@ pub(crate) enum Event {
         /// Delegator account
         account:      AccountAddress,
     },
+    #[serde(rename_all = "camelCase")]
+    Upgraded {
+        /// Address of the instance that was upgraded.
+        address: super::ContractAddress,
+        /// The existing module reference that is in effect before the upgrade.
+        from:    smart_contracts::ModuleRef,
+        /// The new module reference that is in effect after the upgrade.
+        to:      smart_contracts::ModuleRef,
+    },
 }
 
 impl From<super::ContractTraceElement> for Event {
@@ -362,6 +371,9 @@ impl From<super::ContractTraceElement> for Event {
             crate::types::ContractTraceElement::Resumed { address, success } => {
                 Event::Resumed { address, success }
             }
+            crate::types::ContractTraceElement::Upgraded { address, from, to } => {
+                Event::Upgraded { address, from, to }
+            }
         }
     }
 }
@@ -376,13 +388,10 @@ impl TryFrom<Event> for super::ContractTraceElement {
                 from: Address::Contract(from),
                 amount,
                 to: Address::Account(to),
-            } => Ok(super::ContractTraceElement::Transferred { from, amount, to }),
-            Event::Interrupted { address, events } => {
-                Ok(super::ContractTraceElement::Interrupted { address, events })
-            }
-            Event::Resumed { address, success } => {
-                Ok(super::ContractTraceElement::Resumed { address, success })
-            }
+            } => Ok(Self::Transferred { from, amount, to }),
+            Event::Interrupted { address, events } => Ok(Self::Interrupted { address, events }),
+            Event::Resumed { address, success } => Ok(Self::Resumed { address, success }),
+            Event::Upgraded { address, from, to } => Ok(Self::Upgraded { address, from, to }),
             _ => Err(ConversionError::InvalidTransactionResult),
         }
     }
