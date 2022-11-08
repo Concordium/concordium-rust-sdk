@@ -757,7 +757,7 @@ mod block_summary_parser {
                         data,
                     })
                 }
-                P4 => {
+                P4 | P5 => {
                     let updates: super::Updates<super::ChainParameterVersion1> =
                         serde_json::from_value(value.data.updates)?;
                     let data = super::BlockSummaryData {

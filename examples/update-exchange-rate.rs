@@ -86,10 +86,7 @@ async fn main() -> anyhow::Result<()> {
     let effective_time = 0.into(); // immediate effect
     let timeout =
         TransactionTime::from_seconds(chrono::offset::Utc::now().timestamp() as u64 + 300); // 5min expiry.,
-    let payload = UpdatePayload::MicroGTUPerEuro(ExchangeRate {
-        numerator:   1,
-        denominator: 1,
-    }); // make the exchange rate 1:1
+    let payload = UpdatePayload::MicroGTUPerEuro(ExchangeRate::new_unchecked(1, 1)); // make the exchange rate 1:1
     let block_item: BlockItem<Payload> =
         update::update(&signer, seq_number, effective_time, timeout, payload).into();
 

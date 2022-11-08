@@ -210,16 +210,16 @@ impl ChainParameters {
                 let x = v0.micro_ccd_per_euro;
                 let y = v0.euro_per_energy;
                 (
-                    u128::from(x.numerator) * u128::from(y.numerator),
-                    u128::from(y.denominator) * u128::from(y.denominator),
+                    u128::from(x.numerator()) * u128::from(y.numerator()),
+                    u128::from(y.denominator()) * u128::from(y.denominator()),
                 )
             }
             ChainParameters::V1(v1) => {
                 let x = v1.micro_ccd_per_euro;
                 let y = v1.euro_per_energy;
                 (
-                    u128::from(x.numerator) * u128::from(y.numerator),
-                    u128::from(y.denominator) * u128::from(y.denominator),
+                    u128::from(x.numerator()) * u128::from(y.numerator()),
+                    u128::from(y.denominator()) * u128::from(y.denominator()),
                 )
             }
         };
