@@ -70,8 +70,19 @@ pub enum QueryError {
 }
 
 impl QueryError {
-    /// Whether this error is the NotFound variant.
-    pub fn is_not_found(&self) -> bool { matches!(self, Self::NotFound) }
+    /// Whether this error indicates an object was not found.
+    pub fn is_not_found(&self) -> bool {
+        match self {
+            QueryError::RPCError(c) => {
+                if let RPCError::CallError(ce) = c {
+                    ce.code() == tonic::Code::NotFound
+                } else {
+                    false
+                }
+            }
+            QueryError::NotFound => true,
+        }
+    }
 }
 
 impl From<tonic::Status> for QueryError {
