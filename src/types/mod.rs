@@ -37,7 +37,7 @@ use std::{
 /// zero-knowledge proofs.
 pub type CryptographicParameters = crate::id::types::GlobalContext<crate::id::constants::ArCurve>;
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, PartialEq, Eq, SerdeDeserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 /// The state of the encrypted balance of an account.
 pub struct AccountEncryptedAmount {
@@ -200,7 +200,7 @@ impl AccountEncryptedAmount {
         }
     }
 }
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// State of the account's release schedule. This is the balance of the account
 /// that is owned by the account, but cannot be used until the release point.
@@ -211,7 +211,7 @@ pub struct AccountReleaseSchedule {
     pub schedule: Vec<Release>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// An individual release of a locked balance.
 pub struct Release {
@@ -224,7 +224,7 @@ pub struct Release {
     pub transactions: Vec<hashes::TransactionHash>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// Information about a baker.
 pub struct BakerInfo {
@@ -242,7 +242,7 @@ pub struct BakerInfo {
     pub baker_aggregation_verify_key: BakerAggregationVerifyKey,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum AccountStakingInfo {
     #[serde(rename_all = "camelCase")]
@@ -275,7 +275,7 @@ impl AccountStakingInfo {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// Account information exposed via the node's API. This is always the state of
 /// an account in a specific block.
@@ -319,7 +319,7 @@ pub struct AccountInfo {
     pub account_address:          AccountAddress,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// The state of consensus parameters, and allowed participants (i.e., bakers).
 pub struct BirkParameters {
@@ -331,7 +331,7 @@ pub struct BirkParameters {
     pub bakers:              Vec<BirkBaker>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// State of an individual baker.
 pub struct BirkBaker {
@@ -344,7 +344,7 @@ pub struct BirkBaker {
     pub baker_account:       AccountAddress,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
+#[derive(SerdeSerialize, SerdeDeserialize, PartialEq, Debug, Clone, Copy)]
 #[serde(tag = "change")]
 /// Pending change in the baker's stake.
 pub enum StakePendingChange {
@@ -374,7 +374,7 @@ impl StakePendingChange {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 /// Information about a registered passive or pool delegator.
 pub struct DelegatorInfo {
     /// The delegator account address.
@@ -494,7 +494,7 @@ mod rewards_overview {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy, PartialEq)]
 #[serde(tag = "pendingChangeType")]
 pub enum PoolPendingChange {
     NoChange,
@@ -512,7 +512,7 @@ pub enum PoolPendingChange {
     },
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CurrentPaydayBakerPoolStatus {
     /// The number of blocks baked in the current reward period.
@@ -549,7 +549,7 @@ mod lottery_power_parser {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// The state of the baker currently registered on the account.
 /// Current here means "present". This is the information that is being updated

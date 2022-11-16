@@ -15,7 +15,7 @@ use std::convert::TryFrom;
 
 pub use concordium_base::smart_contracts::*;
 
-#[derive(Clone, SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(Clone, SerdeSerialize, SerdeDeserialize, Debug, PartialEq, Eq)]
 #[serde(
     try_from = "instance_parser::InstanceInfoHelper",
     into = "instance_parser::InstanceInfoHelper"
