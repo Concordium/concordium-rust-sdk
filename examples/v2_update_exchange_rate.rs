@@ -64,7 +64,7 @@ async fn main() -> anyhow::Result<()> {
         .context("Invalid keys supplied.")?;
 
     let seq_number = client
-        .get_next_update_sequence_numbers(&params.block_hash.into())
+        .get_next_update_sequence_numbers(params.block_hash)
         .await?
         .response
         .micro_ccd_per_euro;

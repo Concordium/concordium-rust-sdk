@@ -190,6 +190,16 @@ async fn main() -> anyhow::Result<()> {
         specification_auxiliary_data: to_bytes(&params),
     };
 
+    let p5 = ProtocolUpdate {
+        message: "Update to P5".into(),
+        specification_url:
+            "https://github.com/Concordium/concordium-update-proposals/blob/main/updates/P5.txt"
+                .into(),
+        specification_hash: "af5684e70c1438e442066d017e4410af6da2b53bfa651a07d81efa2aa668db20"
+            .parse()?,
+        specification_auxiliary_data: Vec::new(),
+    };
+
     let block_item: BlockItem<Payload> = update::update(
         &signer,
         seq_number,
@@ -227,7 +237,21 @@ async fn main() -> anyhow::Result<()> {
     )
     .into();
 
-    send_and_wait(&mut client, &block_item, ProtocolVersion::P3).await?;
+    let sent = send_and_wait(&mut client, &block_item, ProtocolVersion::P3).await?;
+    if sent {
+        seq_number.next_mut();
+    }
+
+    let block_item: BlockItem<Payload> = update::update(
+        &signer,
+        seq_number,
+        effective_time,
+        TransactionTime::from_seconds(chrono::offset::Utc::now().timestamp() as u64 + 300), // 5min expiry.,
+        UpdatePayload::Protocol(p5),
+    )
+    .into();
+
+    send_and_wait(&mut client, &block_item, ProtocolVersion::P4).await?;
 
     Ok(())
 }

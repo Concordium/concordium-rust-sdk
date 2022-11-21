@@ -18,6 +18,10 @@ use concordium_base::{
         Buffer, Deserial, Get, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
         Versioned,
     },
+    encrypted_transfers,
+    encrypted_transfers::types::{
+        AggregatedDecryptedAmount, EncryptedAmountTransferData, SecToPubAmountTransferData,
+    },
     id::{
         constants::{ArCurve, AttributeKind},
         elgamal,
@@ -33,7 +37,7 @@ use std::{
 /// zero-knowledge proofs.
 pub type CryptographicParameters = crate::id::types::GlobalContext<crate::id::constants::ArCurve>;
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, PartialEq, Eq, SerdeDeserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 /// The state of the encrypted balance of an account.
 pub struct AccountEncryptedAmount {
@@ -67,7 +71,136 @@ pub struct AccountEncryptedAmount {
     pub incoming_amounts:  Vec<crate::encrypted_transfers::types::EncryptedAmount<ArCurve>>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+/// Context that speeds up decryption of encrypted amounts.
+#[derive(Debug)]
+pub struct EncryptedAmountDecryptionContext<'a> {
+    params: &'a concordium_base::id::types::GlobalContext<ArCurve>,
+    table:  elgamal::BabyStepGiantStep<EncryptedAmountsCurve>,
+}
+
+impl<'a> EncryptedAmountDecryptionContext<'a> {
+    /// Construct the decryption context from cryptographic parameters.
+    /// It is crucial that the cryptographic parameters are for the right chain.
+    /// Otherwise decryption with the constructed context will not
+    /// terminate.
+    pub fn new(
+        params: &'a concordium_base::id::types::GlobalContext<EncryptedAmountsCurve>,
+    ) -> Self {
+        Self {
+            params,
+            table: elgamal::BabyStepGiantStep::new(
+                params.encryption_in_exponent_generator(),
+                1 << 16,
+            ),
+        }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum MakeEncryptedTransferError {
+    #[error(
+        "Attempt to transfer too many CCD. Encrypted balance is {existing} but {requested} was \
+         requested."
+    )]
+    InsufficientAmount {
+        /// An existing encrypted amount.
+        existing:  Amount,
+        /// An amount that was attempted to be transferred.
+        requested: Amount,
+    },
+    #[error("Cannot produce proof.")]
+    FailedToProve,
+}
+
+impl AccountEncryptedAmount {
+    /// Decrypt all the encrypted amounts and combine them in preparation for
+    /// sending an encrypted transfer.
+    pub fn decrypt_and_combine(
+        &self,
+        ctx: &EncryptedAmountDecryptionContext,
+        sk: &elgamal::SecretKey<EncryptedAmountsCurve>,
+    ) -> AggregatedDecryptedAmount<EncryptedAmountsCurve> {
+        let table = &ctx.table;
+        let mut combined = self.self_amount.clone();
+        let mut agg_amount = encrypted_transfers::decrypt_amount(table, sk, &self.self_amount);
+        let mut index = self.start_index;
+        if let Some((agg, num_agg)) = self.aggregated_amount.as_ref() {
+            agg_amount += encrypted_transfers::decrypt_amount(table, sk, agg);
+            combined = encrypted_transfers::aggregate(&combined, agg);
+            index += u64::from(*num_agg);
+        }
+        for amount in &self.incoming_amounts {
+            agg_amount += encrypted_transfers::decrypt_amount(table, sk, amount);
+            combined = encrypted_transfers::aggregate(&combined, amount);
+            index += 1;
+        }
+        AggregatedDecryptedAmount {
+            agg_encrypted_amount: combined,
+            agg_amount,
+            agg_index: index.into(),
+        }
+    }
+
+    /// Construct the payload of a transfer from encrypted to public balance of
+    /// the same account.
+    pub fn make_transfer_to_public_data<R: rand::CryptoRng + rand::Rng>(
+        &self,
+        ctx: &EncryptedAmountDecryptionContext,
+        sk: &elgamal::SecretKey<ArCurve>,
+        amount: Amount,
+        rng: &mut R,
+    ) -> Result<SecToPubAmountTransferData<EncryptedAmountsCurve>, MakeEncryptedTransferError> {
+        let agg_amount = self.decrypt_and_combine(ctx, sk);
+        if amount <= agg_amount.agg_amount {
+            let data = encrypted_transfers::make_sec_to_pub_transfer_data(
+                ctx.params,
+                sk,
+                &agg_amount,
+                amount,
+                rng,
+            )
+            .ok_or(MakeEncryptedTransferError::FailedToProve)?;
+            Ok(data)
+        } else {
+            Err(MakeEncryptedTransferError::InsufficientAmount {
+                existing:  agg_amount.agg_amount,
+                requested: amount,
+            })
+        }
+    }
+
+    /// Construct the payload of an encrypted transfer to another address.
+    /// The arguments are ...
+    pub fn make_encrypted_transfer_data<R: rand::CryptoRng + rand::Rng>(
+        &self,
+        ctx: &EncryptedAmountDecryptionContext,
+        sk: &elgamal::SecretKey<ArCurve>,
+        amount: Amount,
+        receiver_pk: &elgamal::PublicKey<EncryptedAmountsCurve>,
+        rng: &mut R,
+    ) -> Result<EncryptedAmountTransferData<EncryptedAmountsCurve>, MakeEncryptedTransferError>
+    {
+        let agg_amount = self.decrypt_and_combine(ctx, sk);
+        if amount <= agg_amount.agg_amount {
+            let data = encrypted_transfers::make_transfer_data(
+                ctx.params,
+                receiver_pk,
+                sk,
+                &agg_amount,
+                amount,
+                rng,
+            )
+            .ok_or(MakeEncryptedTransferError::FailedToProve)?;
+            Ok(data)
+        } else {
+            Err(MakeEncryptedTransferError::InsufficientAmount {
+                existing:  agg_amount.agg_amount,
+                requested: amount,
+            })
+        }
+    }
+}
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// State of the account's release schedule. This is the balance of the account
 /// that is owned by the account, but cannot be used until the release point.
@@ -78,7 +211,7 @@ pub struct AccountReleaseSchedule {
     pub schedule: Vec<Release>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// An individual release of a locked balance.
 pub struct Release {
@@ -91,7 +224,7 @@ pub struct Release {
     pub transactions: Vec<hashes::TransactionHash>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// Information about a baker.
 pub struct BakerInfo {
@@ -109,7 +242,7 @@ pub struct BakerInfo {
     pub baker_aggregation_verify_key: BakerAggregationVerifyKey,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum AccountStakingInfo {
     #[serde(rename_all = "camelCase")]
@@ -142,7 +275,7 @@ impl AccountStakingInfo {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// Account information exposed via the node's API. This is always the state of
 /// an account in a specific block.
@@ -186,7 +319,7 @@ pub struct AccountInfo {
     pub account_address:          AccountAddress,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// The state of consensus parameters, and allowed participants (i.e., bakers).
 pub struct BirkParameters {
@@ -198,7 +331,7 @@ pub struct BirkParameters {
     pub bakers:              Vec<BirkBaker>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// State of an individual baker.
 pub struct BirkBaker {
@@ -211,7 +344,7 @@ pub struct BirkBaker {
     pub baker_account:       AccountAddress,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
+#[derive(SerdeSerialize, SerdeDeserialize, PartialEq, Debug, Clone, Copy)]
 #[serde(tag = "change")]
 /// Pending change in the baker's stake.
 pub enum StakePendingChange {
@@ -241,7 +374,7 @@ impl StakePendingChange {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 /// Information about a registered passive or pool delegator.
 pub struct DelegatorInfo {
     /// The delegator account address.
@@ -361,7 +494,7 @@ mod rewards_overview {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy, PartialEq)]
 #[serde(tag = "pendingChangeType")]
 pub enum PoolPendingChange {
     NoChange,
@@ -379,7 +512,7 @@ pub enum PoolPendingChange {
     },
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CurrentPaydayBakerPoolStatus {
     /// The number of blocks baked in the current reward period.
@@ -416,7 +549,7 @@ mod lottery_power_parser {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// The state of the baker currently registered on the account.
 /// Current here means "present". This is the information that is being updated
@@ -757,7 +890,7 @@ mod block_summary_parser {
                         data,
                     })
                 }
-                P4 => {
+                P4 | P5 => {
                     let updates: super::Updates<super::ChainParameterVersion1> =
                         serde_json::from_value(value.data.updates)?;
                     let data = super::BlockSummaryData {
@@ -933,6 +1066,7 @@ impl BlockItemSummary {
                             ContractTraceElement::Transferred { .. } => (),
                             ContractTraceElement::Interrupted { .. } => (),
                             ContractTraceElement::Resumed { .. } => (),
+                            ContractTraceElement::Upgraded { .. } => (),
                         }
                     }
                     addresses
@@ -977,6 +1111,7 @@ impl BlockItemSummary {
                             Some((*address, &events[..]))
                         }
                         ContractTraceElement::Resumed { .. } => None,
+                        ContractTraceElement::Upgraded { .. } => None,
                     });
                     Some(iter)
                 }
@@ -1008,6 +1143,7 @@ impl BlockItemSummary {
                             }
                             ContractTraceElement::Interrupted { .. } => (),
                             ContractTraceElement::Resumed { .. } => (),
+                            ContractTraceElement::Upgraded { .. } => (),
                         }
                     }
                     addresses
@@ -1167,6 +1303,14 @@ pub enum ContractTraceElement {
     Resumed {
         address: ContractAddress,
         success: bool,
+    },
+    Upgraded {
+        /// Address of the instance that was upgraded.
+        address: ContractAddress,
+        /// The existing module reference that is in effect before the upgrade.
+        from:    smart_contracts::ModuleRef,
+        /// The new module reference that is in effect after the upgrade.
+        to:      smart_contracts::ModuleRef,
     },
 }
 

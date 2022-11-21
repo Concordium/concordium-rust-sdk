@@ -43,7 +43,7 @@ async fn main() -> anyhow::Result<()> {
         .block
         .map_or(v2::BlockIdentifier::LastFinal, v2::BlockIdentifier::Given);
     let mut instances = client.get_instance_list(&block).await?;
-    let block = instances.block_hash.into();
+    let block = instances.block_hash;
     println!("Using block {}", instances.block_hash);
     while let Some(ia) = instances.response.next().await {
         let ia = ia?;

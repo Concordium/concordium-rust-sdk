@@ -32,7 +32,7 @@ async fn main() -> anyhow::Result<()> {
     println!("Blockhash: {}", res.block_hash);
     while let Some(a) = res.response.next().await.transpose()? {
         let mut response_delegators = client
-            .get_pool_delegators_reward_period(&v2::BlockIdentifier::Given(res.block_hash), a)
+            .get_pool_delegators_reward_period(res.block_hash, a)
             .await?;
         println!("Baker {:?}", &a);
 

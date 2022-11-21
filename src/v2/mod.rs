@@ -210,16 +210,16 @@ impl ChainParameters {
                 let x = v0.micro_ccd_per_euro;
                 let y = v0.euro_per_energy;
                 (
-                    u128::from(x.numerator) * u128::from(y.numerator),
-                    u128::from(y.denominator) * u128::from(y.denominator),
+                    u128::from(x.numerator()) * u128::from(y.numerator()),
+                    u128::from(y.denominator()) * u128::from(y.denominator()),
                 )
             }
             ChainParameters::V1(v1) => {
                 let x = v1.micro_ccd_per_euro;
                 let y = v1.euro_per_energy;
                 (
-                    u128::from(x.numerator) * u128::from(y.numerator),
-                    u128::from(y.denominator) * u128::from(y.denominator),
+                    u128::from(x.numerator()) * u128::from(y.numerator()),
+                    u128::from(y.denominator()) * u128::from(y.denominator()),
                 )
             }
         };
@@ -876,6 +876,28 @@ impl TryFrom<generated::NodeInfo> for types::NodeInfo {
     }
 }
 
+/// A helper trait that is implemented by types that can be cheaply converted to
+/// a [`BlockIdentifier`]. This is esentially [`Into<BlockIdentifier>`] but
+/// orphan rules prevent using that exactly.
+///
+/// This trait makes it convenient to use block hashes as input to functions
+/// that take a block identifier.
+pub trait IntoBlockIdentifier {
+    fn into_block_identifier(self) -> BlockIdentifier;
+}
+
+impl IntoBlockIdentifier for BlockIdentifier {
+    fn into_block_identifier(self) -> BlockIdentifier { self }
+}
+
+impl<X: IntoBlockIdentifier + Copy> IntoBlockIdentifier for &X {
+    fn into_block_identifier(self) -> BlockIdentifier { (*self).into_block_identifier() }
+}
+
+impl IntoBlockIdentifier for BlockHash {
+    fn into_block_identifier(self) -> BlockIdentifier { BlockIdentifier::Given(self) }
+}
+
 impl Client {
     /// Construct a new client connection to a concordium node.
     ///
@@ -907,9 +929,12 @@ impl Client {
     pub async fn get_account_info(
         &mut self,
         acc: &AccountIdentifier,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<QueryResponse<AccountInfo>> {
-        let response = self.client.get_account_info((acc, bi)).await?;
+        let response = self
+            .client
+            .get_account_info((acc, &bi.into_block_identifier()))
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let response = AccountInfo::try_from(response.into_inner())?;
         Ok(QueryResponse {
@@ -949,9 +974,12 @@ impl Client {
     /// not exist [`QueryError::NotFound`] is returned.
     pub async fn get_cryptographic_parameters(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<QueryResponse<types::CryptographicParameters>> {
-        let response = self.client.get_cryptographic_parameters(bi).await?;
+        let response = self
+            .client
+            .get_cryptographic_parameters(&bi.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let response = types::CryptographicParameters::try_from(response.into_inner())?;
         Ok(QueryResponse {
@@ -966,11 +994,14 @@ impl Client {
     /// [`QueryError::NotFound`] is returned.
     pub async fn get_account_list(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<
         QueryResponse<impl Stream<Item = Result<AccountAddress, tonic::Status>>>,
     > {
-        let response = self.client.get_account_list(bi).await?;
+        let response = self
+            .client
+            .get_account_list(&bi.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|x| x.and_then(TryFrom::try_from));
         Ok(QueryResponse {
@@ -985,10 +1016,13 @@ impl Client {
     /// If the block does not exist [`QueryError::NotFound`] is returned.
     pub async fn get_module_list(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<QueryResponse<impl Stream<Item = Result<ModuleRef, tonic::Status>>>>
     {
-        let response = self.client.get_module_list(bi).await?;
+        let response = self
+            .client
+            .get_module_list(&bi.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|x| x.and_then(TryFrom::try_from));
         Ok(QueryResponse {
@@ -1003,9 +1037,12 @@ impl Client {
     pub async fn get_module_source(
         &mut self,
         module_ref: &ModuleRef,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<QueryResponse<types::smart_contracts::WasmModule>> {
-        let response = self.client.get_module_source((module_ref, bi)).await?;
+        let response = self
+            .client
+            .get_module_source((module_ref, &bi.into_block_identifier()))
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let response = types::smart_contracts::WasmModule::try_from(response.into_inner())?;
         Ok(QueryResponse {
@@ -1020,11 +1057,14 @@ impl Client {
     /// exist [`QueryError::NotFound`] is returned.
     pub async fn get_instance_list(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<
         QueryResponse<impl Stream<Item = Result<ContractAddress, tonic::Status>>>,
     > {
-        let response = self.client.get_instance_list(bi).await?;
+        let response = self
+            .client
+            .get_instance_list(&bi.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|x| x.map(From::from));
         Ok(QueryResponse {
@@ -1039,9 +1079,12 @@ impl Client {
     pub async fn get_instance_info(
         &mut self,
         address: ContractAddress,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<QueryResponse<InstanceInfo>> {
-        let response = self.client.get_instance_info((address, bi)).await?;
+        let response = self
+            .client
+            .get_instance_info((address, &bi.into_block_identifier()))
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let response = InstanceInfo::try_from(response.into_inner())?;
         Ok(QueryResponse {
@@ -1055,11 +1098,14 @@ impl Client {
     /// ancestors or the requested number of ancestors have been returned.
     pub async fn get_ancestors(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
         limit: u64,
     ) -> endpoints::QueryResult<QueryResponse<impl Stream<Item = Result<BlockHash, tonic::Status>>>>
     {
-        let response = self.client.get_ancestors((bi, limit)).await?;
+        let response = self
+            .client
+            .get_ancestors((&bi.into_block_identifier(), limit))
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|x| x.and_then(TryFrom::try_from));
         Ok(QueryResponse {
@@ -1101,11 +1147,14 @@ impl Client {
     pub async fn get_instance_state(
         &mut self,
         ca: ContractAddress,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<
         QueryResponse<impl Stream<Item = Result<(Vec<u8>, Vec<u8>), tonic::Status>>>,
     > {
-        let response = self.client.get_instance_state((ca, bi)).await?;
+        let response = self
+            .client
+            .get_instance_state((ca, &bi.into_block_identifier()))
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|x| match x {
             Ok(v) => {
@@ -1130,9 +1179,12 @@ impl Client {
         &mut self,
         ca: ContractAddress,
         key: impl Into<Vec<u8>>,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<QueryResponse<Vec<u8>>> {
-        let response = self.client.instance_state_lookup((ca, bi, key)).await?;
+        let response = self
+            .client
+            .instance_state_lookup((ca, &bi.into_block_identifier(), key))
+            .await?;
         let block_hash = extract_metadata(&response)?;
         Ok(QueryResponse {
             block_hash,
@@ -1261,10 +1313,13 @@ impl Client {
     /// If the block does not exist [`QueryError::NotFound`] is returned.
     pub async fn invoke_instance(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
         context: &ContractContext,
     ) -> endpoints::QueryResult<QueryResponse<InvokeContractResult>> {
-        let response = self.client.invoke_instance((bi, context)).await?;
+        let response = self
+            .client
+            .invoke_instance((&bi.into_block_identifier(), context))
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let response = InvokeContractResult::try_from(response.into_inner())?;
         Ok(QueryResponse {
@@ -1278,9 +1333,12 @@ impl Client {
     /// returned.
     pub async fn get_block_info(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<QueryResponse<types::queries::BlockInfo>> {
-        let response = self.client.get_block_info(bi).await?;
+        let response = self
+            .client
+            .get_block_info(&bi.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let response = types::queries::BlockInfo::try_from(response.into_inner())?;
         Ok(QueryResponse {
@@ -1293,11 +1351,14 @@ impl Client {
     /// If the block does not exist [`QueryError::NotFound`] is returned.
     pub async fn get_baker_list(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<
         QueryResponse<impl Stream<Item = Result<types::BakerId, tonic::Status>>>,
     > {
-        let response = self.client.get_baker_list(bi).await?;
+        let response = self
+            .client
+            .get_baker_list(&bi.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|x| x.map(From::from));
         Ok(QueryResponse {
@@ -1311,10 +1372,13 @@ impl Client {
     /// returned.
     pub async fn get_pool_info(
         &mut self,
-        block_id: &BlockIdentifier,
+        block_id: impl IntoBlockIdentifier,
         baker_id: types::BakerId,
     ) -> endpoints::QueryResult<QueryResponse<types::BakerPoolStatus>> {
-        let response = self.client.get_pool_info((block_id, baker_id)).await?;
+        let response = self
+            .client
+            .get_pool_info((&block_id.into_block_identifier(), baker_id))
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let response = types::BakerPoolStatus::try_from(response.into_inner())?;
         Ok(QueryResponse {
@@ -1328,9 +1392,12 @@ impl Client {
     /// returned.
     pub async fn get_passive_delegation_info(
         &mut self,
-        block_id: &BlockIdentifier,
+        block_id: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<QueryResponse<types::PassiveDelegationStatus>> {
-        let response = self.client.get_passive_delegation_info(block_id).await?;
+        let response = self
+            .client
+            .get_passive_delegation_info(&block_id.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let response = types::PassiveDelegationStatus::try_from(response.into_inner())?;
         Ok(QueryResponse {
@@ -1361,9 +1428,12 @@ impl Client {
     /// If the block does not exist [`QueryError::NotFound`] is returned.
     pub async fn get_tokenomics_info(
         &mut self,
-        block_id: &BlockIdentifier,
+        block_id: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<QueryResponse<types::RewardsOverview>> {
-        let response = self.client.get_tokenomics_info(block_id).await?;
+        let response = self
+            .client
+            .get_tokenomics_info(&block_id.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let response = types::RewardsOverview::try_from(response.into_inner())?;
         Ok(QueryResponse {
@@ -1384,12 +1454,15 @@ impl Client {
     /// visible in this list.
     pub async fn get_pool_delegators(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
         baker_id: types::BakerId,
     ) -> endpoints::QueryResult<
         QueryResponse<impl Stream<Item = Result<types::DelegatorInfo, tonic::Status>>>,
     > {
-        let response = self.client.get_pool_delegators((bi, baker_id)).await?;
+        let response = self
+            .client
+            .get_pool_delegators((&bi.into_block_identifier(), baker_id))
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|result| match result {
             Ok(delegator) => delegator.try_into(),
@@ -1412,14 +1485,14 @@ impl Client {
     /// containing the given block.
     pub async fn get_pool_delegators_reward_period(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
         baker_id: types::BakerId,
     ) -> endpoints::QueryResult<
         QueryResponse<impl Stream<Item = Result<types::DelegatorRewardPeriodInfo, tonic::Status>>>,
     > {
         let response = self
             .client
-            .get_pool_delegators_reward_period((bi, baker_id))
+            .get_pool_delegators_reward_period((&bi.into_block_identifier(), baker_id))
             .await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|result| match result {
@@ -1443,11 +1516,14 @@ impl Client {
     /// visible in this list.
     pub async fn get_passive_delegators(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<
         QueryResponse<impl Stream<Item = Result<types::DelegatorInfo, tonic::Status>>>,
     > {
-        let response = self.client.get_passive_delegators(bi).await?;
+        let response = self
+            .client
+            .get_passive_delegators(&bi.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|result| match result {
             Ok(delegator) => delegator.try_into(),
@@ -1470,11 +1546,14 @@ impl Client {
     /// given block.
     pub async fn get_passive_delegators_reward_period(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<
         QueryResponse<impl Stream<Item = Result<types::DelegatorRewardPeriodInfo, tonic::Status>>>,
     > {
-        let response = self.client.get_passive_delegators_reward_period(bi).await?;
+        let response = self
+            .client
+            .get_passive_delegators_reward_period(&bi.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|result| match result {
             Ok(delegator) => delegator.try_into(),
@@ -1505,9 +1584,12 @@ impl Client {
     /// If the block does not exist [`QueryError::NotFound`] is returned.
     pub async fn get_election_info(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<QueryResponse<types::BirkParameters>> {
-        let response = self.client.get_election_info(bi).await?;
+        let response = self
+            .client
+            .get_election_info(&bi.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let response = types::BirkParameters::try_from(response.into_inner())?;
         Ok(QueryResponse {
@@ -1521,7 +1603,7 @@ impl Client {
     /// The stream will end when all the identity providers have been returned.
     pub async fn get_identity_providers(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<
         QueryResponse<
             impl Stream<
@@ -1532,7 +1614,10 @@ impl Client {
             >,
         >,
     > {
-        let response = self.client.get_identity_providers(bi).await?;
+        let response = self
+            .client
+            .get_identity_providers(&bi.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|result| match result {
             Ok(ip_info) => ip_info.try_into(),
@@ -1549,7 +1634,7 @@ impl Client {
     /// The stream will end when all the anonymity revokers have been returned.
     pub async fn get_anonymity_revokers(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<
         QueryResponse<
             impl Stream<
@@ -1560,7 +1645,10 @@ impl Client {
             >,
         >,
     > {
-        let response = self.client.get_anonymity_revokers(bi).await?;
+        let response = self
+            .client
+            .get_anonymity_revokers(&bi.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|result| match result {
             Ok(ar_info) => ar_info.try_into(),
@@ -1602,11 +1690,14 @@ impl Client {
     /// been returned.
     pub async fn get_block_items(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<
         QueryResponse<impl Stream<Item = Result<BlockItem<EncodedPayload>, tonic::Status>>>,
     > {
-        let response = self.client.get_block_items(bi).await?;
+        let response = self
+            .client
+            .get_block_items(&bi.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|result| match result {
             Ok(summary) => summary.try_into(),
@@ -1780,11 +1871,14 @@ impl Client {
     /// transaction events for a given block have been returned.
     pub async fn get_block_transaction_events(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<
         QueryResponse<impl Stream<Item = Result<types::BlockItemSummary, tonic::Status>>>,
     > {
-        let response = self.client.get_block_transaction_events(bi).await?;
+        let response = self
+            .client
+            .get_block_transaction_events(&bi.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|result| match result {
             Ok(summary) => summary.try_into(),
@@ -1804,11 +1898,14 @@ impl Client {
     /// payouts. They are not directly generated by any transaction.
     pub async fn get_block_special_events(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<
         QueryResponse<impl Stream<Item = Result<types::SpecialTransactionOutcome, tonic::Status>>>,
     > {
-        let response = self.client.get_block_special_events(bi).await?;
+        let response = self
+            .client
+            .get_block_special_events(&bi.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|result| match result {
             Ok(summary) => summary.try_into(),
@@ -1826,11 +1923,14 @@ impl Client {
     /// been returned.
     pub async fn get_block_pending_updates(
         &mut self,
-        bi: &BlockIdentifier,
+        bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<
         QueryResponse<impl Stream<Item = Result<types::queries::PendingUpdate, tonic::Status>>>,
     > {
-        let response = self.client.get_block_pending_updates(bi).await?;
+        let response = self
+            .client
+            .get_block_pending_updates(&bi.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let stream = response.into_inner().map(|result| match result {
             Ok(update) => update.try_into(),
@@ -1847,11 +1947,11 @@ impl Client {
     /// is returned.
     pub async fn get_next_update_sequence_numbers(
         &mut self,
-        block_id: &BlockIdentifier,
+        block_id: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<QueryResponse<types::queries::NextUpdateSequenceNumbers>> {
         let response = self
             .client
-            .get_next_update_sequence_numbers(block_id)
+            .get_next_update_sequence_numbers(&block_id.into_block_identifier())
             .await?;
         let block_hash = extract_metadata(&response)?;
         let response = types::queries::NextUpdateSequenceNumbers::try_from(response.into_inner())?;
@@ -1865,9 +1965,12 @@ impl Client {
     /// If the block does not exist [`QueryError::NotFound`] is returned.
     pub async fn get_block_chain_parameters(
         &mut self,
-        block_id: &BlockIdentifier,
+        block_id: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<QueryResponse<ChainParameters>> {
-        let response = self.client.get_block_chain_parameters(block_id).await?;
+        let response = self
+            .client
+            .get_block_chain_parameters(&block_id.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let response = ChainParameters::try_from(response.into_inner())?;
         Ok(QueryResponse {
@@ -1884,9 +1987,12 @@ impl Client {
     /// the block does not exist [`QueryError::NotFound`] is returned.
     pub async fn get_block_finalization_summary(
         &mut self,
-        block_id: &BlockIdentifier,
+        block_id: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<QueryResponse<Option<types::FinalizationSummary>>> {
-        let response = self.client.get_block_finalization_summary(block_id).await?;
+        let response = self
+            .client
+            .get_block_finalization_summary(&block_id.into_block_identifier())
+            .await?;
         let block_hash = extract_metadata(&response)?;
         let response = response.into_inner().try_into()?;
         Ok(QueryResponse {
