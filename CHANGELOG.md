@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+## 2.0.0
+
 - Expose macros for deriving `Serial` and `Deserial` from `concordium-contracts-common`.
 - Address method `is_alias_of` is now `is_alias`.
 - Replaced `ReceiveName` and `InitName` with `OwnedReceiveName` and `OwnedContractName` from `concordium-contracts-common`.
@@ -20,6 +22,9 @@
 - The CIS2 support now uses the V2 node API. This has led so small changes in
   the API.
 - Add support for protocol version 5 events and limitations.
+- Deprecate `add_baker`, `update_baker_keys`, `remove_baker`,
+  `update_baker_stake`, `update_baker_restake_earnings` functions. They only
+  apply to protocol versions 1-3 and are replaced by `configure_baker`.
 
 ## 1.1.0
 
