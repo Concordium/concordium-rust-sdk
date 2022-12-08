@@ -1,5 +1,11 @@
 ## Unreleased changes
 
+## 2.1.0
+
+- Add `WalletAccount` type that can be parsed from the browser extension wallet
+  export. This supports the signer interface and so can be used to send transactions.
+
+
 ## 2.0.0
 
 - Expose macros for deriving `Serial` and `Deserial` from `concordium-contracts-common`.

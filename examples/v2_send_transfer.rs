@@ -1,27 +1,17 @@
 //! Basic example that shows how to send a transaction with an optional memo, in
 //! this case a transfer from the account to itself.
+//!
+//! The keys are meant to be supplied in the browser extension wallet export
+//! format.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    common::{
-        types::{Amount, TransactionTime},
-        SerdeDeserialize, SerdeSerialize,
-    },
-    id::types::{AccountAddress, AccountKeys},
-    types::transactions::send,
+    common::types::{Amount, TransactionTime},
+    types::{transactions::send, WalletAccount},
     v2,
 };
 use std::path::PathBuf;
 use structopt::*;
-
-#[derive(SerdeSerialize, SerdeDeserialize)]
-#[serde(rename_all = "camelCase")]
-/// Account address and keys that will be supplied in a JSON file.
-/// The transaction will be signed with the given keys.
-struct AccountData {
-    account_keys: AccountKeys,
-    address:      AccountAddress,
-}
 
 #[derive(StructOpt)]
 struct App {
@@ -47,16 +37,18 @@ async fn main() -> anyhow::Result<()> {
         let matches = app.get_matches();
         App::from_clap(&matches)
     };
+
+    // load account keys and sender address from a file
+    let keys: WalletAccount =
+        serde_json::from_str(&std::fs::read_to_string(app.keys_path).context(
+            "Could not read the keys
+    file.",
+        )?)
+        .context("Could not parse the keys file.")?;
+
     let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
-
-    // load account keys and sender address from a file
-    let keys: AccountData = serde_json::from_str(&std::fs::read_to_string(app.keys_path).context(
-        "Could not read the keys
-    file.",
-    )?)
-    .context("Could not parse the keys file.")?;
 
     // Get the initial nonce at the last finalized block.
     let ai = client
@@ -70,7 +62,7 @@ async fn main() -> anyhow::Result<()> {
     let tx = match &app.memo {
         None => {
             send::transfer(
-                &keys.account_keys,
+                &keys,
                 keys.address,
                 nonce,
                 expiry,
@@ -81,7 +73,7 @@ async fn main() -> anyhow::Result<()> {
         Some(memo) => {
             let memo = memo.as_bytes().to_owned().try_into()?;
             send::transfer_with_memo(
-                &keys.account_keys,
+                &keys,
                 keys.address,
                 nonce,
                 expiry,

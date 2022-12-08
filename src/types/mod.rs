@@ -25,8 +25,9 @@ use concordium_base::{
     id::{
         constants::{ArCurve, AttributeKind},
         elgamal,
-        types::{AccountAddress, AccountCredentialWithoutProofs},
+        types::{AccountAddress, AccountCredentialWithoutProofs, AccountKeys},
     },
+    transactions::{ExactSizeTransactionSigner, TransactionSigner},
 };
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
@@ -2218,4 +2219,65 @@ pub struct NodeInfo {
     pub network_info: NetworkInfo,
     /// Information related to consensus for the node.
     pub details:      NodeDetails,
+}
+
+#[derive(Debug, SerdeDeserialize)]
+#[serde(try_from = "wallet_account_json::VersionedWalletAccount")]
+/// A parsed import file in the format exported by the browser extension wallet
+/// and the new android and iOS wallets.
+///
+/// This structure implements [`TransactionSigner`] and
+/// [`ExactSizeTransactionSigner`] so it may be used for sending transactions.
+pub struct WalletAccount {
+    pub address: AccountAddress,
+    pub keys:    AccountKeys,
+}
+
+impl TransactionSigner for WalletAccount {
+    fn sign_transaction_hash(
+        &self,
+        hash_to_sign: &hashes::TransactionSignHash,
+    ) -> common::types::TransactionSignature {
+        self.keys.sign_transaction_hash(hash_to_sign)
+    }
+}
+
+impl ExactSizeTransactionSigner for WalletAccount {
+    fn num_keys(&self) -> u32 { self.keys.num_keys() }
+}
+
+mod wallet_account_json {
+    use concordium_base::common::{Version, VERSION_0};
+
+    use super::*;
+
+    #[derive(Debug, SerdeDeserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct WalletAccount {
+        account_keys: AccountKeys,
+        pub address:  AccountAddress,
+    }
+
+    #[derive(Debug, SerdeDeserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct VersionedWalletAccount {
+        r#type: String,
+        v:      Version,
+        value:  WalletAccount,
+    }
+
+    impl TryFrom<VersionedWalletAccount> for super::WalletAccount {
+        type Error = anyhow::Error;
+
+        fn try_from(value: VersionedWalletAccount) -> Result<Self, Self::Error> {
+            if value.v == VERSION_0 && value.r#type == "concordium-browser-wallet-account" {
+                Ok(Self {
+                    address: value.value.address,
+                    keys:    value.value.account_keys,
+                })
+            } else {
+                anyhow::bail!("Unexpected wallet export version.")
+            }
+        }
+    }
 }
