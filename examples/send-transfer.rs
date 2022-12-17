@@ -3,28 +3,15 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    common::{
-        types::{Amount, TransactionTime},
-        SerdeDeserialize, SerdeSerialize,
-    },
+    common::types::{Amount, TransactionTime},
     endpoints,
-    id::types::{AccountAddress, AccountKeys},
     types::{
         transactions::{send, BlockItem},
-        AccountInfo,
+        AccountInfo, WalletAccount,
     },
 };
 use std::path::PathBuf;
 use structopt::*;
-
-#[derive(SerdeSerialize, SerdeDeserialize)]
-#[serde(rename_all = "camelCase")]
-/// Account address and keys that will be supplied in a JSON file.
-/// The transaction will be signed with the given keys.
-struct AccountData {
-    account_keys: AccountKeys,
-    address:      AccountAddress,
-}
 
 #[derive(StructOpt)]
 struct App {
@@ -48,10 +35,8 @@ async fn main() -> anyhow::Result<()> {
     let mut client = endpoints::Client::connect(app.endpoint, "rpcadmin").await?;
 
     // load account keys and sender address from a file
-    let keys: AccountData = serde_json::from_str(
-        &std::fs::read_to_string(app.keys_path).context("Could not read the keys file.")?,
-    )
-    .context("Could not parse the keys file.")?;
+    let keys: WalletAccount =
+        WalletAccount::from_json_file(app.keys_path).context("Could not read the keys file.")?;
 
     let consensus_info = client.get_consensus_status().await?;
     // Get the initial nonce at the last finalized block.
@@ -64,7 +49,7 @@ async fn main() -> anyhow::Result<()> {
     let expiry: TransactionTime =
         TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
     let tx = send::transfer(
-        &keys.account_keys,
+        &keys,
         keys.address,
         nonce,
         expiry,

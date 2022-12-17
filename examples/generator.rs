@@ -1,15 +1,13 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    common::{
-        types::{Amount, TransactionTime},
-        SerdeDeserialize, SerdeSerialize,
-    },
+    common::types::{Amount, TransactionTime},
     endpoints::{self, Endpoint},
-    id::types::{AccountAddress, AccountKeys},
+    id::types::AccountAddress,
     types::{
         self,
         transactions::{send, BlockItem},
+        WalletAccount,
     },
 };
 use std::path::PathBuf;
@@ -37,13 +35,6 @@ struct App {
     amount:    Amount,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize)]
-#[serde(rename_all = "camelCase")]
-struct AccountData {
-    account_keys: AccountKeys,
-    address:      AccountAddress,
-}
-
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
     let app = {
@@ -56,10 +47,8 @@ async fn main() -> anyhow::Result<()> {
 
     let consensus_info = client.get_consensus_status().await?;
 
-    let keys: AccountData = serde_json::from_str(
-        &std::fs::read_to_string(app.account).context("Could not read the keys file.")?,
-    )
-    .context("Could not parse the keys file.")?;
+    let keys: WalletAccount =
+        WalletAccount::from_json_file(app.account).context("Could not parse the keys file.")?;
     let accounts: Vec<AccountAddress> = match app.receivers {
         None => client
             .get_account_list(&consensus_info.last_finalized_block)
@@ -96,7 +85,7 @@ async fn main() -> anyhow::Result<()> {
             let expiry: TransactionTime =
                 TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
             let tx = send::transfer(
-                &keys.account_keys,
+                &keys,
                 keys.address,
                 nonce,
                 expiry,

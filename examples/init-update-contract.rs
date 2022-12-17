@@ -7,7 +7,6 @@ use clap::AppSettings;
 use concordium_rust_sdk::{
     common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize},
     endpoints,
-    id::types::{AccountAddress, AccountKeys},
     smart_contracts::common::{
         self as contracts_common, Amount, ContractAddress, OwnedContractName, OwnedReceiveName,
         Serial,
@@ -15,7 +14,7 @@ use concordium_rust_sdk::{
     types::{
         smart_contracts::{ModuleRef, Parameter},
         transactions::{send, BlockItem, InitContractPayload, UpdateContractPayload},
-        AccountInfo,
+        AccountInfo, WalletAccount,
     },
 };
 use std::path::PathBuf;
@@ -34,15 +33,6 @@ struct App {
     keys_path: PathBuf,
     #[structopt(subcommand, help = "The action you want to perform.")]
     action:    Action,
-}
-
-#[derive(SerdeSerialize, SerdeDeserialize)]
-#[serde(rename_all = "camelCase")]
-/// Account address and keys that will be supplied in a JSON file.
-/// The transaction will be signed with the given keys.
-struct AccountData {
-    account_keys: AccountKeys,
-    address:      AccountAddress,
 }
 
 #[derive(StructOpt)]
@@ -101,10 +91,8 @@ async fn main() -> anyhow::Result<()> {
     let mut client = endpoints::Client::connect(app.endpoint, "rpcadmin").await?;
 
     // load account keys and sender address from a file
-    let keys: AccountData = serde_json::from_str(
-        &std::fs::read_to_string(app.keys_path).context("Could not read the keys file.")?,
-    )
-    .context("Could not parse the keys file.")?;
+    let keys: WalletAccount =
+        WalletAccount::from_json_file(app.keys_path).context("Could not parse the keys file.")?;
 
     let consensus_info = client.get_consensus_status().await?;
     // Get the initial nonce at the last finalized block.
@@ -130,14 +118,7 @@ async fn main() -> anyhow::Result<()> {
                 param,
             };
 
-            send::init_contract(
-                &keys.account_keys,
-                keys.address,
-                nonce,
-                expiry,
-                payload,
-                10000u64.into(),
-            )
+            send::init_contract(&keys, keys.address, nonce, expiry, payload, 10000u64.into())
         }
         Action::Update { weather, address } => {
             let message = Parameter::try_from(contracts_common::to_bytes(&weather)).unwrap();
@@ -148,14 +129,7 @@ async fn main() -> anyhow::Result<()> {
                 message,
             };
 
-            send::update_contract(
-                &keys.account_keys,
-                keys.address,
-                nonce,
-                expiry,
-                payload,
-                10000u64.into(),
-            )
+            send::update_contract(&keys, keys.address, nonce, expiry, payload, 10000u64.into())
         }
     };
 

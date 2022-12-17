@@ -2,22 +2,15 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize},
-    id::types::{AccountAddress, AccountKeys},
-    types::transactions::{send, BlockItem},
+    common::types::TransactionTime,
+    types::{
+        transactions::{send, BlockItem},
+        WalletAccount,
+    },
     v2,
 };
 use std::path::PathBuf;
 use structopt::*;
-
-#[derive(SerdeSerialize, SerdeDeserialize)]
-#[serde(rename_all = "camelCase")]
-/// Account address and keys that will be supplied in a JSON file.
-/// The transaction will be signed with the given keys.
-struct AccountData {
-    account_keys: AccountKeys,
-    address:      AccountAddress,
-}
 
 #[derive(StructOpt)]
 struct App {
@@ -48,11 +41,8 @@ async fn main() -> anyhow::Result<()> {
         .context("Cannot connect.")?;
 
     // load account keys and sender address from a file
-    let keys: AccountData = serde_json::from_str(&std::fs::read_to_string(app.keys_path).context(
-        "Could not read the keys
-    file.",
-    )?)
-    .context("Could not parse the keys file.")?;
+    let keys: WalletAccount =
+        WalletAccount::from_json_file(app.keys_path).context("Could not parse the keys file.")?;
 
     // Get the initial nonce at the last finalized block.
     let ai = client
@@ -66,7 +56,7 @@ async fn main() -> anyhow::Result<()> {
     let tx = {
         let contents = std::fs::read(app.data_path).context("Could not read data file.")?;
         let data = contents.try_into()?;
-        send::register_data(&keys.account_keys, keys.address, nonce, expiry, data)
+        send::register_data(&keys, keys.address, nonce, expiry, data)
     };
 
     let item = BlockItem::AccountTransaction(tx);

@@ -7,7 +7,6 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::{self, types::TransactionTime, SerdeDeserialize, SerdeSerialize},
-    id::types::{AccountAddress, AccountKeys},
     smart_contracts::{
         common as contracts_common,
         common::Amount,
@@ -16,7 +15,7 @@ use concordium_rust_sdk::{
     types::{
         smart_contracts::{ModuleRef, Parameter, WasmModule},
         transactions::{send, BlockItem, InitContractPayload, UpdateContractPayload},
-        AccountInfo, ContractAddress,
+        AccountInfo, ContractAddress, WalletAccount,
     },
     v2,
 };
@@ -36,15 +35,6 @@ struct App {
     keys_path: PathBuf,
     #[structopt(subcommand, help = "The action you want to perform.")]
     action:    Action,
-}
-
-#[derive(SerdeSerialize, SerdeDeserialize)]
-#[serde(rename_all = "camelCase")]
-/// Account address and keys that will be supplied in a JSON file.
-/// The transaction will be signed with the given keys.
-struct AccountData {
-    account_keys: AccountKeys,
-    address:      AccountAddress,
 }
 
 #[derive(StructOpt)]
@@ -110,10 +100,8 @@ async fn main() -> anyhow::Result<()> {
         .context("Cannot connect.")?;
 
     // load account keys and sender address from a file
-    let keys: AccountData = serde_json::from_str(
-        &std::fs::read_to_string(app.keys_path).context("Could not read the keys file.")?,
-    )
-    .context("Could not parse the keys file.")?;
+    let keys: WalletAccount =
+        WalletAccount::from_json_file(app.keys_path).context("Could not read the keys file.")?;
 
     // Get the initial nonce at the last finalized block.
     let acc_info: AccountInfo = client
@@ -139,14 +127,7 @@ async fn main() -> anyhow::Result<()> {
                 param,
             };
 
-            send::init_contract(
-                &keys.account_keys,
-                keys.address,
-                nonce,
-                expiry,
-                payload,
-                10000u64.into(),
-            )
+            send::init_contract(&keys, keys.address, nonce, expiry, payload, 10000u64.into())
         }
         Action::Update { weather, address } => {
             let message = Parameter::try_from(contracts_common::to_bytes(&weather)).unwrap();
@@ -157,20 +138,13 @@ async fn main() -> anyhow::Result<()> {
                 message,
             };
 
-            send::update_contract(
-                &keys.account_keys,
-                keys.address,
-                nonce,
-                expiry,
-                payload,
-                10000u64.into(),
-            )
+            send::update_contract(&keys, keys.address, nonce, expiry, payload, 10000u64.into())
         }
         Action::Deploy { module_path } => {
             let contents = std::fs::read(module_path).context("Could not read contract module.")?;
             let payload: WasmModule =
                 common::Deserial::deserial(&mut std::io::Cursor::new(contents))?;
-            send::deploy_module(&keys.account_keys, keys.address, nonce, expiry, payload)
+            send::deploy_module(&keys, keys.address, nonce, expiry, payload)
         }
     };
 
