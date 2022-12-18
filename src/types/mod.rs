@@ -2228,11 +2228,11 @@ pub struct NodeInfo {
 /// In particular the `serde` instance supports the browser wallet key export
 /// format, but there are other constructors available.
 ///
-/// This structure does not have the encryption key for sending encrypted
-/// transfers, it only contains keys for signing transactions.
-///
 /// This structure implements [`TransactionSigner`] and
 /// [`ExactSizeTransactionSigner`] so it may be used for sending transactions.
+///
+/// This structure does not have the encryption key for sending encrypted
+/// transfers, it only contains keys for signing transactions.
 pub struct WalletAccount {
     pub address: AccountAddress,
     pub keys:    AccountKeys,
