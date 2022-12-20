@@ -1,5 +1,9 @@
 ## Unreleased changes
 
+- Add helpers to `WalletAccount` so that it can be constructed from genesis
+  account format produced by the genesis creator tool, as well as from browser
+  key export format.
+
 ## 2.1.0
 
 - Add `WalletAccount` type that can be parsed from the browser extension wallet
