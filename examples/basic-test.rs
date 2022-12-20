@@ -21,13 +21,6 @@ struct App {
     start_block: Option<types::hashes::BlockHash>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize)]
-#[serde(rename_all = "camelCase")]
-struct AccountData {
-    account_keys: AccountKeys,
-    address:      AccountAddress,
-}
-
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
     let app: App = {
