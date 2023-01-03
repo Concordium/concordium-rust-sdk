@@ -1,4 +1,4 @@
-//! An example showing how to do the first 3 protocol updates.
+//! An example showing how to do the first 4 protocol updates.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{

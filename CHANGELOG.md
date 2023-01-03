@@ -3,6 +3,7 @@
 - Add helpers to `WalletAccount` so that it can be constructed from genesis
   account format produced by the genesis creator tool, as well as from browser
   key export format.
+- Fix contract schema's `to_json` to output contract addresses in the correct format.
 
 ## 2.1.0
 
