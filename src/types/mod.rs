@@ -1035,11 +1035,16 @@ impl BlockItemSummary {
 
     /// Return whether the transaction has failed to achieve the intended
     /// effects.
-    pub fn is_reject(&self) -> bool {
+    pub fn is_reject(&self) -> bool { self.is_rejected_account_transaction().is_some() }
+
+    /// Return `Some` if the result corresponds to a rejected account
+    /// transaction. This returns `Some` if and only if
+    /// [`is_reject`](Self::is_reject) returns `true`.
+    pub fn is_rejected_account_transaction(&self) -> Option<&RejectReason> {
         match &self.details {
-            BlockItemSummaryDetails::AccountTransaction(ad) => ad.is_rejected().is_some(),
-            BlockItemSummaryDetails::AccountCreation(_) => false,
-            BlockItemSummaryDetails::Update(_) => false,
+            BlockItemSummaryDetails::AccountTransaction(ad) => ad.is_rejected(),
+            BlockItemSummaryDetails::AccountCreation(_) => None,
+            BlockItemSummaryDetails::Update(_) => None,
         }
     }
 

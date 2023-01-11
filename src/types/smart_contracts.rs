@@ -169,6 +169,16 @@ pub struct ContractEvent {
     bytes: Vec<u8>,
 }
 
+/// Display the entire event in hex.
+impl std::fmt::Display for ContractEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for b in &self.bytes {
+            f.write_fmt(format_args!("{:02x}", b))?
+        }
+        Ok(())
+    }
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Clone)]
 /// Data needed to invoke the contract.
 pub struct ContractContext {

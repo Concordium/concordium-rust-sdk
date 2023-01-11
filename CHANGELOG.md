@@ -4,6 +4,18 @@
   account format produced by the genesis creator tool, as well as from browser
   key export format.
 - Fix contract schema's `to_json` to output contract addresses in the correct format.
+- Add a `Display` implementation for `ContractEvent`.
+- Add `_single` family of functions to `Cis2Contract` to make it easier to do
+  queries and updates for a single token or operator.
+- Generalize the signature of `Cis2Contract` methods that take a block
+  identifier. They now take `impl IntoBlockIdentifier`. All existing uses should
+  remain working since `&BlockIdentifier` implements this trait.
+- Add `is_rejected_account_transaction` helper to `BlockItemSummary` to help
+  extract reject reason for an account transaction.
+- Add `update_operator_dry_run` and `transfer_dry_run` methods to
+  `Cis2Contract`. These dry-run `update_operator` and `transfer` transactions
+  using `invoke_instance`. They can be used to estimate transaction costs, and
+  check whether the call will succeed.
 
 ## 2.1.0
 
