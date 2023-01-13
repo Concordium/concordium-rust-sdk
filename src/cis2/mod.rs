@@ -161,6 +161,8 @@ impl Cis2Contract {
     ///
     /// # Arguments
     ///
+    /// * `bi` - The block to dry-run at. The invocation happens at the end of
+    ///   the specified block.
     /// * `sender` - The address that is invoking the entrypoint.
     /// * `transfers` - A list of CIS2 token transfers to execute.
     pub async fn transfer_dry_run(
@@ -195,7 +197,7 @@ impl Cis2Contract {
 
     /// Like [`transfer_dry_run`](Self::transfer_dry_run) except it is more
     /// ergonomic when only a single transfer is to be made.
-    pub async fn transfer_dry_run_single(
+    pub async fn transfer_single_dry_run(
         &mut self,
         bi: impl IntoBlockIdentifier,
         sender: Address,
@@ -267,6 +269,7 @@ impl Cis2Contract {
     ///
     /// # Arguments
     ///
+    /// * `bi` - The block to dry-run at. The invocation happens at the end of
     /// * `owner` - The address that is invoking. This is the owner of the
     ///   tokens.
     /// * `updates` - A list of CIS2 UpdateOperators to update.
@@ -306,7 +309,7 @@ impl Cis2Contract {
 
     /// Like [`update_operator_dry_run`](Self::update_operator_dry_run) except
     /// more ergonomic when a single operator is to be updated.
-    pub async fn update_operator_dry_run_single(
+    pub async fn update_operator_single_dry_run(
         &mut self,
         bi: impl IntoBlockIdentifier,
         owner: Address,
@@ -491,9 +494,9 @@ impl Cis2Contract {
         }
     }
 
-    /// Like [`operator_of`], except for querying a single `owner`-`address`
-    /// pair. This additionally ensures that the response has correct
-    /// length.
+    /// Like [`operator_of`](Self::operator_of), except for querying a single
+    /// `owner`-`address` pair. This additionally ensures that the response
+    /// has correct length.
     pub async fn operator_of_single(
         &mut self,
         bi: impl IntoBlockIdentifier,
@@ -558,8 +561,9 @@ impl Cis2Contract {
         }
     }
 
-    /// Like [`token_metadata`], except for querying a single token. This
-    /// additionally ensures that the response has correct length.
+    /// Like [`token_metadata`](Self::token_metadata), except for querying a
+    /// single token. This additionally ensures that the response has
+    /// correct length.
     pub async fn token_metadata_single(
         &mut self,
         bi: impl IntoBlockIdentifier,
