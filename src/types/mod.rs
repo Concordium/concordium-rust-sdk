@@ -1035,11 +1035,16 @@ impl BlockItemSummary {
 
     /// Return whether the transaction has failed to achieve the intended
     /// effects.
-    pub fn is_reject(&self) -> bool {
+    pub fn is_reject(&self) -> bool { self.is_rejected_account_transaction().is_some() }
+
+    /// Return `Some` if the result corresponds to a rejected account
+    /// transaction. This returns `Some` if and only if
+    /// [`is_reject`](Self::is_reject) returns `true`.
+    pub fn is_rejected_account_transaction(&self) -> Option<&RejectReason> {
         match &self.details {
-            BlockItemSummaryDetails::AccountTransaction(ad) => ad.is_rejected().is_some(),
-            BlockItemSummaryDetails::AccountCreation(_) => false,
-            BlockItemSummaryDetails::Update(_) => false,
+            BlockItemSummaryDetails::AccountTransaction(ad) => ad.is_rejected(),
+            BlockItemSummaryDetails::AccountCreation(_) => None,
+            BlockItemSummaryDetails::Update(_) => None,
         }
     }
 
@@ -2292,21 +2297,21 @@ impl WalletAccount {
     }
 
     /// Helper for reading keys from files or other readers directly. See
-    /// [`from_json`](Self::from_json) for details.
+    /// [`from_json_value`](Self::from_json_value) for details.
     pub fn from_json_reader(reader: impl std::io::Read) -> Result<Self, serde_json::Error> {
         let v = serde_json::from_reader(reader)?;
         Self::from_json_value(v)
     }
 
     /// Helper for reading keys from strings. See
-    /// [`from_json`](Self::from_json) for details.
+    /// [`from_json_value`](Self::from_json_value) for details.
     pub fn from_json_str(reader: &str) -> Result<Self, serde_json::Error> {
         let v = serde_json::from_str(reader)?;
         Self::from_json_value(v)
     }
 
     /// Helper for reading keys from files. See
-    /// [`from_json`](Self::from_json) for details.
+    /// [`from_json_value`](Self::from_json_value) for details.
     pub fn from_json_file(path: impl AsRef<std::path::Path>) -> anyhow::Result<Self> {
         Ok(Self::from_json_reader(
             std::fs::File::open(path).context("Unable to open key file.")?,
