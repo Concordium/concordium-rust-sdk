@@ -906,6 +906,9 @@ mod block_summary_parser {
                         data,
                     })
                 }
+                P6 => {
+                    anyhow::bail!("Not yet supported.")
+                }
             }
         }
     }

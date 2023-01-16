@@ -416,6 +416,7 @@ impl From<ProtocolVersion> for super::types::ProtocolVersion {
             ProtocolVersion::ProtocolVersion3 => super::types::ProtocolVersion::P3,
             ProtocolVersion::ProtocolVersion4 => super::types::ProtocolVersion::P4,
             ProtocolVersion::ProtocolVersion5 => super::types::ProtocolVersion::P5,
+            ProtocolVersion::ProtocolVersion6 => super::types::ProtocolVersion::P6,
         }
     }
 }
