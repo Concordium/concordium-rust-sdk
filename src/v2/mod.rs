@@ -1370,6 +1370,8 @@ impl Client {
     /// Get information about a given pool at the end of a given block.
     /// If the block or baker ID does not exist [`QueryError::NotFound`] is
     /// returned.
+    /// If the block is baked prior to protocol version 4,
+    /// [`QueryError::NotFound`] is returned.
     pub async fn get_pool_info(
         &mut self,
         block_id: impl IntoBlockIdentifier,
@@ -1388,8 +1390,10 @@ impl Client {
     }
 
     /// Get information about the passive delegators at the end of a given
-    /// block. If the block does not exist [`QueryError::NotFound`] is
-    /// returned.
+    /// block.
+    /// If the block does not exist [`QueryError::NotFound`] is returned.
+    /// If the block is baked prior to protocol version 4,
+    /// [`QueryError::NotFound`] is returned.
     pub async fn get_passive_delegation_info(
         &mut self,
         block_id: impl IntoBlockIdentifier,
@@ -1443,9 +1447,11 @@ impl Client {
     }
 
     /// Get the registered delegators of a given pool at the end of a given
-    /// block. If the block or baker ID does not exist [`QueryError::NotFound`]
-    /// is returned. The stream will end when all the delegators have been
-    /// returned for the given block.
+    /// block.
+    /// If the block or baker ID does not exist [`QueryError::NotFound`] is
+    /// returned. If the block is baked prior to protocol version 4,
+    /// [`QueryError::RPCError`] is returned. The stream will end when all
+    /// the delegators have been returned for the given block.
     ///
     /// In contrast to the [Client::get_pool_delegators_reward_period] which
     /// returns delegators that are fixed for the reward period of the
@@ -1475,11 +1481,13 @@ impl Client {
     }
 
     /// Get the fixed delegators of a given pool for the reward period of the
-    /// given block. If the block or baker ID does not exist
-    /// [`QueryError::NotFound`] is returned. The stream will end when all the
-    /// delegators have been returned.
+    /// given block.
+    /// If the block or baker ID does not exist [`QueryError::NotFound`] is
+    /// returned. If the block is baked prior to protocol version 4,
+    /// [`QueryError::RPCError`] is returned. The stream will end when all
+    /// the delegators have been returned.
     ///
-    /// In contracts to the [Client::get_pool_delegators] which
+    /// In contrast to the [Client::get_pool_delegators] which
     /// returns delegators registered for the given block, this endpoint
     /// returns the fixed delegators contributing stake in the reward period
     /// containing the given block.
@@ -1505,9 +1513,11 @@ impl Client {
         })
     }
 
-    /// Get the registered passive delegators at the end of a given block. If
-    /// the block does not exist [`QueryError::NotFound`] is returned. The
-    /// stream will end when all the delegators have been returned.
+    /// Get the registered passive delegators at the end of a given block.
+    /// If the block does not exist [`QueryError::NotFound`] is returned.
+    /// If the block is baked prior to protocol version 4,
+    /// [`QueryError::RPCError`] is returned. The stream will end when all
+    /// the delegators have been returned.
     ///
     /// In contrast to the [`Client::get_passive_delegators_reward_period`]
     /// which returns delegators that are fixed for the reward period of the
@@ -1536,11 +1546,13 @@ impl Client {
     }
 
     /// Get the fixed passive delegators for the reward period of the given
-    /// block. If the block does not exist [`QueryError::NotFound`] is
-    /// returned. The stream will end when all the delegators have been
-    /// returned.
+    /// block.
+    /// If the block does not exist [`QueryError::NotFound`] is returned.
+    /// If the block is baked prior to protocol version 4,
+    /// [`QueryError::RPCError`] is returned. The stream will end when all
+    /// the delegators have been returned.
     ///
-    /// In contracts to the `GetPassiveDelegators` which returns delegators
+    /// In contrast to the `GetPassiveDelegators` which returns delegators
     /// registered for the given block, this endpoint returns the fixed
     /// delegators contributing stake in the reward period containing the
     /// given block.
