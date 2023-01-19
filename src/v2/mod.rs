@@ -38,7 +38,7 @@ pub use endpoints::{QueryError, QueryResult, RPCError, RPCResult};
 use futures::{Stream, StreamExt};
 use std::collections::HashMap;
 use tonic::IntoRequest;
-pub use tonic::{transport::Endpoint, Status};
+pub use tonic::{transport::Endpoint, Code, Status};
 
 mod conversions;
 mod generated;
@@ -1447,8 +1447,9 @@ impl Client {
     /// block.
     /// If the block or baker ID does not exist [`QueryError::NotFound`] is
     /// returned, and if the block is baked prior to protocol version 4
-    /// [`QueryError::RPCError`] is returned. The stream will end when all
-    /// the delegators have been returned for the given block.
+    /// [`QueryError::RPCError`] with status [`Code::InvalidArgument`] is
+    /// returned. The stream will end when all the delegators have been
+    /// returned for the given block.
     ///
     /// In contrast to the [Client::get_pool_delegators_reward_period] which
     /// returns delegators that are fixed for the reward period of the
@@ -1481,8 +1482,9 @@ impl Client {
     /// given block.
     /// If the block or baker ID does not exist [`QueryError::NotFound`] is
     /// returned, and if the block is baked prior to protocol version 4
-    /// [`QueryError::RPCError`] is returned. The stream will end when all
-    /// the delegators have been returned.
+    /// [`QueryError::RPCError`] with status [`Code::InvalidArgument`] is
+    /// returned. The stream will end when all the delegators have been
+    /// returned.
     ///
     /// In contrast to the [Client::get_pool_delegators] which
     /// returns delegators registered for the given block, this endpoint
@@ -1513,8 +1515,8 @@ impl Client {
     /// Get the registered passive delegators at the end of a given block.
     /// If the block does not exist [`QueryError::NotFound`] is returned, and if
     /// the block is baked prior to protocol version 4 [`QueryError::
-    /// RPCError`] is returned. The stream will end when all the delegators
-    /// have been returned.
+    /// RPCError`] with status [`Code::InvalidArgument`] is returned. The stream
+    /// will end when all the delegators have been returned.
     ///
     /// In contrast to the [`Client::get_passive_delegators_reward_period`]
     /// which returns delegators that are fixed for the reward period of the
@@ -1546,8 +1548,9 @@ impl Client {
     /// block.
     /// If the block does not exist [`QueryError::NotFound`] is returned.
     /// If the block is baked prior to protocol version 4,
-    /// [`QueryError::RPCError`] is returned. The stream will end when all
-    /// the delegators have been returned.
+    /// [`QueryError::RPCError`] with status [`Code::InvalidArgument`] is
+    /// returned. The stream will end when all the delegators have been
+    /// returned.
     ///
     /// In contrast to the `GetPassiveDelegators` which returns delegators
     /// registered for the given block, this endpoint returns the fixed
