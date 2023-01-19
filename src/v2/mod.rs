@@ -1368,9 +1368,7 @@ impl Client {
     }
 
     /// Get information about a given pool at the end of a given block.
-    /// If the block or baker ID does not exist [`QueryError::NotFound`] is
-    /// returned.
-    /// If the block is baked prior to protocol version 4,
+    /// If the block does not exist or is prior to protocol version 4 then
     /// [`QueryError::NotFound`] is returned.
     pub async fn get_pool_info(
         &mut self,
@@ -1391,8 +1389,7 @@ impl Client {
 
     /// Get information about the passive delegators at the end of a given
     /// block.
-    /// If the block does not exist [`QueryError::NotFound`] is returned.
-    /// If the block is baked prior to protocol version 4,
+    /// If the block does not exist or is prior to protocol version 4 then
     /// [`QueryError::NotFound`] is returned.
     pub async fn get_passive_delegation_info(
         &mut self,
@@ -1449,7 +1446,7 @@ impl Client {
     /// Get the registered delegators of a given pool at the end of a given
     /// block.
     /// If the block or baker ID does not exist [`QueryError::NotFound`] is
-    /// returned. If the block is baked prior to protocol version 4,
+    /// returned, and if the block is baked prior to protocol version 4
     /// [`QueryError::RPCError`] is returned. The stream will end when all
     /// the delegators have been returned for the given block.
     ///
@@ -1483,7 +1480,7 @@ impl Client {
     /// Get the fixed delegators of a given pool for the reward period of the
     /// given block.
     /// If the block or baker ID does not exist [`QueryError::NotFound`] is
-    /// returned. If the block is baked prior to protocol version 4,
+    /// returned, and if the block is baked prior to protocol version 4
     /// [`QueryError::RPCError`] is returned. The stream will end when all
     /// the delegators have been returned.
     ///
@@ -1514,10 +1511,10 @@ impl Client {
     }
 
     /// Get the registered passive delegators at the end of a given block.
-    /// If the block does not exist [`QueryError::NotFound`] is returned.
-    /// If the block is baked prior to protocol version 4,
-    /// [`QueryError::RPCError`] is returned. The stream will end when all
-    /// the delegators have been returned.
+    /// If the block does not exist [`QueryError::NotFound`] is returned, and if
+    /// the block is baked prior to protocol version 4 [`QueryError::
+    /// RPCError`] is returned. The stream will end when all the delegators
+    /// have been returned.
     ///
     /// In contrast to the [`Client::get_passive_delegators_reward_period`]
     /// which returns delegators that are fixed for the reward period of the
