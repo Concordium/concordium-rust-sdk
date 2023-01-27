@@ -13,7 +13,7 @@ use crate::{
         },
         transactions::{self, InitContractPayload, UpdateContractPayload, UpdateInstruction},
         AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, Energy, Memo, Nonce,
-        RegisteredData, TransactionStatus, UpdateSequenceNumber,
+        RegisteredData, SpecialTransactionOutcome, TransactionStatus, UpdateSequenceNumber,
     },
 };
 use concordium_base::{
@@ -1355,9 +1355,10 @@ impl Client {
         &mut self,
         bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<QueryResponse<bool>> {
-        let mut special_events = self.get_block_special_events(block_hash).await?.response;
+        let mut special_events = self.get_block_special_events(bi).await?;
+        let block_hash = special_events.block_hash;
 
-        while let Some(event) = special_events.next().await.transpose()? {
+        while let Some(event) = special_events.response.next().await.transpose()? {
             let has_payday_event = match event {
                 SpecialTransactionOutcome::PaydayPoolReward { .. } => true,
                 SpecialTransactionOutcome::PaydayAccountReward { .. } => true,
@@ -1366,11 +1367,17 @@ impl Client {
             };
 
             if has_payday_event {
-                return Ok(true);
+                return Ok(QueryResponse {
+                    block_hash,
+                    response: true,
+                });
             };
         }
 
-        Ok(false)
+        Ok(QueryResponse {
+            block_hash,
+            response: false,
+        })
     }
 
     /// Get all the bakers at the end of the given block.

@@ -16,6 +16,7 @@
   `Cis2Contract`. These dry-run `update_operator` and `transfer` transactions
   using `invoke_instance`. They can be used to estimate transaction costs, and
   check whether the call will succeed.
+- Add `is_payday_block` helper function to `v2::Client` to identify whether a specific block is one that includes payday events.
 
 ## 2.1.0
 
