@@ -1347,6 +1347,32 @@ impl Client {
         })
     }
 
+    /// Get information about whether a block identified by `bi` is a payday
+    /// block or not. This will always return `false` for blocks produced prior
+    /// to protocol version 4. If the block does not exits
+    /// [`QueryError::NotFound`] is returned.
+    pub async fn is_payday_block(
+        &mut self,
+        bi: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<bool>> {
+        let mut special_events = self.get_block_special_events(block_hash).await?.response;
+
+        while let Some(event) = special_events.next().await.transpose()? {
+            let has_payday_event = match event {
+                SpecialTransactionOutcome::PaydayPoolReward { .. } => true,
+                SpecialTransactionOutcome::PaydayAccountReward { .. } => true,
+                SpecialTransactionOutcome::PaydayFoundationReward { .. } => true,
+                _ => false,
+            };
+
+            if has_payday_event {
+                return Ok(true);
+            };
+        }
+
+        Ok(false)
+    }
+
     /// Get all the bakers at the end of the given block.
     /// If the block does not exist [`QueryError::NotFound`] is returned.
     pub async fn get_baker_list(
