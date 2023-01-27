@@ -1359,12 +1359,12 @@ impl Client {
         let block_hash = special_events.block_hash;
 
         while let Some(event) = special_events.response.next().await.transpose()? {
-            let has_payday_event = match event {
-                SpecialTransactionOutcome::PaydayPoolReward { .. } => true,
-                SpecialTransactionOutcome::PaydayAccountReward { .. } => true,
-                SpecialTransactionOutcome::PaydayFoundationReward { .. } => true,
-                _ => false,
-            };
+            let has_payday_event = matches!(
+                event,
+                SpecialTransactionOutcome::PaydayPoolReward { .. }
+                    | SpecialTransactionOutcome::PaydayAccountReward { .. }
+                    | SpecialTransactionOutcome::PaydayFoundationReward { .. }
+            );
 
             if has_payday_event {
                 return Ok(QueryResponse {
