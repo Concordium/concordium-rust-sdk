@@ -13,7 +13,7 @@ use crate::{
         },
         transactions::{self, InitContractPayload, UpdateContractPayload, UpdateInstruction},
         AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, Energy, Memo, Nonce,
-        RegisteredData, TransactionStatus, UpdateSequenceNumber,
+        RegisteredData, SpecialTransactionOutcome, TransactionStatus, UpdateSequenceNumber,
     },
 };
 use concordium_base::{
@@ -1344,6 +1344,39 @@ impl Client {
         Ok(QueryResponse {
             block_hash,
             response,
+        })
+    }
+
+    /// Get information about whether a block identified by `bi` is a payday
+    /// block or not. This will always return `false` for blocks produced prior
+    /// to protocol version 4. If the block does not exits
+    /// [`QueryError::NotFound`] is returned.
+    pub async fn is_payday_block(
+        &mut self,
+        bi: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<bool>> {
+        let mut special_events = self.get_block_special_events(bi).await?;
+        let block_hash = special_events.block_hash;
+
+        while let Some(event) = special_events.response.next().await.transpose()? {
+            let has_payday_event = matches!(
+                event,
+                SpecialTransactionOutcome::PaydayPoolReward { .. }
+                    | SpecialTransactionOutcome::PaydayAccountReward { .. }
+                    | SpecialTransactionOutcome::PaydayFoundationReward { .. }
+            );
+
+            if has_payday_event {
+                return Ok(QueryResponse {
+                    block_hash,
+                    response: true,
+                });
+            };
+        }
+
+        Ok(QueryResponse {
+            block_hash,
+            response: false,
         })
     }
 
