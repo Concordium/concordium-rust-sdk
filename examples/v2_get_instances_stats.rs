@@ -45,6 +45,7 @@ async fn main() -> anyhow::Result<()> {
     let mut instances = client.get_instance_list(&block).await?;
     let block = instances.block_hash;
     println!("Using block {}", instances.block_hash);
+    let mut total_state_size: usize = 0;
     while let Some(ia) = instances.response.next().await {
         let ia = ia?;
         let ii = client.get_instance_info(ia, &block).await?;
@@ -56,6 +57,7 @@ async fn main() -> anyhow::Result<()> {
                 name,
                 ..
             } => {
+                total_state_size += model.len();
                 println!(
                     "{}, V0, {}, {}, {}, {}",
                     ia,
@@ -95,6 +97,7 @@ async fn main() -> anyhow::Result<()> {
                     let _root_ref = state.store_update(&mut storer)?;
                     storer.inner.into_inner().len()
                 };
+                total_state_size += stored_size;
                 println!(
                     "{}, V1, {}, {}, {}, {}, ({})",
                     ia,
@@ -107,5 +110,6 @@ async fn main() -> anyhow::Result<()> {
             }
         }
     }
+    println!("Total state size of all contracts is {}B", total_state_size);
     Ok(())
 }
