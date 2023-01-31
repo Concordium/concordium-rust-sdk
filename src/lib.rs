@@ -46,6 +46,7 @@ pub mod constants;
 /// Wrapper for the node's GRPC API. The return values are parsed and wrapped in
 /// structured values.
 pub mod endpoints;
+#[path = "v1/generated/concordium.rs"]
 mod generated_types;
 mod internal;
 /// Interface to the (optional) postgres database that the node logs finalized
