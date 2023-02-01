@@ -17,6 +17,8 @@
   using `invoke_instance`. They can be used to estimate transaction costs, and
   check whether the call will succeed.
 - Add `is_payday_block` helper function to `v2::Client` to identify whether a specific block is one that includes payday events.
+- Add `new_from_payload` helper to `ContractContext` for convenience when
+  dry-running smart contract update transactions.
 
 ## 2.1.0
 

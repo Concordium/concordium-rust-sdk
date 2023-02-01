@@ -4,6 +4,7 @@ use super::{Address, ContractAddress, ContractTraceElement, Energy, RejectReason
 use concordium_base::{
     common::{types::Amount, SerdeDeserialize, SerdeSerialize},
     id::types::AccountAddress,
+    transactions::UpdateContractPayload,
 };
 /// Re-export of common helper functionality for smart contract, such as types
 /// and serialization specific for smart contracts.
@@ -228,6 +229,27 @@ impl ContractContext {
             method,
             parameter: Parameter::default(),
             energy: DEFAULT_INVOKE_ENERGY,
+        }
+    }
+
+    /// Construct a new contract context from an update contract payload.
+    /// The arguments are
+    ///
+    /// - `sender` - the account sending the transaction
+    /// - `energy` - the energy allowed for execution.
+    /// - `payload` - the update contract payload to derive arguments from.
+    pub fn new_from_payload(
+        sender: AccountAddress,
+        energy: Energy,
+        payload: UpdateContractPayload,
+    ) -> Self {
+        Self {
+            invoker: Some(sender.into()),
+            contract: payload.address,
+            amount: payload.amount,
+            method: payload.receive_name,
+            parameter: payload.message,
+            energy,
         }
     }
 }

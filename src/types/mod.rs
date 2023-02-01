@@ -575,7 +575,8 @@ pub struct BakerPoolStatus {
     /// Any pending change to the baker's stake.
     pub baker_stake_pending_change: PoolPendingChange,
     /// Status of the pool in the current reward period. This will be [`None`]
-    /// if the pool is not a
+    /// if the pool is not a baker in the payday (e.g., because they just
+    /// registered and a new payday has not started yet).
     pub current_payday_status:      Option<CurrentPaydayBakerPoolStatus>,
     /// Total capital staked across all pools.
     pub all_pool_total_capital:     Amount,
