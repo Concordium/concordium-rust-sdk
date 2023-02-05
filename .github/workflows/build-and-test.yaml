@@ -44,11 +44,6 @@ jobs:
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     steps:
-      - name: Install protobuf
-        run: |
-          wget https://github.com/protocolbuffers/protobuf/releases/download/v3.15.3/protoc-3.15.3-linux-x86_64.zip
-          unzip protoc-3.15.3-linux-x86_64.zip
-          sudo mv ./bin/protoc /usr/bin/protoc
       - name: Checkout
         uses: actions/checkout@v2
         with:
@@ -62,7 +57,7 @@ jobs:
           components: rustfmt, clippy
       - name: Clippy
         run: |
-          cargo clippy --all-features --color=always --tests --benches --examples -- -Dclippy::all
+          cargo clippy --features=postgres --color=always --tests --benches --examples -- -Dclippy::all
 
   "cargo_test":
     name: cargo:test
@@ -70,11 +65,6 @@ jobs:
     needs:
       - lint_clippy
     steps:
-      - name: Install system packages
-        run: |
-          wget https://github.com/protocolbuffers/protobuf/releases/download/v3.15.3/protoc-3.15.3-linux-x86_64.zip
-          unzip protoc-3.15.3-linux-x86_64.zip
-          sudo mv ./bin/protoc /usr/bin/protoc
       - name: Checkout
         uses: actions/checkout@v2
         with:
