@@ -104,7 +104,7 @@ mod instance_parser {
                     source_module,
                 } => Self {
                     version: WasmVersion::V0,
-                    model: Some(hex::encode(&model)),
+                    model: Some(hex::encode(model)),
                     owner,
                     amount,
                     methods,
@@ -137,7 +137,7 @@ mod instance_parser {
             match value.version {
                 WasmVersion::V0 => {
                     if let Some(model) = value.model {
-                        let model = hex::decode(&model)?;
+                        let model = hex::decode(model)?;
                         Ok(Self::V0 {
                             model,
                             owner: value.owner,
