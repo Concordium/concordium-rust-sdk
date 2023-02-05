@@ -29,7 +29,7 @@ assuming the submodule is cloned into the directory `./deps/concordium-rust-sdk`
 ## Versions
 
 - Minimum supported Rust version: 1.57.
-- Node version compatibility: 4.*
+- Node version compatibility: 5.*
 
 ## Basic usage
 
@@ -120,3 +120,20 @@ that is commonly needed faster. The main differences are
 - The node information has been consolidated into two endpoints,
   `get_node_info`, and `get_peers_info`, the latter of which now returns both
   the list of peers and their details.
+
+## For developers
+
+The SDK relies on files generated from [protobuf schemas](https://github.com/Concordium/concordium-grpc-api).
+These files are committed to the repository so that users of the SDK do not have to have the
+protobuf compiler installed in order to use the SDK.
+
+Occassionally there is a need to update the generated files, if the schemas
+change. This can be done by compiling the SDK using the `compile-protos`
+feature, i.e.,
+
+```
+cargo build --features=compile-protos
+```
+
+Updating these files should only be done when the node's API, determined by the
+schemas, changes and we need to support the new API in the SDK.

@@ -36,6 +36,7 @@ wasm-chain-integration = { version = "*", path = "./concordium-base/smart-contra
 
 [features]
 postgres = ["tokio-postgres"]
+# An internal feature used to generate Rust sources from protobuf schemas.
 generate-protos = ["tonic-build"]
 
 [dev-dependencies]
