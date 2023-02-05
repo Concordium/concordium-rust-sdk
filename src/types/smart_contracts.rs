@@ -232,7 +232,7 @@ impl ContractContext {
         }
     }
 
-    /// Constract a new contract context from an update contract payload.
+    /// Construct a new contract context from an update contract payload.
     /// The arguments are
     ///
     /// - `sender` - the account sending the transaction
