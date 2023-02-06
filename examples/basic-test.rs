@@ -1,9 +1,7 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    common::{SerdeDeserialize, SerdeSerialize},
     endpoints::{self, Endpoint},
-    id::types::{AccountAddress, AccountKeys},
     types,
 };
 use rand::{prelude::SliceRandom, thread_rng};

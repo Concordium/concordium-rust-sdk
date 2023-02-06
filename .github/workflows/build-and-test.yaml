@@ -57,7 +57,7 @@ jobs:
           components: rustfmt, clippy
       - name: Clippy
         run: |
-          cargo clippy --features=postgres --color=always --tests --benches --examples -- -Dclippy::all
+          cargo clippy --features=postgres --color=always --tests --benches --examples -- -D warnings
 
   "cargo_test":
     name: cargo:test
