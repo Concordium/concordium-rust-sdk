@@ -20,3 +20,4 @@ pkg
 *.state
 
 Cargo.lock
+/src/v1/generated/google.protobuf.rs

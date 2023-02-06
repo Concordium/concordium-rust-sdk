@@ -4,6 +4,7 @@ version = "2.2.0"
 authors = ["Concordium <developers@concordium.com>"]
 edition = "2021"
 license-file = "LICENSE"
+include = ["README.md", "CHANGELOG.md"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -35,6 +36,8 @@ wasm-chain-integration = { version = "*", path = "./concordium-base/smart-contra
 
 [features]
 postgres = ["tokio-postgres"]
+# An internal feature used to generate Rust sources from protobuf schemas.
+generate-protos = ["tonic-build"]
 
 [dev-dependencies]
 structopt = "0.3"
@@ -52,4 +55,4 @@ name = "monitor-postgres"
 required-features = ["postgres"]
 
 [build-dependencies]
-tonic-build = "0.8"
+tonic-build = {version = "0.8", optional = true}
