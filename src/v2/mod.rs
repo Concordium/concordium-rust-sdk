@@ -44,6 +44,7 @@ mod conversions;
 #[path = "generated/concordium.v2.rs"]
 #[allow(clippy::large_enum_variant, clippy::enum_variant_names)]
 mod generated;
+pub mod proto_schema_version;
 
 /// A client for gRPC API v2 of the Concordium node. Can be used to control the
 /// node, send transactions and query information about the node and the state
