@@ -56,4 +56,4 @@ required-features = ["postgres"]
 
 [build-dependencies]
 tonic-build = {version = "0.8", optional = true}
-git2 = {version = "0.16", optional = true}
+git2 = {version = "0.14", optional = true}
