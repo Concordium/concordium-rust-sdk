@@ -2102,6 +2102,56 @@ impl Client {
         });
         Ok(FinalizedBlocksStream { handle, receiver })
     }
+
+    /// Find a block in which the instance was created, if it exists.
+    /// Optional bounds can be provided, and the search will only consider
+    /// blocks in that range, inclusive. If the lower bound is not provided it
+    /// defaults to 0, if the upper bound is not provided it defaults to the
+    /// last finalized block at the time of the call.
+    ///
+    /// The return value is a pair of the absolute block height, and the hash,
+    /// of the block in which the instance was created. If the instance
+    /// cannot be found [`QueryError::NotFound`] is returned.
+    pub async fn find_instance_creation(
+        &mut self,
+        addr: ContractAddress,
+        start: Option<AbsoluteBlockHeight>,
+        end: Option<AbsoluteBlockHeight>,
+    ) -> QueryResult<(AbsoluteBlockHeight, BlockHash)> {
+        let mut start = start.map_or(0, Into::into);
+        let mut end: u64 = if let Some(end) = end {
+            end.into()
+        } else {
+            self.get_consensus_info()
+                .await?
+                .last_finalized_block_height
+                .into()
+        };
+        let mut last_found = None;
+        while start < end {
+            let mid = (start + end) / 2;
+            let bh = self
+                .get_blocks_at_height(&AbsoluteBlockHeight::from(mid).into())
+                .await?[0];
+            match self.get_instance_info(addr, &bh).await {
+                Ok(_) => {
+                    end = mid;
+                    last_found = Some((mid, bh));
+                }
+                Err(e) if e.is_not_found() => {
+                    start = mid + 1;
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+        }
+        if let Some((h, bh)) = last_found {
+            Ok((h.into(), bh))
+        } else {
+            Err(QueryError::NotFound)
+        }
+    }
 }
 
 /// A stream of finalized blocks. This contains a background task that polls
