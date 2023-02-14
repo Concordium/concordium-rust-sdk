@@ -1,7 +1,8 @@
 //! Test the `GetAccountInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{id::types::AccountAddress, v2};
+use concordium_base::hashes::BlockHash;
+use concordium_rust_sdk::{types::AccountIndex, v2};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -13,7 +14,9 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "address", help = "Account address to query.")]
-    address:  AccountAddress,
+    address:  AccountIndex,
+    #[structopt(long = "block", help = "Block to query the account in.")]
+    block:    Option<BlockHash>,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -24,20 +27,17 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
+    let block_ident = app
+        .block
+        .map_or(v2::BlockIdentifier::LastFinal, v2::BlockIdentifier::Given);
+
     let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
 
     {
         let ai = client
-            .get_account_info(&app.address.into(), &v2::BlockIdentifier::Best)
-            .await?;
-        println!("{:#?}", ai);
-    }
-
-    {
-        let ai = client
-            .get_account_info(&app.address.into(), &v2::BlockIdentifier::LastFinal)
+            .get_account_info(&app.address.into(), &block_ident)
             .await?;
         println!("{:#?}", ai);
     }

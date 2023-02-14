@@ -2103,11 +2103,20 @@ impl Client {
         Ok(FinalizedBlocksStream { handle, receiver })
     }
 
-    /// Find a block in which the instance was created, if it exists.
-    /// Optional bounds can be provided, and the search will only consider
-    /// blocks in that range, inclusive. If the lower bound is not provided it
-    /// defaults to 0, if the upper bound is not provided it defaults to the
-    /// last finalized block at the time of the call.
+    /// Find a block in which the instance was created, if it exists and is
+    /// finalized. The return value is a triple of the absolute block height and
+    /// the corresponding block hash, and the instance information at the
+    /// end of that block. The block is the first block in which the instance
+    /// appears.
+    ///
+    /// Note that this is not necessarily the initial state of the instance
+    /// since there can be transactions updating the instance in the same block
+    /// as the initialization transaction.
+    ///
+    /// Optional bounds can be provided, and the search will only
+    /// consider blocks in that range, inclusive. If the lower bound is not
+    /// provided it defaults to 0, if the upper bound is not provided it
+    /// defaults to the last finalized block at the time of the call.
     ///
     /// The return value is a pair of the absolute block height, and the hash,
     /// of the block in which the instance was created. If the instance
@@ -2117,10 +2126,74 @@ impl Client {
         addr: ContractAddress,
         start: Option<AbsoluteBlockHeight>,
         end: Option<AbsoluteBlockHeight>,
-    ) -> QueryResult<(AbsoluteBlockHeight, BlockHash)> {
+    ) -> QueryResult<(AbsoluteBlockHeight, BlockHash, InstanceInfo)> {
+        self.find_earliest_finalized(start, end, |mut client, height, bh| async move {
+            match client.get_instance_info(addr, &bh).await {
+                Ok(ii) => Ok(Some((height, bh, ii.response))),
+                Err(e) if e.is_not_found() => Ok(None),
+                Err(e) => Err(e),
+            }
+        })
+        .await
+    }
+
+    /// Find the first (i.e., earliers) finalized block whose slot time is no
+    /// later than the specified time. If a block is not found return
+    /// [`QueryError::NotFound`].
+    ///
+    /// If `start` and `end` are given the search is limited to that range,
+    /// inclusive. If the lower bound is not provided it defaults to 0, if the
+    /// upper bound is not provided it defaults to the last finalized block
+    /// at the time of the call.
+    pub async fn find_first_finalized_block_no_later_than(
+        &mut self,
+        time: chrono::DateTime<chrono::Utc>,
+        start: Option<AbsoluteBlockHeight>,
+        end: Option<AbsoluteBlockHeight>,
+    ) -> QueryResult<types::queries::BlockInfo> {
+        self.find_earliest_finalized(start, end, move |mut client, _, bh| async move {
+            let info = client.get_block_info(&bh).await?.response;
+            if info.block_slot_time >= time {
+                Ok(Some(info))
+            } else {
+                Ok(None)
+            }
+        })
+        .await
+    }
+
+    /// Find a block with lowest height that satisfies the given condition.
+    /// If a block is not found return [`QueryError::NotFound`].
+    ///
+    /// The `test` method should return `Some` if the object is found in the
+    /// block, and `None` otherwise. It can also signal errors which will
+    /// terminate search immediately.
+    ///
+    /// The precondition for this method is that the `test` method is monotone,
+    /// i.e., if block at height `h` satisfies the test then also a block at
+    /// height `h+1` does.
+    /// If this precondition does not hold then the return value from this
+    /// method is unspecified.
+    ///
+    /// If `start` and `end` are given the search is limited to that range,
+    /// inclusive. If the lower bound is not provided it defaults to 0, if the
+    /// upper bound is not provided it defaults to the last finalized block
+    /// at the time of the call.
+    pub async fn find_earliest_finalized<A, F: futures::Future<Output = QueryResult<Option<A>>>>(
+        &mut self,
+        start: Option<AbsoluteBlockHeight>,
+        end: Option<AbsoluteBlockHeight>,
+        test: impl Fn(Self, AbsoluteBlockHeight, BlockHash) -> F,
+    ) -> QueryResult<A> {
+        if end < start {
+            return Err(QueryError::NotFound);
+        }
         let mut start = start.map_or(0, Into::into);
         let mut end: u64 = if let Some(end) = end {
-            end.into()
+            let ci = self.get_consensus_info().await?;
+            // Since we are only looking at finalized blocks limiting search to max
+            // finalized height is safe.
+            std::cmp::min(end.into(), ci.last_finalized_block_height.into())
         } else {
             self.get_consensus_info()
                 .await?
@@ -2129,28 +2202,19 @@ impl Client {
         };
         let mut last_found = None;
         while start < end {
-            let mid = (start + end) / 2;
+            let mid = start + (end - start) / 2;
             let bh = self
                 .get_blocks_at_height(&AbsoluteBlockHeight::from(mid).into())
-                .await?[0];
-            match self.get_instance_info(addr, &bh).await {
-                Ok(_) => {
-                    end = mid;
-                    last_found = Some((mid, bh));
-                }
-                Err(e) if e.is_not_found() => {
-                    start = mid + 1;
-                }
-                Err(e) => {
-                    return Err(e);
-                }
+                .await?[0]; // using [0] is safe since we are only looking at finalized blocks.
+            let ok = test(self.clone(), mid.into(), bh).await?;
+            if ok.is_some() {
+                end = mid;
+                last_found = ok;
+            } else {
+                start = mid + 1;
             }
         }
-        if let Some((h, bh)) = last_found {
-            Ok((h.into(), bh))
-        } else {
-            Err(QueryError::NotFound)
-        }
+        last_found.ok_or(QueryError::NotFound)
     }
 }
 
