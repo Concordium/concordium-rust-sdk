@@ -1,6 +1,7 @@
 //! Test the `GetPoolDelegatorsRewardPeriod` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
+use concordium_base::hashes::BlockHash;
 use concordium_rust_sdk::v2;
 use futures::StreamExt;
 use structopt::StructOpt;
@@ -13,6 +14,8 @@ struct App {
         default_value = "http://localhost:10001"
     )]
     endpoint: v2::Endpoint,
+    #[structopt(long = "block", help = "Block to query delegators in.")]
+    block:    Option<BlockHash>,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -23,12 +26,14 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
+    let block_ident = app
+        .block
+        .map_or(v2::BlockIdentifier::LastFinal, v2::BlockIdentifier::Given);
+
     let mut client = v2::Client::new(app.endpoint)
         .await
         .context("Cannot connect.")?;
-    let mut res = client
-        .get_baker_list(&v2::BlockIdentifier::LastFinal)
-        .await?;
+    let mut res = client.get_baker_list(block_ident).await?;
     println!("Blockhash: {}", res.block_hash);
     while let Some(a) = res.response.next().await.transpose()? {
         let mut response_delegators = client

@@ -1,5 +1,8 @@
 ## Unreleased changes
 
+- Add `find_earliest_finalized`, `find_instance_creation`,
+  `find_first_finalized_block_no_later_than` methods to the `v2` client.
+
 ## 2.2.0
 
 - Add helpers to `WalletAccount` so that it can be constructed from genesis

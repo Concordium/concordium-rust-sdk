@@ -1,8 +1,8 @@
 //! Test the `GetPoolInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::v2;
-use futures::StreamExt;
+use concordium_base::hashes::BlockHash;
+use concordium_rust_sdk::{types::BakerId, v2};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -13,6 +13,10 @@ struct App {
         default_value = "http://localhost:10001"
     )]
     endpoint: v2::Endpoint,
+    #[structopt(long = "block", help = "Block to query in.")]
+    block:    Option<BlockHash>,
+    #[structopt(long = "baker-id", help = "Pool identifier.")]
+    baker_id: BakerId,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -27,15 +31,10 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect.")?;
 
-    let mut res = client.get_baker_list(&v2::BlockIdentifier::Best).await?;
-    println!("Best block {:#?}:", res.block_hash);
-    while let Some(a) = res.response.next().await {
-        let baker_id = a?;
-        let status = client
-            .get_pool_info(&v2::BlockIdentifier::Best, baker_id)
-            .await?;
-        println!("Baker {:#?}: {:#?}", baker_id, status);
-    }
-
+    let block_ident = app
+        .block
+        .map_or(v2::BlockIdentifier::LastFinal, v2::BlockIdentifier::Given);
+    let status = client.get_pool_info(&block_ident, app.baker_id).await?;
+    println!("{:#?}", status);
     Ok(())
 }
