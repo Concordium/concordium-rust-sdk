@@ -2114,7 +2114,7 @@ impl Client {
     /// as the initialization transaction.
     ///
     /// Optional bounds can be provided, and the search will only
-    /// consider blocks in that range, inclusive. If the lower bound is not
+    /// consider blocks in that range. If the lower bound is not
     /// provided it defaults to 0, if the upper bound is not provided it
     /// defaults to the last finalized block at the time of the call.
     ///
@@ -2123,11 +2123,10 @@ impl Client {
     /// cannot be found [`QueryError::NotFound`] is returned.
     pub async fn find_instance_creation(
         &mut self,
+        range: impl std::ops::RangeBounds<AbsoluteBlockHeight>,
         addr: ContractAddress,
-        start: Option<AbsoluteBlockHeight>,
-        end: Option<AbsoluteBlockHeight>,
     ) -> QueryResult<(AbsoluteBlockHeight, BlockHash, InstanceInfo)> {
-        self.find_earliest_finalized(start, end, |mut client, height, bh| async move {
+        self.find_earliest_finalized(range, |mut client, height, bh| async move {
             match client.get_instance_info(addr, &bh).await {
                 Ok(ii) => Ok(Some((height, bh, ii.response))),
                 Err(e) if e.is_not_found() => Ok(None),
@@ -2141,17 +2140,15 @@ impl Client {
     /// later than the specified time. If a block is not found return
     /// [`QueryError::NotFound`].
     ///
-    /// If `start` and `end` are given the search is limited to that range,
-    /// inclusive. If the lower bound is not provided it defaults to 0, if the
-    /// upper bound is not provided it defaults to the last finalized block
-    /// at the time of the call.
+    /// The search is limited to the bounds specified. If the lower bound is not
+    /// provided it defaults to 0, if the upper bound is not provided it
+    /// defaults to the last finalized block at the time of the call.
     pub async fn find_first_finalized_block_no_later_than(
         &mut self,
+        range: impl std::ops::RangeBounds<AbsoluteBlockHeight>,
         time: chrono::DateTime<chrono::Utc>,
-        start: Option<AbsoluteBlockHeight>,
-        end: Option<AbsoluteBlockHeight>,
     ) -> QueryResult<types::queries::BlockInfo> {
-        self.find_earliest_finalized(start, end, move |mut client, _, bh| async move {
+        self.find_earliest_finalized(range, move |mut client, _, bh| async move {
             let info = client.get_block_info(&bh).await?.response;
             if info.block_slot_time >= time {
                 Ok(Some(info))
@@ -2175,31 +2172,33 @@ impl Client {
     /// If this precondition does not hold then the return value from this
     /// method is unspecified.
     ///
-    /// If `start` and `end` are given the search is limited to that range,
-    /// inclusive. If the lower bound is not provided it defaults to 0, if the
-    /// upper bound is not provided it defaults to the last finalized block
-    /// at the time of the call.
+    /// The search is limited to the given range. If the lower bound is not
+    /// provided it defaults to 0, if the upper bound is not provided it
+    /// defaults to the last finalized block at the time of the call.
     pub async fn find_earliest_finalized<A, F: futures::Future<Output = QueryResult<Option<A>>>>(
         &mut self,
-        start: Option<AbsoluteBlockHeight>,
-        end: Option<AbsoluteBlockHeight>,
+        range: impl std::ops::RangeBounds<AbsoluteBlockHeight>,
         test: impl Fn(Self, AbsoluteBlockHeight, BlockHash) -> F,
     ) -> QueryResult<A> {
+        let mut start = match range.start_bound() {
+            std::ops::Bound::Included(s) => u64::from(*s),
+            std::ops::Bound::Excluded(e) => u64::from(*e).saturating_add(1),
+            std::ops::Bound::Unbounded => 0,
+        };
+        let mut end = {
+            let ci = self.get_consensus_info().await?;
+            let bound = |end: u64| std::cmp::min(end, ci.last_finalized_block_height.into());
+            match range.end_bound() {
+                std::ops::Bound::Included(e) => bound(u64::from(*e)),
+                std::ops::Bound::Excluded(e) => {
+                    bound(u64::from(*e).checked_sub(1).ok_or(QueryError::NotFound)?)
+                }
+                std::ops::Bound::Unbounded => u64::from(ci.last_finalized_block_height),
+            }
+        };
         if end < start {
             return Err(QueryError::NotFound);
         }
-        let mut start = start.map_or(0, Into::into);
-        let mut end: u64 = if let Some(end) = end {
-            let ci = self.get_consensus_info().await?;
-            // Since we are only looking at finalized blocks limiting search to max
-            // finalized height is safe.
-            std::cmp::min(end.into(), ci.last_finalized_block_height.into())
-        } else {
-            self.get_consensus_info()
-                .await?
-                .last_finalized_block_height
-                .into()
-        };
         let mut last_found = None;
         while start < end {
             let mid = start + (end - start) / 2;
