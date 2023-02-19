@@ -31,7 +31,7 @@ use std::{
     time::UNIX_EPOCH,
 };
 use thiserror::Error;
-pub use tonic::transport::Endpoint;
+pub use tonic::transport::{Endpoint, Error};
 use tonic::{
     metadata::{errors::InvalidMetadataValue, MetadataValue},
     transport::Channel,
@@ -55,6 +55,34 @@ impl From<serde_json::Error> for RPCError {
 
 impl From<semver::Error> for RPCError {
     fn from(x: semver::Error) -> Self { Self::ParseError(x.into()) }
+}
+
+impl RPCError {
+    /// Return whether the error indicates the item being sent is invalid.
+    /// Retrying a request in this case will likely not succeed.
+    ///
+    /// Although some conditions like that are transient.
+    pub fn is_invalid_argument(&self) -> bool {
+        match self {
+            RPCError::CallError(e) => {
+                matches!(e.code(), tonic::Code::InvalidArgument)
+            }
+            RPCError::InvalidMetadata(_) => false,
+            RPCError::ParseError(_) => false,
+        }
+    }
+
+    /// Return whether the object already exists at the node.
+    /// Retrying a request in this case will likely not succeed.
+    pub fn is_duplicate(&self) -> bool {
+        match self {
+            RPCError::CallError(e) => {
+                matches!(e.code(), tonic::Code::AlreadyExists)
+            }
+            RPCError::InvalidMetadata(_) => false,
+            RPCError::ParseError(_) => false,
+        }
+    }
 }
 
 #[derive(Error, Debug)]
