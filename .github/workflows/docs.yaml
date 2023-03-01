@@ -3,7 +3,7 @@ on:
   workflow_dispatch: # allows manual trigger
 
 env:
-  RUST_VERSION: 1.57
+  RUST_VERSION: 1.60
 
 jobs:
   build-and-deploy:
