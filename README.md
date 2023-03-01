@@ -12,7 +12,7 @@ performs better. The V1 API will be deprecated in the next SDK version.
 
 ## Minimum supported Rust version
 
-The current minimal version is 1.57. A MSRV bump will be accompanied by a minor
+The current minimal version is 1.60. A MSRV bump will be accompanied by a minor
 version bump of the SDK.
 
 ## Add it to your project
@@ -28,7 +28,7 @@ assuming the submodule is cloned into the directory `./deps/concordium-rust-sdk`
 
 ## Versions
 
-- Minimum supported Rust version: 1.57.
+- Minimum supported Rust version: 1.60.
 - Node version compatibility: 5.*
 
 ## Basic usage
