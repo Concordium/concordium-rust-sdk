@@ -11,6 +11,7 @@ include = ["README.md", "CHANGELOG.md"]
 [dependencies]
 tonic = "0.8"
 prost = "0.11"
+prost-derive = "0.11"
 tokio = { version = "1.21", features = ["net"] }
 futures = "0.3"
 serde_json = "1.0"

@@ -38,7 +38,10 @@ pub use endpoints::{QueryError, QueryResult, RPCError, RPCResult};
 use futures::{Stream, StreamExt};
 use std::collections::HashMap;
 use tonic::IntoRequest;
-pub use tonic::{transport::Endpoint, Code, Status};
+pub use tonic::{
+    transport::{Endpoint, Error},
+    Code, Status,
+};
 
 mod conversions;
 #[path = "generated/concordium.v2.rs"]
