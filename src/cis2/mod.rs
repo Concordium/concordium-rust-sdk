@@ -75,7 +75,7 @@ pub enum Cis2DryRunError {
     QueryError(#[from] crate::endpoints::QueryError),
 
     /// The node rejected the invocation.
-    #[error("Rejected by the node.")]
+    #[error("Rejected by the node: {0:?}.")]
     NodeRejected(sdk_types::RejectReason),
 }
 
@@ -108,7 +108,7 @@ pub enum Cis2QueryError {
     ResponseParseError(#[from] concordium_contracts_common::ParseError),
 
     /// The node rejected the invocation.
-    #[error("Rejected by the node.")]
+    #[error("Rejected by the node: {0:?}.")]
     NodeRejected(sdk_types::RejectReason),
 }
 
