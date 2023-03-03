@@ -11,7 +11,7 @@ use concordium_base::{
 };
 use sdk_types::{smart_contracts, ContractAddress};
 use smart_contracts::concordium_contracts_common as contracts_common;
-use std::convert::{From, TryFrom};
+use std::convert::From;
 use thiserror::*;
 
 /// The query result type for whether a smart contract supports a standard.
@@ -200,7 +200,7 @@ pub async fn supports_multi(
         id.serial(&mut parameters)
             .map_err(|_| SupportsError::InvalidParameter)?;
     }
-    let parameter = smart_contracts::Parameter::try_from(parameters)
+    let parameter = smart_contracts::OwnedParameter::try_from_bytes(parameters)
         .map_err(|_| SupportsError::InvalidParameter)?;
     let ctx = ContractContext {
         invoker: None,

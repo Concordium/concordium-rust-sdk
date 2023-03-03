@@ -182,7 +182,7 @@ impl Cis2Contract {
             contract:  self.address,
             amount:    common::types::Amount::from_micro_ccd(0),
             method:    receive_name,
-            parameter: smart_contracts::Parameter::try_from(bytes)
+            parameter: smart_contracts::OwnedParameter::try_from_bytes(bytes)
                 .map_err(|_| Cis2DryRunError::InvalidTransferParams(NewTransferParamsError))?,
             energy:    DEFAULT_INVOKE_ENERGY,
         };
@@ -233,7 +233,7 @@ impl Cis2Contract {
                 amount: transaction_metadata.amount,
                 address: self.address,
                 receive_name,
-                message: smart_contracts::Parameter::try_from(bytes).map_err(|_| {
+                message: smart_contracts::OwnedParameter::try_from_bytes(bytes).map_err(|_| {
                     Cis2TransactionError::InvalidTransferParams(NewTransferParamsError)
                 })?,
             },
@@ -293,7 +293,7 @@ impl Cis2Contract {
             contract:  self.address,
             amount:    common::types::Amount::from_micro_ccd(0),
             method:    receive_name,
-            parameter: smart_contracts::Parameter::try_from(bytes)
+            parameter: smart_contracts::OwnedParameter::try_from_bytes(bytes)
                 .map_err(|_| Cis2DryRunError::InvalidTransferParams(NewTransferParamsError))?,
             energy:    smart_contracts::DEFAULT_INVOKE_ENERGY,
         };
@@ -351,7 +351,7 @@ impl Cis2Contract {
                 amount: transaction_metadata.amount,
                 address: self.address,
                 receive_name,
-                message: smart_contracts::Parameter::try_from(bytes).map_err(|_| {
+                message: smart_contracts::OwnedParameter::try_from_bytes(bytes).map_err(|_| {
                     Cis2TransactionError::InvalidUpdateOperatorParams(NewUpdateOperatorParamsError)
                 })?,
             },
@@ -411,7 +411,7 @@ impl Cis2Contract {
             contract:  self.address,
             amount:    common::types::Amount::from_micro_ccd(0),
             method:    receive_name,
-            parameter: smart_contracts::Parameter::try_from(bytes).map_err(|_| {
+            parameter: smart_contracts::OwnedParameter::try_from_bytes(bytes).map_err(|_| {
                 Cis2QueryError::InvalidBalanceOfParams(NewBalanceOfQueryParamsError)
             })?,
             energy:    smart_contracts::MAX_ALLOWED_INVOKE_ENERGY,
@@ -473,7 +473,7 @@ impl Cis2Contract {
             contract:  self.address,
             amount:    common::types::Amount::from_micro_ccd(0),
             method:    receive_name,
-            parameter: smart_contracts::Parameter::try_from(bytes).map_err(|_| {
+            parameter: smart_contracts::OwnedParameter::try_from_bytes(bytes).map_err(|_| {
                 Cis2QueryError::InvalidOperatorOfParams(NewOperatorOfQueryParamsError)
             })?,
             energy:    smart_contracts::MAX_ALLOWED_INVOKE_ENERGY,
@@ -540,7 +540,7 @@ impl Cis2Contract {
             contract:  self.address,
             amount:    common::types::Amount::from_micro_ccd(0),
             method:    receive_name,
-            parameter: smart_contracts::Parameter::try_from(bytes).map_err(|_| {
+            parameter: smart_contracts::OwnedParameter::try_from_bytes(bytes).map_err(|_| {
                 Cis2QueryError::InvalidTokenMetadataParams(NewTokenMetadataQueryParamsError)
             })?,
             energy:    smart_contracts::MAX_ALLOWED_INVOKE_ENERGY,

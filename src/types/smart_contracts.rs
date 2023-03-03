@@ -197,7 +197,7 @@ pub struct ContractContext {
     pub method:    OwnedReceiveName,
     /// And with what parameter.
     #[serde(default)]
-    pub parameter: Parameter,
+    pub parameter: OwnedParameter,
     /// And what amount of energy to allow for execution. This should be small
     /// enough so that it can be converted to interpreter energy.
     #[serde(default = "return_default_invoke_energy")]
@@ -227,7 +227,7 @@ impl ContractContext {
             contract,
             amount: Amount::zero(),
             method,
-            parameter: Parameter::default(),
+            parameter: OwnedParameter::default(),
             energy: DEFAULT_INVOKE_ENERGY,
         }
     }

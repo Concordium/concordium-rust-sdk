@@ -13,7 +13,7 @@ use concordium_rust_sdk::{
         types::{OwnedContractName, OwnedReceiveName},
     },
     types::{
-        smart_contracts::{ModuleRef, Parameter, WasmModule},
+        smart_contracts::{ModuleRef, OwnedParameter, WasmModule},
         transactions::{send, BlockItem, InitContractPayload, UpdateContractPayload},
         AccountInfo, ContractAddress, WalletAccount,
     },
@@ -119,7 +119,7 @@ async fn main() -> anyhow::Result<()> {
             weather,
             module_ref: mod_ref,
         } => {
-            let param = Parameter::try_from(contracts_common::to_bytes(&weather)).unwrap();
+            let param = OwnedParameter::new(&weather);
             let payload = InitContractPayload {
                 amount: Amount::zero(),
                 mod_ref,
@@ -130,7 +130,7 @@ async fn main() -> anyhow::Result<()> {
             send::init_contract(&keys, keys.address, nonce, expiry, payload, 10000u64.into())
         }
         Action::Update { weather, address } => {
-            let message = Parameter::try_from(contracts_common::to_bytes(&weather)).unwrap();
+            let message = OwnedParameter::new(&weather);
             let payload = UpdateContractPayload {
                 amount: Amount::zero(),
                 address,

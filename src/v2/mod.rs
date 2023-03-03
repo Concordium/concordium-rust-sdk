@@ -9,7 +9,7 @@ use crate::{
         self, hashes,
         hashes::{BlockHash, TransactionHash, TransactionSignHash},
         smart_contracts::{
-            ContractContext, InstanceInfo, InvokeContractResult, ModuleRef, Parameter, WasmModule,
+            ContractContext, InstanceInfo, InvokeContractResult, ModuleRef, WasmModule,
         },
         transactions::{self, InitContractPayload, UpdateContractPayload, UpdateInstruction},
         AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, Energy, Memo, Nonce,
@@ -26,7 +26,8 @@ use concordium_base::{
         types::{TransactionSignature, TransactionTime},
     },
     contracts_common::{
-        AccountAddress, Amount, ContractAddress, OwnedContractName, OwnedReceiveName, ReceiveName,
+        AccountAddress, Amount, ContractAddress, OwnedContractName, OwnedParameter,
+        OwnedReceiveName, ReceiveName,
     },
     transactions::{BlockItem, EncodedPayload, PayloadLike},
     updates::{
@@ -400,10 +401,10 @@ impl From<&OwnedReceiveName> for generated::ReceiveName {
     }
 }
 
-impl From<&Parameter> for generated::Parameter {
-    fn from(v: &Parameter) -> Self {
+impl From<&OwnedParameter> for generated::Parameter {
+    fn from(v: &OwnedParameter) -> Self {
         Self {
-            value: v.as_ref().clone(),
+            value: v.as_ref().to_vec(),
         }
     }
 }
@@ -691,7 +692,7 @@ impl IntoRequest<generated::InvokeInstanceRequest> for (&BlockIdentifier, &Contr
             instance:   Some((&context.contract).into()),
             amount:     Some(context.amount.into()),
             entrypoint: Some(context.method.as_receive_name().into()),
-            parameter:  Some(context.parameter.as_ref().as_slice().into()),
+            parameter:  Some(context.parameter.as_ref().into()),
             energy:     Some(context.energy.into()),
         })
     }
