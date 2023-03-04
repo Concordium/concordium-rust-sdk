@@ -233,7 +233,8 @@ pub enum BanMethod {
     Id(RemotePeerId),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, SerdeSerialize, SerdeDeserialize)]
+#[serde(rename_all = "camelCase")]
 /// A scheduled pending update.
 pub struct PendingUpdate {
     /// Time when it will become effective.
@@ -242,26 +243,46 @@ pub struct PendingUpdate {
     pub effect:         PendingUpdateEffect,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, SerdeSerialize, SerdeDeserialize)]
+#[serde(tag = "updateType", content = "update")]
 pub enum PendingUpdateEffect {
+    #[serde(rename = "root")]
     RootKeys(HigherLevelAccessStructure<RootKeysKind>),
+    #[serde(rename = "level1")]
     Level1Keys(HigherLevelAccessStructure<Level1KeysKind>),
+    #[serde(rename = "level2V0")]
     Level2KeysCPV0(Authorizations<ChainParameterVersion0>),
+    #[serde(rename = "level2V1")]
     Level2KeysCPV1(Authorizations<ChainParameterVersion1>),
+    #[serde(rename = "protocol")]
     Protocol(ProtocolUpdate),
+    #[serde(rename = "electionDifficulty")]
     ElectionDifficulty(ElectionDifficulty),
+    #[serde(rename = "euroPerEnergy")]
     EuroPerEnergy(ExchangeRate),
+    #[serde(rename = "microGTUPerEuro")]
     MicroCcdPerEnergy(ExchangeRate),
+    #[serde(rename = "foundationAccount")]
     FoundationAccount(AccountAddress),
+    #[serde(rename = "mintDistributionV0")]
     MintDistributionV0(MintDistribution<ChainParameterVersion0>),
+    #[serde(rename = "mintDistributionV1")]
     MintDistributionV1(MintDistribution<ChainParameterVersion1>),
+    #[serde(rename = "transactionFeeDistribution")]
     TransactionFeeDistribution(TransactionFeeDistribution),
+    #[serde(rename = "gasRewards")]
     GasRewards(GASRewards),
+    #[serde(rename = "poolParametersV0")]
     PoolParametersV0(BakerParameters),
+    #[serde(rename = "poolParametersV1")]
     PoolParametersV1(PoolParameters),
+    #[serde(rename = "addAnonymityRevoker")]
     AddAnonymityRevoker(id::types::ArInfo<id::constants::ArCurve>),
+    #[serde(rename = "addIdentityProvider")]
     AddIdentityProvider(Box<id::types::IpInfo<id::constants::IpPairing>>),
+    #[serde(rename = "cooldownParametersV1")]
     CooldownParameters(CooldownParameters),
+    #[serde(rename = "timeParametersV1")]
     TimeParameters(TimeParameters),
 }
 
