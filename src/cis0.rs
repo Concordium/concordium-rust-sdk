@@ -200,7 +200,7 @@ pub async fn supports_multi(
         id.serial(&mut parameters)
             .map_err(|_| SupportsError::InvalidParameter)?;
     }
-    let parameter = smart_contracts::OwnedParameter::try_from_bytes(parameters)
+    let parameter = smart_contracts::OwnedParameter::try_from(parameters)
         .map_err(|_| SupportsError::InvalidParameter)?;
     let ctx = ContractContext {
         invoker: None,

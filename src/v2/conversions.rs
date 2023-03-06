@@ -114,7 +114,7 @@ impl TryFrom<Parameter> for super::types::smart_contracts::OwnedParameter {
     type Error = tonic::Status;
 
     fn try_from(value: Parameter) -> Result<Self, Self::Error> {
-        Self::try_from_bytes(value.value).map_err(
+        Self::try_from(value.value).map_err(
             |e: concordium_base::smart_contracts::ExceedsParameterSize| {
                 tonic::Status::invalid_argument(e.to_string())
             },
