@@ -64,7 +64,7 @@ impl TryFrom<Address> for super::types::Address {
     }
 }
 
-impl TryFrom<ModuleRef> for super::ModuleRef {
+impl TryFrom<ModuleRef> for super::ModuleReference {
     type Error = tonic::Status;
 
     fn try_from(value: ModuleRef) -> Result<Self, Self::Error> {

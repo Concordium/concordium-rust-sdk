@@ -1321,9 +1321,9 @@ pub enum ContractTraceElement {
         /// Address of the instance that was upgraded.
         address: ContractAddress,
         /// The existing module reference that is in effect before the upgrade.
-        from:    smart_contracts::ModuleRef,
+        from:    smart_contracts::ModuleReference,
         /// The new module reference that is in effect after the upgrade.
-        to:      smart_contracts::ModuleRef,
+        to:      smart_contracts::ModuleReference,
     },
 }
 
@@ -1358,7 +1358,7 @@ pub enum AccountTransactionEffects {
     /// [`DeployModule`](transactions::Payload::DeployModule) transaction
     /// type.
     ModuleDeployed {
-        module_ref: smart_contracts::ModuleRef,
+        module_ref: smart_contracts::ModuleReference,
     },
     /// A contract was initialized was deployed. This corresponds to
     /// [`InitContract`](transactions::Payload::InitContract) transaction type.
@@ -1721,7 +1721,7 @@ pub struct ContractInitializedEvent {
     pub contract_version: smart_contracts::WasmVersion,
     #[serde(rename = "ref")]
     /// Module with the source code of the contract.
-    pub origin_ref:       smart_contracts::ModuleRef,
+    pub origin_ref:       smart_contracts::ModuleReference,
     /// The newly assigned address of the contract.
     pub address:          ContractAddress,
     /// The amount the instance was initialized with.
@@ -2005,27 +2005,27 @@ pub enum RejectReason {
     ModuleNotWF,
     /// As the name says.
     ModuleHashAlreadyExists {
-        contents: smart_contracts::ModuleRef,
+        contents: smart_contracts::ModuleReference,
     },
     /// Account does not exist.
     InvalidAccountReference { contents: AccountAddress },
     /// Reference to a non-existing contract init method.
     InvalidInitMethod {
         contents: (
-            smart_contracts::ModuleRef,
+            smart_contracts::ModuleReference,
             smart_contracts::OwnedContractName,
         ),
     },
     /// Reference to a non-existing contract receive method.
     InvalidReceiveMethod {
         contents: (
-            smart_contracts::ModuleRef,
+            smart_contracts::ModuleReference,
             smart_contracts::OwnedReceiveName,
         ),
     },
     /// Reference to a non-existing module.
     InvalidModuleReference {
-        contents: smart_contracts::ModuleRef,
+        contents: smart_contracts::ModuleReference,
     },
     /// Contract instance does not exist.
     InvalidContractAddress { contents: ContractAddress },

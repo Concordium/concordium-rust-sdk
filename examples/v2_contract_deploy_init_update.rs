@@ -13,7 +13,7 @@ use concordium_rust_sdk::{
         types::{OwnedContractName, OwnedReceiveName},
     },
     types::{
-        smart_contracts::{ModuleRef, OwnedParameter, WasmModule},
+        smart_contracts::{ModuleReference, OwnedParameter, WasmModule},
         transactions::{send, BlockItem, InitContractPayload, UpdateContractPayload},
         AccountInfo, ContractAddress, WalletAccount,
     },
@@ -52,7 +52,7 @@ enum Action {
             long,
             help = "The module reference used for initializing the contract instance."
         )]
-        module_ref: ModuleRef,
+        module_ref: ModuleReference,
     },
     #[structopt(about = "Update the contract and set the provided weather")]
     Update {
