@@ -3,6 +3,8 @@
 - Add `find_earliest_finalized`, `find_instance_creation`,
   `find_first_finalized_block_no_later_than` methods to the `v2` client.
 - Bump MSRV to 1.60
+- Add deprecation notices to `ModuleRef` and `Parameter`. Use `ModuleReference`
+  and `OwnedParameter`, respectively, instead.
 
 ## 2.2.0
 
