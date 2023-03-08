@@ -260,7 +260,7 @@ pub enum PendingUpdateEffect {
     ElectionDifficulty(ElectionDifficulty),
     #[serde(rename = "euroPerEnergy")]
     EuroPerEnergy(ExchangeRate),
-    #[serde(rename = "microGTUPerEuro")]
+    #[serde(rename = "microCCDPerEuro")]
     MicroCcdPerEnergy(ExchangeRate),
     #[serde(rename = "foundationAccount")]
     FoundationAccount(AccountAddress),
