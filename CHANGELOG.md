@@ -5,6 +5,13 @@
 - Bump MSRV to 1.60
 - Add deprecation notices to `ModuleRef` and `Parameter`. Use `ModuleReference`
   and `OwnedParameter`, respectively, instead.
+  - There are no breaking changes to the API of either type, but `OwnedParameter` has some
+    additional methods and trait implementation, namely:
+  - A `new` method which constructs a new parameter by serializing the input.
+  - An `Into<Vec<u8>>` implementation for getting the inner `bytes`.
+  - An `as_parameter` method for converting it to the borrowed version
+    `Parameter(&[u8])` type (not to be confused with the now deprecated
+    `Parameter(Vec<u8>)`)
 
 ## 2.2.0
 
