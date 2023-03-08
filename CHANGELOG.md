@@ -5,15 +5,18 @@
 - Bump MSRV to 1.60
 - Add deprecation notices to `ModuleRef` and `Parameter`. Use `ModuleReference`
   and `OwnedParameter`, respectively, instead.
-  - There are no breaking changes to the API of either type, but `OwnedParameter` has some
-    additional methods and trait implementation, namely:
+  - Replace `AsRef<Vec<u8>>` with `AsRef<[u8]>` for `OwnedParameter` (and
+    thereby also for the now deprecated `Parameter`).
+    - Migrate from `parameter.as_ref()`: Use `&parameter.as_ref().to_vec()` instead.
+  - `OwnedParameter` also has a number of additional methods and trait
+    implementations, namely:
   - A `from_serial` method which constructs a new parameter by serializing the
     input and checking that the length is valid.
   - An `empty` method which constructs an empty parameter.
   - An `Into<Vec<u8>>` implementation for getting the inner `bytes`.
   - An `as_parameter` method for converting it to the borrowed version
     `Parameter(&[u8])` type (not to be confused with the now deprecated
-    `Parameter(Vec<u8>)`)
+    `Parameter(Vec<u8>)`).
 
 ## 2.2.0
 
