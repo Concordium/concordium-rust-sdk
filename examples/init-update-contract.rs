@@ -109,7 +109,8 @@ async fn main() -> anyhow::Result<()> {
             weather,
             module_ref: mod_ref,
         } => {
-            let param = OwnedParameter::new(&weather);
+            let param = OwnedParameter::from_serial(&weather)
+                .expect("Known to not exceed parameter size limit.");
             let payload = InitContractPayload {
                 amount: Amount::zero(),
                 mod_ref,
@@ -120,7 +121,8 @@ async fn main() -> anyhow::Result<()> {
             send::init_contract(&keys, keys.address, nonce, expiry, payload, 10000u64.into())
         }
         Action::Update { weather, address } => {
-            let message = OwnedParameter::new(&weather);
+            let message = OwnedParameter::from_serial(&weather)
+                .expect("Known to not exceed parameter size limit.");
             let payload = UpdateContractPayload {
                 amount: Amount::zero(),
                 address,
