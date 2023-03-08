@@ -8,11 +8,10 @@ use concordium_rust_sdk::{
     common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize},
     endpoints,
     smart_contracts::common::{
-        self as contracts_common, Amount, ContractAddress, OwnedContractName, OwnedReceiveName,
-        Serial,
+        Amount, ContractAddress, OwnedContractName, OwnedReceiveName, Serial,
     },
     types::{
-        smart_contracts::{ModuleRef, Parameter},
+        smart_contracts::{ModuleReference, OwnedParameter},
         transactions::{send, BlockItem, InitContractPayload, UpdateContractPayload},
         AccountInfo, WalletAccount,
     },
@@ -45,7 +44,7 @@ enum Action {
             long,
             help = "The module reference used for initializing the contract instance."
         )]
-        module_ref: ModuleRef,
+        module_ref: ModuleReference,
     },
     #[structopt(about = "Update the contract and set the provided weather")]
     Update {
@@ -110,7 +109,8 @@ async fn main() -> anyhow::Result<()> {
             weather,
             module_ref: mod_ref,
         } => {
-            let param = Parameter::try_from(contracts_common::to_bytes(&weather)).unwrap();
+            let param = OwnedParameter::from_serial(&weather)
+                .expect("Known to not exceed parameter size limit.");
             let payload = InitContractPayload {
                 amount: Amount::zero(),
                 mod_ref,
@@ -121,7 +121,8 @@ async fn main() -> anyhow::Result<()> {
             send::init_contract(&keys, keys.address, nonce, expiry, payload, 10000u64.into())
         }
         Action::Update { weather, address } => {
-            let message = Parameter::try_from(contracts_common::to_bytes(&weather)).unwrap();
+            let message = OwnedParameter::from_serial(&weather)
+                .expect("Known to not exceed parameter size limit.");
             let payload = UpdateContractPayload {
                 amount: Amount::zero(),
                 address,

@@ -686,7 +686,7 @@ impl Client {
     pub async fn get_module_list(
         &mut self,
         bh: &types::hashes::BlockHash,
-    ) -> QueryResult<Vec<types::smart_contracts::ModuleRef>> {
+    ) -> QueryResult<Vec<types::smart_contracts::ModuleReference>> {
         let request = self.construct_request(BlockHash {
             block_hash: bh.to_string(),
         })?;
@@ -697,7 +697,7 @@ impl Client {
     // FIXME: Do not return just bytes, wrap it.
     pub async fn get_module_source(
         &mut self,
-        mr: &types::smart_contracts::ModuleRef,
+        mr: &types::smart_contracts::ModuleReference,
         bh: &types::hashes::BlockHash,
     ) -> QueryResult<Vec<u8>> {
         let request = self.construct_request(GetModuleSourceRequest {
