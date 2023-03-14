@@ -3,11 +3,9 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::{
-        base16_encode_string,
-        derive::Serialize,
-        to_bytes,
+        base16_encode_string, to_bytes,
         types::{Amount, TransactionTime},
-        Buffer, Deserial, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
+        SerdeDeserialize, SerdeSerialize, Serialize,
     },
     endpoints::{self, Client, Endpoint},
     types::{
