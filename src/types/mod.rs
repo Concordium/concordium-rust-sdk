@@ -14,7 +14,6 @@ pub use concordium_base::base::*;
 use concordium_base::{
     common::{
         self,
-        derive::Serialize,
         types::{Amount, CredentialIndex, Timestamp, TransactionTime},
         Buffer, Deserial, Get, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
         Versioned,
@@ -1798,7 +1797,7 @@ impl<Auths: Deserial> Deserial for UpdateKeysCollectionSkeleton<Auths> {
 
 pub type UpdateKeysCollection<CPV> = UpdateKeysCollectionSkeleton<Authorizations<CPV>>;
 
-#[derive(Serialize, Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(common::Serialize, Debug, SerdeSerialize, SerdeDeserialize)]
 #[serde(rename_all = "camelCase")]
 /// Values of chain parameters that can be updated via chain updates.
 pub struct ChainParametersV0 {
@@ -1822,7 +1821,7 @@ pub struct ChainParametersV0 {
     pub minimum_threshold_for_baking: Amount,
 }
 
-#[derive(Serialize, Debug, SerdeSerialize, SerdeDeserialize)]
+#[derive(common::Serialize, Debug, SerdeSerialize, SerdeDeserialize)]
 #[serde(rename_all = "camelCase")]
 /// Values of chain parameters that can be updated via chain updates.
 pub struct ChainParametersV1 {
