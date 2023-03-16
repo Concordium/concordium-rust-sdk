@@ -64,7 +64,7 @@ impl TryFrom<Address> for super::types::Address {
     }
 }
 
-impl TryFrom<ModuleRef> for super::ModuleRef {
+impl TryFrom<ModuleRef> for super::ModuleReference {
     type Error = tonic::Status;
 
     fn try_from(value: ModuleRef) -> Result<Self, Self::Error> {
@@ -110,11 +110,11 @@ impl TryFrom<VersionedModuleSource> for super::types::smart_contracts::WasmModul
     }
 }
 
-impl TryFrom<Parameter> for super::types::smart_contracts::Parameter {
+impl TryFrom<Parameter> for super::types::smart_contracts::OwnedParameter {
     type Error = tonic::Status;
 
     fn try_from(value: Parameter) -> Result<Self, Self::Error> {
-        value.value.try_into().map_err(
+        Self::try_from(value.value).map_err(
             |e: concordium_base::smart_contracts::ExceedsParameterSize| {
                 tonic::Status::invalid_argument(e.to_string())
             },

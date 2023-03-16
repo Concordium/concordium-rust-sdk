@@ -88,7 +88,7 @@ pub(crate) enum Event {
     /// A smart contract module was successfully deployed.
     ModuleDeployed {
         #[serde(rename = "contents")]
-        module_ref: smart_contracts::ModuleRef,
+        module_ref: smart_contracts::ModuleReference,
     },
     /// A new smart contract instance was created.
     #[serde(rename_all = "camelCase")]
@@ -350,9 +350,9 @@ pub(crate) enum Event {
         /// Address of the instance that was upgraded.
         address: super::ContractAddress,
         /// The existing module reference that is in effect before the upgrade.
-        from:    smart_contracts::ModuleRef,
+        from:    smart_contracts::ModuleReference,
         /// The new module reference that is in effect after the upgrade.
-        to:      smart_contracts::ModuleRef,
+        to:      smart_contracts::ModuleReference,
     },
 }
 

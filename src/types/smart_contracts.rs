@@ -9,7 +9,8 @@ use concordium_base::{
 /// Re-export of common helper functionality for smart contract, such as types
 /// and serialization specific for smart contracts.
 pub use concordium_contracts_common::{
-    self, ContractName, OwnedContractName, OwnedReceiveName, ReceiveName,
+    self, ContractName, ModuleReference, OwnedContractName, OwnedParameter, OwnedReceiveName,
+    ReceiveName,
 };
 use derive_more::*;
 use std::convert::TryFrom;
@@ -29,14 +30,14 @@ pub enum InstanceInfo {
         amount:        Amount,
         methods:       std::collections::BTreeSet<OwnedReceiveName>,
         name:          OwnedContractName,
-        source_module: ModuleRef,
+        source_module: ModuleReference,
     },
     V1 {
         owner:         AccountAddress,
         amount:        Amount,
         methods:       std::collections::BTreeSet<OwnedReceiveName>,
         name:          OwnedContractName,
-        source_module: ModuleRef,
+        source_module: ModuleReference,
     },
 }
 
@@ -50,7 +51,7 @@ impl InstanceInfo {
     }
 
     /// The source module of the instance.
-    pub fn source_module(&self) -> ModuleRef {
+    pub fn source_module(&self) -> ModuleReference {
         match self {
             InstanceInfo::V0 { source_module, .. } => *source_module,
             InstanceInfo::V1 { source_module, .. } => *source_module,
@@ -89,7 +90,7 @@ mod instance_parser {
         amount:        Amount,
         methods:       std::collections::BTreeSet<OwnedReceiveName>,
         name:          OwnedContractName,
-        source_module: ModuleRef,
+        source_module: ModuleReference,
     }
 
     impl From<InstanceInfo> for InstanceInfoHelper {
@@ -197,7 +198,7 @@ pub struct ContractContext {
     pub method:    OwnedReceiveName,
     /// And with what parameter.
     #[serde(default)]
-    pub parameter: Parameter,
+    pub parameter: OwnedParameter,
     /// And what amount of energy to allow for execution. This should be small
     /// enough so that it can be converted to interpreter energy.
     #[serde(default = "return_default_invoke_energy")]
@@ -227,7 +228,7 @@ impl ContractContext {
             contract,
             amount: Amount::zero(),
             method,
-            parameter: Parameter::default(),
+            parameter: OwnedParameter::default(),
             energy: DEFAULT_INVOKE_ENERGY,
         }
     }

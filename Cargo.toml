@@ -3,6 +3,7 @@ name = "concordium-rust-sdk"
 version = "2.2.0"
 authors = ["Concordium <developers@concordium.com>"]
 edition = "2021"
+rust-version = "1.60"
 license-file = "LICENSE"
 include = ["README.md", "CHANGELOG.md"]
 
@@ -43,7 +44,7 @@ generate-protos = ["tonic-build", "git2"]
 [dev-dependencies]
 structopt = "0.3"
 clap = "2.34"
-csv = "=1.1" # Fixed to 1.1. until we update to Rust 1.60+.
+csv = "1.1"
 tokio = { version = "1.21", features = ["full"] }
 tokio-test = { version = "0.4" }
 

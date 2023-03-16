@@ -9,7 +9,7 @@ use crate::{
         self, hashes,
         hashes::{BlockHash, TransactionHash, TransactionSignHash},
         smart_contracts::{
-            ContractContext, InstanceInfo, InvokeContractResult, ModuleRef, Parameter, WasmModule,
+            ContractContext, InstanceInfo, InvokeContractResult, ModuleReference, WasmModule,
         },
         transactions::{self, InitContractPayload, UpdateContractPayload, UpdateInstruction},
         AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, Energy, Memo, Nonce,
@@ -26,7 +26,8 @@ use concordium_base::{
         types::{TransactionSignature, TransactionTime},
     },
     contracts_common::{
-        AccountAddress, Amount, ContractAddress, OwnedContractName, OwnedReceiveName, ReceiveName,
+        AccountAddress, Amount, ContractAddress, OwnedContractName, OwnedParameter,
+        OwnedReceiveName, ReceiveName,
     },
     transactions::{BlockItem, EncodedPayload, PayloadLike},
     updates::{
@@ -353,12 +354,12 @@ impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
     }
 }
 
-impl From<&ModuleRef> for generated::ModuleRef {
-    fn from(mr: &ModuleRef) -> Self { Self { value: mr.to_vec() } }
+impl From<&ModuleReference> for generated::ModuleRef {
+    fn from(mr: &ModuleReference) -> Self { Self { value: mr.to_vec() } }
 }
 
-impl From<ModuleRef> for generated::ModuleRef {
-    fn from(mr: ModuleRef) -> Self { Self { value: mr.to_vec() } }
+impl From<ModuleReference> for generated::ModuleRef {
+    fn from(mr: ModuleReference) -> Self { Self { value: mr.to_vec() } }
 }
 
 impl From<&WasmModule> for generated::VersionedModuleSource {
@@ -400,10 +401,10 @@ impl From<&OwnedReceiveName> for generated::ReceiveName {
     }
 }
 
-impl From<&Parameter> for generated::Parameter {
-    fn from(v: &Parameter) -> Self {
+impl From<&OwnedParameter> for generated::Parameter {
+    fn from(v: &OwnedParameter) -> Self {
         Self {
-            value: v.as_ref().clone(),
+            value: v.as_ref().to_vec(),
         }
     }
 }
@@ -536,7 +537,7 @@ impl IntoRequest<generated::AncestorsRequest> for (&BlockIdentifier, u64) {
     }
 }
 
-impl IntoRequest<generated::ModuleSourceRequest> for (&ModuleRef, &BlockIdentifier) {
+impl IntoRequest<generated::ModuleSourceRequest> for (&ModuleReference, &BlockIdentifier) {
     fn into_request(self) -> tonic::Request<generated::ModuleSourceRequest> {
         let r = generated::ModuleSourceRequest {
             block_hash: Some(self.1.into()),
@@ -691,7 +692,7 @@ impl IntoRequest<generated::InvokeInstanceRequest> for (&BlockIdentifier, &Contr
             instance:   Some((&context.contract).into()),
             amount:     Some(context.amount.into()),
             entrypoint: Some(context.method.as_receive_name().into()),
-            parameter:  Some(context.parameter.as_ref().as_slice().into()),
+            parameter:  Some(context.parameter.as_ref().into()),
             energy:     Some(context.energy.into()),
         })
     }
@@ -1023,8 +1024,9 @@ impl Client {
     pub async fn get_module_list(
         &mut self,
         bi: impl IntoBlockIdentifier,
-    ) -> endpoints::QueryResult<QueryResponse<impl Stream<Item = Result<ModuleRef, tonic::Status>>>>
-    {
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<ModuleReference, tonic::Status>>>,
+    > {
         let response = self
             .client
             .get_module_list(&bi.into_block_identifier())
@@ -1042,7 +1044,7 @@ impl Client {
     /// returned.
     pub async fn get_module_source(
         &mut self,
-        module_ref: &ModuleRef,
+        module_ref: &ModuleReference,
         bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<QueryResponse<types::smart_contracts::WasmModule>> {
         let response = self
