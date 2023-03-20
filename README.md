@@ -26,7 +26,6 @@ concordium-rust-sdk = "1"
 
 ## Versions
 
-- Minimum supported Rust version: 1.60.
 - Node version compatibility: 5.*
 
 ## Basic usage
