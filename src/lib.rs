@@ -86,3 +86,7 @@ pub mod v2;
 
 /// Functionality related to smart contracts.
 pub mod smart_contracts;
+
+/// Re-export of [`concordium_base`]. The main purpose of this is
+/// to enable the use of `concordium_base_derive` serialization macros.
+pub use concordium_base as base;

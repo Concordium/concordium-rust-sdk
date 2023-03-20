@@ -1,5 +1,8 @@
 ## Unreleased changes
 
+- Re-export `concordium_base` to enable use of `concordium_base_derive`
+  serialization macros.
+
 ## 2.3.0
 
 - Add `find_earliest_finalized`, `find_instance_creation`,
