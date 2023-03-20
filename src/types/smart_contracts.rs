@@ -1,11 +1,12 @@
 //! Types related to smart contracts.
 
-use super::{Address, ContractAddress, ContractTraceElement, Energy, RejectReason};
+use super::{Address, ContractAddress, Energy, RejectReason};
 use concordium_base::{
     common::{types::Amount, SerdeDeserialize, SerdeSerialize},
     id::types::AccountAddress,
     transactions::UpdateContractPayload,
 };
+pub use concordium_base::{constants::MAX_ALLOWED_INVOKE_ENERGY, smart_contracts::*};
 /// Re-export of common helper functionality for smart contract, such as types
 /// and serialization specific for smart contracts.
 pub use concordium_contracts_common::{
@@ -14,8 +15,6 @@ pub use concordium_contracts_common::{
 };
 use derive_more::*;
 use std::convert::TryFrom;
-
-pub use concordium_base::smart_contracts::*;
 
 #[derive(Clone, SerdeSerialize, SerdeDeserialize, Debug, PartialEq, Eq)]
 #[serde(
@@ -163,24 +162,6 @@ mod instance_parser {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, AsRef, Into, From)]
-#[serde(transparent)]
-/// An event logged by a smart contract initialization.
-pub struct ContractEvent {
-    #[serde(with = "crate::internal::byte_array_hex")]
-    bytes: Vec<u8>,
-}
-
-/// Display the entire event in hex.
-impl std::fmt::Display for ContractEvent {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for b in &self.bytes {
-            f.write_fmt(format_args!("{:02x}", b))?
-        }
-        Ok(())
-    }
-}
-
 #[derive(SerdeSerialize, SerdeDeserialize, Clone)]
 /// Data needed to invoke the contract.
 pub struct ContractContext {
@@ -206,12 +187,6 @@ pub struct ContractContext {
 }
 
 pub const DEFAULT_INVOKE_ENERGY: Energy = Energy { energy: 10_000_000 };
-
-/// The highest amount of energy allowed when invoking a smart contract endpoint
-/// with a concordium node.
-pub const MAX_ALLOWED_INVOKE_ENERGY: Energy = Energy {
-    energy: 100_000_000_000,
-};
 
 impl ContractContext {
     /// Construct a minimal context with defaults for omitted values. The
