@@ -12,8 +12,8 @@ performs better. The V1 API will be deprecated in the next SDK version.
 
 ## Minimum supported Rust version
 
-The current minimal version is 1.60. A MSRV bump will be accompanied by a minor
-version bump of the SDK.
+The minimal supported rust version is stated in the `Cargo.toml` manifest. A
+MSRV bump will be accompanied by at least a minor version bump of the SDK.
 
 ## Add it to your project
 
