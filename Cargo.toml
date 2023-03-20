@@ -5,7 +5,8 @@ authors = ["Concordium <developers@concordium.com>"]
 edition = "2021"
 rust-version = "1.62"
 license-file = "LICENSE"
-include = ["README.md", "CHANGELOG.md"]
+readme = "README.md"
+include = ["src/", "examples/", "CHANGELOG.md"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -34,7 +35,7 @@ num-traits = "0.2"
 tokio-postgres = { version = "^0.7.5", features = ["with-serde_json-1"], optional = true }
 
 concordium_base = { version = "1", path = "./concordium-base/rust-src/concordium_base/" }
-concordium-smart-contract-engine = { version = "1", path = "./concordium-base/smart-contracts/wasm-chain-integration/", default-features = false, features = ["async"]}
+concordium-smart-contract-engine = { version = ">= 1.0.1", path = "./concordium-base/smart-contracts/wasm-chain-integration/", default-features = false, features = ["async"]}
 
 [features]
 postgres = ["tokio-postgres"]

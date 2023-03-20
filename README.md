@@ -17,14 +17,12 @@ MSRV bump will be accompanied by at least a minor version bump of the SDK.
 
 ## Add it to your project
 
-Until the SDK is published on [crates.io](crates.io) the recommended way to use it is to add this repository as a git submodule to your project and then add a dependency to your Cargo.toml
+The SDK is published on [crates.io](crates.io).
 
 ```toml
 [dependencies]
-concordium-rust-sdk = { path = "./deps/concordium-rust-sdk", version = "1" }
+concordium-rust-sdk = "1"
 ```
-
-assuming the submodule is cloned into the directory `./deps/concordium-rust-sdk`.
 
 ## Versions
 
