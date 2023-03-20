@@ -2,5 +2,5 @@
 //! token standard.
 
 // All code from this module has been moved to cis2_types in base, but this is
-// still re-exported for backwards compatability.
+// still re-exported for backward compatibility.
 pub use concordium_base::cis2_types::*;
