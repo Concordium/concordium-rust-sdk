@@ -17,11 +17,11 @@ MSRV bump will be accompanied by at least a minor version bump of the SDK.
 
 ## Add it to your project
 
-The SDK is published on [crates.io](crates.io).
+The SDK is published on [crates.io](https://crates.io/crates/concordium-rust-sdk).
 
 ```toml
 [dependencies]
-concordium-rust-sdk = "1"
+concordium-rust-sdk = "2"
 ```
 
 ## Versions
@@ -31,11 +31,11 @@ concordium-rust-sdk = "1"
 ## Basic usage
 
 The core structure of the SDK is the
-[Client](http://developer.concordium.software/concordium-rust-sdk/concordium_rust_sdk/v2/struct.Client.html)
+[Client](https://docs.rs/concordium-rust-sdk/latest/concordium_rust_sdk/v2/struct.Client.html)
 which maintains a connection to the node and supports querying the node and
 sending messages to it. This client is cheaply clonable.
 
-The `Client` is constructed using the [new](http://developer.concordium.software/concordium-rust-sdk/concordium_rust_sdk/v2/struct.Client.html#method.new) method.
+The `Client` is constructed using the [new](https://docs.rs/concordium-rust-sdk/latest/concordium_rust_sdk/v2/struct.Client.html#method.new) method.
 
 ```rust
 use concordium_rust_sdk::*;
@@ -55,17 +55,17 @@ async fn main() -> anyhow::Result<()> {
 ## Signing transactions
 
 The
-[`transactions::send`](http://developer.concordium.software/concordium-rust-sdk/concordium_rust_sdk/types/transactions/send/index.html)
+[`transactions::send`](https://docs.rs/concordium-rust-sdk/latest/concordium_rust_sdk/types/transactions/send/index.html)
 contains methods for constructing and sending transactions. There is an
 accompanying module
-[`transactions::construct`](http://developer.concordium.software/concordium-rust-sdk/concordium_rust_sdk/types/transactions/construct/index.html)
+[`transactions::construct`](https://docs.rs/concordium-rust-sdk/latest/concordium_rust_sdk/types/transactions/construct/index.html)
 which can be used if transactions only need to be constructed, but not
 immediately signed.
 
 Each supported transaction has a method to construct it that takes minimal data
 needed for the transaction. Once a transaction is constructed it can be sent to
 the node and the chain using the
-[`send_block_item`](http://developer.concordium.software/concordium-rust-sdk/concordium_rust_sdk/v2/struct.Client.html#method.send_block_item)
+[`send_block_item`](https://docs.rs/concordium-rust-sdk/latest/concordium_rust_sdk/v2/struct.Client.html#method.send_block_item)
 endpoint.
 
 ## Examples
@@ -97,7 +97,7 @@ affected account.
 
 ## Documentation
 
-The rendered documentation is available at http://developer.concordium.software/concordium-rust-sdk/
+The rendered documentation is available at https://docs.rs/concordium-rust-sdk/latest/
 
 ## Migration from V1 to V2
 
