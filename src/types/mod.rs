@@ -17,7 +17,7 @@ pub use concordium_base::{
 use concordium_base::{
     common::{
         self,
-        types::{Amount, CredentialIndex, Timestamp, TransactionTime},
+        types::{Amount, CredentialIndex, Timestamp, TransactionSignature, TransactionTime},
         Buffer, Deserial, Get, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
         Versioned,
     },
@@ -32,7 +32,10 @@ use concordium_base::{
             AccountAddress, AccountCredentialWithoutProofs, AccountKeys, CredentialPublicKeys,
         },
     },
-    transactions::{AccountAccessStructure, ExactSizeTransactionSigner, TransactionSigner},
+    transactions::{
+        verify_message_signature, AccountAccessStructure, AccountTransaction,
+        ExactSizeTransactionSigner, PayloadLike, TransactionSigner,
+    },
 };
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
@@ -323,6 +326,24 @@ pub struct AccountInfo {
     pub account_stake:            Option<AccountStakingInfo>,
     /// Canonical address of the account.
     pub account_address:          AccountAddress,
+}
+
+impl AccountInfo {
+    /// Verify whether the transactio was signed with the [`Self`]'s keys.
+    pub fn verify_transaction_signature<P: PayloadLike>(&self, tx: &AccountTransaction<P>) -> bool {
+        tx.verify_transaction_signature(self)
+    }
+
+    /// Verify a signature on a message, as produced by wallets, with the
+    /// [`Self`] keys. Note that this is the signature on a **message** as
+    /// distinct from a signature on a transaction.
+    pub fn verify_message_signature(
+        &self,
+        message: impl AsRef<[u8]>,
+        sig: &TransactionSignature,
+    ) -> bool {
+        verify_message_signature(self, self.account_address, message, sig)
+    }
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
