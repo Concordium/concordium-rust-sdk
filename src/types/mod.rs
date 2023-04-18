@@ -350,7 +350,7 @@ pub struct BirkBaker {
     pub baker_account:       AccountAddress,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, PartialEq, Debug, Clone, Copy)]
+#[derive(SerdeSerialize, SerdeDeserialize, PartialEq, Eq, Debug, Clone, Copy)]
 #[serde(tag = "change")]
 /// Pending change in the baker's stake.
 pub enum StakePendingChange {
@@ -380,7 +380,7 @@ impl StakePendingChange {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// Information about a registered passive or pool delegator.
 pub struct DelegatorInfo {
     /// The delegator account address.
@@ -500,7 +500,7 @@ mod rewards_overview {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy, PartialEq)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(tag = "pendingChangeType")]
 pub enum PoolPendingChange {
     NoChange,

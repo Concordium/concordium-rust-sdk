@@ -2,6 +2,7 @@
 
 - Re-export `concordium_base` to enable use of `concordium_base_derive`
   serialization macros.
+- Bump minimum supported rust version to 1.64.
 
 ## 2.3.0
 

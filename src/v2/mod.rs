@@ -46,7 +46,11 @@ pub use tonic::{
 
 mod conversions;
 #[path = "generated/concordium.v2.rs"]
-#[allow(clippy::large_enum_variant, clippy::enum_variant_names)]
+#[allow(
+    clippy::large_enum_variant,
+    clippy::enum_variant_names,
+    clippy::derive_partial_eq_without_eq
+)]
 mod generated;
 pub mod proto_schema_version;
 

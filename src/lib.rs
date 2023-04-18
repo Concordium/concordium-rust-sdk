@@ -47,6 +47,7 @@ pub mod constants;
 /// structured values.
 pub mod endpoints;
 #[path = "v1/generated/concordium.rs"]
+#[allow(clippy::derive_partial_eq_without_eq)]
 mod generated_types;
 mod internal;
 /// Interface to the (optional) postgres database that the node logs finalized
