@@ -10,7 +10,7 @@ struct App {
     #[structopt(
         long = "node",
         help = "GRPC interface of the node.",
-        default_value = "http://localhost:10001"
+        default_value = "http://localhost:20000"
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "address", help = "Account address to query.")]

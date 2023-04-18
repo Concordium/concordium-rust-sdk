@@ -11,7 +11,7 @@ struct App {
     #[structopt(
         long = "node",
         help = "GRPC interface of the node.",
-        default_value = "http://localhost:10001"
+        default_value = "http://localhost:20000"
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "block", help = "Block to query delegators in.")]
