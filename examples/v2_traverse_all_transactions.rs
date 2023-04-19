@@ -20,7 +20,7 @@ struct App {
     #[structopt(
         long = "node-v2",
         help = "GRPC2 interface of the node.",
-        default_value = "http://localhost:10001"
+        default_value = "http://localhost:20000"
     )]
     endpoint_v2: Endpoint,
     #[structopt(long = "block")]

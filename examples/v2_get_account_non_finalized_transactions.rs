@@ -10,13 +10,12 @@ struct App {
     #[structopt(
         long = "node",
         help = "GRPC interface of the node.",
-        default_value = "http://localhost:10001"
+        default_value = "http://localhost:20000"
     )]
     endpoint: v2::Endpoint,
     #[structopt(
         long = "account",
-        help = "Account address to get non-finalized transactions for.",
-        default_value = "http://localhost:10001"
+        help = "Account address to get non-finalized transactions for."
     )]
     account:  AccountAddress,
 }
