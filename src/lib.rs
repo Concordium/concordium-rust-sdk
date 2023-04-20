@@ -1,15 +1,5 @@
-//! A library for interacting with the Concordium blockchain.
-//!
-//! To use this in your project the recommended setup is to clone the repository
-//! (e.g., add it as a submodule), and then declare a local dependency in your
-//! `Cargo.toml`, e.g.,
-//!
-//! ```toml
-//! [dependencies]
-//! concordium-rust-sdk = { path = "./deps/concordium-rust-sdk", version = "1" }
-//! ```
-//!
-//! The library is structured around multiple modules.
+//! A library for interacting with the Concordium blockchain. The library is
+//! structured around multiple modules.
 //!
 //! - [`v2`] contains the main entrypoint to the library. In particular it
 //!   contains the [`Client`](v2::Client) struct
