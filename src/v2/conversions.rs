@@ -6,6 +6,7 @@ use super::generated::*;
 use crate::types::UpdateKeysCollectionSkeleton;
 
 use super::Require;
+use chrono::TimeZone;
 use concordium_base::{
     base,
     common::{Deserial, Versioned, VERSION_0},
@@ -428,10 +429,10 @@ impl TryFrom<StakePendingChange> for super::types::StakePendingChange {
         match value.change.require()? {
             stake_pending_change::Change::Reduce(rs) => Ok(Self::ReduceStake {
                 new_stake:      rs.new_stake.require()?.into(),
-                effective_time: rs.effective_time.require()?.into(),
+                effective_time: rs.effective_time.require()?.try_into()?,
             }),
             stake_pending_change::Change::Remove(rs) => {
-                let effective_time = rs.into();
+                let effective_time = rs.try_into()?;
                 Ok(Self::RemoveStake { effective_time })
             }
         }
@@ -544,7 +545,7 @@ impl TryFrom<Release> for super::types::Release {
 
     fn try_from(value: Release) -> Result<Self, Self::Error> {
         Ok(Self {
-            timestamp:    value.timestamp.require()?.into(),
+            timestamp:    value.timestamp.require()?.try_into()?,
             amount:       value.amount.require()?.into(),
             transactions: value
                 .transactions
@@ -811,10 +812,18 @@ impl From<Timestamp> for concordium_base::common::types::Timestamp {
     fn from(value: Timestamp) -> Self { value.value.into() }
 }
 
-impl From<Timestamp> for chrono::DateTime<chrono::Utc> {
-    fn from(value: Timestamp) -> Self {
-        chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
-            + chrono::Duration::milliseconds(value.value as i64)
+impl TryFrom<Timestamp> for chrono::DateTime<chrono::Utc> {
+    type Error = tonic::Status;
+
+    fn try_from(value: Timestamp) -> Result<Self, Self::Error> {
+        let ts = chrono::Utc.timestamp_millis_opt(
+            value
+                .value
+                .try_into()
+                .map_err(|_| tonic::Status::internal("Timestamp out of range."))?,
+        );
+        ts.single()
+            .ok_or_else(|| tonic::Status::internal("Ambiguous time."))
     }
 }
 
@@ -2098,22 +2107,31 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
             transactions_per_block_e_m_s_d: value.transactions_per_block_emsd,
             finalization_period_e_m_a:      value.finalization_period_ema,
             best_block_height:              value.best_block_height.require()?.into(),
-            last_finalized_time:            value.last_finalized_time.map(|v| v.into()),
+            last_finalized_time:            value
+                .last_finalized_time
+                .map(|v| v.try_into())
+                .transpose()?,
             finalization_count:             value.finalization_count.into(),
             epoch_duration:                 value.epoch_duration.require()?.into(),
             blocks_verified_count:          value.blocks_verified_count.into(),
             slot_duration:                  value.slot_duration.require()?.into(),
-            genesis_time:                   value.genesis_time.require()?.into(),
+            genesis_time:                   value.genesis_time.require()?.try_into()?,
             finalization_period_e_m_s_d:    value.finalization_period_emsd,
             transactions_per_block_e_m_a:   value.transactions_per_block_ema,
             block_arrive_latency_e_m_a:     value.block_arrive_latency_ema,
             block_receive_latency_e_m_a:    value.block_receive_latency_ema,
             block_arrive_period_e_m_a:      value.block_arrive_period_ema,
             block_receive_period_e_m_a:     value.block_receive_period_ema,
-            block_last_arrived_time:        value.block_last_arrived_time.map(|v| v.into()),
+            block_last_arrived_time:        value
+                .block_last_arrived_time
+                .map(|v| v.try_into())
+                .transpose()?,
             best_block:                     value.best_block.require()?.try_into()?,
             genesis_block:                  value.genesis_block.require()?.try_into()?,
-            block_last_received_time:       value.block_last_received_time.map(|v| v.into()),
+            block_last_received_time:       value
+                .block_last_received_time
+                .map(|v| v.try_into())
+                .transpose()?,
             protocol_version:               ProtocolVersion::from_i32(value.protocol_version)
                 .ok_or_else(|| tonic::Status::internal("Unknown protocol version"))?
                 .into(),
@@ -2122,7 +2140,7 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
                 .current_era_genesis_block
                 .require()?
                 .try_into()?,
-            current_era_genesis_time:       value.current_era_genesis_time.require()?.into(),
+            current_era_genesis_time:       value.current_era_genesis_time.require()?.try_into()?,
         })
     }
 }
@@ -2297,13 +2315,13 @@ impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
             block_hash:              value.hash.require()?.try_into()?,
             finalized:               value.finalized,
             block_state_hash:        value.state_hash.require()?.try_into()?,
-            block_arrive_time:       value.arrive_time.require()?.into(),
-            block_receive_time:      value.receive_time.require()?.into(),
+            block_arrive_time:       value.arrive_time.require()?.try_into()?,
+            block_receive_time:      value.receive_time.require()?.try_into()?,
             transaction_count:       value.transaction_count.into(),
             transaction_energy_cost: value.transactions_energy_cost.require()?.into(),
             block_slot:              value.slot_number.require()?.into(),
             block_last_finalized:    value.last_finalized_block.require()?.try_into()?,
-            block_slot_time:         value.slot_time.require()?.into(),
+            block_slot_time:         value.slot_time.require()?.try_into()?,
             block_height:            value.height.require()?.into(),
             era_block_height:        value.era_block_height.require()?.into(),
             genesis_index:           value.genesis_index.require()?.into(),
@@ -2342,10 +2360,10 @@ impl TryFrom<Option<PoolPendingChange>> for super::types::PoolPendingChange {
             match value.change.require()? {
                 pool_pending_change::Change::Reduce(rs) => Ok(Self::ReduceBakerCapital {
                     baker_equity_capital: rs.reduced_equity_capital.require()?.into(),
-                    effective_time:       rs.effective_time.require()?.into(),
+                    effective_time:       rs.effective_time.require()?.try_into()?,
                 }),
                 pool_pending_change::Change::Remove(rs) => Ok(Self::RemovePool {
-                    effective_time: rs.effective_time.require()?.into(),
+                    effective_time: rs.effective_time.require()?.try_into()?,
                 }),
             }
         } else {
@@ -2457,7 +2475,7 @@ impl TryFrom<TokenomicsInfo> for super::types::RewardsOverview {
                     .foundation_transaction_rewards
                     .require()?
                     .into(),
-                next_payday_time: value.next_payday_time.require()?.into(),
+                next_payday_time: value.next_payday_time.require()?.try_into()?,
                 next_payday_mint_rate: value.next_payday_mint_rate.require()?.try_into()?,
                 total_staked_capital: value.total_staked_capital.require()?.into(),
             }),
