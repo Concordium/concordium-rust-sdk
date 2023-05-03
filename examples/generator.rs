@@ -2,14 +2,15 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::types::{Amount, TransactionTime},
-    endpoints::{self, Endpoint},
+    endpoints::Endpoint,
     id::types::AccountAddress,
     types::{
-        self,
         transactions::{send, BlockItem},
         WalletAccount,
     },
+    v2::{self, BlockIdentifier},
 };
+use futures::TryStreamExt;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -18,7 +19,7 @@ struct App {
     #[structopt(
         long = "node",
         help = "GRPC interface of the node.",
-        default_value = "http://localhost:10000"
+        default_value = "http://localhost:20000"
     )]
     endpoint:  Endpoint,
     #[structopt(long = "sender")]
@@ -33,6 +34,12 @@ struct App {
         default_value = "0"
     )]
     amount:    Amount,
+    #[structopt(
+        long = "expiry",
+        help = "Expiry of transactions in seconds.",
+        default_value = "7200"
+    )]
+    expiry:    u32,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -43,17 +50,20 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
-    let mut client = endpoints::Client::connect(app.endpoint, "rpcadmin".to_string()).await?;
-
-    let consensus_info = client.get_consensus_status().await?;
+    let mut client = v2::Client::new(app.endpoint).await?;
 
     let keys: WalletAccount =
         WalletAccount::from_json_file(app.account).context("Could not parse the keys file.")?;
     let accounts: Vec<AccountAddress> = match app.receivers {
-        None => client
-            .get_account_list(&consensus_info.last_finalized_block)
-            .await
-            .context("Could not obtain a list of accounts.")?,
+        None => {
+            client
+                .get_account_list(BlockIdentifier::LastFinal)
+                .await
+                .context("Could not obtain a list of accounts.")?
+                .response
+                .try_collect()
+                .await?
+        }
         Some(receivers) => serde_json::from_str(
             &std::fs::read_to_string(receivers).context("Could not read the receivers file.")?,
         )
@@ -62,13 +72,15 @@ async fn main() -> anyhow::Result<()> {
     anyhow::ensure!(!accounts.is_empty(), "List of receivers must not be empty.");
 
     // Get the initial nonce.
-    let acc_info: types::AccountInfo = client
-        .get_account_info(&keys.address, &consensus_info.last_finalized_block)
+    let nonce = client
+        .get_next_account_sequence_number(&keys.address)
         .await?;
+
+    anyhow::ensure!(nonce.all_final, "Not all transactions are finalized.");
 
     println!(
         "Using account {} for sending, starting at nonce {}.",
-        &keys.address, acc_info.account_nonce
+        &keys.address, nonce.nonce
     );
 
     // Create a channel between the task signing and the task sending transactions.
@@ -79,11 +91,10 @@ async fn main() -> anyhow::Result<()> {
     // A task that will generate and sign transactions. Transactions are sent in a
     // round-robin fashion to all accounts in the list of receivers.
     let generator = async move {
-        let mut nonce = acc_info.account_nonce;
+        let mut nonce = nonce.nonce;
         let mut count = 0;
         loop {
-            let expiry: TransactionTime =
-                TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
+            let expiry: TransactionTime = TransactionTime::seconds_after(app.expiry);
             let tx = send::transfer(
                 &keys,
                 keys.address,
@@ -114,8 +125,11 @@ async fn main() -> anyhow::Result<()> {
             let item = BlockItem::AccountTransaction(tx);
             let transaction_hash = client.send_block_item(&item).await?;
             println!(
-                "Transaction {} submitted (nonce = {}, energy = {}).",
-                transaction_hash, nonce, energy
+                "{}: Transaction {} submitted (nonce = {}, energy = {}).",
+                chrono::Utc::now(),
+                transaction_hash,
+                nonce,
+                energy
             );
         } else {
             break;
