@@ -8,7 +8,7 @@ use clap::AppSettings;
 use concordium_rust_sdk::{
     common::{self, types::TransactionTime, SerdeDeserialize, SerdeSerialize},
     smart_contracts::{
-        common as contracts_common,
+        common as concordium_std,
         common::Amount,
         types::{OwnedContractName, OwnedReceiveName},
     },
@@ -77,7 +77,7 @@ enum Action {
 
 // The order must match the enum defined in the contract code. Otherwise, the
 // serialization will be incorrect.
-#[derive(SerdeSerialize, SerdeDeserialize, contracts_common::Serial, StructOpt)]
+#[derive(SerdeSerialize, SerdeDeserialize, concordium_std::Serial, StructOpt)]
 enum Weather {
     Rainy,
     Sunny,
@@ -164,9 +164,9 @@ async fn main() -> anyhow::Result<()> {
             )
             .context("Unable to parse parameter JSON.")?;
             let schema_source = std::fs::read(schema).context("Unable to read the schema file.")?;
-            let schema = contracts_common::from_bytes::<
-                contracts_common::schema::VersionedModuleSchema,
-            >(&schema_source)?;
+            let schema = concordium_std::from_bytes::<concordium_std::schema::VersionedModuleSchema>(
+                &schema_source,
+            )?;
             let param_schema = schema.get_receive_param_schema("weather", "set")?;
             let serialized_parameter = param_schema.serial_value(&parameter)?;
             let message = OwnedParameter::try_from(serialized_parameter).unwrap();
