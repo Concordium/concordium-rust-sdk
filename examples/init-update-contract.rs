@@ -7,8 +7,9 @@ use clap::AppSettings;
 use concordium_rust_sdk::{
     common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize},
     endpoints,
-    smart_contracts::common::{
-        Amount, ContractAddress, OwnedContractName, OwnedReceiveName, Serial,
+    smart_contracts::{
+        common as concordium_std,
+        common::{Amount, ContractAddress, OwnedContractName, OwnedReceiveName, Serial},
     },
     types::{
         smart_contracts::{ModuleReference, OwnedParameter},

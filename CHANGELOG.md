@@ -1,8 +1,13 @@
 ## Unreleased changes
 
+## 2.4.0
+
 - Re-export `concordium_base` to enable use of `concordium_base_derive`
   serialization macros.
 - Bump minimum supported rust version to 1.64.
+- When using derive(Serial,Deserial) macros from the smart_contracts modules
+  `concordium_std` must be made available, for example as 
+  `use concordium_rust_sdk::smart_contracts::common as concordium_std`
 
 ## 2.3.0
 
