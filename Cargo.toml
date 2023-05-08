@@ -47,6 +47,8 @@ clap = "2.34"
 csv = "1.1"
 tokio = { version = "1.27", features = ["full"] }
 tokio-test = { version = "0.4" }
+tonic = {version = "0.8", features = ["tls", "tls-roots"]} # Use system trust roots.
+http = "0.2"
 
 [[example]]
 name = "postgres"

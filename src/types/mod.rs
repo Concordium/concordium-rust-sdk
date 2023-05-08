@@ -2124,7 +2124,7 @@ pub struct NetworkInfo {
 }
 
 // Details of the consensus protocol running on the node.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum NodeConsensusStatus {
     /// The consensus protocol is not running on the node.
     /// This only occurs when the node does not support the protocol on the
@@ -2149,6 +2149,21 @@ pub enum NodeConsensusStatus {
     Baker(crate::types::BakerId),
     /// The node is member of the baking and finalization committee.
     Finalizer(crate::types::BakerId),
+}
+
+impl NodeConsensusStatus {
+    /// Retrieve the baker ID the node is configured with, if that is the case.
+    pub fn baker(self) -> Option<BakerId> {
+        match self {
+            NodeConsensusStatus::ConsensusNotRunning => None,
+            NodeConsensusStatus::ConsensusPassive => None,
+            NodeConsensusStatus::NotInCommittee(bi) => Some(bi),
+            NodeConsensusStatus::AddedButNotActiveInCommittee(bi) => Some(bi),
+            NodeConsensusStatus::AddedButWrongKeys(bi) => Some(bi),
+            NodeConsensusStatus::Baker(bi) => Some(bi),
+            NodeConsensusStatus::Finalizer(bi) => Some(bi),
+        }
+    }
 }
 
 /// Consensus related information for a node.

@@ -6,13 +6,30 @@ use concordium_rust_sdk::{
     id::types::AccountAddress,
     types::{
         transactions::{send, BlockItem},
-        WalletAccount,
+        NodeDetails, WalletAccount,
     },
     v2::{self, BlockIdentifier},
 };
 use futures::TryStreamExt;
-use std::path::PathBuf;
+use rand::{rngs::StdRng, Rng, SeedableRng};
+use std::{path::PathBuf, str::FromStr};
 use structopt::StructOpt;
+
+enum Mode {
+    Random,
+    Every(usize),
+}
+
+impl FromStr for Mode {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "random" => Ok(Self::Random),
+            s => Ok(Self::Every(s.parse()?)),
+        }
+    }
+}
 
 #[derive(StructOpt)]
 struct App {
@@ -26,6 +43,13 @@ struct App {
     account:   PathBuf,
     #[structopt(long = "receivers")]
     receivers: Option<PathBuf>,
+    #[structopt(
+        long = "mode",
+        help = "If set this provides the mode when selecting accounts. It can either be `random` \
+                or a non-negative integer. If it is an integer then the set of receivers is \
+                partitioned based on baker id into the given amount of chunks."
+    )]
+    mode:      Option<Mode>,
     #[structopt(long = "tps")]
     tps:       u16,
     #[structopt(
@@ -50,7 +74,26 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
-    let mut client = v2::Client::new(app.endpoint).await?;
+    let mut client = {
+        // Use TLS if the URI scheme is HTTPS.
+        // This uses whatever system certificates have been installed as trusted roots.
+        let endpoint = if app
+            .endpoint
+            .uri()
+            .scheme()
+            .map_or(false, |x| x == &http::uri::Scheme::HTTPS)
+        {
+            app.endpoint
+                .tls_config(tonic::transport::channel::ClientTlsConfig::new())
+                .context("Unable to construct TLS configuration for the Concordium API.")?
+        } else {
+            app.endpoint
+        };
+        let ep = endpoint.connect_timeout(std::time::Duration::from_secs(10));
+        v2::Client::new(ep)
+            .await
+            .context("Unable to connect Concordium node.")?
+    };
 
     let keys: WalletAccount =
         WalletAccount::from_json_file(app.account).context("Could not parse the keys file.")?;
@@ -70,6 +113,28 @@ async fn main() -> anyhow::Result<()> {
         .context("Could not parse the receivers file.")?,
     };
     anyhow::ensure!(!accounts.is_empty(), "List of receivers must not be empty.");
+
+    let (random, accounts) = match app.mode {
+        Some(Mode::Random) => (true, accounts),
+        Some(Mode::Every(n)) if n > 0 => {
+            let ni = client.get_node_info().await?;
+            if let NodeDetails::Node(nd) = ni.details {
+                let baker = nd
+                    .baker()
+                    .context("Node is not a baker but integer mode is required.")?;
+                let step = accounts.len() / n;
+                let start = baker.id.index as usize % n;
+                let end = std::cmp::min(accounts.len(), (start + 1) * step);
+                (false, accounts[start * step..end].to_vec())
+            } else {
+                anyhow::bail!("Mode is an integer, but the node is not a baker");
+            }
+        }
+        Some(Mode::Every(_)) => {
+            anyhow::bail!("Integer mode cannot be 0.");
+        }
+        None => (false, accounts),
+    };
 
     // Get the initial nonce.
     let nonce = client
@@ -93,14 +158,21 @@ async fn main() -> anyhow::Result<()> {
     let generator = async move {
         let mut nonce = nonce.nonce;
         let mut count = 0;
+        let mut rng = StdRng::from_entropy();
         loop {
+            let next_account = if random {
+                let n = rng.gen_range(0, accounts.len());
+                accounts[n]
+            } else {
+                accounts[count % accounts.len()]
+            };
             let expiry: TransactionTime = TransactionTime::seconds_after(app.expiry);
             let tx = send::transfer(
                 &keys,
                 keys.address,
                 nonce,
                 expiry,
-                accounts[count % accounts.len()],
+                next_account,
                 transfer_amount,
             );
             nonce.next_mut();
