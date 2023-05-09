@@ -874,7 +874,7 @@ mod block_summary_parser {
         protocol_version: super::ProtocolVersion,
         #[serde(flatten)]
         // parse first into a value
-        data:             super::BlockSummaryData<serde_json::Value>,
+        data: super::BlockSummaryData<serde_json::Value>,
     }
 
     impl std::convert::TryFrom<BlockSummaryRaw> for super::BlockSummary {
