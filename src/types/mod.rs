@@ -21,6 +21,7 @@ use concordium_base::{
         Buffer, Deserial, Get, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
         Versioned,
     },
+    contracts_common::Duration,
     encrypted_transfers,
     encrypted_transfers::types::{
         AggregatedDecryptedAmount, EncryptedAmountTransferData, SecToPubAmountTransferData,
@@ -1792,19 +1793,19 @@ pub struct ChainParametersV1 {
     pub pool_parameters:          PoolParameters,
 }
 
-#[derive(common::Serial, Debug)]
+#[derive(common::Serialize, Debug)]
 /// Values of chain parameters that can be updated via chain updates.
 pub struct ChainParametersV2 {
     /// Consensus protocol version 2 timeout parameters.
     pub timeout_parameters:                TimeoutParameters,
     /// Minimum time interval between blocks.
-    pub min_block_time:                    SlotDuration,
+    pub min_block_time:                    Duration,
     /// Maximum energy allowed per block.
     pub block_energy_limit:                Energy,
     /// Euro per energy exchange rate.
     pub euro_per_energy:                   ExchangeRate,
     /// Micro ccd per euro exchange rate.
-    pub micro_gtu_per_euro:                ExchangeRate,
+    pub micro_ccd_per_euro:                ExchangeRate,
     pub cooldown_parameters:               CooldownParameters,
     pub time_parameters:                   TimeParameters,
     /// The limit for the number of account creations in a block.
@@ -1840,11 +1841,15 @@ pub type ChainParameters<CPV> = <CPV as ChainParametersFamily>::Output;
 #[derive(Debug, SerdeSerialize, SerdeDeserialize)]
 #[serde(rename_all = "camelCase")]
 /// Values of reward parameters.
-pub struct RewardParametersSkeleton<MD, GR> {
-    pub mint_distribution:            MD,
+///
+/// The concrete types for some of the fields depends on the version of chain
+/// parameters, thus the generics. See [`RewardParameters`] for the connections
+/// to the concrete types.
+pub struct RewardParametersSkeleton<MintDistribution, GasRewards> {
+    pub mint_distribution:            MintDistribution,
     pub transaction_fee_distribution: TransactionFeeDistribution,
     #[serde(rename = "gASRewards")]
-    pub gas_rewards:                  GR,
+    pub gas_rewards:                  GasRewards,
 }
 
 impl<MD: common::Serial, GR: common::Serial> common::Serial for RewardParametersSkeleton<MD, GR> {
@@ -1870,6 +1875,11 @@ impl<MD: common::Deserial, GR: common::Deserial> common::Deserial
     }
 }
 
+/// Values of reward parameters.
+///
+/// The concrete types for some of the fields depends on the version of chain
+/// parameters. See implementations of [`MintDistribution`] and
+/// [`GasRewardsFor`] for concrete types.
 pub type RewardParameters<CPV> =
     RewardParametersSkeleton<MintDistribution<CPV>, GASRewardsFor<CPV>>;
 
