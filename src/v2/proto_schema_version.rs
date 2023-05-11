@@ -1,1 +1,1 @@
-pub const PROTO_SCHEMA_VERSION: &str = "e244ceacd738df5031e2d88f63d77fe584f13ed3";
+pub const PROTO_SCHEMA_VERSION: &str = "b09e484a53953a6a2a0863ee0834d33b09b913d1";
