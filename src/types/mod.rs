@@ -1879,7 +1879,7 @@ impl<MD: common::Deserial, GR: common::Deserial> common::Deserial
 ///
 /// The concrete types for some of the fields depends on the version of chain
 /// parameters. See implementations of [`MintDistribution`] and
-/// [`GasRewardsFor`] for concrete types.
+/// [`GASRewardsFor`] for concrete types.
 pub type RewardParameters<CPV> =
     RewardParametersSkeleton<MintDistribution<CPV>, GASRewardsFor<CPV>>;
 
