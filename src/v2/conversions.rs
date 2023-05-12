@@ -397,6 +397,12 @@ impl From<Duration> for super::types::SlotDuration {
     }
 }
 
+impl From<Duration> for concordium_base::contracts_common::Duration {
+    fn from(value: Duration) -> Self {
+        concordium_base::contracts_common::Duration::from_millis(value.value)
+    }
+}
+
 impl From<GenesisIndex> for super::types::GenesisIndex {
     fn from(value: GenesisIndex) -> Self { value.value.into() }
 }
@@ -463,6 +469,10 @@ impl From<OpenStatus> for super::types::OpenStatus {
 }
 
 impl From<AmountFraction> for super::types::AmountFraction {
+    fn from(af: AmountFraction) -> Self { Self::new_unchecked(af.parts_per_hundred_thousand) }
+}
+
+impl From<AmountFraction> for super::types::PartsPerHundredThousands {
     fn from(af: AmountFraction) -> Self { Self::new_unchecked(af.parts_per_hundred_thousand) }
 }
 
@@ -1284,6 +1294,17 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
             update_payload::Payload::MintDistributionCpv1Update(v) => {
                 Self::MintDistributionCPV1(v.try_into()?)
             }
+            update_payload::Payload::GasRewardsCpv2Update(v) => Self::GASRewardsCPV2(v.try_into()?),
+            update_payload::Payload::TimeoutParametersUpdate(v) => {
+                Self::TimeoutParametersCPV2(v.try_into()?)
+            }
+            update_payload::Payload::MinBlockTimeUpdate(v) => Self::MinBlockTimeCPV2(v.into()),
+            update_payload::Payload::BlockEnergyLimitUpdate(v) => {
+                Self::BlockEnergyLimitCPV2(v.into())
+            }
+            update_payload::Payload::FinalizationCommitteeParametersUpdate(v) => {
+                Self::FinalizationCommitteeParametersCPV2(v.try_into()?)
+            }
         })
     }
 }
@@ -1372,7 +1393,7 @@ impl TryFrom<AuthorizationsV0> for super::types::AuthorizationsV0 {
                 .collect::<Result<_, tonic::Status>>()?,
             emergency: value.emergency.require()?.try_into()?,
             protocol: value.protocol.require()?.try_into()?,
-            election_difficulty: value.parameter_election_difficulty.require()?.try_into()?,
+            election_difficulty: value.parameter_consensus.require()?.try_into()?,
             euro_per_energy: value.parameter_euro_per_energy.require()?.try_into()?,
             micro_gtu_per_euro: value.parameter_micro_ccd_per_euro.require()?.try_into()?,
             foundation_account: value.parameter_foundation_account.require()?.try_into()?,
@@ -2256,6 +2277,45 @@ impl TryFrom<ChainParametersV1> for super::ChainParametersV1 {
     }
 }
 
+impl TryFrom<ChainParametersV2> for super::ChainParametersV2 {
+    type Error = tonic::Status;
+
+    fn try_from(value: ChainParametersV2) -> Result<Self, Self::Error> {
+        let consensus_parameters = value.consensus_parameters.require()?;
+
+        Ok(Self {
+            timeout_parameters: consensus_parameters
+                .timeout_parameters
+                .require()?
+                .try_into()?,
+            min_block_time: consensus_parameters.min_block_time.require()?.into(),
+            block_energy_limit: consensus_parameters.block_energy_limit.require()?.into(),
+            euro_per_energy: value.euro_per_energy.require()?.try_into()?,
+            micro_ccd_per_euro: value.micro_ccd_per_euro.require()?.try_into()?,
+            pool_parameters: value.pool_parameters.require()?.try_into()?,
+            account_creation_limit: value.account_creation_limit.require()?.try_into()?,
+            mint_distribution: value.mint_distribution.require()?.try_into()?,
+            transaction_fee_distribution: value
+                .transaction_fee_distribution
+                .require()?
+                .try_into()?,
+            gas_rewards: value.gas_rewards.require()?.try_into()?,
+            foundation_account: value.foundation_account.require()?.try_into()?,
+            time_parameters: value.time_parameters.require()?.try_into()?,
+            cooldown_parameters: value.cooldown_parameters.require()?.try_into()?,
+            finalization_committee_parameters: value
+                .finalization_committee_parameters
+                .require()?
+                .try_into()?,
+            keys: UpdateKeysCollectionSkeleton {
+                root_keys:    value.root_keys.require()?.try_into()?,
+                level_1_keys: value.level1_keys.require()?.try_into()?,
+                level_2_keys: value.level2_keys.require()?.try_into()?,
+            },
+        })
+    }
+}
+
 impl TryFrom<ChainParameters> for super::ChainParameters {
     type Error = tonic::Status;
 
@@ -2263,6 +2323,7 @@ impl TryFrom<ChainParameters> for super::ChainParameters {
         match value.parameters.require()? {
             chain_parameters::Parameters::V0(v0) => Ok(Self::V0(v0.try_into()?)),
             chain_parameters::Parameters::V1(v1) => Ok(Self::V1(v1.try_into()?)),
+            chain_parameters::Parameters::V2(v2) => Ok(Self::V2(v2.try_into()?)),
         }
     }
 }
@@ -2726,6 +2787,53 @@ impl TryFrom<GasRewards> for updates::GASRewards {
     }
 }
 
+impl TryFrom<GasRewardsCpv2> for updates::GASRewardsV1 {
+    type Error = tonic::Status;
+
+    fn try_from(value: GasRewardsCpv2) -> Result<Self, Self::Error> {
+        Ok(Self {
+            baker:            value.baker.require()?.into(),
+            account_creation: value.account_creation.require()?.into(),
+            chain_update:     value.chain_update.require()?.into(),
+        })
+    }
+}
+
+impl TryFrom<TimeoutParameters> for updates::TimeoutParameters {
+    type Error = tonic::Status;
+
+    fn try_from(value: TimeoutParameters) -> Result<Self, Self::Error> {
+        let base = value.timeout_base.require()?.into();
+        let increase = value.timeout_increase.require()?.try_into()?;
+        let decrease = value.timeout_decrease.require()?.try_into()?;
+        Self::new(base, increase, decrease).map_err(|err| tonic::Status::internal(err.to_string()))
+    }
+}
+
+impl TryFrom<Ratio> for concordium_base::common::types::Ratio {
+    type Error = tonic::Status;
+
+    fn try_from(value: Ratio) -> Result<Self, Self::Error> {
+        Self::new(value.numerator, value.denominator)
+            .map_err(|err| tonic::Status::internal(err.to_string()))
+    }
+}
+
+impl TryFrom<FinalizationCommitteeParameters> for updates::FinalizationCommitteeParameters {
+    type Error = tonic::Status;
+
+    fn try_from(value: FinalizationCommitteeParameters) -> Result<Self, Self::Error> {
+        Ok(Self {
+            min_finalizers: value.minimum_finalizers,
+            max_finalizers: value.maximum_finalizers,
+            finalizers_relative_stake_threshold: value
+                .finalizer_relative_stake_threshold
+                .require()?
+                .into(),
+        })
+    }
+}
+
 impl TryFrom<PoolParametersCpv1> for updates::PoolParameters {
     type Error = tonic::Status;
 
@@ -2908,6 +3016,26 @@ impl TryFrom<PendingUpdate> for super::types::queries::PendingUpdate {
             pending_update::Effect::TimeParameters(tp) => Ok(Self {
                 effective_time,
                 effect: PendingUpdateEffect::TimeParameters(tp.try_into()?),
+            }),
+            pending_update::Effect::GasRewardsCpv2(update) => Ok(Self {
+                effective_time,
+                effect: PendingUpdateEffect::GasRewardsV1(update.try_into()?),
+            }),
+            pending_update::Effect::TimeoutParameters(update) => Ok(Self {
+                effective_time,
+                effect: PendingUpdateEffect::TimeoutParameters(update.try_into()?),
+            }),
+            pending_update::Effect::MinBlockTime(update) => Ok(Self {
+                effective_time,
+                effect: PendingUpdateEffect::MinBlockTime(update.into()),
+            }),
+            pending_update::Effect::BlockEnergyLimit(update) => Ok(Self {
+                effective_time,
+                effect: PendingUpdateEffect::BlockEnergyLimit(update.into()),
+            }),
+            pending_update::Effect::FinalizationCommitteeParameters(update) => Ok(Self {
+                effective_time,
+                effect: PendingUpdateEffect::FinalizationCommitteeParameters(update.try_into()?),
             }),
         }
     }

@@ -72,6 +72,7 @@ async fn main() -> anyhow::Result<()> {
     let exchange_rate = match &params.response {
         v2::ChainParameters::V0(v0) => v0.micro_ccd_per_euro,
         v2::ChainParameters::V1(v1) => v1.micro_ccd_per_euro,
+        v2::ChainParameters::V2(v2) => v2.micro_ccd_per_euro,
     };
 
     let effective_time = 0.into(); // immediate effect

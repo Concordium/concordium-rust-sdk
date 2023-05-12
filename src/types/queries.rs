@@ -284,6 +284,16 @@ pub enum PendingUpdateEffect {
     CooldownParameters(CooldownParameters),
     #[serde(rename = "timeParametersV1")]
     TimeParameters(TimeParameters),
+    #[serde(rename = "gasRewardsV1")]
+    GasRewardsV1(GASRewardsV1),
+    #[serde(rename = "timeoutParameters")]
+    TimeoutParameters(TimeoutParameters),
+    #[serde(rename = "minBlockTime")]
+    MinBlockTime(Duration),
+    #[serde(rename = "blockEnergyLimit")]
+    BlockEnergyLimit(Energy),
+    #[serde(rename = "finalizationCommitteeParameters")]
+    FinalizationCommitteeParameters(FinalizationCommitteeParameters),
 }
 
 #[derive(Debug, Copy, Clone)]
