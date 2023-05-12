@@ -2787,7 +2787,7 @@ impl TryFrom<GasRewards> for updates::GASRewards {
     }
 }
 
-impl TryFrom<GasRewardsCpv2> for updates::GASRewardsCPV2 {
+impl TryFrom<GasRewardsCpv2> for updates::GASRewardsV1 {
     type Error = tonic::Status;
 
     fn try_from(value: GasRewardsCpv2) -> Result<Self, Self::Error> {
@@ -3019,25 +3019,23 @@ impl TryFrom<PendingUpdate> for super::types::queries::PendingUpdate {
             }),
             pending_update::Effect::GasRewardsCpv2(update) => Ok(Self {
                 effective_time,
-                effect: PendingUpdateEffect::GasRewardsCPV2(update.try_into()?),
+                effect: PendingUpdateEffect::GasRewardsV1(update.try_into()?),
             }),
             pending_update::Effect::TimeoutParameters(update) => Ok(Self {
                 effective_time,
-                effect: PendingUpdateEffect::TimeoutParametersCPV2(update.try_into()?),
+                effect: PendingUpdateEffect::TimeoutParameters(update.try_into()?),
             }),
             pending_update::Effect::MinBlockTime(update) => Ok(Self {
                 effective_time,
-                effect: PendingUpdateEffect::MinBlockTimeCPV2(update.into()),
+                effect: PendingUpdateEffect::MinBlockTime(update.into()),
             }),
             pending_update::Effect::BlockEnergyLimit(update) => Ok(Self {
                 effective_time,
-                effect: PendingUpdateEffect::BlockEnergyLimitCPV2(update.into()),
+                effect: PendingUpdateEffect::BlockEnergyLimit(update.into()),
             }),
             pending_update::Effect::FinalizationCommitteeParameters(update) => Ok(Self {
                 effective_time,
-                effect: PendingUpdateEffect::FinalizationCommitteeParametersCPV2(
-                    update.try_into()?,
-                ),
+                effect: PendingUpdateEffect::FinalizationCommitteeParameters(update.try_into()?),
             }),
         }
     }

@@ -32,7 +32,7 @@ use concordium_base::{
     transactions::{BlockItem, EncodedPayload, PayloadLike},
     updates::{
         AuthorizationsV0, CooldownParameters, FinalizationCommitteeParameters, GASRewards,
-        GASRewardsCPV2, PoolParameters, TimeParameters, TimeoutParameters,
+        GASRewardsV1, PoolParameters, TimeParameters, TimeoutParameters,
         TransactionFeeDistribution,
     },
 };
@@ -209,7 +209,9 @@ pub struct ChainParametersV2 {
     pub euro_per_energy: ExchangeRate,
     /// Micro ccd per euro exchange rate.
     pub micro_ccd_per_euro: ExchangeRate,
+    /// Parameters related to cooldowns when staking.
     pub cooldown_parameters: CooldownParameters,
+    /// Parameters related mint rate and reward period.
     pub time_parameters: TimeParameters,
     /// The limit for the number of account creations in a block.
     pub account_creation_limit: CredentialsPerBlockLimit,
@@ -217,8 +219,8 @@ pub struct ChainParametersV2 {
     pub mint_distribution: MintDistributionV1,
     /// Parameters related to the distribution of transaction fees.
     pub transaction_fee_distribution: TransactionFeeDistribution,
-    /// Parameters related to the distribution of the GAS account.
-    pub gas_rewards: GASRewardsCPV2,
+    /// Parameters related to the distribution from the GAS account.
+    pub gas_rewards: GASRewardsV1,
     /// Address of the foundation account.
     pub foundation_account: AccountAddress,
     /// Parameters for baker pools.
