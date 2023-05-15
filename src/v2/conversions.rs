@@ -261,6 +261,16 @@ impl From<super::AbsoluteBlockHeight> for AbsoluteBlockHeight {
     fn from(abh: super::AbsoluteBlockHeight) -> Self { Self { value: abh.height } }
 }
 
+impl From<super::RelativeBlockHeight> for block_hash_input::RelativeHeight {
+    fn from(relative_block_height: super::RelativeBlockHeight) -> Self {
+        Self {
+            genesis_index: Some(relative_block_height.genesis_index.into()),
+            height:        Some(relative_block_height.height.into()),
+            restrict:      relative_block_height.restrict,
+        }
+    }
+}
+
 impl From<super::types::BlockHeight> for BlockHeight {
     fn from(bh: super::types::BlockHeight) -> Self { Self { value: bh.height } }
 }
@@ -424,6 +434,19 @@ impl From<ProtocolVersion> for super::types::ProtocolVersion {
             ProtocolVersion::ProtocolVersion4 => super::types::ProtocolVersion::P4,
             ProtocolVersion::ProtocolVersion5 => super::types::ProtocolVersion::P5,
             ProtocolVersion::ProtocolVersion6 => super::types::ProtocolVersion::P6,
+        }
+    }
+}
+
+impl From<super::types::ProtocolVersion> for ProtocolVersion {
+    fn from(value: super::types::ProtocolVersion) -> Self {
+        match value {
+            super::types::ProtocolVersion::P1 => ProtocolVersion::ProtocolVersion1,
+            super::types::ProtocolVersion::P2 => ProtocolVersion::ProtocolVersion2,
+            super::types::ProtocolVersion::P3 => ProtocolVersion::ProtocolVersion3,
+            super::types::ProtocolVersion::P4 => ProtocolVersion::ProtocolVersion4,
+            super::types::ProtocolVersion::P5 => ProtocolVersion::ProtocolVersion5,
+            super::types::ProtocolVersion::P6 => ProtocolVersion::ProtocolVersion6,
         }
     }
 }
@@ -2387,6 +2410,9 @@ impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
             era_block_height:        value.era_block_height.require()?.into(),
             genesis_index:           value.genesis_index.require()?.into(),
             block_baker:             value.baker.map(|b| b.into()),
+            protocol_version:        ProtocolVersion::from_i32(value.protocol_version)
+                .ok_or_else(|| tonic::Status::internal("Unknown protocol version"))?
+                .into(),
         })
     }
 }

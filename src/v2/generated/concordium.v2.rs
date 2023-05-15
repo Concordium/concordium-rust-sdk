@@ -695,11 +695,27 @@ pub struct AccountInfo {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockHashInput {
-    #[prost(oneof = "block_hash_input::BlockHashInput", tags = "1, 2, 3")]
+    #[prost(oneof = "block_hash_input::BlockHashInput", tags = "1, 2, 3, 4, 5")]
     pub block_hash_input: ::core::option::Option<block_hash_input::BlockHashInput>,
 }
 /// Nested message and enum types in `BlockHashInput`.
 pub mod block_hash_input {
+    /// Request using a relative block height.
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct RelativeHeight {
+        /// Genesis index to start from.
+        #[prost(message, optional, tag = "1")]
+        pub genesis_index: ::core::option::Option<super::GenesisIndex>,
+        /// Height starting from the genesis block at the genesis index.
+        #[prost(message, optional, tag = "2")]
+        pub height:        ::core::option::Option<super::BlockHeight>,
+        /// Whether to return results only from the specified genesis index
+        /// (`true`), or allow results from more recent genesis indices
+        /// as well (`false`).
+        #[prost(bool, tag = "3")]
+        pub restrict:      bool,
+    }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum BlockHashInput {
@@ -713,6 +729,12 @@ pub mod block_hash_input {
         /// be 32 bytes.
         #[prost(message, tag = "3")]
         Given(super::BlockHash),
+        /// Query for a block at height, if a unique block can be identified at
+        /// that height.
+        #[prost(message, tag = "4")]
+        AbsoluteHeight(super::AbsoluteBlockHeight),
+        #[prost(message, tag = "5")]
+        RelativeHeight(RelativeHeight),
     }
 }
 /// Input to queries which take an account as a parameter.
@@ -2877,6 +2899,9 @@ pub struct BlockInfo {
     /// The hash of the block state after this block.
     #[prost(message, optional, tag = "16")]
     pub state_hash:               ::core::option::Option<StateHash>,
+    /// Protocol version to which the block belongs.
+    #[prost(enumeration = "ProtocolVersion", tag = "17")]
+    pub protocol_version:         i32,
 }
 /// Request for GetPoolInfo.
 #[allow(clippy::derive_partial_eq_without_eq)]
