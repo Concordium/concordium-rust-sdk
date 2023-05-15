@@ -733,6 +733,7 @@ pub mod block_hash_input {
         /// that height.
         #[prost(message, tag = "4")]
         AbsoluteHeight(super::AbsoluteBlockHeight),
+        /// Query for a block at height relative to a genesis index.
         #[prost(message, tag = "5")]
         RelativeHeight(RelativeHeight),
     }
