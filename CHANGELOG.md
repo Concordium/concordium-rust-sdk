@@ -1,5 +1,9 @@
 ## Unreleased changes
 
+- Extend enum `PendingUpdateEffect` with variants for protocol version 6.
+- Introduce `ChainParametersV2` struct for protocol version 6.
+- Introduce generic `gas_reward` in `RewardParametersSkeleton` for supporting different versions of GASRewards.
+
 ## 2.4.0
 
 - Re-export `concordium_base` to enable use of `concordium_base_derive`

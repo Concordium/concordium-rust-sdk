@@ -21,6 +21,7 @@ use concordium_base::{
         Buffer, Deserial, Get, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
         Versioned,
     },
+    contracts_common::Duration,
     encrypted_transfers,
     encrypted_transfers::types::{
         AggregatedDecryptedAmount, EncryptedAmountTransferData, SecToPubAmountTransferData,
@@ -1792,6 +1793,33 @@ pub struct ChainParametersV1 {
     pub pool_parameters:          PoolParameters,
 }
 
+#[derive(common::Serialize, Debug)]
+/// Values of chain parameters that can be updated via chain updates.
+pub struct ChainParametersV2 {
+    /// Consensus protocol version 2 timeout parameters.
+    pub timeout_parameters:                TimeoutParameters,
+    /// Minimum time interval between blocks.
+    pub min_block_time:                    Duration,
+    /// Maximum energy allowed per block.
+    pub block_energy_limit:                Energy,
+    /// Euro per energy exchange rate.
+    pub euro_per_energy:                   ExchangeRate,
+    /// Micro ccd per euro exchange rate.
+    pub micro_ccd_per_euro:                ExchangeRate,
+    pub cooldown_parameters:               CooldownParameters,
+    pub time_parameters:                   TimeParameters,
+    /// The limit for the number of account creations in a block.
+    pub account_creation_limit:            CredentialsPerBlockLimit,
+    /// Current reward parameters.
+    pub reward_parameters:                 RewardParameters<ChainParameterVersion2>,
+    /// Index of the foundation account.
+    pub foundation_account_index:          AccountIndex,
+    /// Parameters for baker pools.
+    pub pool_parameters:                   PoolParameters,
+    /// The finalization committee parameters.
+    pub finalization_committee_parameters: FinalizationCommitteeParameters,
+}
+
 pub trait ChainParametersFamily {
     type Output: std::fmt::Debug;
 }
@@ -1804,19 +1832,27 @@ impl ChainParametersFamily for ChainParameterVersion1 {
     type Output = ChainParametersV1;
 }
 
+impl ChainParametersFamily for ChainParameterVersion2 {
+    type Output = ChainParametersV2;
+}
+
 pub type ChainParameters<CPV> = <CPV as ChainParametersFamily>::Output;
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize)]
 #[serde(rename_all = "camelCase")]
 /// Values of reward parameters.
-pub struct RewardParametersSkeleton<MD> {
-    pub mint_distribution:            MD,
+///
+/// The concrete types for some of the fields depends on the version of chain
+/// parameters, thus the generics. See [`RewardParameters`] for the connections
+/// to the concrete types.
+pub struct RewardParametersSkeleton<MintDistribution, GasRewards> {
+    pub mint_distribution:            MintDistribution,
     pub transaction_fee_distribution: TransactionFeeDistribution,
     #[serde(rename = "gASRewards")]
-    pub gas_rewards:                  GASRewards,
+    pub gas_rewards:                  GasRewards,
 }
 
-impl<MD: common::Serial> common::Serial for RewardParametersSkeleton<MD> {
+impl<MD: common::Serial, GR: common::Serial> common::Serial for RewardParametersSkeleton<MD, GR> {
     fn serial<B: Buffer>(&self, out: &mut B) {
         self.mint_distribution.serial(out);
         self.transaction_fee_distribution.serial(out);
@@ -1824,7 +1860,9 @@ impl<MD: common::Serial> common::Serial for RewardParametersSkeleton<MD> {
     }
 }
 
-impl<MD: common::Deserial> common::Deserial for RewardParametersSkeleton<MD> {
+impl<MD: common::Deserial, GR: common::Deserial> common::Deserial
+    for RewardParametersSkeleton<MD, GR>
+{
     fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
         let mint_distribution = source.get()?;
         let transaction_fee_distribution = source.get()?;
@@ -1837,7 +1875,13 @@ impl<MD: common::Deserial> common::Deserial for RewardParametersSkeleton<MD> {
     }
 }
 
-pub type RewardParameters<CPV> = RewardParametersSkeleton<MintDistribution<CPV>>;
+/// Values of reward parameters.
+///
+/// The concrete types for some of the fields depends on the version of chain
+/// parameters. See implementations of [`MintDistribution`] and
+/// [`GASRewardsFor`] for concrete types.
+pub type RewardParameters<CPV> =
+    RewardParametersSkeleton<MintDistribution<CPV>, GASRewardsFor<CPV>>;
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
