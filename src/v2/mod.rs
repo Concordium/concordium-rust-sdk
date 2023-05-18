@@ -118,11 +118,13 @@ pub enum BlockIdentifier {
     LastFinal,
     /// Query in the context of a specific block hash.
     Given(BlockHash),
-    /// Query for a block at absolute height, if a unique block can be
-    /// identified at that height.
+    /// Query for a block at absolute height. If a unique
+    /// block can not be identified at that height the query will return
+    /// `NotFound`.
     AbsoluteHeight(AbsoluteBlockHeight),
-    /// Query for a block at height relative to genesis index, if a unique block
-    /// can be identified at that height.
+    /// Query for a block at a height relative to genesis index. If a unique
+    /// block can not be identified at that height the query will return
+    /// `NotFound`.
     RelativeHeight(RelativeBlockHeight),
 }
 
@@ -391,11 +393,11 @@ impl From<&BlockIdentifier> for generated::BlockHashInput {
                     value: h.as_ref().to_vec(),
                 })
             }
-            BlockIdentifier::AbsoluteHeight(h) => {
-                generated::block_hash_input::BlockHashInput::AbsoluteHeight(h.to_owned().into())
+            &BlockIdentifier::AbsoluteHeight(h) => {
+                generated::block_hash_input::BlockHashInput::AbsoluteHeight(h.into())
             }
-            BlockIdentifier::RelativeHeight(h) => {
-                generated::block_hash_input::BlockHashInput::RelativeHeight(h.to_owned().into())
+            &BlockIdentifier::RelativeHeight(h) => {
+                generated::block_hash_input::BlockHashInput::RelativeHeight(h.into())
             }
         };
         generated::BlockHashInput {

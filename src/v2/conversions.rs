@@ -2411,7 +2411,12 @@ impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
             genesis_index:           value.genesis_index.require()?.into(),
             block_baker:             value.baker.map(|b| b.into()),
             protocol_version:        ProtocolVersion::from_i32(value.protocol_version)
-                .ok_or_else(|| tonic::Status::internal("Unknown protocol version"))?
+                .ok_or_else(|| {
+                    tonic::Status::internal(format!(
+                        "Unknown protocol version: {}",
+                        value.protocol_version
+                    ))
+                })?
                 .into(),
         })
     }
