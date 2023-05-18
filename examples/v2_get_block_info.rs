@@ -1,10 +1,9 @@
 //! Test the `GetBlockInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_base::base::AbsoluteBlockHeight;
 use structopt::StructOpt;
 
-use concordium_rust_sdk::v2;
+use concordium_rust_sdk::v2::{self, BlockIdentifier};
 
 #[derive(StructOpt)]
 struct App {
@@ -14,6 +13,8 @@ struct App {
         default_value = "http://localhost:20000"
     )]
     endpoint: v2::Endpoint,
+    #[structopt(long = "block", help = "Block identifier.", default_value = "best")]
+    block:    BlockIdentifier,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -29,31 +30,8 @@ async fn main() -> anyhow::Result<()> {
         .context("Cannot connect.")?;
 
     {
-        let ai = client.get_block_info(&v2::BlockIdentifier::Best).await?;
-        println!("Best block {:#?}", ai);
-    }
-
-    {
-        let ai = client
-            .get_block_info(&v2::BlockIdentifier::LastFinal)
-            .await?;
-        println!("Last finalized {:#?}", ai);
-    }
-
-    {
-        let identifier = AbsoluteBlockHeight::from(0);
-        let ai = client.get_block_info(identifier).await?;
-        println!("Block at absolute height {:?} {:#?}", identifier, ai);
-    }
-
-    {
-        let identifier = v2::RelativeBlockHeight {
-            genesis_index: 0.into(),
-            height:        0.into(),
-            restrict:      true,
-        };
-        let ai = client.get_block_info(identifier).await?;
-        println!("Block at relative height {:?} {:#?}", identifier, ai);
+        let ai = client.get_block_info(&app.block).await?;
+        println!("{}: {:#?}", ai.block_hash, ai.response);
     }
 
     Ok(())
