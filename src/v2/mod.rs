@@ -40,10 +40,11 @@ use concordium_base::{
 };
 pub use endpoints::{QueryError, QueryResult, RPCError, RPCResult};
 use futures::{Stream, StreamExt};
+pub use http::uri::Scheme;
 use std::{collections::HashMap, num::ParseIntError};
 use tonic::IntoRequest;
 pub use tonic::{
-    transport::{Endpoint, Error},
+    transport::{ClientTlsConfig, Endpoint, Error},
     Code, Status,
 };
 
@@ -2400,10 +2401,8 @@ impl Client {
         last_found.ok_or(QueryError::NotFound)
     }
 
-    #[deprecated(
-        note = "Use [`find_at_lowest_height`](./struct.Client.html#method.\
-                find_at_lowest_height) instead since it avoids an extra call."
-    )]
+    #[deprecated(note = "Use [`find_at_lowest_height`](./struct.Client.html#method.\
+                         find_at_lowest_height) instead since it avoids an extra call.")]
     pub async fn find_earliest_finalized<A, F: futures::Future<Output = QueryResult<Option<A>>>>(
         &mut self,
         range: impl std::ops::RangeBounds<AbsoluteBlockHeight>,
@@ -2619,27 +2618,21 @@ mod tests {
         let b6 = "@33/3".parse::<BlockIdentifier>()?;
         assert_eq!(
             b6,
-            BlockIdentifier::RelativeHeight(
-                RelativeBlockHeight {
-                    genesis_index: 3.into(),
-                    height:        33.into(),
-                    restrict:      false,
-                }
-                .into()
-            )
+            BlockIdentifier::RelativeHeight(RelativeBlockHeight {
+                genesis_index: 3.into(),
+                height:        33.into(),
+                restrict:      false,
+            })
         );
 
         let b7 = "@33/3!".parse::<BlockIdentifier>()?;
         assert_eq!(
             b7,
-            BlockIdentifier::RelativeHeight(
-                RelativeBlockHeight {
-                    genesis_index: 3.into(),
-                    height:        33.into(),
-                    restrict:      true,
-                }
-                .into()
-            )
+            BlockIdentifier::RelativeHeight(RelativeBlockHeight {
+                genesis_index: 3.into(),
+                height:        33.into(),
+                restrict:      true,
+            })
         );
 
         Ok(())
