@@ -26,7 +26,7 @@ concordium-rust-sdk = "2"
 
 ## Versions
 
-- Node version compatibility: 5.*
+- Node version compatibility: 5.4+
 
 ## Basic usage
 

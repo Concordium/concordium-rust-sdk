@@ -729,8 +729,8 @@ pub mod block_hash_input {
         /// be 32 bytes.
         #[prost(message, tag = "3")]
         Given(super::BlockHash),
-        /// Query for a block at height, if a unique block can be identified at
-        /// that height.
+        /// Query for a block at absolute height, if a unique block can be
+        /// identified at that height.
         #[prost(message, tag = "4")]
         AbsoluteHeight(super::AbsoluteBlockHeight),
         /// Query for a block at height relative to a genesis index.
