@@ -51,6 +51,8 @@ pub mod types;
 pub mod cis0;
 /// Types and functions for working with CIS-2 smart contracts.
 pub mod cis2;
+/// Types and functions for working with CIS-4 credential registry standard contracts.
+pub mod cis4;
 
 /// Re-export of the identity library.
 pub use concordium_base::id;

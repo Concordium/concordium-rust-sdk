@@ -139,8 +139,7 @@ impl Cis2Contract {
     /// # Arguments
     ///
     /// * `client` - The RPC client for the concordium node. Note that cloning
-    ///   [Client](crate::endpoints::Client) is cheap and is therefore the
-    ///   intended way of sharing.
+    ///   the [`Client`] is cheap and is therefore the intended way of sharing.
     /// * `address` - The contract address of the CIS2 token smart contract.
     /// * `contract_name` - The name of the contract.
     pub fn new(
