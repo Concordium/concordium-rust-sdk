@@ -14,7 +14,7 @@ use concordium_base::{
     transactions::UpdateContractPayload,
     web3id::Web3IdSigner,
 };
-pub use concordium_base::{cis2_types::MetadataUrl, cis4_types::*};
+pub use concordium_base::{cis2_types::MetadataUrl, cis4_types::*, web3id::CredentialId};
 use std::sync::Arc;
 
 pub struct Cis4Contract {
@@ -102,7 +102,7 @@ impl Cis4Contract {
     pub async fn credential_entry(
         &mut self,
         cred_id: CredentialId,
-    ) -> Result<CredentialQueryResponse, Cis4QueryError> {
+    ) -> Result<CredentialEntry, Cis4QueryError> {
         let parameter =
             OwnedParameter::from_serial(&cred_id).expect("Credential ID is a valid parameter.");
 
