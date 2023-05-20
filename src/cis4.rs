@@ -3,7 +3,7 @@ use crate::{
         smart_contracts::{self, ContractContext},
         transactions,
     },
-    v2::{BlockIdentifier, Client},
+    v2::{self, BlockIdentifier, Client},
 };
 use concordium_base::{
     base::Nonce,
@@ -84,17 +84,18 @@ impl Cis4Contract {
     /// * `client` - The RPC client for the concordium node. Note that cloning
     ///   [`Client`] is cheap and is therefore the intended way of sharing.
     /// * `address` - The contract address of the CIS4 registry smart contract.
-    /// * `contract_name` - The name of the contract.
-    pub fn new(
-        client: Client,
+    pub async fn new(
+        mut client: Client,
         address: ContractAddress,
-        contract_name: contracts_common::OwnedContractName,
-    ) -> Cis4Contract {
-        Cis4Contract {
+    ) -> v2::QueryResult<Cis4Contract> {
+        let ci = client
+            .get_instance_info(address, BlockIdentifier::LastFinal)
+            .await?;
+        Ok(Cis4Contract {
             client,
             address,
-            contract_name: Arc::new(contract_name),
-        }
+            contract_name: Arc::new(ci.response.name().clone()),
+        })
     }
 
     /// Look up an entry in the registry by id.
