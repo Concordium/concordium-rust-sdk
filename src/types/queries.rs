@@ -54,6 +54,8 @@ pub struct BlockInfo {
     /// Identity of the baker of the block. For non-genesis blocks the value is
     /// going to always be `Some`.
     pub block_baker:             Option<BakerId>,
+    /// Protocol version to which the block belongs.
+    pub protocol_version:        ProtocolVersion,
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize)]

@@ -1,6 +1,7 @@
 //! Test the `GetBlockInfo` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
+use concordium_base::base::AbsoluteBlockHeight;
 use structopt::StructOpt;
 
 use concordium_rust_sdk::v2;
@@ -37,6 +38,22 @@ async fn main() -> anyhow::Result<()> {
             .get_block_info(&v2::BlockIdentifier::LastFinal)
             .await?;
         println!("Last finalized {:#?}", ai);
+    }
+
+    {
+        let identifier = AbsoluteBlockHeight::from(0);
+        let ai = client.get_block_info(identifier).await?;
+        println!("Block at absolute height {:?} {:#?}", identifier, ai);
+    }
+
+    {
+        let identifier = v2::RelativeBlockHeight {
+            genesis_index: 0.into(),
+            height:        0.into(),
+            restrict:      true,
+        };
+        let ai = client.get_block_info(identifier).await?;
+        println!("Block at relative height {:?} {:#?}", identifier, ai);
     }
 
     Ok(())

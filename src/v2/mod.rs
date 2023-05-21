@@ -116,6 +116,27 @@ pub enum BlockIdentifier {
     LastFinal,
     /// Query in the context of a specific block hash.
     Given(BlockHash),
+    /// Query for a block at absolute height. If a unique
+    /// block can not be identified at that height the query will return
+    /// `NotFound`.
+    AbsoluteHeight(AbsoluteBlockHeight),
+    /// Query for a block at a height relative to genesis index. If a unique
+    /// block can not be identified at that height the query will return
+    /// `NotFound`.
+    RelativeHeight(RelativeBlockHeight),
+}
+
+/// Block height relative to an explicit genesis index.
+#[derive(Copy, Clone, Debug)]
+pub struct RelativeBlockHeight {
+    /// Genesis index to start from.
+    pub genesis_index: types::GenesisIndex,
+    /// Height starting from the genesis block at the genesis index.
+    pub height:        types::BlockHeight,
+    /// Whether to return results only from the specified genesis index
+    /// (`true`), or allow results from more recent genesis indices
+    /// as well (`false`).
+    pub restrict:      bool,
 }
 
 /// An account identifier used in queries.
@@ -307,6 +328,12 @@ impl From<&BlockIdentifier> for generated::BlockHashInput {
                 generated::block_hash_input::BlockHashInput::Given(generated::BlockHash {
                     value: h.as_ref().to_vec(),
                 })
+            }
+            &BlockIdentifier::AbsoluteHeight(h) => {
+                generated::block_hash_input::BlockHashInput::AbsoluteHeight(h.into())
+            }
+            &BlockIdentifier::RelativeHeight(h) => {
+                generated::block_hash_input::BlockHashInput::RelativeHeight(h.into())
             }
         };
         generated::BlockHashInput {
@@ -955,6 +982,14 @@ impl<X: IntoBlockIdentifier + Copy> IntoBlockIdentifier for &X {
 
 impl IntoBlockIdentifier for BlockHash {
     fn into_block_identifier(self) -> BlockIdentifier { BlockIdentifier::Given(self) }
+}
+
+impl IntoBlockIdentifier for AbsoluteBlockHeight {
+    fn into_block_identifier(self) -> BlockIdentifier { BlockIdentifier::AbsoluteHeight(self) }
+}
+
+impl IntoBlockIdentifier for RelativeBlockHeight {
+    fn into_block_identifier(self) -> BlockIdentifier { BlockIdentifier::RelativeHeight(self) }
 }
 
 impl Client {
