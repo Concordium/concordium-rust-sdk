@@ -12,11 +12,15 @@ use concordium_base::{
     hashes::TransactionHash,
     smart_contracts::{ExceedsParameterSize, OwnedParameter, OwnedReceiveName},
     transactions::UpdateContractPayload,
-    web3id::Web3IdSigner,
+    web3id::{Web3IdSigner, REVOKE_DOMAIN_STRING},
 };
 pub use concordium_base::{cis2_types::MetadataUrl, cis4_types::*, web3id::CredentialId};
 use std::sync::Arc;
 
+/// A CIS4 compatible contract instance.
+///
+/// Note that cloning is cheap and is, therefore, the intended way of sharing
+/// values of this type between multiple tasks.
 pub struct Cis4Contract {
     client:        Client,
     address:       ContractAddress,
@@ -24,6 +28,7 @@ pub struct Cis4Contract {
 }
 
 #[derive(thiserror::Error, Debug)]
+/// An error that can occur when executing CIS4 queries.
 pub enum Cis4QueryError {
     /// The smart contract receive name is invalid.
     #[error("Invalid receive name: {0}")]
@@ -43,6 +48,7 @@ pub enum Cis4QueryError {
 }
 
 #[derive(thiserror::Error, Debug)]
+/// An error that can occur when sending CIS4 update transactions.
 pub enum Cis4TransactionError {
     /// The smart contract receive name is invalid.
     #[error("Invalid receive name: {0}")]
@@ -61,7 +67,7 @@ pub enum Cis4TransactionError {
     NodeRejected(crate::types::RejectReason),
 }
 
-/// Transaction metadata for CIS-4
+/// Transaction metadata for CIS-4 update transactions.
 #[derive(Debug, Clone, Copy)]
 pub struct Cis4TransactionMetadata {
     /// The account address sending the transaction.
@@ -98,7 +104,7 @@ impl Cis4Contract {
         })
     }
 
-    /// Look up an entry in the registry by id.
+    /// Look up an entry in the registry by its id.
     pub async fn credential_entry(
         &mut self,
         cred_id: CredentialId,

@@ -1,10 +1,10 @@
 pub use concordium_base::web3id::*;
 use concordium_base::{
     base::CredentialRegistrationID,
-    cis4_types::{CredentialHolderId, CredentialStatus},
+    cis4_types::CredentialStatus,
     contracts_common::{AccountAddress, ContractAddress},
     id::{constants::ArCurve, types::IpIdentity},
-    web3id::{self, CredentialMetadata, CredentialsInputs},
+    web3id,
 };
 use futures::TryStreamExt;
 
