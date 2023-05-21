@@ -1,6 +1,7 @@
+pub use concordium_base::web3id::*;
 use concordium_base::{
     base::CredentialRegistrationID,
-    cis4_types::CredentialHolderId,
+    cis4_types::{CredentialHolderId, CredentialStatus},
     contracts_common::{AccountAddress, ContractAddress},
     id::{constants::ArCurve, types::IpIdentity},
     web3id::{self, CredentialMetadata, CredentialsInputs},
@@ -44,36 +45,73 @@ pub enum CredentialLookupError {
         contract: ContractAddress,
         cred_id:  web3id::CredentialId,
     },
+    #[error("Unexpected response from the node: {0}")]
+    InvalidResponse(String),
 }
 
-pub async fn get_credential_public_data(
+pub struct CredentialWithMetadata {
+    pub status:      CredentialStatus,
+    pub commitments: CredentialsInputs<ArCurve>,
+}
+
+pub async fn verify_credential_metadata(
     mut client: v2::Client,
-    metadata: &CredentialMetadata,
-) -> Result<CredentialsInputs<ArCurve>, CredentialLookupError> {
-    match metadata {
+    network: web3id::did::Network,
+    metadata: &ProofMetadata,
+) -> Result<CredentialWithMetadata, CredentialLookupError> {
+    if metadata.network != network {
+        return Err(CredentialLookupError::IncorrectNetwork);
+    }
+    // TODO
+    match metadata.cred_metadata {
         CredentialMetadata::Identity { issuer, cred_id } => {
             let ai = client
-                .get_account_info(&(*cred_id).into(), BlockIdentifier::LastFinal)
+                .get_account_info(&cred_id.into(), BlockIdentifier::LastFinal)
                 .await?;
             let Some(cred) = ai.response.account_credentials.values().find(|cred| cred.value.cred_id() == cred_id.as_ref()) else {
-                return Err(CredentialLookupError::CredentialNotPresent{ cred_id: *cred_id, account: ai.response.account_address });
+                return Err(CredentialLookupError::CredentialNotPresent{ cred_id, account: ai.response.account_address });
             };
-            if cred.value.issuer() != *issuer {
+            if cred.value.issuer() != issuer {
                 return Err(CredentialLookupError::InconsistentIssuer {
-                    stated: *issuer,
+                    stated: issuer,
                     actual: cred.value.issuer(),
                 });
             }
             match &cred.value {
                 concordium_base::id::types::AccountCredentialWithoutProofs::Initial { .. } => {
-                    return Err(CredentialLookupError::InitialCredential { cred_id: *cred_id })
+                    return Err(CredentialLookupError::InitialCredential { cred_id })
                 }
                 concordium_base::id::types::AccountCredentialWithoutProofs::Normal {
-                    cdv: _,
+                    cdv,
                     commitments,
-                } => Ok(CredentialsInputs::Identity {
-                    commitments: commitments.cmm_attributes.clone(),
-                }),
+                } => {
+                    let now = chrono::Utc::now();
+                    let valid_from = cdv.policy.created_at.lower().ok_or_else(|| {
+                        CredentialLookupError::InvalidResponse(
+                            "Credential creation date is not valid.".into(),
+                        )
+                    })?;
+                    let valid_until = cdv.policy.valid_to.upper().ok_or_else(|| {
+                        CredentialLookupError::InvalidResponse(
+                            "Credential creation date is not valid.".into(),
+                        )
+                    })?;
+                    let status = if valid_from > now {
+                        CredentialStatus::NotActivated
+                    } else if valid_until < now {
+                        CredentialStatus::Expired
+                    } else {
+                        CredentialStatus::Active
+                    };
+                    let commitments = CredentialsInputs::Identity {
+                        commitments: commitments.cmm_attributes.clone(),
+                    };
+
+                    Ok(CredentialWithMetadata {
+                        status,
+                        commitments,
+                    })
+                }
             }
         }
         CredentialMetadata::Web3Id {
@@ -81,11 +119,11 @@ pub async fn get_credential_public_data(
             owner,
             id,
         } => {
-            let mut contract_client = Cis4Contract::new(client, *contract).await?;
-            let entry = contract_client.credential_entry(*id).await?;
-            if &entry.credential_info.holder_id != owner {
+            let mut contract_client = Cis4Contract::new(client, contract).await?;
+            let entry = contract_client.credential_entry(id).await?;
+            if entry.credential_info.holder_id != owner {
                 return Err(CredentialLookupError::InconsistentOwner {
-                    stated: *owner,
+                    stated: owner,
                     actual: entry.credential_info.holder_id,
                 });
             }
@@ -93,10 +131,18 @@ pub async fn get_credential_public_data(
                 &entry.credential_info.commitment,
             ))
             .map_err(|_| CredentialLookupError::CommitmentParseError {
-                contract: *contract,
-                cred_id:  *id,
+                contract,
+                cred_id: id,
             })?;
-            Ok(CredentialsInputs::Web3 { commitment })
+
+            let commitments = CredentialsInputs::Web3 { commitment };
+
+            let status = contract_client.credential_status(id).await?;
+
+            Ok(CredentialWithMetadata {
+                status,
+                commitments,
+            })
         }
     }
 }
@@ -110,18 +156,12 @@ pub async fn get_public_data(
     client: &mut v2::Client,
     network: web3id::did::Network,
     presentation: &web3id::Presentation<ArCurve, web3id::Web3IdAttribute>,
-) -> Result<Vec<CredentialsInputs<ArCurve>>, CredentialLookupError> {
+) -> Result<Vec<CredentialWithMetadata>, CredentialLookupError> {
     let stream = presentation
         .metadata()
         .map(|meta| {
             let mainnet_client = client.clone();
-            async move {
-                if meta.network == network {
-                    get_credential_public_data(mainnet_client, &meta.cred_metadata).await
-                } else {
-                    Err(CredentialLookupError::IncorrectNetwork)
-                }
-            }
+            async move { verify_credential_metadata(mainnet_client, network, &meta).await }
         })
         .collect::<futures::stream::FuturesOrdered<_>>();
     Ok(stream.try_collect().await?)
