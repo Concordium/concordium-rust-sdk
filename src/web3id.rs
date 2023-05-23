@@ -22,11 +22,6 @@ pub enum CredentialLookupError {
         stated: IpIdentity,
         actual: IpIdentity,
     },
-    #[error("Credential owner not as stated: {stated} != {actual}.")]
-    InconsistentOwner {
-        stated: CredentialHolderId,
-        actual: CredentialHolderId,
-    },
     #[error("Unable to look up account: {0}")]
     QueryError(#[from] v2::QueryError),
     #[error("Unable to query CIS4 contract: {0}")]
@@ -43,7 +38,7 @@ pub enum CredentialLookupError {
     )]
     CommitmentParseError {
         contract: ContractAddress,
-        cred_id:  web3id::CredentialId,
+        cred_id:  CredentialHolderId,
     },
     #[error("Unexpected response from the node: {0}")]
     InvalidResponse(String),
@@ -114,30 +109,20 @@ pub async fn verify_credential_metadata(
                 }
             }
         }
-        CredentialMetadata::Web3Id {
-            contract,
-            owner,
-            id,
-        } => {
+        CredentialMetadata::Web3Id { contract, owner } => {
             let mut contract_client = Cis4Contract::new(client, contract).await?;
-            let entry = contract_client.credential_entry(id).await?;
-            if entry.credential_info.holder_id != owner {
-                return Err(CredentialLookupError::InconsistentOwner {
-                    stated: owner,
-                    actual: entry.credential_info.holder_id,
-                });
-            }
+            let entry = contract_client.credential_entry(owner).await?;
             let commitment = concordium_base::common::from_bytes(&mut std::io::Cursor::new(
                 &entry.credential_info.commitment,
             ))
             .map_err(|_| CredentialLookupError::CommitmentParseError {
                 contract,
-                cred_id: id,
+                cred_id: owner,
             })?;
 
             let commitments = CredentialsInputs::Web3 { commitment };
 
-            let status = contract_client.credential_status(id).await?;
+            let status = contract_client.credential_status(owner).await?;
 
             Ok(CredentialWithMetadata {
                 status,

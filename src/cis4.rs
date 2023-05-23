@@ -12,9 +12,9 @@ use concordium_base::{
     hashes::TransactionHash,
     smart_contracts::{ExceedsParameterSize, OwnedParameter, OwnedReceiveName},
     transactions::UpdateContractPayload,
-    web3id::{Web3IdSigner, REVOKE_DOMAIN_STRING},
+    web3id::{CredentialHolderId, Web3IdSigner, REVOKE_DOMAIN_STRING},
 };
-pub use concordium_base::{cis2_types::MetadataUrl, cis4_types::*, web3id::CredentialId};
+pub use concordium_base::{cis2_types::MetadataUrl, cis4_types::*};
 use std::sync::Arc;
 
 /// A CIS4 compatible contract instance.
@@ -107,7 +107,7 @@ impl Cis4Contract {
     /// Look up an entry in the registry by its id.
     pub async fn credential_entry(
         &mut self,
-        cred_id: CredentialId,
+        cred_id: CredentialHolderId,
     ) -> Result<CredentialEntry, Cis4QueryError> {
         let parameter =
             OwnedParameter::from_serial(&cred_id).expect("Credential ID is a valid parameter.");
@@ -118,7 +118,7 @@ impl Cis4Contract {
     /// Look up the status of a credential by its id.
     pub async fn credential_status(
         &mut self,
-        cred_id: CredentialId,
+        cred_id: CredentialHolderId,
     ) -> Result<CredentialStatus, Cis4QueryError> {
         let parameter =
             OwnedParameter::from_serial(&cred_id).expect("Credential ID is a valid parameter.");
@@ -131,13 +131,6 @@ impl Cis4Contract {
         let parameter = OwnedParameter::empty();
 
         self.make_query("revocationKeys", parameter).await
-    }
-
-    /// Look up all the issuer keys.
-    pub async fn issuer_keys(&mut self) -> Result<Vec<IssuerKey>, Cis4QueryError> {
-        let parameter = OwnedParameter::empty();
-
-        self.make_query("issuerKeys", parameter).await
     }
 
     /// Look up the issuer's metadata URL.
@@ -158,10 +151,9 @@ impl Cis4Contract {
         &mut self,
         signer: &impl transactions::ExactSizeTransactionSigner,
         metadata: &Cis4TransactionMetadata,
-        cred_id: CredentialId,
         cred_info: &CredentialInfo,
     ) -> Result<TransactionHash, Cis4TransactionError> {
-        let parameter = OwnedParameter::from_serial(&(cred_id, cred_info))?;
+        let parameter = OwnedParameter::from_serial(cred_info)?;
 
         self.make_call(signer, metadata, "registerCredential", parameter)
             .await
@@ -172,7 +164,7 @@ impl Cis4Contract {
         &mut self,
         signer: &impl transactions::ExactSizeTransactionSigner,
         metadata: &Cis4TransactionMetadata,
-        cred_id: CredentialId,
+        cred_id: CredentialHolderId,
         reason: Option<Reason>,
     ) -> Result<TransactionHash, Cis4TransactionError> {
         let parameter = OwnedParameter::from_serial(&(cred_id, reason))?;
@@ -190,13 +182,13 @@ impl Cis4Contract {
         &mut self,
         signer: &impl transactions::ExactSizeTransactionSigner,
         metadata: &Cis4TransactionMetadata,
-        web3signer: impl Web3IdSigner,
+        web3signer: impl Web3IdSigner, // the holder
         nonce: u64,
-        cred_id: CredentialId,
         reason: Option<Reason>,
     ) -> Result<TransactionHash, Cis4TransactionError> {
         use contracts_common::Serial;
         let mut to_sign = REVOKE_DOMAIN_STRING.to_vec();
+        let cred_id = web3signer.id();
         cred_id
             .serial(&mut to_sign)
             .expect("Serialization to vector does not fail.");
@@ -237,8 +229,8 @@ impl Cis4Contract {
         web3signer: impl Web3IdSigner, // the revoker.
         nonce: u64,
         key: RevocationKey,
-        cred_id: CredentialId,
-        reason: Option<Reason>,
+        cred_id: CredentialHolderId,
+        reason: Option<&Reason>,
     ) -> Result<TransactionHash, Cis4TransactionError> {
         use contracts_common::Serial;
         let mut to_sign = REVOKE_DOMAIN_STRING.to_vec();
