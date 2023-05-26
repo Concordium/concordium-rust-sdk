@@ -6,14 +6,13 @@ use crate::{
     v2::{self, BlockIdentifier, Client},
 };
 use concordium_base::{
-    base::{Energy, Nonce},
+    base::Nonce,
     common::types,
-    contracts_common::{self, AccountAddress, Amount, ContractAddress, NewReceiveNameError, Address},
-    hashes::TransactionHash,
-    smart_contracts::{
-        ContractTraceElement, ExceedsParameterSize, OwnedContractName, OwnedParameter,
-        OwnedReceiveName,
+    contracts_common::{
+        self, AccountAddress, Address, Amount, ContractAddress, NewReceiveNameError,
     },
+    hashes::TransactionHash,
+    smart_contracts::{ExceedsParameterSize, OwnedContractName, OwnedParameter, OwnedReceiveName},
     transactions::UpdateContractPayload,
 };
 pub use concordium_base::{cis2_types::MetadataUrl, cis4_types::*};
@@ -145,7 +144,9 @@ impl<Type> ContractClient<Type> {
             + From<RejectReason>
             + From<contracts_common::ParseError>
             + From<v2::QueryError>, {
-        let ir = self.make_invoke::<E>(entrypoint, Amount::zero(), None, parameter, bi).await?;
+        let ir = self
+            .make_invoke::<E>(entrypoint, Amount::zero(), None, parameter, bi)
+            .await?;
         match ir {
             smart_contracts::InvokeContractResult::Success {
                 return_value,

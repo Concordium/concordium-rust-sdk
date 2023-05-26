@@ -113,8 +113,8 @@ impl std::fmt::Display for StandardIdentifier {
             StandardIdentifier::CIS0 => f.write_str("CIS-0"),
             StandardIdentifier::CIS1 => f.write_str("CIS-1"),
             StandardIdentifier::CIS2 => f.write_str("CIS-2"),
-            StandardIdentifier::CIS2 => f.write_str("CIS-3"),
-            StandardIdentifier::CIS2 => f.write_str("CIS-4"),
+            StandardIdentifier::CIS3 => f.write_str("CIS-3"),
+            StandardIdentifier::CIS4 => f.write_str("CIS-4"),
             StandardIdentifier::Other(s) => f.write_str(s),
         }
     }

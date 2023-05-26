@@ -10,7 +10,7 @@ use futures::TryStreamExt;
 
 use crate::{
     cis4::{Cis4Contract, Cis4QueryError},
-    v2::{self, BlockIdentifier},
+    v2::{self, BlockIdentifier, IntoBlockIdentifier},
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -53,10 +53,12 @@ pub async fn verify_credential_metadata(
     mut client: v2::Client,
     network: web3id::did::Network,
     metadata: &ProofMetadata,
+    bi: impl IntoBlockIdentifier,
 ) -> Result<CredentialWithMetadata, CredentialLookupError> {
     if metadata.network != network {
         return Err(CredentialLookupError::IncorrectNetwork);
     }
+    let bi = bi.into_block_identifier();
     // TODO
     match metadata.cred_metadata {
         CredentialMetadata::Account { issuer, cred_id } => {
@@ -110,8 +112,8 @@ pub async fn verify_credential_metadata(
             }
         }
         CredentialMetadata::Web3Id { contract, owner } => {
-            let mut contract_client = Cis4Contract::new(client, contract).await?;
-            let entry = contract_client.credential_entry(owner).await?;
+            let mut contract_client = Cis4Contract::create(client, contract).await?;
+            let entry = contract_client.credential_entry(owner, bi).await?;
             let commitment = concordium_base::common::from_bytes(&mut std::io::Cursor::new(
                 &entry.credential_info.commitment,
             ))
@@ -122,7 +124,7 @@ pub async fn verify_credential_metadata(
 
             let commitments = CredentialsInputs::Web3 { commitment };
 
-            let status = contract_client.credential_status(owner).await?;
+            let status = contract_client.credential_status(owner, bi).await?;
 
             Ok(CredentialWithMetadata {
                 status,
@@ -141,12 +143,14 @@ pub async fn get_public_data(
     client: &mut v2::Client,
     network: web3id::did::Network,
     presentation: &web3id::Presentation<ArCurve, web3id::Web3IdAttribute>,
+    bi: impl IntoBlockIdentifier,
 ) -> Result<Vec<CredentialWithMetadata>, CredentialLookupError> {
+    let block = bi.into_block_identifier();
     let stream = presentation
         .metadata()
         .map(|meta| {
             let mainnet_client = client.clone();
-            async move { verify_credential_metadata(mainnet_client, network, &meta).await }
+            async move { verify_credential_metadata(mainnet_client, network, &meta, block).await }
         })
         .collect::<futures::stream::FuturesOrdered<_>>();
     Ok(stream.try_collect().await?)

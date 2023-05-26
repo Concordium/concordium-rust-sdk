@@ -1,31 +1,15 @@
 use crate::{
-    types::{
-        smart_contracts::{self, ContractContext},
-        transactions,
-    },
-    v2::{self, BlockIdentifier, Client},
-};
-use concordium_base::{
-    base::Nonce,
-    common::types,
-    contracts_common::{self, AccountAddress, Amount, ContractAddress},
-    hashes::TransactionHash,
-    smart_contracts::{ExceedsParameterSize, OwnedParameter, OwnedReceiveName},
-    transactions::UpdateContractPayload,
-    web3id::{CredentialHolderId, Web3IdSigner, REVOKE_DOMAIN_STRING},
+    contract_client::*,
+    types::{transactions, RejectReason},
+    v2::IntoBlockIdentifier,
 };
 pub use concordium_base::{cis2_types::MetadataUrl, cis4_types::*};
-use std::sync::Arc;
-
-/// A CIS4 compatible contract instance.
-///
-/// Note that cloning is cheap and is, therefore, the intended way of sharing
-/// values of this type between multiple tasks.
-pub struct Cis4Contract {
-    client:        Client,
-    address:       ContractAddress,
-    contract_name: Arc<contracts_common::OwnedContractName>,
-}
+use concordium_base::{
+    contracts_common::{self, AccountAddress},
+    hashes::TransactionHash,
+    smart_contracts::{ExceedsParameterSize, OwnedParameter},
+    web3id::{CredentialHolderId, Web3IdSigner, REVOKE_DOMAIN_STRING},
+};
 
 #[derive(thiserror::Error, Debug)]
 /// An error that can occur when executing CIS4 queries.
@@ -45,6 +29,10 @@ pub enum Cis4QueryError {
     /// The node rejected the invocation.
     #[error("Rejected by the node: {0:?}.")]
     NodeRejected(crate::types::RejectReason),
+}
+
+impl From<RejectReason> for Cis4QueryError {
+    fn from(value: RejectReason) -> Self { Self::NodeRejected(value) }
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -68,82 +56,66 @@ pub enum Cis4TransactionError {
 }
 
 /// Transaction metadata for CIS-4 update transactions.
+pub type Cis4TransactionMetadata = ContractTransactionMetadata;
+
+#[doc(hidden)]
 #[derive(Debug, Clone, Copy)]
-pub struct Cis4TransactionMetadata {
-    /// The account address sending the transaction.
-    pub sender_address: AccountAddress,
-    /// The nonce to use for the transaction.
-    pub nonce:          Nonce,
-    /// Expiry date of the transaction.
-    pub expiry:         types::TransactionTime,
-    /// The limit on energy to use for the transaction.
-    pub energy:         transactions::send::GivenEnergy,
-    /// The amount of CCD to include in the transaction.
-    pub amount:         types::Amount,
-}
+pub enum Cis4Type {}
+
+pub type Cis4Contract = ContractClient<Cis4Type>;
 
 impl Cis4Contract {
-    /// Construct a Cis4Contract.
-    ///
-    /// # Arguments
-    ///
-    /// * `client` - The RPC client for the concordium node. Note that cloning
-    ///   [`Client`] is cheap and is therefore the intended way of sharing.
-    /// * `address` - The contract address of the CIS4 registry smart contract.
-    pub async fn new(
-        mut client: Client,
-        address: ContractAddress,
-    ) -> v2::QueryResult<Cis4Contract> {
-        let ci = client
-            .get_instance_info(address, BlockIdentifier::LastFinal)
-            .await?;
-        Ok(Cis4Contract {
-            client,
-            address,
-            contract_name: Arc::new(ci.response.name().clone()),
-        })
-    }
-
     /// Look up an entry in the registry by its id.
     pub async fn credential_entry(
         &mut self,
         cred_id: CredentialHolderId,
+        bi: impl IntoBlockIdentifier,
     ) -> Result<CredentialEntry, Cis4QueryError> {
         let parameter =
             OwnedParameter::from_serial(&cred_id).expect("Credential ID is a valid parameter.");
 
-        self.make_query("credentialEntry", parameter).await
+        self.make_query("credentialEntry", parameter, bi).await
     }
 
     /// Look up the status of a credential by its id.
     pub async fn credential_status(
         &mut self,
         cred_id: CredentialHolderId,
+        bi: impl IntoBlockIdentifier,
     ) -> Result<CredentialStatus, Cis4QueryError> {
         let parameter =
             OwnedParameter::from_serial(&cred_id).expect("Credential ID is a valid parameter.");
 
-        self.make_query("credentialStatus", parameter).await
+        self.make_query("credentialStatus", parameter, bi).await
     }
 
     /// Get the list of all the revocation keys together with their nonces.
-    pub async fn revocation_keys(&mut self) -> Result<Vec<RevocationKeyWithNonce>, Cis4QueryError> {
+    pub async fn revocation_keys(
+        &mut self,
+        bi: impl IntoBlockIdentifier,
+    ) -> Result<Vec<RevocationKeyWithNonce>, Cis4QueryError> {
         let parameter = OwnedParameter::empty();
 
-        self.make_query("revocationKeys", parameter).await
+        self.make_query("revocationKeys", parameter, bi).await
     }
 
     /// Look up the issuer's metadata URL.
-    pub async fn issuer_metadata(&mut self) -> Result<MetadataUrl, Cis4QueryError> {
+    pub async fn issuer_metadata(
+        &mut self,
+        bi: impl IntoBlockIdentifier,
+    ) -> Result<MetadataUrl, Cis4QueryError> {
         let parameter = OwnedParameter::empty();
-        self.make_query("issuerMetadata", parameter).await
+        self.make_query("issuerMetadata", parameter, bi).await
     }
 
     /// Look up the issuer's account address.
-    pub async fn issuer_address(&mut self) -> Result<AccountAddress, Cis4QueryError> {
+    pub async fn issuer_address(
+        &mut self,
+        bi: impl IntoBlockIdentifier,
+    ) -> Result<AccountAddress, Cis4QueryError> {
         let parameter = OwnedParameter::empty();
 
-        self.make_query("issuer", parameter).await
+        self.make_query("issuer", parameter, bi).await
     }
 
     /// Register a new credential.
@@ -262,77 +234,5 @@ impl Cis4Contract {
 
         self.make_call(signer, metadata, "revokeCredentialHolder", parameter)
             .await
-    }
-
-    async fn make_query<A: contracts_common::Deserial>(
-        &mut self,
-        entrypoint: &str,
-        parameter: OwnedParameter,
-    ) -> Result<A, Cis4QueryError> {
-        let contract_name = self.contract_name.as_contract_name().contract_name();
-        let method = OwnedReceiveName::try_from(format!("{contract_name}.{entrypoint}"))?;
-
-        let context = ContractContext {
-            invoker: None,
-            contract: self.address,
-            amount: Amount::zero(),
-            method,
-            parameter,
-            energy: 1_000_000.into(),
-        };
-
-        let invoke_result = self
-            .client
-            .invoke_instance(BlockIdentifier::LastFinal, &context)
-            .await?
-            .response;
-        process_response(invoke_result)
-    }
-
-    async fn make_call(
-        &mut self,
-        signer: &impl transactions::ExactSizeTransactionSigner,
-        metadata: &Cis4TransactionMetadata,
-        entrypoint: &str,
-        message: OwnedParameter,
-    ) -> Result<TransactionHash, Cis4TransactionError> {
-        let contract_name = self.contract_name.as_contract_name().contract_name();
-        let receive_name = OwnedReceiveName::try_from(format!("{contract_name}.{entrypoint}"))?;
-
-        let payload = UpdateContractPayload {
-            amount: Amount::zero(),
-            address: self.address,
-            receive_name,
-            message,
-        };
-
-        let tx = transactions::send::make_and_sign_transaction(
-            signer,
-            metadata.sender_address,
-            metadata.nonce,
-            metadata.expiry,
-            metadata.energy,
-            transactions::Payload::Update { payload },
-        );
-
-        let hash = self.client.send_account_transaction(tx).await?;
-        Ok(hash)
-    }
-}
-
-fn process_response<A: contracts_common::Deserial>(
-    response: smart_contracts::InvokeContractResult,
-) -> Result<A, Cis4QueryError> {
-    match response {
-        smart_contracts::InvokeContractResult::Success { return_value, .. } => {
-            let bytes: smart_contracts::ReturnValue = return_value.ok_or(
-                Cis4QueryError::ResponseParseError(contracts_common::ParseError {}),
-            )?;
-            let response: A = contracts_common::from_bytes(&bytes.value)?;
-            Ok(response)
-        }
-        smart_contracts::InvokeContractResult::Failure { reason, .. } => {
-            Err(Cis4QueryError::NodeRejected(reason))
-        }
     }
 }
