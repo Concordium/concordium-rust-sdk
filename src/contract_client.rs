@@ -41,6 +41,12 @@ impl<Type> Clone for ContractClient<Type> {
     }
 }
 
+pub trait ViewEntrypoint {
+    const NAME: &'static str;
+    type Input: contracts_common::Serial;
+    type Output: contracts_common::Deserial;
+}
+
 #[derive(thiserror::Error, Debug)]
 /// An error that can occur when executing CIS4 queries.
 pub enum Cis4QueryError {
@@ -96,6 +102,24 @@ pub struct ContractTransactionMetadata {
     pub amount:         types::Amount,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum ViewError {
+    #[error("Invalid receive name: {0}")]
+    InvalidName(#[from] NewReceiveNameError),
+    #[error("Node rejected with reason: {0:#?}")]
+    QueryFailed(RejectReason),
+    #[error("Response was not as expected: {0}")]
+    InvalidResponse(#[from] contracts_common::ParseError),
+    #[error("Network error: {0}")]
+    NetworkError(#[from] v2::QueryError),
+    #[error("Parameter is too large: {0}")]
+    ParameterError(#[from] ExceedsParameterSize),
+}
+
+impl From<RejectReason> for ViewError {
+    fn from(value: RejectReason) -> Self { Self::QueryFailed(value) }
+}
+
 impl<Type> ContractClient<Type> {
     /// Construct a [`ContractClient`] by looking up metadata from the chain.
     ///
@@ -131,6 +155,15 @@ impl<Type> ContractClient<Type> {
             contract_name: Arc::new(contract_name),
             phantom: PhantomData,
         })
+    }
+
+    pub async fn view<Entrypoint: ViewEntrypoint>(
+        &mut self,
+        input: &Entrypoint::Input,
+        bi: impl v2::IntoBlockIdentifier,
+    ) -> Result<Entrypoint::Output, ViewError> {
+        let parameter = OwnedParameter::from_serial(input)?;
+        self.make_query(Entrypoint::NAME, parameter, bi).await
     }
 
     pub async fn make_query<A: contracts_common::Deserial, E>(
@@ -218,28 +251,5 @@ impl<Type> ContractClient<Type> {
 
         let hash = self.client.send_account_transaction(tx).await?;
         Ok(hash)
-    }
-}
-
-fn process_response<A: contracts_common::Deserial, E>(
-    response: smart_contracts::InvokeContractResult,
-) -> Result<A, E>
-where
-    E: From<NewReceiveNameError>
-        + From<RejectReason>
-        + From<contracts_common::ParseError>
-        + From<v2::QueryError>, {
-    match response {
-        smart_contracts::InvokeContractResult::Success {
-            return_value,
-            events,
-            used_energy,
-        } => {
-            let Some(bytes) = return_value else {return Err(contracts_common::ParseError {}.into()
-            )};
-            let response: A = contracts_common::from_bytes(&bytes.value)?;
-            Ok(response)
-        }
-        smart_contracts::InvokeContractResult::Failure { reason, .. } => Err(reason.into()),
     }
 }
