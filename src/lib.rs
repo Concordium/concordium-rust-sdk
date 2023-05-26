@@ -47,6 +47,9 @@ pub mod postgres;
 /// Type definitions used throughout the rest of the SDK.
 pub mod types;
 
+/// A generic client for interacting with smart contracts.
+pub mod contract_client;
+
 /// Types and functions for working with CIS-0 smart contracts.
 pub mod cis0;
 /// Types and functions for working with CIS-2 smart contracts.
