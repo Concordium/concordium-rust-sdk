@@ -59,7 +59,7 @@ pub async fn verify_credential_metadata(
     }
     // TODO
     match metadata.cred_metadata {
-        CredentialMetadata::Identity { issuer, cred_id } => {
+        CredentialMetadata::Account { issuer, cred_id } => {
             let ai = client
                 .get_account_info(&cred_id.into(), BlockIdentifier::LastFinal)
                 .await?;
@@ -98,7 +98,7 @@ pub async fn verify_credential_metadata(
                     } else {
                         CredentialStatus::Active
                     };
-                    let commitments = CredentialsInputs::Identity {
+                    let commitments = CredentialsInputs::Account {
                         commitments: commitments.cmm_attributes.clone(),
                     };
 
