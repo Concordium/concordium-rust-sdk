@@ -40,13 +40,6 @@ impl<Type> Clone for ContractClient<Type> {
         }
     }
 }
-
-pub trait ViewEntrypoint {
-    const NAME: &'static str;
-    type Input: contracts_common::Serial;
-    type Output: contracts_common::Deserial;
-}
-
 #[derive(thiserror::Error, Debug)]
 /// An error that can occur when executing CIS4 queries.
 pub enum Cis4QueryError {
@@ -157,13 +150,14 @@ impl<Type> ContractClient<Type> {
         })
     }
 
-    pub async fn view<Entrypoint: ViewEntrypoint>(
+    pub async fn view<R: contracts_common::Deserial>(
         &mut self,
-        input: &Entrypoint::Input,
+        entrypoint: &str,
+        input: &impl contracts_common::Serial,
         bi: impl v2::IntoBlockIdentifier,
-    ) -> Result<Entrypoint::Output, ViewError> {
+    ) -> Result<R, ViewError> {
         let parameter = OwnedParameter::from_serial(input)?;
-        self.make_query(Entrypoint::NAME, parameter, bi).await
+        self.make_query(entrypoint, parameter, bi).await
     }
 
     pub async fn make_query<A: contracts_common::Deserial, E>(
@@ -181,11 +175,7 @@ impl<Type> ContractClient<Type> {
             .make_invoke::<E>(entrypoint, Amount::zero(), None, parameter, bi)
             .await?;
         match ir {
-            smart_contracts::InvokeContractResult::Success {
-                return_value,
-                events,
-                used_energy,
-            } => {
+            smart_contracts::InvokeContractResult::Success { return_value, .. } => {
                 let Some(bytes) = return_value else {return Err(contracts_common::ParseError {}.into()
             )};
                 let response: A = contracts_common::from_bytes(&bytes.value)?;
