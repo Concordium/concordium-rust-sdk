@@ -157,10 +157,25 @@ impl<Type> ContractClient<Type> {
         bi: impl v2::IntoBlockIdentifier,
     ) -> Result<R, ViewError> {
         let parameter = OwnedParameter::from_serial(input)?;
-        self.make_query(entrypoint, parameter, bi).await
+        self.make_query_raw(entrypoint, parameter, bi).await
     }
 
-    pub async fn make_query<A: contracts_common::Deserial, E>(
+    pub async fn make_query<P: contracts_common::Serial, A: contracts_common::Deserial, E>(
+        &mut self,
+        entrypoint: &str,
+        parameter: &P,
+        bi: impl v2::IntoBlockIdentifier,
+    ) -> Result<A, E>
+    where
+        E: From<NewReceiveNameError>
+            + From<RejectReason>
+            + From<contracts_common::ParseError>
+            + From<v2::QueryError> + From<ExceedsParameterSize>, {
+        let parameter = OwnedParameter::from_serial(parameter)?;
+        self.make_query_raw::<A, E>(entrypoint, parameter, bi).await
+    }
+
+    pub async fn make_query_raw<A: contracts_common::Deserial, E>(
         &mut self,
         entrypoint: &str,
         parameter: OwnedParameter,
@@ -211,7 +226,20 @@ impl<Type> ContractClient<Type> {
         Ok(invoke_result)
     }
 
-    pub async fn make_call<E>(
+    pub async fn make_call<P: contracts_common::Serial, E>(
+        &mut self,
+        signer: &impl transactions::ExactSizeTransactionSigner,
+        metadata: &ContractTransactionMetadata,
+        entrypoint: &str,
+        message: &P,
+    ) -> Result<TransactionHash, E>
+    where
+        E: From<NewReceiveNameError> + From<v2::RPCError> + From<ExceedsParameterSize>, {
+        let message = OwnedParameter::from_serial(message)?;
+        self.make_call_raw::<E>(signer, metadata, entrypoint, message).await
+    }
+
+    pub async fn make_call_raw<E>(
         &mut self,
         signer: &impl transactions::ExactSizeTransactionSigner,
         metadata: &ContractTransactionMetadata,

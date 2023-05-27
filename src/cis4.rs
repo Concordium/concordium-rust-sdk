@@ -74,7 +74,7 @@ impl Cis4Contract {
         let parameter =
             OwnedParameter::from_serial(&cred_id).expect("Credential ID is a valid parameter.");
 
-        self.make_query("credentialEntry", parameter, bi).await
+        self.make_query_raw("credentialEntry", parameter, bi).await
     }
 
     /// Look up the status of a credential by its id.
@@ -86,7 +86,7 @@ impl Cis4Contract {
         let parameter =
             OwnedParameter::from_serial(&cred_id).expect("Credential ID is a valid parameter.");
 
-        self.make_query("credentialStatus", parameter, bi).await
+        self.make_query_raw("credentialStatus", parameter, bi).await
     }
 
     /// Get the list of all the revocation keys together with their nonces.
@@ -96,7 +96,7 @@ impl Cis4Contract {
     ) -> Result<Vec<RevocationKeyWithNonce>, Cis4QueryError> {
         let parameter = OwnedParameter::empty();
 
-        self.make_query("revocationKeys", parameter, bi).await
+        self.make_query_raw("revocationKeys", parameter, bi).await
     }
 
     /// Look up the issuer's metadata URL.
@@ -105,7 +105,7 @@ impl Cis4Contract {
         bi: impl IntoBlockIdentifier,
     ) -> Result<MetadataUrl, Cis4QueryError> {
         let parameter = OwnedParameter::empty();
-        self.make_query("issuerMetadata", parameter, bi).await
+        self.make_query_raw("issuerMetadata", parameter, bi).await
     }
 
     /// Look up the issuer's account address.
@@ -115,7 +115,7 @@ impl Cis4Contract {
     ) -> Result<AccountAddress, Cis4QueryError> {
         let parameter = OwnedParameter::empty();
 
-        self.make_query("issuer", parameter, bi).await
+        self.make_query_raw("issuer", parameter, bi).await
     }
 
     /// Register a new credential.
@@ -127,7 +127,7 @@ impl Cis4Contract {
     ) -> Result<TransactionHash, Cis4TransactionError> {
         let parameter = OwnedParameter::from_serial(cred_info)?;
 
-        self.make_call(signer, metadata, "registerCredential", parameter)
+        self.make_call_raw(signer, metadata, "registerCredential", parameter)
             .await
     }
 
@@ -141,7 +141,7 @@ impl Cis4Contract {
     ) -> Result<TransactionHash, Cis4TransactionError> {
         let parameter = OwnedParameter::from_serial(&(cred_id, reason))?;
 
-        self.make_call(signer, metadata, "revokeCredentialIssuer", parameter)
+        self.make_call_raw(signer, metadata, "revokeCredentialIssuer", parameter)
             .await
     }
 
@@ -185,7 +185,7 @@ impl Cis4Contract {
         parameter_vec.extend_from_slice(&to_sign[REVOKE_DOMAIN_STRING.len()..]);
         let parameter = OwnedParameter::try_from(parameter_vec)?;
 
-        self.make_call(signer, metadata, "revokeCredentialHolder", parameter)
+        self.make_call_raw(signer, metadata, "revokeCredentialHolder", parameter)
             .await
     }
 
@@ -232,7 +232,7 @@ impl Cis4Contract {
         parameter_vec.extend_from_slice(&to_sign[REVOKE_DOMAIN_STRING.len()..]);
         let parameter = OwnedParameter::try_from(parameter_vec)?;
 
-        self.make_call(signer, metadata, "revokeCredentialHolder", parameter)
+        self.make_call_raw(signer, metadata, "revokeCredentialHolder", parameter)
             .await
     }
 }
