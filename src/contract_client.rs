@@ -24,9 +24,9 @@ use std::{marker::PhantomData, sync::Arc};
 /// values of this type between multiple tasks.
 #[derive(Debug)]
 pub struct ContractClient<Type> {
-    pub(crate) client:        Client,
-    pub(crate) address:       ContractAddress,
-    pub(crate) contract_name: Arc<contracts_common::OwnedContractName>,
+    pub client:        Client,
+    pub address:       ContractAddress,
+    pub contract_name: Arc<contracts_common::OwnedContractName>,
     phantom:                  PhantomData<Type>,
 }
 
