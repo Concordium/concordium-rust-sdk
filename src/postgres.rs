@@ -16,6 +16,7 @@ use tokio_postgres::{
 pub use tokio_postgres::{Config, Error, NoTls};
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum DatabaseSummaryEntry {
     #[serde(rename = "Left")]
     /// An item that is explicitly included in the block. This is always a
