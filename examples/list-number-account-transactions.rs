@@ -88,7 +88,7 @@ async fn main() -> anyhow::Result<()> {
         async move {
             let bi = client.get_block_info(&AbsoluteBlockHeight::from(n)).await?;
             let v = client
-                .get_block_transaction_events(bh)
+                .get_block_transaction_events(bi.block_hash)
                 .await?
                 .response
                 .map_ok(|e| e.sender_account())

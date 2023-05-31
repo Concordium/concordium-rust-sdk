@@ -44,7 +44,7 @@ pub use http::uri::Scheme;
 use std::{collections::HashMap, num::ParseIntError};
 use tonic::IntoRequest;
 pub use tonic::{
-    transport::{ClientTlsConfig, Endpoint, Error},
+    transport::{Endpoint, Error},
     Code, Status,
 };
 
