@@ -18,8 +18,9 @@ use crate::{
 };
 use concordium_base::{
     base::{
-        ChainParameterVersion0, ChainParameterVersion1, CredentialsPerBlockLimit,
-        ElectionDifficulty, Epoch, ExchangeRate, MintDistributionV0, MintDistributionV1,
+        BlockHeight, ChainParameterVersion0, ChainParameterVersion1, CredentialsPerBlockLimit,
+        ElectionDifficulty, Epoch, ExchangeRate, GenesisIndex, MintDistributionV0,
+        MintDistributionV1,
     },
     common::{
         self,
@@ -29,6 +30,7 @@ use concordium_base::{
         AccountAddress, Amount, ContractAddress, Duration, OwnedContractName, OwnedParameter,
         OwnedReceiveName, ReceiveName,
     },
+    hashes::HashFromStrError,
     transactions::{BlockItem, EncodedPayload, PayloadLike},
     updates::{
         AuthorizationsV0, CooldownParameters, FinalizationCommitteeParameters, GASRewards,
@@ -38,7 +40,8 @@ use concordium_base::{
 };
 pub use endpoints::{QueryError, QueryResult, RPCError, RPCResult};
 use futures::{Stream, StreamExt};
-use std::collections::HashMap;
+pub use http::uri::Scheme;
+use std::{collections::HashMap, num::ParseIntError};
 use tonic::IntoRequest;
 pub use tonic::{
     transport::{Endpoint, Error},
@@ -107,7 +110,7 @@ impl<A> AsRef<A> for QueryResponse<A> {
 }
 
 /// A block identifier used in queries.
-#[derive(Copy, Clone, Debug, derive_more::From)]
+#[derive(Copy, Clone, Debug, derive_more::From, PartialEq, Eq)]
 pub enum BlockIdentifier {
     /// Query in the context of the best block.
     Best,
@@ -126,8 +129,70 @@ pub enum BlockIdentifier {
     RelativeHeight(RelativeBlockHeight),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum BlockIdentifierFromStrError {
+    #[error("The input is not recognized.")]
+    InvalidFormat,
+    #[error("The input is not a valid hash: {0}.")]
+    InvalidHash(#[from] HashFromStrError),
+    #[error("The input is not a valid unsigned integer: {0}.")]
+    InvalidInteger(#[from] ParseIntError),
+}
+
+/// Parse a string as a [`BlockIdentifier`]. The format is one of the following
+///
+/// - the string `best` for [`Best`](BlockIdentifier::Best)
+/// - the string `lastFinal` or `lastfinal` for
+///   [`LastFinal`](BlockIdentifier::LastFinal)
+/// - a valid block hash for [`Given`](BlockIdentifier::Given)
+/// - a string starting with `@` followed by an integer and nothing else for
+///   [`AbsoluteHeight`](BlockIdentifier::AbsoluteHeight)
+/// - a string in the format `@123/3` optionally followed by `!` where `123` is
+///   the block height and `3` is the genesis index for
+///   [`RelativeHeight`](BlockIdentifier::RelativeHeight). If `!` is present
+///   then `restrict` is set to `true`.
+impl std::str::FromStr for BlockIdentifier {
+    type Err = BlockIdentifierFromStrError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "best" => Ok(Self::Best),
+            "lastFinal" => Ok(Self::LastFinal),
+            "lastfinal" => Ok(Self::LastFinal),
+            _ => {
+                if let Some(rest) = s.strip_prefix('@') {
+                    if let Some((height_str, gen_idx_str)) = rest.split_once('/') {
+                        let height = BlockHeight::from_str(height_str)?;
+                        if let Some(gen_idx) = gen_idx_str.strip_suffix('!') {
+                            let genesis_index = GenesisIndex::from_str(gen_idx)?;
+                            Ok(Self::RelativeHeight(RelativeBlockHeight {
+                                genesis_index,
+                                height,
+                                restrict: true,
+                            }))
+                        } else {
+                            let genesis_index = GenesisIndex::from_str(gen_idx_str)?;
+                            Ok(Self::RelativeHeight(RelativeBlockHeight {
+                                genesis_index,
+                                height,
+                                restrict: false,
+                            }))
+                        }
+                    } else {
+                        let h = AbsoluteBlockHeight::from_str(rest)?;
+                        Ok(Self::AbsoluteHeight(h))
+                    }
+                } else {
+                    let h = BlockHash::from_str(s)?;
+                    Ok(Self::Given(h))
+                }
+            }
+        }
+    }
+}
+
 /// Block height relative to an explicit genesis index.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct RelativeBlockHeight {
     /// Genesis index to start from.
     pub genesis_index: types::GenesisIndex,
@@ -2195,6 +2260,37 @@ impl Client {
         Ok(FinalizedBlocksStream { handle, receiver })
     }
 
+    /// Find a block in which the account was created, if it exists and is
+    /// finalized. The return value is a triple of the absolute block height and
+    /// the corresponding block hash, and the account information at the
+    /// end of that block. The block is the first block in which the account
+    /// appears.
+    ///
+    /// Note that this is not necessarily the initial state of the account
+    /// since there can be transactions updating it in the same block that it is
+    /// created.
+    ///
+    /// Optional bounds can be provided, and the search will only
+    /// consider blocks in that range. If the lower bound is not
+    /// provided it defaults to 0, if the upper bound is not provided it
+    /// defaults to the last finalized block at the time of the call.
+    ///
+    /// If the account cannot be found [`QueryError::NotFound`] is returned.
+    pub async fn find_account_creation(
+        &mut self,
+        range: impl std::ops::RangeBounds<AbsoluteBlockHeight>,
+        addr: AccountAddress,
+    ) -> QueryResult<(AbsoluteBlockHeight, BlockHash, AccountInfo)> {
+        self.find_at_lowest_height(range, |mut client, height| async move {
+            match client.get_account_info(&addr.into(), &height).await {
+                Ok(ii) => Ok(Some((height, ii.block_hash, ii.response))),
+                Err(e) if e.is_not_found() => Ok(None),
+                Err(e) => Err(e),
+            }
+        })
+        .await
+    }
+
     /// Find a block in which the instance was created, if it exists and is
     /// finalized. The return value is a triple of the absolute block height and
     /// the corresponding block hash, and the instance information at the
@@ -2210,17 +2306,15 @@ impl Client {
     /// provided it defaults to 0, if the upper bound is not provided it
     /// defaults to the last finalized block at the time of the call.
     ///
-    /// The return value is a pair of the absolute block height, and the hash,
-    /// of the block in which the instance was created. If the instance
-    /// cannot be found [`QueryError::NotFound`] is returned.
+    /// If the instance cannot be found [`QueryError::NotFound`] is returned.
     pub async fn find_instance_creation(
         &mut self,
         range: impl std::ops::RangeBounds<AbsoluteBlockHeight>,
         addr: ContractAddress,
     ) -> QueryResult<(AbsoluteBlockHeight, BlockHash, InstanceInfo)> {
-        self.find_earliest_finalized(range, |mut client, height, bh| async move {
-            match client.get_instance_info(addr, &bh).await {
-                Ok(ii) => Ok(Some((height, bh, ii.response))),
+        self.find_at_lowest_height(range, |mut client, height| async move {
+            match client.get_instance_info(addr, &height).await {
+                Ok(ii) => Ok(Some((height, ii.block_hash, ii.response))),
                 Err(e) if e.is_not_found() => Ok(None),
                 Err(e) => Err(e),
             }
@@ -2240,8 +2334,8 @@ impl Client {
         range: impl std::ops::RangeBounds<AbsoluteBlockHeight>,
         time: chrono::DateTime<chrono::Utc>,
     ) -> QueryResult<types::queries::BlockInfo> {
-        self.find_earliest_finalized(range, move |mut client, _, bh| async move {
-            let info = client.get_block_info(&bh).await?.response;
+        self.find_at_lowest_height(range, move |mut client, height| async move {
+            let info = client.get_block_info(&height).await?.response;
             if info.block_slot_time >= time {
                 Ok(Some(info))
             } else {
@@ -2251,8 +2345,8 @@ impl Client {
         .await
     }
 
-    /// Find a block with lowest height that satisfies the given condition.
-    /// If a block is not found return [`QueryError::NotFound`].
+    /// Find a **finalized** block with lowest height that satisfies the given
+    /// condition. If a block is not found return [`QueryError::NotFound`].
     ///
     /// The `test` method should return `Some` if the object is found in the
     /// block, and `None` otherwise. It can also signal errors which will
@@ -2264,9 +2358,51 @@ impl Client {
     /// If this precondition does not hold then the return value from this
     /// method is unspecified.
     ///
-    /// The search is limited to the given range. If the lower bound is not
-    /// provided it defaults to 0, if the upper bound is not provided it
-    /// defaults to the last finalized block at the time of the call.
+    /// The search is limited to at most the given range, the upper bound is
+    /// always at most the last finalized block at the time of the call. If the
+    /// lower bound is not provided it defaults to 0, if the upper bound is
+    /// not provided it defaults to the last finalized block at the time of
+    /// the call.
+    pub async fn find_at_lowest_height<A, F: futures::Future<Output = QueryResult<Option<A>>>>(
+        &mut self,
+        range: impl std::ops::RangeBounds<AbsoluteBlockHeight>,
+        test: impl Fn(Self, AbsoluteBlockHeight) -> F,
+    ) -> QueryResult<A> {
+        let mut start = match range.start_bound() {
+            std::ops::Bound::Included(s) => u64::from(*s),
+            std::ops::Bound::Excluded(e) => u64::from(*e).saturating_add(1),
+            std::ops::Bound::Unbounded => 0,
+        };
+        let mut end = {
+            let ci = self.get_consensus_info().await?;
+            let bound = |end: u64| std::cmp::min(end, ci.last_finalized_block_height.into());
+            match range.end_bound() {
+                std::ops::Bound::Included(e) => bound(u64::from(*e)),
+                std::ops::Bound::Excluded(e) => {
+                    bound(u64::from(*e).checked_sub(1).ok_or(QueryError::NotFound)?)
+                }
+                std::ops::Bound::Unbounded => u64::from(ci.last_finalized_block_height),
+            }
+        };
+        if end < start {
+            return Err(QueryError::NotFound);
+        }
+        let mut last_found = None;
+        while start < end {
+            let mid = start + (end - start) / 2;
+            let ok = test(self.clone(), mid.into()).await?;
+            if ok.is_some() {
+                end = mid;
+                last_found = ok;
+            } else {
+                start = mid + 1;
+            }
+        }
+        last_found.ok_or(QueryError::NotFound)
+    }
+
+    #[deprecated(note = "Use [`find_at_lowest_height`](./struct.Client.html#method.\
+                         find_at_lowest_height) instead since it avoids an extra call.")]
     pub async fn find_earliest_finalized<A, F: futures::Future<Output = QueryResult<Option<A>>>>(
         &mut self,
         range: impl std::ops::RangeBounds<AbsoluteBlockHeight>,
@@ -2449,5 +2585,56 @@ impl<A> Require<tonic::Status> for Option<A> {
             Some(v) => Ok(v),
             None => Err(tonic::Status::invalid_argument("missing field in response")),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    /// Test the different cases when parsing BlockIdentifiers.
+    fn block_ident_from_str() -> anyhow::Result<()> {
+        let b1 = "best".parse::<BlockIdentifier>()?;
+        assert_eq!(b1, BlockIdentifier::Best);
+
+        let b2 = "lastFinal".parse::<BlockIdentifier>()?;
+        assert_eq!(b2, BlockIdentifier::LastFinal);
+
+        let b3 = "lastfinal".parse::<BlockIdentifier>()?;
+        assert_eq!(b3, BlockIdentifier::LastFinal);
+
+        let b4 = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+            .parse::<BlockIdentifier>()?;
+        assert_eq!(
+            b4,
+            BlockIdentifier::Given(
+                "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".parse()?
+            )
+        );
+
+        let b5 = "@33".parse::<BlockIdentifier>()?;
+        assert_eq!(b5, BlockIdentifier::AbsoluteHeight(33.into()));
+
+        let b6 = "@33/3".parse::<BlockIdentifier>()?;
+        assert_eq!(
+            b6,
+            BlockIdentifier::RelativeHeight(RelativeBlockHeight {
+                genesis_index: 3.into(),
+                height:        33.into(),
+                restrict:      false,
+            })
+        );
+
+        let b7 = "@33/3!".parse::<BlockIdentifier>()?;
+        assert_eq!(
+            b7,
+            BlockIdentifier::RelativeHeight(RelativeBlockHeight {
+                genesis_index: 3.into(),
+                height:        33.into(),
+                restrict:      true,
+            })
+        );
+
+        Ok(())
     }
 }

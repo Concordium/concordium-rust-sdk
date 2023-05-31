@@ -86,12 +86,9 @@ async fn main() -> anyhow::Result<()> {
     let mut blocks = heights.map(|n| {
         let mut client = client.clone();
         async move {
-            let bh = client
-                .get_blocks_at_height(&AbsoluteBlockHeight::from(n).into())
-                .await?[0];
-            let bi = client.get_block_info(bh).await?;
+            let bi = client.get_block_info(&AbsoluteBlockHeight::from(n)).await?;
             let v = client
-                .get_block_transaction_events(bh)
+                .get_block_transaction_events(bi.block_hash)
                 .await?
                 .response
                 .map_ok(|e| e.sender_account())

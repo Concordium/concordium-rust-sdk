@@ -3,7 +3,7 @@ name = "concordium-rust-sdk"
 version = "2.4.0"
 authors = ["Concordium <developers@concordium.com>"]
 edition = "2021"
-rust-version = "1.64"
+rust-version = "1.65"
 license-file = "LICENSE"
 readme = "README.md"
 include = ["src/", "examples/", "CHANGELOG.md"]
@@ -12,7 +12,7 @@ description = "An SDK to use the Concordium blockchain."
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tonic = "0.8"
+tonic = {version = "0.8"}
 prost = "0.11"
 tokio = { version = "1.27", features = ["net"] }
 futures = "0.3"
@@ -33,6 +33,7 @@ num = "0.4"
 num-bigint = "0.4"
 num-traits = "0.2"
 tokio-postgres = { version = "^0.7.8", features = ["with-serde_json-1"], optional = true }
+http = "0.2"
 
 concordium_base = { version = "1.2", path = "./concordium-base/rust-src/concordium_base/", features = ["encryption"] }
 concordium-smart-contract-engine = { version = ">= 1.1.0", path = "./concordium-base/smart-contracts/wasm-chain-integration/", default-features = false, features = ["async"]}
@@ -48,7 +49,6 @@ csv = "1.1"
 tokio = { version = "1.27", features = ["full"] }
 tokio-test = { version = "0.4" }
 tonic = {version = "0.8", features = ["tls", "tls-roots"]} # Use system trust roots.
-http = "0.2"
 
 [[example]]
 name = "postgres"

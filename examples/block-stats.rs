@@ -46,8 +46,8 @@ async fn main() -> anyhow::Result<()> {
     // Find the starting block.
     let mut h = if let Some(start_time) = app.from {
         let b = client
-            .find_earliest_finalized(.., |mut client, _, bh| async move {
-                let bi = client.get_block_info(&bh).await?.response;
+            .find_at_lowest_height(.., |mut client, height| async move {
+                let bi = client.get_block_info(&height).await?.response;
                 Ok(if bi.block_slot_time >= start_time {
                     Some(bi)
                 } else {
