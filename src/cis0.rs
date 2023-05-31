@@ -158,11 +158,11 @@ impl contracts_common::Serial for StandardIdentifier {
             }
             StandardIdentifier::CIS3 => {
                 out.write_u8(5)?; // length
-                out.write_all(b"CIS-2")
+                out.write_all(b"CIS-3")
             }
             StandardIdentifier::CIS4 => {
                 out.write_u8(5)?; // length
-                out.write_all(b"CIS-2")
+                out.write_all(b"CIS-4")
             }
             StandardIdentifier::Other(s) => {
                 out.write_u8(s.len() as u8)?;

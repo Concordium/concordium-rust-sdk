@@ -76,7 +76,7 @@ pub async fn verify_credential_metadata(
             }
             match &cred.value {
                 concordium_base::id::types::AccountCredentialWithoutProofs::Initial { .. } => {
-                    return Err(CredentialLookupError::InitialCredential { cred_id })
+                    Err(CredentialLookupError::InitialCredential { cred_id })
                 }
                 concordium_base::id::types::AccountCredentialWithoutProofs::Normal {
                     cdv,
@@ -153,5 +153,5 @@ pub async fn get_public_data(
             async move { verify_credential_metadata(mainnet_client, network, &meta, block).await }
         })
         .collect::<futures::stream::FuturesOrdered<_>>();
-    Ok(stream.try_collect().await?)
+    stream.try_collect().await
 }

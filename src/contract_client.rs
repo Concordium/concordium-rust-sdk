@@ -1,3 +1,5 @@
+//! This module contains a generic client that provides conveniences for
+//! interacting with any smart contract instance.
 use crate::{
     types::{
         smart_contracts::{self, ContractContext, InvokeContractResult},
@@ -18,7 +20,9 @@ use concordium_base::{
 pub use concordium_base::{cis2_types::MetadataUrl, cis4_types::*};
 use std::{marker::PhantomData, sync::Arc};
 
-/// A CIS4 compatible contract instance.
+/// A contract client that handles some of the boilerplate such as serialization
+/// and parsing of responses when sending transactions, or invoking smart
+/// contracts.
 ///
 /// Note that cloning is cheap and is, therefore, the intended way of sharing
 /// values of this type between multiple tasks.
@@ -40,45 +44,6 @@ impl<Type> Clone for ContractClient<Type> {
         }
     }
 }
-#[derive(thiserror::Error, Debug)]
-/// An error that can occur when executing CIS4 queries.
-pub enum Cis4QueryError {
-    /// The smart contract receive name is invalid.
-    #[error("Invalid receive name: {0}")]
-    InvalidReceiveName(#[from] contracts_common::NewReceiveNameError),
-
-    /// A general RPC error occured.
-    #[error("RPC error: {0}")]
-    RPCError(#[from] super::v2::QueryError),
-
-    /// The data returned from q query could not be parsed.
-    #[error("Failed parsing the response.")]
-    ResponseParseError(#[from] contracts_common::ParseError),
-
-    /// The node rejected the invocation.
-    #[error("Rejected by the node: {0:?}.")]
-    NodeRejected(crate::types::RejectReason),
-}
-
-#[derive(thiserror::Error, Debug)]
-/// An error that can occur when sending CIS4 update transactions.
-pub enum Cis4TransactionError {
-    /// The smart contract receive name is invalid.
-    #[error("Invalid receive name: {0}")]
-    InvalidReceiveName(#[from] contracts_common::NewReceiveNameError),
-
-    /// The parameter is too large.
-    #[error("Parameter is too large: {0}")]
-    InvalidParams(#[from] ExceedsParameterSize),
-
-    /// A general RPC error occured.
-    #[error("RPC error: {0}")]
-    RPCError(#[from] super::v2::RPCError),
-
-    /// The node rejected the invocation.
-    #[error("Rejected by the node: {0:?}.")]
-    NodeRejected(crate::types::RejectReason),
-}
 
 /// Transaction metadata for CIS-4 update transactions.
 #[derive(Debug, Clone, Copy)]
@@ -96,6 +61,8 @@ pub struct ContractTransactionMetadata {
 }
 
 #[derive(Debug, thiserror::Error)]
+/// An error that can be used as the error for the
+/// [`view`](ContractClient::view) family of functions.
 pub enum ViewError {
     #[error("Invalid receive name: {0}")]
     InvalidName(#[from] NewReceiveNameError),
@@ -124,43 +91,42 @@ impl<Type> ContractClient<Type> {
         let ci = client
             .get_instance_info(address, BlockIdentifier::LastFinal)
             .await?;
-        Self::new(client, address, ci.response.name().clone())
+        Ok(Self::new(client, address, ci.response.name().clone()))
     }
 
-    /// Construct a [`ContractClient`] locally.
+    /// Construct a [`ContractClient`] locally. In comparison to
+    /// [`create`](Self::create) this always succeeds and does not check
+    /// existence of the contract.
     ///
     /// # Arguments
     ///
     /// * `client` - The RPC client for the concordium node. Note that cloning
     ///   [`Client`] is cheap and is therefore the intended way of sharing.
-    /// * `address` - The contract address of the CIS4 registry smart contract.
+    /// * `address` - The contract address of the smart contract.
     /// * `contract_name` - The name of the contract. This must match the name
     ///   on the chain,
     /// otherwise the constructed client will not work.
-    pub fn new(
-        client: Client,
-        address: ContractAddress,
-        contract_name: OwnedContractName,
-    ) -> v2::QueryResult<Self> {
-        Ok(Self {
+    pub fn new(client: Client, address: ContractAddress, contract_name: OwnedContractName) -> Self {
+        Self {
             client,
             address,
             contract_name: Arc::new(contract_name),
             phantom: PhantomData,
-        })
+        }
     }
 
-    pub async fn view<R: contracts_common::Deserial>(
-        &mut self,
-        entrypoint: &str,
-        input: &impl contracts_common::Serial,
-        bi: impl v2::IntoBlockIdentifier,
-    ) -> Result<R, ViewError> {
-        let parameter = OwnedParameter::from_serial(input)?;
-        self.make_query_raw(entrypoint, parameter, bi).await
-    }
-
-    pub async fn make_query<P: contracts_common::Serial, A: contracts_common::Deserial, E>(
+    /// Invoke a contract and return the response.
+    ///
+    /// This will always fail for a V0 contract, and for V1 contracts it will
+    /// attempt to deserialize the response into the provided type `A`.
+    ///
+    /// The error `E` is left generic in order to support specialized errors
+    /// such as CIS2 or CIS4 specific errors for more specialized view functions
+    /// defined by those standards.
+    ///
+    /// For a general contract [`ViewError`] can be used as a concrete error
+    /// type `E`.
+    pub async fn view<P: contracts_common::Serial, A: contracts_common::Deserial, E>(
         &mut self,
         entrypoint: &str,
         parameter: &P,
@@ -173,10 +139,11 @@ impl<Type> ContractClient<Type> {
             + From<v2::QueryError>
             + From<ExceedsParameterSize>, {
         let parameter = OwnedParameter::from_serial(parameter)?;
-        self.make_query_raw::<A, E>(entrypoint, parameter, bi).await
+        self.view_raw::<A, E>(entrypoint, parameter, bi).await
     }
 
-    pub async fn make_query_raw<A: contracts_common::Deserial, E>(
+    /// Like [`view`](Self::view) but expects an already serialized parameter.
+    pub async fn view_raw<A: contracts_common::Deserial, E>(
         &mut self,
         entrypoint: &str,
         parameter: OwnedParameter,
@@ -188,7 +155,7 @@ impl<Type> ContractClient<Type> {
             + From<contracts_common::ParseError>
             + From<v2::QueryError>, {
         let ir = self
-            .make_invoke::<E>(entrypoint, Amount::zero(), None, parameter, bi)
+            .invoke_raw::<E>(entrypoint, Amount::zero(), None, parameter, bi)
             .await?;
         match ir {
             smart_contracts::InvokeContractResult::Success { return_value, .. } => {
@@ -201,7 +168,9 @@ impl<Type> ContractClient<Type> {
         }
     }
 
-    pub async fn make_invoke<E>(
+    /// Invoke a contract instance and return the response without any
+    /// processing.
+    pub async fn invoke_raw<E>(
         &mut self,
         entrypoint: &str,
         amount: Amount,
@@ -227,7 +196,8 @@ impl<Type> ContractClient<Type> {
         Ok(invoke_result)
     }
 
-    pub async fn make_call<P: contracts_common::Serial, E>(
+    /// Send a transaction with the specified parameter.
+    pub async fn update<P: contracts_common::Serial, E>(
         &mut self,
         signer: &impl transactions::ExactSizeTransactionSigner,
         metadata: &ContractTransactionMetadata,
@@ -237,11 +207,12 @@ impl<Type> ContractClient<Type> {
     where
         E: From<NewReceiveNameError> + From<v2::RPCError> + From<ExceedsParameterSize>, {
         let message = OwnedParameter::from_serial(message)?;
-        self.make_call_raw::<E>(signer, metadata, entrypoint, message)
+        self.update_raw::<E>(signer, metadata, entrypoint, message)
             .await
     }
 
-    pub async fn make_call_raw<E>(
+    /// Like [`update`](Self::update) but expects a serialized parameter.
+    pub async fn update_raw<E>(
         &mut self,
         signer: &impl transactions::ExactSizeTransactionSigner,
         metadata: &ContractTransactionMetadata,

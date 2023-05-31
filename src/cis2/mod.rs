@@ -143,7 +143,7 @@ impl Cis2Contract {
         let parameter = smart_contracts::OwnedParameter::from_serial(&parameter)
             .map_err(|_| Cis2DryRunError::InvalidTransferParams(NewTransferParamsError))?;
         let ir = self
-            .make_invoke::<Cis2DryRunError>("transfer", Amount::zero(), Some(sender), parameter, bi)
+            .invoke_raw::<Cis2DryRunError>("transfer", Amount::zero(), Some(sender), parameter, bi)
             .await?;
         match ir {
             smart_contracts::InvokeContractResult::Success { used_energy, .. } => Ok(used_energy),
@@ -181,7 +181,7 @@ impl Cis2Contract {
         let parameter = TransferParams::new(transfers)?;
         let message = smart_contracts::OwnedParameter::from_serial(&parameter)
             .map_err(|_| Cis2TransactionError::InvalidTransferParams(NewTransferParamsError))?;
-        self.make_call_raw(signer, &transaction_metadata, "transfer", message)
+        self.update_raw(signer, &transaction_metadata, "transfer", message)
             .await
     }
 
@@ -217,10 +217,10 @@ impl Cis2Contract {
         let parameter = smart_contracts::OwnedParameter::from_serial(&parameter)
             .map_err(|_| Cis2DryRunError::InvalidTransferParams(NewTransferParamsError))?;
         let ir = self
-            .make_invoke::<Cis2DryRunError>(
+            .invoke_raw::<Cis2DryRunError>(
                 "updateOperator",
                 Amount::zero(),
-                Some(owner.into()),
+                Some(owner),
                 parameter,
                 bi,
             )
@@ -265,7 +265,7 @@ impl Cis2Contract {
         let message = smart_contracts::OwnedParameter::from_serial(&parameter).map_err(|_| {
             Cis2TransactionError::InvalidUpdateOperatorParams(NewUpdateOperatorParamsError)
         })?;
-        self.make_call_raw(signer, &transaction_metadata, "updateOperator", message)
+        self.update_raw(signer, &transaction_metadata, "updateOperator", message)
             .await
     }
 
@@ -303,7 +303,7 @@ impl Cis2Contract {
         let parameter = BalanceOfQueryParams::new(queries)?;
         let parameter = smart_contracts::OwnedParameter::from_serial(&parameter)
             .map_err(|_| Cis2QueryError::InvalidBalanceOfParams(NewBalanceOfQueryParamsError))?;
-        self.make_query_raw("balanceOf", parameter, bi).await
+        self.view_raw("balanceOf", parameter, bi).await
     }
 
     /// Like [`balance_of`](Self::balance_of), except for querying a single
@@ -339,7 +339,7 @@ impl Cis2Contract {
         let parameter = OperatorOfQueryParams::new(queries)?;
         let parameter = smart_contracts::OwnedParameter::from_serial(&parameter)
             .map_err(|_| Cis2QueryError::InvalidOperatorOfParams(NewOperatorOfQueryParamsError))?;
-        self.make_query_raw("operatorOf", parameter, bi).await
+        self.view_raw("operatorOf", parameter, bi).await
     }
 
     /// Like [`operator_of`](Self::operator_of), except for querying a single
@@ -379,7 +379,7 @@ impl Cis2Contract {
         let parameter = smart_contracts::OwnedParameter::from_serial(&parameter).map_err(|_| {
             Cis2QueryError::InvalidTokenMetadataParams(NewTokenMetadataQueryParamsError)
         })?;
-        self.make_query_raw("tokenMetadata", parameter, bi).await
+        self.view_raw("tokenMetadata", parameter, bi).await
     }
 
     /// Like [`token_metadata`](Self::token_metadata), except for querying a
