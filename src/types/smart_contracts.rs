@@ -258,6 +258,16 @@ pub enum InvokeContractResult {
     },
 }
 
+impl InvokeContractResult {
+    /// Retrieve the amount of energy used for the call.
+    pub fn used_energy(&self) -> Energy {
+        match self {
+            InvokeContractResult::Success { used_energy, .. } => *used_energy,
+            InvokeContractResult::Failure { used_energy, .. } => *used_energy,
+        }
+    }
+}
+
 mod contract_trace_via_events {
     use super::*;
     use serde::de::Error;
