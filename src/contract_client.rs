@@ -27,7 +27,7 @@ pub struct ContractClient<Type> {
     pub client:        Client,
     pub address:       ContractAddress,
     pub contract_name: Arc<contracts_common::OwnedContractName>,
-    phantom:                  PhantomData<Type>,
+    phantom:           PhantomData<Type>,
 }
 
 impl<Type> Clone for ContractClient<Type> {
@@ -170,7 +170,8 @@ impl<Type> ContractClient<Type> {
         E: From<NewReceiveNameError>
             + From<RejectReason>
             + From<contracts_common::ParseError>
-            + From<v2::QueryError> + From<ExceedsParameterSize>, {
+            + From<v2::QueryError>
+            + From<ExceedsParameterSize>, {
         let parameter = OwnedParameter::from_serial(parameter)?;
         self.make_query_raw::<A, E>(entrypoint, parameter, bi).await
     }
@@ -236,7 +237,8 @@ impl<Type> ContractClient<Type> {
     where
         E: From<NewReceiveNameError> + From<v2::RPCError> + From<ExceedsParameterSize>, {
         let message = OwnedParameter::from_serial(message)?;
-        self.make_call_raw::<E>(signer, metadata, entrypoint, message).await
+        self.make_call_raw::<E>(signer, metadata, entrypoint, message)
+            .await
     }
 
     pub async fn make_call_raw<E>(

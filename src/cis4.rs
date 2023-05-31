@@ -5,6 +5,7 @@ use crate::{
 };
 pub use concordium_base::{cis2_types::MetadataUrl, cis4_types::*};
 use concordium_base::{
+    constants::MAX_PARAMETER_LEN,
     contracts_common::{self, AccountAddress},
     hashes::TransactionHash,
     smart_contracts::{ExceedsParameterSize, OwnedParameter},
@@ -124,9 +125,22 @@ impl Cis4Contract {
         signer: &impl transactions::ExactSizeTransactionSigner,
         metadata: &Cis4TransactionMetadata,
         cred_info: &CredentialInfo,
+        additional_data: &[u8],
     ) -> Result<TransactionHash, Cis4TransactionError> {
-        let parameter = OwnedParameter::from_serial(cred_info)?;
-
+        use contracts_common::Serial;
+        let mut payload = contracts_common::to_bytes(cred_info);
+        let actual = payload.len() + additional_data.len() + 2;
+        if payload.len() + additional_data.len() + 2 > MAX_PARAMETER_LEN {
+            return Err(Cis4TransactionError::InvalidParams(ExceedsParameterSize {
+                actual,
+                max: MAX_PARAMETER_LEN,
+            }));
+        }
+        (additional_data.len() as u16)
+            .serial(&mut payload)
+            .expect("We checked lengths above, so this must succeed.");
+        payload.extend_from_slice(additional_data);
+        let parameter = OwnedParameter::try_from(payload)?;
         self.make_call_raw(signer, metadata, "registerCredential", parameter)
             .await
     }
