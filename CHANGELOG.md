@@ -11,6 +11,8 @@
 - Deprecate `find_earliest_finalized` and replace it with
   `find_at_lowest_height` that avoids an extra call to the node. This is making
   use of the new API.
+- Re-export `http::Scheme` from `http` crate since it is often needed when
+  configuring endpoints.
 
 ## 2.4.0
 
