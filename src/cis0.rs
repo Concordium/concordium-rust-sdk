@@ -102,6 +102,8 @@ pub enum StandardIdentifier {
     CIS0,
     CIS1,
     CIS2,
+    CIS3,
+    CIS4,
     Other(String),
 }
 
@@ -111,6 +113,8 @@ impl std::fmt::Display for StandardIdentifier {
             StandardIdentifier::CIS0 => f.write_str("CIS-0"),
             StandardIdentifier::CIS1 => f.write_str("CIS-1"),
             StandardIdentifier::CIS2 => f.write_str("CIS-2"),
+            StandardIdentifier::CIS3 => f.write_str("CIS-3"),
+            StandardIdentifier::CIS4 => f.write_str("CIS-4"),
             StandardIdentifier::Other(s) => f.write_str(s),
         }
     }
@@ -129,6 +133,8 @@ impl std::str::FromStr for StandardIdentifier {
             "CIS-0" => Ok(Self::CIS0),
             "CIS-1" => Ok(Self::CIS1),
             "CIS-2" => Ok(Self::CIS2),
+            "CIS-3" => Ok(Self::CIS3),
+            "CIS-4" => Ok(Self::CIS4),
             other if other.is_ascii() && other.len() <= 255 => Ok(Self::Other(other.into())),
             _ => Err(InvalidStandardName),
         }
@@ -149,6 +155,14 @@ impl contracts_common::Serial for StandardIdentifier {
             StandardIdentifier::CIS2 => {
                 out.write_u8(5)?; // length
                 out.write_all(b"CIS-2")
+            }
+            StandardIdentifier::CIS3 => {
+                out.write_u8(5)?; // length
+                out.write_all(b"CIS-3")
+            }
+            StandardIdentifier::CIS4 => {
+                out.write_u8(5)?; // length
+                out.write_all(b"CIS-4")
             }
             StandardIdentifier::Other(s) => {
                 out.write_u8(s.len() as u8)?;
