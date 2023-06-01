@@ -13,6 +13,8 @@
   use of the new API.
 - Re-export `http::Scheme` from `http` crate since it is often needed when
   configuring endpoints.
+- Add a new `ContractClient` that supports operations on smart contract
+  instances such as queries and updates.
 
 ## 2.4.0
 
