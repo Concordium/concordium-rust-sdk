@@ -1,3 +1,5 @@
+//! Functionality for retrieving and verifying web3id credentials.
+
 pub use concordium_base::web3id::*;
 use concordium_base::{
     base::CredentialRegistrationID,
@@ -44,11 +46,33 @@ pub enum CredentialLookupError {
     InvalidResponse(String),
 }
 
+/// The public cryptographic data of a credential together with its current
+/// status.
 pub struct CredentialWithMetadata {
+    /// The status of the credential at a point in time.
     pub status:      CredentialStatus,
+    /// The commitments of the credential.
     pub commitments: CredentialsInputs<ArCurve>,
 }
 
+/// Retrieve and validate credential metadata in a particular block.
+///
+/// This does not validate the cryptographic proofs, only the metadata. In
+/// particular it checks.
+///
+/// - credential exists
+/// - the credential's network is as supplied to this function
+/// - in case of account credentials, the credential issuer is as stated in the
+///   proof
+/// - credential commitments can be correctly parsed
+/// - credential is active and not expired at the timestamp of the supplied
+///   block
+/// - in case of an account credential, the credential is a normal credential,
+///   and not initial.
+///
+/// For web3id credentials the issuer contract is the source of truth, and this
+/// function does not perform additional validity checks apart from querying the
+/// contract.
 pub async fn verify_credential_metadata(
     mut client: v2::Client,
     network: web3id::did::Network,
@@ -59,7 +83,6 @@ pub async fn verify_credential_metadata(
         return Err(CredentialLookupError::IncorrectNetwork);
     }
     let bi = bi.into_block_identifier();
-    // TODO
     match metadata.cred_metadata {
         CredentialMetadata::Account { issuer, cred_id } => {
             let ai = client
@@ -82,7 +105,7 @@ pub async fn verify_credential_metadata(
                     cdv,
                     commitments,
                 } => {
-                    let now = chrono::Utc::now();
+                    let now = client.get_block_info(bi).await?.response.block_slot_time;
                     let valid_from = cdv.policy.created_at.lower().ok_or_else(|| {
                         CredentialLookupError::InvalidResponse(
                             "Credential creation date is not valid.".into(),
@@ -139,6 +162,9 @@ pub async fn verify_credential_metadata(
 ///
 /// If any credentials from the presentation are from a network different than
 /// the one supplied an error is returned.
+///
+/// See [`verify_credential_metadata`] for the checks performed on each of the
+/// credentials.
 pub async fn get_public_data(
     client: &mut v2::Client,
     network: web3id::did::Network,
