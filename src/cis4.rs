@@ -174,7 +174,7 @@ impl Cis4Contract {
     ) -> Result<TransactionHash, Cis4TransactionError> {
         use contracts_common::Serial;
         let mut to_sign = REVOKE_DOMAIN_STRING.to_vec();
-        let cred_id = web3signer.id();
+        let cred_id: CredentialHolderId = web3signer.id().into();
         cred_id
             .serial(&mut to_sign)
             .expect("Serialization to vector does not fail.");
@@ -212,9 +212,8 @@ impl Cis4Contract {
         &mut self,
         signer: &impl transactions::ExactSizeTransactionSigner,
         metadata: &Cis4TransactionMetadata,
-        web3signer: impl Web3IdSigner, // the revoker.
+        revoker: impl Web3IdSigner, // the revoker.
         nonce: u64,
-        key: RevocationKey,
         cred_id: CredentialHolderId,
         reason: Option<&Reason>,
     ) -> Result<TransactionHash, Cis4TransactionError> {
@@ -236,12 +235,13 @@ impl Cis4Contract {
             .unwrap_or(u64::MAX)
             .serial(&mut to_sign)
             .expect("Serialization to vector does not fail.");
-        key.serial(&mut to_sign)
+        RevocationKey::from(revoker.id())
+            .serial(&mut to_sign)
             .expect("Serialization to vector does not fail.");
         reason
             .serial(&mut to_sign)
             .expect("Serialization to vector does not fail.");
-        let sig = web3signer.sign(&to_sign);
+        let sig = revoker.sign(&to_sign);
         let mut parameter_vec = sig.to_bytes().to_vec();
         parameter_vec.extend_from_slice(&to_sign[REVOKE_DOMAIN_STRING.len()..]);
         let parameter = OwnedParameter::try_from(parameter_vec)?;
