@@ -15,6 +15,9 @@
   configuring endpoints.
 - Add a new `ContractClient` that supports operations on smart contract
   instances such as queries and updates.
+- Add a `Cis4Contract` for interacting with Cis4 contracts.
+- Add a new `web3id` module that contains types and functionality for
+  construcing Web3ID credentials and verifying Web3ID proofs.
 
 ## 2.4.0
 

@@ -2,7 +2,7 @@
 //! contracts following the [CIS-2](https://proposals.concordium.software/CIS/cis-2.html) specification.
 //!
 //! The type [`Cis2Contract`](crate::cis2::Cis2Contract) act as a wrapper around
-//! the [Client](crate::endpoints::Client) and a contract address providing
+//! the [Client](crate::v2::Client) and a contract address providing
 //! functions for querying and making transactions to smart contract.
 mod types;
 
@@ -23,7 +23,7 @@ pub use types::*;
 pub enum Cis2Type {}
 
 /// A wrapper around the client representing a CIS2 token smart contract, which
-/// provides functions for interaction.
+/// provides functions for interaction specific to CIS2 contracts.
 ///
 /// Note that cloning is cheap and is, therefore, the intended way of sharing
 /// this type between multiple tasks.
