@@ -66,10 +66,18 @@ pub enum Cis4TransactionError {
 /// Transaction metadata for CIS-4 update transactions.
 pub type Cis4TransactionMetadata = ContractTransactionMetadata;
 
-#[doc(hidden)]
 #[derive(Debug, Clone, Copy)]
+/// A marker type to indicate that a [`ContractClient`] is a client for a `CIS4`
+/// contract.
 pub enum Cis4Type {}
 
+/// A wrapper around the client representing a CIS4 credential registry smart
+/// contract.
+///
+/// Note that cloning is cheap and is, therefore, the intended way of sharing
+/// this type between multiple tasks.
+///
+/// See also [`ContractClient`] for generic methods available for any contract.
 pub type Cis4Contract = ContractClient<Cis4Type>;
 
 impl Cis4Contract {

@@ -23,7 +23,7 @@ pub use types::*;
 pub enum Cis2Type {}
 
 /// A wrapper around the client representing a CIS2 token smart contract, which
-/// provides functions for interaction.
+/// provides functions for interaction specific to CIS2 contracts.
 ///
 /// Note that cloning is cheap and is, therefore, the intended way of sharing
 /// this type between multiple tasks.
