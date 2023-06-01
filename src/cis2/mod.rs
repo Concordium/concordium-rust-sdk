@@ -17,8 +17,9 @@ use std::convert::From;
 use thiserror::*;
 pub use types::*;
 
-#[doc(hidden)]
 #[derive(Debug, Clone, Copy)]
+/// A marker type to indicate that a [`ContractClient`] is a client for a `CIS2`
+/// contract.
 pub enum Cis2Type {}
 
 /// A wrapper around the client representing a CIS2 token smart contract, which
@@ -26,6 +27,8 @@ pub enum Cis2Type {}
 ///
 /// Note that cloning is cheap and is, therefore, the intended way of sharing
 /// this type between multiple tasks.
+///
+/// See also [`ContractClient`] for generic methods available for any contract.
 pub type Cis2Contract = ContractClient<Cis2Type>;
 
 /// Error which can occur when submitting a transaction such as `transfer` and
