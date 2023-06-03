@@ -1113,7 +1113,8 @@ impl BlockItemSummary {
     /// logs that were produced.
     pub fn contract_update_logs(
         &self,
-    ) -> Option<impl Iterator<Item = (ContractAddress, &[smart_contracts::ContractEvent])>> {
+    ) -> Option<impl Iterator<Item = (ContractAddress, &[smart_contracts::ContractEvent])> + '_>
+    {
         if let BlockItemSummaryDetails::AccountTransaction(at) = &self.details {
             match &at.effects {
                 AccountTransactionEffects::ContractInitialized { .. } => None,
