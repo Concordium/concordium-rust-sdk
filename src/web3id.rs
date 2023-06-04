@@ -216,7 +216,7 @@ pub mod storage {
         }
     }
 
-    #[derive(concordium_std::Serial, concordium_std::Deserial, PartialEq)]
+    #[derive(concordium_std::Serial, concordium_std::Deserial, Eq, PartialEq)]
     /// The credential stored in the credential storage contract.
     pub struct VersionedEncryptedCredential {
         /// Metadata associated with the credential.
