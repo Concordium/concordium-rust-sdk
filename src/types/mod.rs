@@ -318,8 +318,8 @@ pub struct AccountInfo {
     #[serde(default)]
     /// `Some` if and only if the account is a baker or delegator. In that case
     /// it is the information about the baker or delegator.
-    // this is a bit of a hacky way of JSON parsing, and **relies** on
-    // the account staking info serde instance being "untagged"
+    /// this is a bit of a hacky way of JSON parsing, and **relies** on
+    /// the account staking info serde instance being "untagged"
     #[serde(rename = "accountBaker", alias = "accountDelegation")]
     pub account_stake:            Option<AccountStakingInfo>,
     /// Canonical address of the account.
