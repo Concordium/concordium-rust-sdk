@@ -219,7 +219,7 @@ pub mod storage {
     #[derive(concordium_std::Serial, concordium_std::Deserial, Eq, PartialEq)]
     /// The credential stored in the credential storage contract.
     pub struct VersionedEncryptedCredential {
-        /// Metadata associated with the credential.
+        /// Version of the encrypted credential.
         version:              u16,
         /// The encrypted credential.
         encrypted_credential: Vec<u8>,
@@ -283,7 +283,7 @@ pub mod storage {
         pub timestamp:            Timestamp,
         /// The contract_address that the signature is intended for.
         pub contract_address:     ContractAddress,
-        /// Metadata associated with the credential.
+        /// Version of the encrypted credential.
         pub version:              u16,
         /// The serialized encrypted_credential.
         #[concordium(size_length = 2)]
