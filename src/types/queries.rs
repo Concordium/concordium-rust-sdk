@@ -130,7 +130,7 @@ pub struct ConsensusInfo {
     /// verified and added to the node's tree.
     pub block_last_arrived_time:        Option<chrono::DateTime<chrono::Utc>>,
     /// Hash of the current best block. The best block is a protocol defined
-    /// block that the node must use a parent block to build the chain on.
+    /// block that the node must use as parent block to build the chain on.
     /// Note that this is subjective, in the sense that it is only the best
     /// block among the blocks the node knows about.
     pub best_block:                     BlockHash,
