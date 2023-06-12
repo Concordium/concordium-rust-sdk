@@ -25,7 +25,9 @@ pub(crate) mod byte_array_hex {
     }
 
     /// Deserialize (via Serde) chrono::Duration in milliseconds as an i64.
-    pub fn deserialize<'de, D: serde::Deserializer<'de>>(des: D) -> Result<Vec<u8>, D::Error> {
+    pub fn deserialize<'de, D: serde::Deserializer<'de>, R: TryFrom<Vec<u8>>>(
+        des: D,
+    ) -> Result<R, D::Error> {
         struct HexVisitor;
         impl<'de> serde::de::Visitor<'de> for HexVisitor {
             type Value = Vec<u8>;
@@ -41,7 +43,10 @@ pub(crate) mod byte_array_hex {
                 Ok(r)
             }
         }
-        des.deserialize_str(HexVisitor)
+        let r = des.deserialize_str(HexVisitor)?;
+        r.try_into().map_err(|_| {
+            serde::de::Error::custom("Unable to convert from Vec<u8> to the target type.")
+        })
     }
 }
 
