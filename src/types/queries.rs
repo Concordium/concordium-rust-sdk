@@ -34,7 +34,8 @@ pub struct BlockInfo {
     /// The total energy consumption of transactions in the block.
     pub transaction_energy_cost: Energy,
     /// Slot number of the slot the block is in.
-    pub block_slot:              Slot,
+    /// This is only present up to protocol 5.
+    pub block_slot:              Option<Slot>,
     /// Pointer to the last finalized block. Each block has a pointer to a
     /// specific finalized block that existed at the time the block was
     /// produced.
@@ -56,6 +57,10 @@ pub struct BlockInfo {
     pub block_baker:             Option<BakerId>,
     /// Protocol version to which the block belongs.
     pub protocol_version:        ProtocolVersion,
+    /// The round of the block. Present from protocol version 6.
+    pub round:                   Option<Round>,
+    /// The epoch of the block. Present from protocol version 6.
+    pub epoch:                   Option<Epoch>,
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize)]
@@ -103,7 +108,7 @@ pub struct ConsensusInfo {
     /// produces count towards this, but are not received.
     pub blocks_verified_count:          u64,
     /// Duration of a slot.
-    pub slot_duration:                  SlotDuration,
+    pub slot_duration:                  Option<SlotDuration>,
     /// Slot time of the genesis block.
     pub genesis_time:                   chrono::DateTime<chrono::Utc>,
     /// Exponential moving average standard deviation of the time between
@@ -151,6 +156,27 @@ pub struct ConsensusInfo {
     pub current_era_genesis_block:      BlockHash,
     /// Time when the current era started.
     pub current_era_genesis_time:       chrono::DateTime<chrono::Utc>,
+    #[serde(flatten)]
+    /// Parameters that apply from protocol 6 onward. This is present if and
+    /// only if the `protocol_version` is [`ProtocolVersion::P6`] or later.
+    pub bft_parameters:                 Option<ConcordiumBFTDetails>,
+}
+
+/// Parameters pertaining to the Concordium BFT consensus.
+#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ConcordiumBFTDetails {
+    /// The current duration to wait before a round times out.
+    #[serde(with = "crate::internal::duration_millis")]
+    pub current_timeout_duration: chrono::Duration,
+    /// The current round.
+    pub current_round:            Round,
+    /// The current epoch.
+    pub current_epoch:            Epoch,
+    /// The first block in the epoch with timestamp at least this is considered
+    /// to be the trigger block for the epoch transition.
+    pub trigger_block_time:       chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, PartialEq, Eq)]
