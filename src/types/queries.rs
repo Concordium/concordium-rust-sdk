@@ -324,7 +324,7 @@ pub enum PendingUpdateEffect {
     FinalizationCommitteeParameters(FinalizationCommitteeParameters),
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct NextUpdateSequenceNumbers {
     /// Updates to the root keys.
     pub root_keys: UpdateSequenceNumber,
