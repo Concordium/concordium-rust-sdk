@@ -2654,7 +2654,7 @@ impl TryFrom<ElectionInfo> for super::types::BirkParameters {
 
     fn try_from(info: ElectionInfo) -> Result<Self, Self::Error> {
         Ok(Self {
-            election_difficulty: info.election_difficulty.require()?.try_into()?,
+            election_difficulty: info.election_difficulty.map(|x| x.try_into()).transpose()?,
             election_nonce:      info.election_nonce.require()?.try_into()?,
             bakers:              info
                 .baker_election_info
