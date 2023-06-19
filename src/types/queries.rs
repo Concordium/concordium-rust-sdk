@@ -156,10 +156,10 @@ pub struct ConsensusInfo {
     pub current_era_genesis_block:      BlockHash,
     /// Time when the current era started.
     pub current_era_genesis_time:       chrono::DateTime<chrono::Utc>,
-    #[serde(flatten)]
     /// Parameters that apply from protocol 6 onward. This is present if and
     /// only if the `protocol_version` is [`ProtocolVersion::P6`] or later.
-    pub bft_parameters:                 Option<ConcordiumBFTDetails>,
+    #[serde(rename = "concordiumBFTStatus")]
+    pub concordium_bft_status:          Option<ConcordiumBFTDetails>,
 }
 
 /// Parameters pertaining to the Concordium BFT consensus.

@@ -2183,7 +2183,7 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
             genesis_index: value.genesis_index.require()?.into(),
             current_era_genesis_block: value.current_era_genesis_block.require()?.try_into()?,
             current_era_genesis_time: value.current_era_genesis_time.require()?.try_into()?,
-            bft_parameters: if protocol_version <= super::types::ProtocolVersion::P5 {
+            concordium_bft_status: if protocol_version <= super::types::ProtocolVersion::P5 {
                 None
             } else {
                 Some(ConcordiumBFTDetails {
