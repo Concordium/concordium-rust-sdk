@@ -3112,22 +3112,29 @@ impl TryFrom<NextUpdateSequenceNumbers> for super::types::queries::NextUpdateSeq
 
     fn try_from(message: NextUpdateSequenceNumbers) -> Result<Self, Self::Error> {
         Ok(Self {
-            root_keys:                    message.root_keys.require()?.into(),
-            level_1_keys:                 message.level1_keys.require()?.into(),
-            level_2_keys:                 message.level2_keys.require()?.into(),
-            protocol:                     message.protocol.require()?.into(),
-            election_difficulty:          message.election_difficulty.require()?.into(),
-            euro_per_energy:              message.euro_per_energy.require()?.into(),
-            micro_ccd_per_euro:           message.micro_ccd_per_euro.require()?.into(),
-            foundation_account:           message.foundation_account.require()?.into(),
-            mint_distribution:            message.mint_distribution.require()?.into(),
+            root_keys: message.root_keys.require()?.into(),
+            level_1_keys: message.level1_keys.require()?.into(),
+            level_2_keys: message.level2_keys.require()?.into(),
+            protocol: message.protocol.require()?.into(),
+            election_difficulty: message.election_difficulty.require()?.into(),
+            euro_per_energy: message.euro_per_energy.require()?.into(),
+            micro_ccd_per_euro: message.micro_ccd_per_euro.require()?.into(),
+            foundation_account: message.foundation_account.require()?.into(),
+            mint_distribution: message.mint_distribution.require()?.into(),
             transaction_fee_distribution: message.transaction_fee_distribution.require()?.into(),
-            gas_rewards:                  message.gas_rewards.require()?.into(),
-            pool_parameters:              message.pool_parameters.require()?.into(),
-            add_anonymity_revoker:        message.add_anonymity_revoker.require()?.into(),
-            add_identity_provider:        message.add_identity_provider.require()?.into(),
-            cooldown_parameters:          message.cooldown_parameters.require()?.into(),
-            time_parameters:              message.time_parameters.require()?.into(),
+            gas_rewards: message.gas_rewards.require()?.into(),
+            pool_parameters: message.pool_parameters.require()?.into(),
+            add_anonymity_revoker: message.add_anonymity_revoker.require()?.into(),
+            add_identity_provider: message.add_identity_provider.require()?.into(),
+            cooldown_parameters: message.cooldown_parameters.require()?.into(),
+            time_parameters: message.time_parameters.require()?.into(),
+            timeout_parameters: message.timeout_parameters.require()?.into(),
+            min_block_time: message.min_block_time.require()?.into(),
+            block_energy_limit: message.block_energy_limit.require()?.into(),
+            finalization_committee_parameters: message
+                .finalization_committee_parameters
+                .require()?
+                .into(),
         })
     }
 }

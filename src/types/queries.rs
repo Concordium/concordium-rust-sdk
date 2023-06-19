@@ -326,20 +326,44 @@ pub enum PendingUpdateEffect {
 
 #[derive(Debug, Copy, Clone)]
 pub struct NextUpdateSequenceNumbers {
-    pub root_keys:                    UpdateSequenceNumber,
-    pub level_1_keys:                 UpdateSequenceNumber,
-    pub level_2_keys:                 UpdateSequenceNumber,
-    pub protocol:                     UpdateSequenceNumber,
-    pub election_difficulty:          UpdateSequenceNumber,
-    pub euro_per_energy:              UpdateSequenceNumber,
-    pub micro_ccd_per_euro:           UpdateSequenceNumber,
-    pub foundation_account:           UpdateSequenceNumber,
-    pub mint_distribution:            UpdateSequenceNumber,
+    /// Updates to the root keys.
+    pub root_keys: UpdateSequenceNumber,
+    /// Updates to the level 1 keys.
+    pub level_1_keys: UpdateSequenceNumber,
+    /// Updates to the level 2 keys.
+    pub level_2_keys: UpdateSequenceNumber,
+    /// Protocol updates.
+    pub protocol: UpdateSequenceNumber,
+    /// Updates to the election difficulty parameter.
+    pub election_difficulty: UpdateSequenceNumber,
+    /// Updates to the euro:energy exchange rate.
+    pub euro_per_energy: UpdateSequenceNumber,
+    /// Updates to the CCD:euro exchange rate.
+    pub micro_ccd_per_euro: UpdateSequenceNumber,
+    /// Updates to the foundation account.
+    pub foundation_account: UpdateSequenceNumber,
+    /// Updates to the mint distribution.
+    pub mint_distribution: UpdateSequenceNumber,
+    /// Updates to the transaction fee distribution.
     pub transaction_fee_distribution: UpdateSequenceNumber,
-    pub gas_rewards:                  UpdateSequenceNumber,
-    pub pool_parameters:              UpdateSequenceNumber,
-    pub add_anonymity_revoker:        UpdateSequenceNumber,
-    pub add_identity_provider:        UpdateSequenceNumber,
-    pub cooldown_parameters:          UpdateSequenceNumber,
-    pub time_parameters:              UpdateSequenceNumber,
+    /// Updates to the GAS rewards.
+    pub gas_rewards: UpdateSequenceNumber,
+    /// Updates pool parameters.
+    pub pool_parameters: UpdateSequenceNumber,
+    /// Add a new anonymity revoker.
+    pub add_anonymity_revoker: UpdateSequenceNumber,
+    /// Add a new identity provider.
+    pub add_identity_provider: UpdateSequenceNumber,
+    /// Updates to cooldown parameters for chain parameters version 1 onwards.
+    pub cooldown_parameters: UpdateSequenceNumber,
+    /// Updates to time parameters for chain parameters version 1 onwards.
+    pub time_parameters: UpdateSequenceNumber,
+    /// Updates to the consensus version 2 timeout parameters.
+    pub timeout_parameters: UpdateSequenceNumber,
+    /// Updates to the consensus version 2 minimum time between blocks.
+    pub min_block_time: UpdateSequenceNumber,
+    /// Updates to the consensus version 2 block energy limit.
+    pub block_energy_limit: UpdateSequenceNumber,
+    /// Updates to the consensus version 2 finalization committee parameters
+    pub finalization_committee_parameters: UpdateSequenceNumber,
 }
