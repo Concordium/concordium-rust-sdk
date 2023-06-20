@@ -70,7 +70,6 @@ struct ProtocolUpdateDataP6 {
     pub block_energy_limit:    Energy,
     /// Parameters for the finalization committee.
     pub finalization_commitee: FinalizationCommitteeParameters,
-    pub epoch_duration:        Duration,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -222,7 +221,6 @@ async fn main() -> anyhow::Result<()> {
             max_finalizers: 100,
             finalizers_relative_stake_threshold: "0.0001".parse()?,
         },
-        epoch_duration:        Duration::from_minutes(15),
     };
 
     let p6 = ProtocolUpdate {
