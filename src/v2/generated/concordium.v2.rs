@@ -2299,6 +2299,13 @@ pub struct Epoch {
     #[prost(uint64, tag = "1")]
     pub value: u64,
 }
+/// A round.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Round {
+    #[prost(uint64, tag = "1")]
+    pub value: u64,
+}
 /// Length of a reward period in epochs.
 /// Must always be a strictly positive number.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -2717,7 +2724,8 @@ pub struct ConsensusInfo {
     /// Time of the (original) genesis block.
     #[prost(message, optional, tag = "3")]
     pub genesis_time:                ::core::option::Option<Timestamp>,
-    /// (Current) slot duration in milliseconds.
+    /// (Current) slot duration in milliseconds. Present only in protocol
+    /// versions 1-5.
     #[prost(message, optional, tag = "4")]
     pub slot_duration:               ::core::option::Option<Duration>,
     /// (Current) epoch duration in milliseconds.
@@ -2810,6 +2818,21 @@ pub struct ConsensusInfo {
     /// Time when the current era started.
     #[prost(message, optional, tag = "30")]
     pub current_era_genesis_time:    ::core::option::Option<Timestamp>,
+    /// The current duration to wait before a round times out. Present from
+    /// protocol version 6.
+    #[prost(message, optional, tag = "31")]
+    pub current_timeout_duration:    ::core::option::Option<Duration>,
+    /// The current round. Present from protocol version 6.
+    #[prost(message, optional, tag = "32")]
+    pub current_round:               ::core::option::Option<Round>,
+    /// The current epoch. Present from protocol version 6.
+    #[prost(message, optional, tag = "33")]
+    pub current_epoch:               ::core::option::Option<Epoch>,
+    /// The first block in the epoch with timestamp at least this is considered
+    /// to be the trigger block for the epoch transition. Present from
+    /// protocol version 6.
+    #[prost(message, optional, tag = "34")]
+    pub trigger_block_time:          ::core::option::Option<Timestamp>,
 }
 /// Information about an arrived block that is part of the streaming response.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -2875,7 +2898,8 @@ pub struct BlockInfo {
     /// The time the block was verified.
     #[prost(message, optional, tag = "8")]
     pub arrive_time:              ::core::option::Option<Timestamp>,
-    /// The slot number in which the block was baked.
+    /// The slot number in which the block was baked. Present in protocol
+    /// versions 1-5.
     #[prost(message, optional, tag = "9")]
     pub slot_number:              ::core::option::Option<Slot>,
     /// The time of the slot in which the block was baked.
@@ -2903,6 +2927,12 @@ pub struct BlockInfo {
     /// Protocol version to which the block belongs.
     #[prost(enumeration = "ProtocolVersion", tag = "17")]
     pub protocol_version:         i32,
+    /// Block round. Present from protocol version 6.
+    #[prost(message, optional, tag = "18")]
+    pub round:                    ::core::option::Option<Round>,
+    /// Block epoch. Present from protocol version 6.
+    #[prost(message, optional, tag = "19")]
+    pub epoch:                    ::core::option::Option<Epoch>,
 }
 /// Request for GetPoolInfo.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -3313,7 +3343,8 @@ pub struct LeadershipElectionNonce {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ElectionInfo {
-    /// Baking lottery election difficulty.
+    /// Baking lottery election difficulty. Present only in protocol versions
+    /// 1-5.
     #[prost(message, optional, tag = "1")]
     pub election_difficulty: ::core::option::Option<ElectionDifficulty>,
     /// Current leadership election nonce for the lottery.

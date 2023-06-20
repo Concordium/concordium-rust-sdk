@@ -34,7 +34,8 @@ pub struct BlockInfo {
     /// The total energy consumption of transactions in the block.
     pub transaction_energy_cost: Energy,
     /// Slot number of the slot the block is in.
-    pub block_slot:              Slot,
+    /// This is only present up to protocol 5.
+    pub block_slot:              Option<Slot>,
     /// Pointer to the last finalized block. Each block has a pointer to a
     /// specific finalized block that existed at the time the block was
     /// produced.
@@ -56,6 +57,10 @@ pub struct BlockInfo {
     pub block_baker:             Option<BakerId>,
     /// Protocol version to which the block belongs.
     pub protocol_version:        ProtocolVersion,
+    /// The round of the block. Present from protocol version 6.
+    pub round:                   Option<Round>,
+    /// The epoch of the block. Present from protocol version 6.
+    pub epoch:                   Option<Epoch>,
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize)]
@@ -103,7 +108,7 @@ pub struct ConsensusInfo {
     /// produces count towards this, but are not received.
     pub blocks_verified_count:          u64,
     /// Duration of a slot.
-    pub slot_duration:                  SlotDuration,
+    pub slot_duration:                  Option<SlotDuration>,
     /// Slot time of the genesis block.
     pub genesis_time:                   chrono::DateTime<chrono::Utc>,
     /// Exponential moving average standard deviation of the time between
@@ -151,6 +156,27 @@ pub struct ConsensusInfo {
     pub current_era_genesis_block:      BlockHash,
     /// Time when the current era started.
     pub current_era_genesis_time:       chrono::DateTime<chrono::Utc>,
+    /// Parameters that apply from protocol 6 onward. This is present if and
+    /// only if the `protocol_version` is [`ProtocolVersion::P6`] or later.
+    #[serde(rename = "concordiumBFTStatus")]
+    pub concordium_bft_status:          Option<ConcordiumBFTDetails>,
+}
+
+/// Parameters pertaining to the Concordium BFT consensus.
+#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ConcordiumBFTDetails {
+    /// The current duration to wait before a round times out.
+    #[serde(with = "crate::internal::duration_millis")]
+    pub current_timeout_duration: chrono::Duration,
+    /// The current round.
+    pub current_round:            Round,
+    /// The current epoch.
+    pub current_epoch:            Epoch,
+    /// The first block in the epoch with timestamp at least this is considered
+    /// to be the trigger block for the epoch transition.
+    pub trigger_block_time:       chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Debug, SerdeSerialize, SerdeDeserialize, PartialEq, Eq)]
@@ -298,22 +324,46 @@ pub enum PendingUpdateEffect {
     FinalizationCommitteeParameters(FinalizationCommitteeParameters),
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct NextUpdateSequenceNumbers {
-    pub root_keys:                    UpdateSequenceNumber,
-    pub level_1_keys:                 UpdateSequenceNumber,
-    pub level_2_keys:                 UpdateSequenceNumber,
-    pub protocol:                     UpdateSequenceNumber,
-    pub election_difficulty:          UpdateSequenceNumber,
-    pub euro_per_energy:              UpdateSequenceNumber,
-    pub micro_ccd_per_euro:           UpdateSequenceNumber,
-    pub foundation_account:           UpdateSequenceNumber,
-    pub mint_distribution:            UpdateSequenceNumber,
+    /// Updates to the root keys.
+    pub root_keys: UpdateSequenceNumber,
+    /// Updates to the level 1 keys.
+    pub level_1_keys: UpdateSequenceNumber,
+    /// Updates to the level 2 keys.
+    pub level_2_keys: UpdateSequenceNumber,
+    /// Protocol updates.
+    pub protocol: UpdateSequenceNumber,
+    /// Updates to the election difficulty parameter.
+    pub election_difficulty: UpdateSequenceNumber,
+    /// Updates to the euro:energy exchange rate.
+    pub euro_per_energy: UpdateSequenceNumber,
+    /// Updates to the CCD:euro exchange rate.
+    pub micro_ccd_per_euro: UpdateSequenceNumber,
+    /// Updates to the foundation account.
+    pub foundation_account: UpdateSequenceNumber,
+    /// Updates to the mint distribution.
+    pub mint_distribution: UpdateSequenceNumber,
+    /// Updates to the transaction fee distribution.
     pub transaction_fee_distribution: UpdateSequenceNumber,
-    pub gas_rewards:                  UpdateSequenceNumber,
-    pub pool_parameters:              UpdateSequenceNumber,
-    pub add_anonymity_revoker:        UpdateSequenceNumber,
-    pub add_identity_provider:        UpdateSequenceNumber,
-    pub cooldown_parameters:          UpdateSequenceNumber,
-    pub time_parameters:              UpdateSequenceNumber,
+    /// Updates to the GAS rewards.
+    pub gas_rewards: UpdateSequenceNumber,
+    /// Updates pool parameters.
+    pub pool_parameters: UpdateSequenceNumber,
+    /// Add a new anonymity revoker.
+    pub add_anonymity_revoker: UpdateSequenceNumber,
+    /// Add a new identity provider.
+    pub add_identity_provider: UpdateSequenceNumber,
+    /// Updates to cooldown parameters for chain parameters version 1 onwards.
+    pub cooldown_parameters: UpdateSequenceNumber,
+    /// Updates to time parameters for chain parameters version 1 onwards.
+    pub time_parameters: UpdateSequenceNumber,
+    /// Updates to the consensus version 2 timeout parameters.
+    pub timeout_parameters: UpdateSequenceNumber,
+    /// Updates to the consensus version 2 minimum time between blocks.
+    pub min_block_time: UpdateSequenceNumber,
+    /// Updates to the consensus version 2 block energy limit.
+    pub block_energy_limit: UpdateSequenceNumber,
+    /// Updates to the consensus version 2 finalization committee parameters
+    pub finalization_committee_parameters: UpdateSequenceNumber,
 }

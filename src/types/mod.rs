@@ -330,8 +330,9 @@ pub struct AccountInfo {
 #[serde(rename_all = "camelCase")]
 /// The state of consensus parameters, and allowed participants (i.e., bakers).
 pub struct BirkParameters {
-    /// Current election difficulty.
-    pub election_difficulty: ElectionDifficulty,
+    /// Current election difficulty. This is only present for protocol versions
+    /// 1-5.
+    pub election_difficulty: Option<ElectionDifficulty>,
     /// Leadership election nonce for the current epoch.
     pub election_nonce:      hashes::LeadershipElectionNonce,
     /// The list of active bakers.

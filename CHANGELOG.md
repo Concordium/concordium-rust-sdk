@@ -1,6 +1,6 @@
 ## Unreleased changes
 
-- The SDK requires node version 5.4 or later.
+- The SDK requires node version 6 or later.
 - Support relative and absolute block height as the block identifier in block queries.
 - Add field `protocol_version` to `BlockInfo` which is the protocol version of the queried block.
 - Extend enum `PendingUpdateEffect` with variants for protocol version 6.
@@ -18,6 +18,22 @@
 - Add a `Cis4Contract` for interacting with Cis4 contracts.
 - Add a new `web3id` module that contains types and functionality for
   construcing Web3ID credentials and verifying Web3ID proofs.
+
+### Breaking changes in types
+- `ConsensusInfo`
+  - `slot_duration` is now an optional field, only present in protocols 1-5.
+  - a new field `concordium_bft_status` is added, that is present if protocol
+    version is 6 or higher
+- `BlockInfo`
+  - `slot_number` is optional, and only present in protocols 1-5
+  - new fields `round` and `epoch` that are present in protocol 6 or higher.
+- `BirkParameters`
+  - `election_difficulty` is optional, and only present in protocols 1-5.
+- `NextUpdateSequenceNumbers`
+  - Add `timeout_parameters`, `min_block_time`, `block_energy_limit`, and
+    `finalization_committee_parameters` sequence numbers.
+
+
 
 ## 2.4.0
 

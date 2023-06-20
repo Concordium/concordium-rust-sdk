@@ -3,7 +3,7 @@
 
 use super::generated::*;
 
-use crate::types::UpdateKeysCollectionSkeleton;
+use crate::types::{queries::ConcordiumBFTDetails, UpdateKeysCollectionSkeleton};
 
 use super::Require;
 use chrono::TimeZone;
@@ -2140,51 +2140,59 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
     type Error = tonic::Status;
 
     fn try_from(value: ConsensusInfo) -> Result<Self, Self::Error> {
+        let protocol_version = ProtocolVersion::from_i32(value.protocol_version)
+            .ok_or_else(|| tonic::Status::internal("Unknown protocol version"))?
+            .into();
         Ok(Self {
-            last_finalized_block_height:    value.last_finalized_block_height.require()?.into(),
-            block_arrive_latency_e_m_s_d:   value.block_arrive_latency_emsd,
-            block_receive_latency_e_m_s_d:  value.block_receive_latency_emsd,
-            last_finalized_block:           value.last_finalized_block.require()?.try_into()?,
-            block_receive_period_e_m_s_d:   value.block_receive_period_emsd,
-            block_arrive_period_e_m_s_d:    value.block_arrive_period_emsd,
-            blocks_received_count:          value.blocks_received_count.into(),
+            last_finalized_block_height: value.last_finalized_block_height.require()?.into(),
+            block_arrive_latency_e_m_s_d: value.block_arrive_latency_emsd,
+            block_receive_latency_e_m_s_d: value.block_receive_latency_emsd,
+            last_finalized_block: value.last_finalized_block.require()?.try_into()?,
+            block_receive_period_e_m_s_d: value.block_receive_period_emsd,
+            block_arrive_period_e_m_s_d: value.block_arrive_period_emsd,
+            blocks_received_count: value.blocks_received_count.into(),
             transactions_per_block_e_m_s_d: value.transactions_per_block_emsd,
-            finalization_period_e_m_a:      value.finalization_period_ema,
-            best_block_height:              value.best_block_height.require()?.into(),
-            last_finalized_time:            value
+            finalization_period_e_m_a: value.finalization_period_ema,
+            best_block_height: value.best_block_height.require()?.into(),
+            last_finalized_time: value
                 .last_finalized_time
                 .map(|v| v.try_into())
                 .transpose()?,
-            finalization_count:             value.finalization_count.into(),
-            epoch_duration:                 value.epoch_duration.require()?.into(),
-            blocks_verified_count:          value.blocks_verified_count.into(),
-            slot_duration:                  value.slot_duration.require()?.into(),
-            genesis_time:                   value.genesis_time.require()?.try_into()?,
-            finalization_period_e_m_s_d:    value.finalization_period_emsd,
-            transactions_per_block_e_m_a:   value.transactions_per_block_ema,
-            block_arrive_latency_e_m_a:     value.block_arrive_latency_ema,
-            block_receive_latency_e_m_a:    value.block_receive_latency_ema,
-            block_arrive_period_e_m_a:      value.block_arrive_period_ema,
-            block_receive_period_e_m_a:     value.block_receive_period_ema,
-            block_last_arrived_time:        value
+            finalization_count: value.finalization_count.into(),
+            epoch_duration: value.epoch_duration.require()?.into(),
+            blocks_verified_count: value.blocks_verified_count.into(),
+            slot_duration: value.slot_duration.map(Into::into),
+            genesis_time: value.genesis_time.require()?.try_into()?,
+            finalization_period_e_m_s_d: value.finalization_period_emsd,
+            transactions_per_block_e_m_a: value.transactions_per_block_ema,
+            block_arrive_latency_e_m_a: value.block_arrive_latency_ema,
+            block_receive_latency_e_m_a: value.block_receive_latency_ema,
+            block_arrive_period_e_m_a: value.block_arrive_period_ema,
+            block_receive_period_e_m_a: value.block_receive_period_ema,
+            block_last_arrived_time: value
                 .block_last_arrived_time
                 .map(|v| v.try_into())
                 .transpose()?,
-            best_block:                     value.best_block.require()?.try_into()?,
-            genesis_block:                  value.genesis_block.require()?.try_into()?,
-            block_last_received_time:       value
+            best_block: value.best_block.require()?.try_into()?,
+            genesis_block: value.genesis_block.require()?.try_into()?,
+            block_last_received_time: value
                 .block_last_received_time
                 .map(|v| v.try_into())
                 .transpose()?,
-            protocol_version:               ProtocolVersion::from_i32(value.protocol_version)
-                .ok_or_else(|| tonic::Status::internal("Unknown protocol version"))?
-                .into(),
-            genesis_index:                  value.genesis_index.require()?.into(),
-            current_era_genesis_block:      value
-                .current_era_genesis_block
-                .require()?
-                .try_into()?,
-            current_era_genesis_time:       value.current_era_genesis_time.require()?.try_into()?,
+            protocol_version,
+            genesis_index: value.genesis_index.require()?.into(),
+            current_era_genesis_block: value.current_era_genesis_block.require()?.try_into()?,
+            current_era_genesis_time: value.current_era_genesis_time.require()?.try_into()?,
+            concordium_bft_status: if protocol_version <= super::types::ProtocolVersion::P5 {
+                None
+            } else {
+                Some(ConcordiumBFTDetails {
+                    current_timeout_duration: value.current_timeout_duration.require()?.into(),
+                    current_round:            value.current_round.require()?.into(),
+                    current_epoch:            value.current_epoch.require()?.into(),
+                    trigger_block_time:       value.trigger_block_time.require()?.try_into()?,
+                })
+            },
         })
     }
 }
@@ -2393,31 +2401,46 @@ impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
     type Error = tonic::Status;
 
     fn try_from(value: BlockInfo) -> Result<Self, Self::Error> {
+        let protocol_version = ProtocolVersion::from_i32(value.protocol_version)
+            .ok_or_else(|| {
+                tonic::Status::internal(format!(
+                    "Unknown protocol version: {}",
+                    value.protocol_version
+                ))
+            })?
+            .into();
         Ok(Self {
-            transactions_size:       value.transactions_size.into(),
-            block_parent:            value.parent_block.require()?.try_into()?,
-            block_hash:              value.hash.require()?.try_into()?,
-            finalized:               value.finalized,
-            block_state_hash:        value.state_hash.require()?.try_into()?,
-            block_arrive_time:       value.arrive_time.require()?.try_into()?,
-            block_receive_time:      value.receive_time.require()?.try_into()?,
-            transaction_count:       value.transaction_count.into(),
+            transactions_size: value.transactions_size.into(),
+            block_parent: value.parent_block.require()?.try_into()?,
+            block_hash: value.hash.require()?.try_into()?,
+            finalized: value.finalized,
+            block_state_hash: value.state_hash.require()?.try_into()?,
+            block_arrive_time: value.arrive_time.require()?.try_into()?,
+            block_receive_time: value.receive_time.require()?.try_into()?,
+            transaction_count: value.transaction_count.into(),
             transaction_energy_cost: value.transactions_energy_cost.require()?.into(),
-            block_slot:              value.slot_number.require()?.into(),
-            block_last_finalized:    value.last_finalized_block.require()?.try_into()?,
-            block_slot_time:         value.slot_time.require()?.try_into()?,
-            block_height:            value.height.require()?.into(),
-            era_block_height:        value.era_block_height.require()?.into(),
-            genesis_index:           value.genesis_index.require()?.into(),
-            block_baker:             value.baker.map(|b| b.into()),
-            protocol_version:        ProtocolVersion::from_i32(value.protocol_version)
-                .ok_or_else(|| {
-                    tonic::Status::internal(format!(
-                        "Unknown protocol version: {}",
-                        value.protocol_version
-                    ))
-                })?
-                .into(),
+            block_slot: if protocol_version <= super::types::ProtocolVersion::P5 {
+                Some(value.slot_number.require()?.into())
+            } else {
+                None
+            },
+            block_last_finalized: value.last_finalized_block.require()?.try_into()?,
+            block_slot_time: value.slot_time.require()?.try_into()?,
+            block_height: value.height.require()?.into(),
+            era_block_height: value.era_block_height.require()?.into(),
+            genesis_index: value.genesis_index.require()?.into(),
+            block_baker: value.baker.map(|b| b.into()),
+            protocol_version,
+            round: if protocol_version >= super::types::ProtocolVersion::P6 {
+                Some(value.round.require()?.into())
+            } else {
+                None
+            },
+            epoch: if protocol_version >= super::types::ProtocolVersion::P6 {
+                Some(value.epoch.require()?.into())
+            } else {
+                None
+            },
         })
     }
 }
@@ -2631,7 +2654,7 @@ impl TryFrom<ElectionInfo> for super::types::BirkParameters {
 
     fn try_from(info: ElectionInfo) -> Result<Self, Self::Error> {
         Ok(Self {
-            election_difficulty: info.election_difficulty.require()?.try_into()?,
+            election_difficulty: info.election_difficulty.map(|x| x.try_into()).transpose()?,
             election_nonce:      info.election_nonce.require()?.try_into()?,
             bakers:              info
                 .baker_election_info
@@ -2950,6 +2973,10 @@ impl From<Epoch> for base::Epoch {
     fn from(value: Epoch) -> Self { Self { epoch: value.value } }
 }
 
+impl From<Round> for base::Round {
+    fn from(value: Round) -> Self { Self { round: value.value } }
+}
+
 impl TryFrom<PendingUpdate> for super::types::queries::PendingUpdate {
     type Error = tonic::Status;
 
@@ -3085,22 +3112,29 @@ impl TryFrom<NextUpdateSequenceNumbers> for super::types::queries::NextUpdateSeq
 
     fn try_from(message: NextUpdateSequenceNumbers) -> Result<Self, Self::Error> {
         Ok(Self {
-            root_keys:                    message.root_keys.require()?.into(),
-            level_1_keys:                 message.level1_keys.require()?.into(),
-            level_2_keys:                 message.level2_keys.require()?.into(),
-            protocol:                     message.protocol.require()?.into(),
-            election_difficulty:          message.election_difficulty.require()?.into(),
-            euro_per_energy:              message.euro_per_energy.require()?.into(),
-            micro_ccd_per_euro:           message.micro_ccd_per_euro.require()?.into(),
-            foundation_account:           message.foundation_account.require()?.into(),
-            mint_distribution:            message.mint_distribution.require()?.into(),
+            root_keys: message.root_keys.require()?.into(),
+            level_1_keys: message.level1_keys.require()?.into(),
+            level_2_keys: message.level2_keys.require()?.into(),
+            protocol: message.protocol.require()?.into(),
+            election_difficulty: message.election_difficulty.require()?.into(),
+            euro_per_energy: message.euro_per_energy.require()?.into(),
+            micro_ccd_per_euro: message.micro_ccd_per_euro.require()?.into(),
+            foundation_account: message.foundation_account.require()?.into(),
+            mint_distribution: message.mint_distribution.require()?.into(),
             transaction_fee_distribution: message.transaction_fee_distribution.require()?.into(),
-            gas_rewards:                  message.gas_rewards.require()?.into(),
-            pool_parameters:              message.pool_parameters.require()?.into(),
-            add_anonymity_revoker:        message.add_anonymity_revoker.require()?.into(),
-            add_identity_provider:        message.add_identity_provider.require()?.into(),
-            cooldown_parameters:          message.cooldown_parameters.require()?.into(),
-            time_parameters:              message.time_parameters.require()?.into(),
+            gas_rewards: message.gas_rewards.require()?.into(),
+            pool_parameters: message.pool_parameters.require()?.into(),
+            add_anonymity_revoker: message.add_anonymity_revoker.require()?.into(),
+            add_identity_provider: message.add_identity_provider.require()?.into(),
+            cooldown_parameters: message.cooldown_parameters.require()?.into(),
+            time_parameters: message.time_parameters.require()?.into(),
+            timeout_parameters: message.timeout_parameters.require()?.into(),
+            min_block_time: message.min_block_time.require()?.into(),
+            block_energy_limit: message.block_energy_limit.require()?.into(),
+            finalization_committee_parameters: message
+                .finalization_committee_parameters
+                .require()?
+                .into(),
         })
     }
 }
