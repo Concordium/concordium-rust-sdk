@@ -212,8 +212,8 @@ async fn main() -> anyhow::Result<()> {
     let params_p6 = ProtocolUpdateDataP6 {
         timeout_parameters:    TimeoutParameters {
             base:     Duration::from_seconds(10),
-            increase: Ratio::new(2, 1)?,
-            decrease: Ratio::new(2, 3)?,
+            increase: Ratio::new(5, 4)?,
+            decrease: Ratio::new(4, 5)?,
         },
         min_block_time:        Duration::from_millis(500),
         block_energy_limit:    Energy { energy: 3_000_000 },
@@ -226,7 +226,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let p6 = ProtocolUpdate {
-        message: "Enable delegation and updated smart contracts".into(),
+        message: "Enable ConcordiumBFT".into(),
         specification_url:
             "https://github.com/Concordium/concordium-update-proposals/blob/main/updates/P6.txt"
                 .into(),
