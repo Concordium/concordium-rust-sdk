@@ -13,7 +13,7 @@ use crate::{
 pub use concordium_base::{cis2_types::MetadataUrl, cis4_types::*};
 use concordium_base::{
     constants::MAX_PARAMETER_LEN,
-    contracts_common::{self, AccountAddress},
+    contracts_common,
     hashes::TransactionHash,
     smart_contracts::{ExceedsParameterSize, OwnedParameter},
     web3id::{CredentialHolderId, Web3IdSigner, REVOKE_DOMAIN_STRING},
@@ -115,20 +115,20 @@ impl Cis4Contract {
         self.view_raw("revocationKeys", parameter, bi).await
     }
 
-    /// Look up the issuer's metadata URL.
-    pub async fn issuer_metadata(
+    /// Look up the credential registry's metadata.
+    pub async fn registry_metadata(
         &mut self,
         bi: impl IntoBlockIdentifier,
-    ) -> Result<MetadataUrl, Cis4QueryError> {
+    ) -> Result<RegistryMetadata, Cis4QueryError> {
         let parameter = OwnedParameter::empty();
-        self.view_raw("issuerMetadata", parameter, bi).await
+        self.view_raw("registryMetadata", parameter, bi).await
     }
 
-    /// Look up the issuer's account address.
-    pub async fn issuer_address(
+    /// Look up the issuer's public key.
+    pub async fn issuer(
         &mut self,
         bi: impl IntoBlockIdentifier,
-    ) -> Result<AccountAddress, Cis4QueryError> {
+    ) -> Result<IssuerKey, Cis4QueryError> {
         let parameter = OwnedParameter::empty();
 
         self.view_raw("issuer", parameter, bi).await
@@ -261,7 +261,7 @@ impl Cis4Contract {
         parameter_vec.extend_from_slice(&to_sign[REVOKE_DOMAIN_STRING.len()..]);
         let parameter = OwnedParameter::try_from(parameter_vec)?;
 
-        self.update_raw(signer, metadata, "revokeCredentialHolder", parameter)
+        self.update_raw(signer, metadata, "revokeCredentialRevoker", parameter)
             .await
     }
 }

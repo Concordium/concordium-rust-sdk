@@ -8,7 +8,7 @@ pub use concordium_base::web3id::*;
 use concordium_base::{
     base::CredentialRegistrationID,
     cis4_types::CredentialStatus,
-    contracts_common::{AccountAddress, ContractAddress},
+    contracts_common::AccountAddress,
     id::{constants::ArCurve, types::IpIdentity},
     web3id,
 };
@@ -34,13 +34,6 @@ pub enum CredentialLookupError {
     },
     #[error("Initial credential {cred_id} cannot be used.")]
     InitialCredential { cred_id: CredentialRegistrationID },
-    #[error(
-        "Cannot parse the commitment returned from contract: {contract} for credential {cred_id}."
-    )]
-    CommitmentParseError {
-        contract: ContractAddress,
-        cred_id:  CredentialHolderId,
-    },
     #[error("Unexpected response from the node: {0}")]
     InvalidResponse(String),
 }
@@ -135,16 +128,9 @@ pub async fn verify_credential_metadata(
         }
         CredentialMetadata::Web3Id { contract, owner } => {
             let mut contract_client = Cis4Contract::create(client, contract).await?;
-            let entry = contract_client.credential_entry(owner, bi).await?;
-            let commitment = concordium_base::common::from_bytes(&mut std::io::Cursor::new(
-                &entry.credential_info.commitment,
-            ))
-            .map_err(|_| CredentialLookupError::CommitmentParseError {
-                contract,
-                cred_id: owner,
-            })?;
+            let issuer_pk = contract_client.issuer(bi).await?;
 
-            let commitments = CredentialsInputs::Web3 { commitment };
+            let commitments = CredentialsInputs::Web3 { issuer_pk };
 
             let status = contract_client.credential_status(owner, bi).await?;
 

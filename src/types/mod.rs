@@ -2280,7 +2280,7 @@ impl WalletAccount {
             keys.insert(ci, public);
         }
         AccountAccessStructure {
-            threshold: AccountThreshold::try_from(self.keys.threshold.0).unwrap(),
+            threshold: self.keys.threshold,
             keys,
         }
     }

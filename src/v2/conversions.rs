@@ -643,13 +643,8 @@ impl TryFrom<SignatureThreshold> for crate::id::types::SignatureThreshold {
 
     fn try_from(value: SignatureThreshold) -> Result<Self, Self::Error> {
         if let Ok(v) = u8::try_from(value.value) {
-            if v == 0 {
-                Err(tonic::Status::internal(
-                    "Unexpected zero signature threshold.",
-                ))
-            } else {
-                Ok(Self(v))
-            }
+            crate::id::types::SignatureThreshold::try_from(v)
+                .map_err(|_| tonic::Status::internal("Unexpected zero signature threshold."))
         } else {
             Err(tonic::Status::internal("Unexpected signature threshold."))
         }
