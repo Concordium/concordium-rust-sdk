@@ -43,6 +43,19 @@ impl From<RejectReason> for Cis4QueryError {
     fn from(value: RejectReason) -> Self { Self::NodeRejected(value) }
 }
 
+impl Cis4QueryError {
+    /// Check if the error variant is a logic error, i.e., the query
+    /// was received by the node which attempted to execute it, and it failed.
+    /// If so, extract the reason for execution failure.
+    pub fn is_contract_error(&self) -> Option<&crate::types::RejectReason> {
+        if let Self::NodeRejected(e) = self {
+            Some(e)
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 /// An error that can occur when sending CIS4 update transactions.
 pub enum Cis4TransactionError {
