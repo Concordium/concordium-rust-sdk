@@ -42,9 +42,9 @@ pub enum CredentialLookupError {
 /// status.
 pub struct CredentialWithMetadata {
     /// The status of the credential at a point in time.
-    pub status:      CredentialStatus,
-    /// The commitments of the credential.
-    pub commitments: CredentialsInputs<ArCurve>,
+    pub status: CredentialStatus,
+    /// The extra public inputs needed for verification.
+    pub inputs: CredentialsInputs<ArCurve>,
 }
 
 /// Retrieve and validate credential metadata in a particular block.
@@ -115,29 +115,23 @@ pub async fn verify_credential_metadata(
                     } else {
                         CredentialStatus::Active
                     };
-                    let commitments = CredentialsInputs::Account {
+                    let inputs = CredentialsInputs::Account {
                         commitments: commitments.cmm_attributes.clone(),
                     };
 
-                    Ok(CredentialWithMetadata {
-                        status,
-                        commitments,
-                    })
+                    Ok(CredentialWithMetadata { status, inputs })
                 }
             }
         }
-        CredentialMetadata::Web3Id { contract, owner } => {
+        CredentialMetadata::Web3Id { contract, holder } => {
             let mut contract_client = Cis4Contract::create(client, contract).await?;
             let issuer_pk = contract_client.issuer(bi).await?;
 
-            let commitments = CredentialsInputs::Web3 { issuer_pk };
+            let inputs = CredentialsInputs::Web3 { issuer_pk };
 
-            let status = contract_client.credential_status(owner, bi).await?;
+            let status = contract_client.credential_status(holder, bi).await?;
 
-            Ok(CredentialWithMetadata {
-                status,
-                commitments,
-            })
+            Ok(CredentialWithMetadata { status, inputs })
         }
     }
 }

@@ -187,9 +187,9 @@ impl Cis4Contract {
             .await
     }
 
-    /// Revoke a credential as an issuer.
+    /// Revoke a credential as the holder.
     ///
-    /// The extra nonce that must be provided is the owner's nonce inside the
+    /// The extra nonce that must be provided is the holder's nonce inside the
     /// contract. The signature on this revocation message is set to expire at
     /// the same time as the transaction.
     pub async fn revoke_credential_as_holder(
@@ -231,12 +231,13 @@ impl Cis4Contract {
             .await
     }
 
-    /// Revoke a credential as a revoker.
+    /// Revoke a credential as another party, distinct from issuer or holder.
     ///
-    /// The extra nonce that must be provided is the owner's nonce inside the
-    /// contract. The signature on this revocation message is set to expire at
+    /// The extra nonce that must be provided is the nonce associatedw with the
+    /// key that signs the revocation message.
+    /// The signature on this revocation message is set to expire at
     /// the same time as the transaction.
-    pub async fn revoke_credential_as_revoker(
+    pub async fn revoke_credential_other(
         &mut self,
         signer: &impl transactions::ExactSizeTransactionSigner,
         metadata: &Cis4TransactionMetadata,
@@ -274,7 +275,7 @@ impl Cis4Contract {
         parameter_vec.extend_from_slice(&to_sign[REVOKE_DOMAIN_STRING.len()..]);
         let parameter = OwnedParameter::try_from(parameter_vec)?;
 
-        self.update_raw(signer, metadata, "revokeCredentialRevoker", parameter)
+        self.update_raw(signer, metadata, "revokeCredentialOther", parameter)
             .await
     }
 }
