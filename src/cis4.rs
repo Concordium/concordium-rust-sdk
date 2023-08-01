@@ -233,7 +233,7 @@ impl Cis4Contract {
 
     /// Revoke a credential as another party, distinct from issuer or holder.
     ///
-    /// The extra nonce that must be provided is the nonce associatedw with the
+    /// The extra nonce that must be provided is the nonce associated with the
     /// key that signs the revocation message.
     /// The signature on this revocation message is set to expire at
     /// the same time as the transaction.
