@@ -1,12 +1,12 @@
 //! Types related to smart contracts.
 
 use super::{Address, ContractAddress, Energy, RejectReason};
+pub use concordium_base::smart_contracts::*;
 use concordium_base::{
     common::{types::Amount, SerdeDeserialize, SerdeSerialize},
     id::types::AccountAddress,
     transactions::UpdateContractPayload,
 };
-pub use concordium_base::{constants::MAX_ALLOWED_INVOKE_ENERGY, smart_contracts::*};
 /// Re-export of common helper functionality for smart contract, such as types
 /// and serialization specific for smart contracts.
 pub use concordium_contracts_common::{

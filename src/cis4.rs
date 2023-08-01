@@ -13,7 +13,7 @@ use crate::{
 pub use concordium_base::{cis2_types::MetadataUrl, cis4_types::*};
 use concordium_base::{
     constants::MAX_PARAMETER_LEN,
-    contracts_common::{self, AccountAddress},
+    contracts_common,
     hashes::TransactionHash,
     smart_contracts::{ExceedsParameterSize, OwnedParameter},
     web3id::{CredentialHolderId, Web3IdSigner, REVOKE_DOMAIN_STRING},
@@ -41,6 +41,19 @@ pub enum Cis4QueryError {
 
 impl From<RejectReason> for Cis4QueryError {
     fn from(value: RejectReason) -> Self { Self::NodeRejected(value) }
+}
+
+impl Cis4QueryError {
+    /// Check if the error variant is a logic error, i.e., the query
+    /// was received by the node which attempted to execute it, and it failed.
+    /// If so, extract the reason for execution failure.
+    pub fn is_contract_error(&self) -> Option<&crate::types::RejectReason> {
+        if let Self::NodeRejected(e) = self {
+            Some(e)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -115,20 +128,20 @@ impl Cis4Contract {
         self.view_raw("revocationKeys", parameter, bi).await
     }
 
-    /// Look up the issuer's metadata URL.
-    pub async fn issuer_metadata(
+    /// Look up the credential registry's metadata.
+    pub async fn registry_metadata(
         &mut self,
         bi: impl IntoBlockIdentifier,
-    ) -> Result<MetadataUrl, Cis4QueryError> {
+    ) -> Result<RegistryMetadata, Cis4QueryError> {
         let parameter = OwnedParameter::empty();
-        self.view_raw("issuerMetadata", parameter, bi).await
+        self.view_raw("registryMetadata", parameter, bi).await
     }
 
-    /// Look up the issuer's account address.
-    pub async fn issuer_address(
+    /// Look up the issuer's public key.
+    pub async fn issuer(
         &mut self,
         bi: impl IntoBlockIdentifier,
-    ) -> Result<AccountAddress, Cis4QueryError> {
+    ) -> Result<IssuerKey, Cis4QueryError> {
         let parameter = OwnedParameter::empty();
 
         self.view_raw("issuer", parameter, bi).await
@@ -174,9 +187,9 @@ impl Cis4Contract {
             .await
     }
 
-    /// Revoke a credential as an issuer.
+    /// Revoke a credential as the holder.
     ///
-    /// The extra nonce that must be provided is the owner's nonce inside the
+    /// The extra nonce that must be provided is the holder's nonce inside the
     /// contract. The signature on this revocation message is set to expire at
     /// the same time as the transaction.
     pub async fn revoke_credential_as_holder(
@@ -218,12 +231,13 @@ impl Cis4Contract {
             .await
     }
 
-    /// Revoke a credential as a revoker.
+    /// Revoke a credential as another party, distinct from issuer or holder.
     ///
-    /// The extra nonce that must be provided is the owner's nonce inside the
-    /// contract. The signature on this revocation message is set to expire at
+    /// The extra nonce that must be provided is the nonce associated with the
+    /// key that signs the revocation message.
+    /// The signature on this revocation message is set to expire at
     /// the same time as the transaction.
-    pub async fn revoke_credential_as_revoker(
+    pub async fn revoke_credential_other(
         &mut self,
         signer: &impl transactions::ExactSizeTransactionSigner,
         metadata: &Cis4TransactionMetadata,
@@ -261,7 +275,7 @@ impl Cis4Contract {
         parameter_vec.extend_from_slice(&to_sign[REVOKE_DOMAIN_STRING.len()..]);
         let parameter = OwnedParameter::try_from(parameter_vec)?;
 
-        self.update_raw(signer, metadata, "revokeCredentialHolder", parameter)
+        self.update_raw(signer, metadata, "revokeCredentialOther", parameter)
             .await
     }
 }

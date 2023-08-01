@@ -113,7 +113,7 @@ async fn main() -> anyhow::Result<()> {
                     )]
                     .into_iter()
                     .collect(),
-                    threshold: SignatureThreshold(1),
+                    threshold: SignatureThreshold::ONE,
                 };
                 let prf_key = SecretKey::<ArCurve>::generate_non_zero(&mut csprng);
                 let cred_id_exponent = prf_key.prf_exponent(0).expect("We were very unlucky.");
