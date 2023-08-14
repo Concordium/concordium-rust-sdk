@@ -2322,7 +2322,7 @@ impl Client {
         .await
     }
 
-    /// Find the first (i.e., earliers) finalized block whose slot time is no
+    /// Find the first (i.e., earliest) finalized block whose slot time is no
     /// later than the specified time. If a block is not found return
     /// [`QueryError::NotFound`].
     ///
