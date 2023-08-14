@@ -540,6 +540,9 @@ pub struct CurrentPaydayBakerPoolStatus {
     /// The effective delegated capital to the pool for the current reward
     /// period.
     pub delegated_capital:       Amount,
+    /// The commission rates that apply for the current reward period for the
+    /// baker pool.
+    pub commission_rates:        CommissionRates,
 }
 
 // hack due to a bug in Serde that is caused by the combination of
