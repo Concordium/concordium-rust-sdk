@@ -27,9 +27,15 @@ struct App {
         default_value = "http://localhost:20000"
     )]
     endpoint: Endpoint,
-    #[structopt(long = "from", help = "Starting time. Defaults to genesis time.")]
+    #[structopt(
+        long = "from",
+        help = "Starting time (format 2023-06-22T14:00:00+0200). Defaults to genesis time."
+    )]
     from:     Option<chrono::DateTime<chrono::Utc>>,
-    #[structopt(long = "to", help = "End time. Defaults to the time the tool has run.")]
+    #[structopt(
+        long = "to",
+        help = "End time (format 2023-06-22T14:00:00+0200). Defaults to the time the tool has run."
+    )]
     to:       Option<chrono::DateTime<Utc>>,
 }
 
@@ -69,6 +75,10 @@ async fn main() -> anyhow::Result<()> {
     let mut finalization_count: u32 = 0;
     let mut blocks = client.get_finalized_blocks_from(h).await?;
     let end_time = app.to.unwrap_or_else(chrono::Utc::now);
+    println!(
+        "Block hash, block time, block receive time, block arrive time, receive delta, arrive \
+         delta, #payday events, finalization data, transaction count, round, epoch, baker id"
+    );
     while let Some(block) = blocks.next().await {
         let bi = client.get_block_info(block.block_hash).await?.response;
         if bi.block_slot_time > end_time {
@@ -95,7 +105,7 @@ async fn main() -> anyhow::Result<()> {
             .response
             .is_some();
         println!(
-            "{}, {}, {}, {}, {}ms, {}ms, {}, {}, {}",
+            "{}, {}, {}, {}, {}ms, {}ms, {}, {}, {}, {}, {}, {}",
             bi.block_hash,
             bi.block_slot_time.format("%H:%M:%S%.3f"),
             bi.block_receive_time.format("%H:%M:%S%.3f"),
@@ -108,7 +118,10 @@ async fn main() -> anyhow::Result<()> {
                 .num_milliseconds(),
             payday_block,
             has_finalization_data,
-            bi.transaction_count
+            bi.transaction_count,
+            bi.round.map_or(String::new(), |x| x.to_string()),
+            bi.epoch.map_or(String::new(), |x| x.to_string()),
+            bi.block_baker.map_or(String::new(), |x| x.to_string()),
         );
         if has_finalization_data {
             finalization_count += 1
