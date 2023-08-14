@@ -19,7 +19,7 @@
 - Add a new `web3id` module that contains types and functionality for
   construcing Web3ID credentials and verifying Web3ID proofs.
 - Add a `commission_rates` field to `CurrentPaydayBakerPoolStatus` which yields the commission rates 
-  of the baker for the reward period.
+  of the baker for the reward period (requires a node with version > 6.0).
 
 ### Breaking changes in types
 - `ConsensusInfo`
