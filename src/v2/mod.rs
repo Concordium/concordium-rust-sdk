@@ -12,8 +12,9 @@ use crate::{
             ContractContext, InstanceInfo, InvokeContractResult, ModuleReference, WasmModule,
         },
         transactions::{self, InitContractPayload, UpdateContractPayload, UpdateInstruction},
-        AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, Energy, Memo, Nonce,
-        RegisteredData, SpecialTransactionOutcome, TransactionStatus, UpdateSequenceNumber,
+        AbsoluteBlockHeight, AccountInfo, BakerRewardPeriodInfo, CredentialRegistrationID, Energy,
+        Memo, Nonce, RegisteredData, SpecialTransactionOutcome, TransactionStatus,
+        UpdateSequenceNumber,
     },
 };
 use concordium_base::{
@@ -2442,6 +2443,28 @@ impl Client {
             }
         }
         last_found.ok_or(QueryError::NotFound)
+    }
+
+    /// Get the bakers of a reward period.
+    pub async fn get_bakers_reward_period(
+        &mut self,
+        bi: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::BakerRewardPeriodInfo, tonic::Status>>>,
+    > {
+        let response = self
+            .client
+            .get_bakers_reward_period(&bi.into_block_identifier())
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response
+            .into_inner()
+            .map(|x| x.map(TryFrom::try_from))
+            .collect::<Result<_, tonic::Status>>()?;
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
     }
 }
 

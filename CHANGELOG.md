@@ -18,6 +18,8 @@
 - Add a `Cis4Contract` for interacting with Cis4 contracts.
 - Add a new `web3id` module that contains types and functionality for
   construcing Web3ID credentials and verifying Web3ID proofs.
+- Add support for `GetBakersRewardPeriod` endpoint (only available when querying a node
+  with at least version 6.1)
 
 ### Breaking changes in types
 - `ConsensusInfo`
