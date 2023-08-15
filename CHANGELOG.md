@@ -18,6 +18,8 @@
 - Add a `Cis4Contract` for interacting with Cis4 contracts.
 - Add a new `web3id` module that contains types and functionality for
   construcing Web3ID credentials and verifying Web3ID proofs.
+- Add support for `GetBlockCertificates`. Note that this endpoint is only available when 
+  querying a node with version 6.1 or greater.
 
 ### Breaking changes in types
 - `ConsensusInfo`

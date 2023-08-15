@@ -3134,6 +3134,134 @@ impl TryFrom<NextUpdateSequenceNumbers> for super::types::queries::NextUpdateSeq
     }
 }
 
+impl TryFrom<QuorumSignature> for super::types::block_certificates::QuorumSignature {
+    type Error = tonic::Status;
+
+    fn try_from(message: QuorumSignature) -> Result<Self, Self::Error> {
+        Ok(Self(message.value.try_into().map_err(|_| {
+            tonic::Status::invalid_argument("Malformed QuorumSignature.")
+        })?))
+    }
+}
+
+impl TryFrom<QuorumCertificate> for super::types::block_certificates::QuorumCertificate {
+    type Error = tonic::Status;
+
+    fn try_from(message: QuorumCertificate) -> Result<Self, Self::Error> {
+        Ok(Self {
+            block_hash:          message.block_hash.require()?.try_into()?,
+            round:               message.round.require()?.into(),
+            epoch:               message.epoch.require()?.into(),
+            aggregate_signature: message.aggregate_signature.require()?.try_into()?,
+            signatories:         message
+                .signatories
+                .into_iter()
+                .map(From::from)
+                .collect::<Vec<super::types::BakerId>>(),
+        })
+    }
+}
+
+impl TryFrom<SuccessorProof> for super::types::block_certificates::SuccessorProof {
+    type Error = tonic::Status;
+
+    fn try_from(message: SuccessorProof) -> Result<Self, Self::Error> {
+        Ok(Self(message.value.try_into().map_err(|_| {
+            tonic::Status::invalid_argument("Malformed SuccessorProof.")
+        })?))
+    }
+}
+
+impl TryFrom<EpochFinalizationEntry> for super::types::block_certificates::EpochFinalizationEntry {
+    type Error = tonic::Status;
+
+    fn try_from(message: EpochFinalizationEntry) -> Result<Self, Self::Error> {
+        Ok(Self {
+            finalized_qc:    message.finalized_qc.require()?.try_into()?,
+            successor_qc:    message.successor_qc.require()?.try_into()?,
+            successor_proof: message.successor_proof.require()?.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<FinalizerRound> for super::types::block_certificates::FinalizerRound {
+    type Error = tonic::Status;
+
+    fn try_from(message: FinalizerRound) -> Result<Self, Self::Error> {
+        Ok(Self {
+            round:      message.round.require()?.into(),
+            finalizers: message
+                .finalizers
+                .into_iter()
+                .map(From::from)
+                .collect::<Vec<super::types::BakerId>>(),
+        })
+    }
+}
+
+impl TryFrom<TimeoutSignature> for super::types::block_certificates::TimeoutSignature {
+    type Error = tonic::Status;
+
+    fn try_from(message: TimeoutSignature) -> Result<Self, Self::Error> {
+        Ok(Self(message.value.try_into().map_err(|_| {
+            tonic::Status::invalid_argument("Malformed TimeoutSignature.")
+        })?))
+    }
+}
+
+impl TryFrom<TimeoutCertificate> for super::types::block_certificates::TimeoutCertificate {
+    type Error = tonic::Status;
+
+    fn try_from(message: TimeoutCertificate) -> Result<Self, Self::Error> {
+        Ok(
+            Self {
+                round:                  message.round.require()?.into(),
+                min_epoch:              message.min_epoch.require()?.into(),
+                qc_rounds_first_epoch:
+                    message
+                        .qc_rounds_first_epoch
+                        .into_iter()
+                        .map(TryFrom::try_from)
+                        .collect::<Result<
+                            Vec<super::types::block_certificates::FinalizerRound>,
+                            tonic::Status,
+                        >>()?,
+                qc_rounds_second_epoch:
+                    message
+                        .qc_rounds_second_epoch
+                        .into_iter()
+                        .map(TryFrom::try_from)
+                        .collect::<Result<
+                            Vec<super::types::block_certificates::FinalizerRound>,
+                            tonic::Status,
+                        >>()?,
+                aggregate_signature:    message.aggregate_signature.require()?.try_into()?,
+            },
+        )
+    }
+}
+
+impl TryFrom<BlockCertificates> for super::types::block_certificates::BlockCertificates {
+    type Error = tonic::Status;
+
+    fn try_from(message: BlockCertificates) -> Result<Self, Self::Error> {
+        Ok(Self {
+            quorum_certificate:       message
+                .quorum_certificate
+                .map(TryInto::try_into)
+                .transpose()?,
+            timeout_certificate:      message
+                .timeout_certificate
+                .map(TryInto::try_into)
+                .transpose()?,
+            epoch_finalization_entry: message
+                .epoch_finalization_entry
+                .map(TryInto::try_into)
+                .transpose()?,
+        })
+    }
+}
+
 #[cfg(test)]
 mod test {
 

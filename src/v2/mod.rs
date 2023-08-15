@@ -6,7 +6,9 @@ use crate::{
     endpoints, id,
     id::types::AccountCredentialMessage,
     types::{
-        self, hashes,
+        self,
+        block_certificates::*,
+        hashes,
         hashes::{BlockHash, TransactionHash, TransactionSignHash},
         smart_contracts::{
             ContractContext, InstanceInfo, InvokeContractResult, ModuleReference, WasmModule,
@@ -2178,6 +2180,22 @@ impl Client {
             .await?;
         let block_hash = extract_metadata(&response)?;
         let response = ChainParameters::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    pub async fn get_block_certificates(
+        &mut self,
+        bi: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<BlockCertificates>> {
+        let response = self
+            .client
+            .get_block_certificates(&bi.into_block_identifier())
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = BlockCertificates::try_from(response.into_inner())?;
         Ok(QueryResponse {
             block_hash,
             response,
