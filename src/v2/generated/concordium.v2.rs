@@ -1,25 +1,30 @@
 /// A message that contains no information.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Empty {}
 /// Hash of a block. This is always 32 bytes long.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockHash {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
 /// A SHA256 hash. This is always 32 bytes long.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Sha256Hash {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
 /// Hash of a transaction. This is always 32 bytes long.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TransactionHash {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
 /// Hash of the state after some block. This is always 32 bytes long.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StateHash {
     #[prost(bytes = "vec", tag = "1")]
@@ -28,6 +33,7 @@ pub struct StateHash {
 /// The absolute height of a block. This is the number of ancestors of a block
 /// since the genesis block. In particular, the chain genesis block has absolute
 /// height 0.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AbsoluteBlockHeight {
     #[prost(uint64, tag = "1")]
@@ -36,12 +42,14 @@ pub struct AbsoluteBlockHeight {
 /// The height of a block relative to the last genesis. This differs from the
 /// absolute block height in that it counts height from the last protocol
 /// update.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockHeight {
     #[prost(uint64, tag = "1")]
     pub value: u64,
 }
 /// The ID of a baker, which is the index of its account.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerId {
     #[prost(uint64, tag = "1")]
@@ -49,18 +57,21 @@ pub struct BakerId {
 }
 /// Index of the account in the account table. These are assigned sequentially
 /// in the order of creation of accounts. The first account has index 0.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountIndex {
     #[prost(uint64, tag = "1")]
     pub value: u64,
 }
 /// A smart contract module reference. This is always 32 bytes long.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ModuleRef {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
 /// Source bytes of a versioned smart contract module.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VersionedModuleSource {
     #[prost(oneof = "versioned_module_source::Module", tags = "1, 2")]
@@ -69,17 +80,20 @@ pub struct VersionedModuleSource {
 /// Nested message and enum types in `VersionedModuleSource`.
 pub mod versioned_module_source {
     /// Source bytes of a smart contract v0 module.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct ModuleSourceV0 {
         #[prost(bytes = "vec", tag = "1")]
         pub value: ::prost::alloc::vec::Vec<u8>,
     }
     /// Source bytes of a smart contract v1 module.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct ModuleSourceV1 {
         #[prost(bytes = "vec", tag = "1")]
         pub value: ::prost::alloc::vec::Vec<u8>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Module {
         #[prost(message, tag = "1")]
@@ -89,12 +103,14 @@ pub mod versioned_module_source {
     }
 }
 /// Unix timestamp in milliseconds.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Timestamp {
     #[prost(uint64, tag = "1")]
     pub value: u64,
 }
 /// An individual release of a locked balance.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Release {
     /// Effective time of the release in milliseconds since unix epoch.
@@ -109,6 +125,7 @@ pub struct Release {
 }
 /// A new individual release. Part of a single transfer with schedule
 /// transaction.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewRelease {
     /// Effective time of the release in milliseconds since unix epoch.
@@ -120,6 +137,7 @@ pub struct NewRelease {
 }
 /// State of the account's release schedule. This is the balance of the account
 /// that is owned by the account, but cannot be used until the release point.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ReleaseSchedule {
     /// Total amount locked in the release schedule.
@@ -134,11 +152,13 @@ pub struct ReleaseSchedule {
 /// represents the high 32 bits. The chunks are serialized in order and
 /// represented as a byte array.
 /// Always 192 bytes.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EncryptedAmount {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EncryptedBalance {
     /// Encrypted amount that is a result of this account's actions.
@@ -174,6 +194,7 @@ pub struct EncryptedBalance {
     pub incoming_amounts:  ::prost::alloc::vec::Vec<EncryptedAmount>,
 }
 /// Entity to which the account delegates a portion of its stake.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DelegationTarget {
     #[prost(oneof = "delegation_target::Target", tags = "1, 2")]
@@ -181,6 +202,7 @@ pub struct DelegationTarget {
 }
 /// Nested message and enum types in `DelegationTarget`.
 pub mod delegation_target {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Target {
         /// Delegate passively, i.e., to no specific baker.
@@ -192,6 +214,7 @@ pub mod delegation_target {
     }
 }
 /// Baker's public key used to check whether they won the lottery or not.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerElectionVerifyKey {
     #[prost(bytes = "vec", tag = "1")]
@@ -199,6 +222,7 @@ pub struct BakerElectionVerifyKey {
 }
 /// Baker's public key used to check that they are indeed the ones who
 /// produced the block.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerSignatureVerifyKey {
     #[prost(bytes = "vec", tag = "1")]
@@ -207,12 +231,14 @@ pub struct BakerSignatureVerifyKey {
 /// Baker's public key used to check signatures on finalization records.
 /// This is only used if the baker has sufficient stake to participate in
 /// finalization.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerAggregationVerifyKey {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
 /// Information about a baker.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerInfo {
     /// Identity of the baker. This is actually the account index of
@@ -233,6 +259,7 @@ pub struct BakerInfo {
     pub aggregation_key: ::core::option::Option<BakerAggregationVerifyKey>,
 }
 /// Pending change to the stake either of a baker or delegator.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StakePendingChange {
     #[prost(oneof = "stake_pending_change::Change", tags = "1, 2")]
@@ -240,6 +267,7 @@ pub struct StakePendingChange {
 }
 /// Nested message and enum types in `StakePendingChange`.
 pub mod stake_pending_change {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Reduce {
         #[prost(message, optional, tag = "1")]
@@ -248,6 +276,7 @@ pub mod stake_pending_change {
         #[prost(message, optional, tag = "2")]
         pub effective_time: ::core::option::Option<super::Timestamp>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Change {
         #[prost(message, tag = "1")]
@@ -259,6 +288,7 @@ pub mod stake_pending_change {
     }
 }
 /// A fraction of an amount with a precision of `1/100_000`.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AmountFraction {
     /// Must not exceed 100000.
@@ -266,6 +296,7 @@ pub struct AmountFraction {
     pub parts_per_hundred_thousand: u32,
 }
 /// Distribution of the rewards for the particular pool.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CommissionRates {
     /// Fraction of finalization rewards charged by the pool owner.
@@ -280,6 +311,7 @@ pub struct CommissionRates {
 }
 /// Additional information about a baking pool.
 /// This information is added with the introduction of delegation.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerPoolInfo {
     /// Whether the pool allows delegators.
@@ -294,6 +326,7 @@ pub struct BakerPoolInfo {
 }
 /// Information about the account stake, if the account is either a baker or a
 /// delegator.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountStakingInfo {
     #[prost(oneof = "account_staking_info::StakingInfo", tags = "1, 2")]
@@ -301,6 +334,7 @@ pub struct AccountStakingInfo {
 }
 /// Nested message and enum types in `AccountStakingInfo`.
 pub mod account_staking_info {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Baker {
         /// Amount staked at present.
@@ -321,6 +355,7 @@ pub mod account_staking_info {
         #[prost(message, optional, tag = "5")]
         pub pool_info:        ::core::option::Option<super::BakerPoolInfo>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Delegator {
         /// The amount that the account delegates.
@@ -336,6 +371,7 @@ pub mod account_staking_info {
         #[prost(message, optional, tag = "4")]
         pub pending_change:   ::core::option::Option<super::StakePendingChange>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum StakingInfo {
         /// The account is a baker.
@@ -348,6 +384,7 @@ pub mod account_staking_info {
 }
 /// A sequence number that determines the ordering of transactions from the
 /// account. The minimum sequence number is 1.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SequenceNumber {
     /// The sequence number.
@@ -357,6 +394,7 @@ pub struct SequenceNumber {
 /// A sequence number that determines the ordering of update transactions.
 /// Equivalent to `SequenceNumber` for account transactions.
 /// Update sequence numbers are per update type and the minimum value is 1.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateSequenceNumber {
     /// The sequence number.
@@ -364,42 +402,49 @@ pub struct UpdateSequenceNumber {
     pub value: u64,
 }
 /// An amount of microCCD.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Amount {
     #[prost(uint64, tag = "1")]
     pub value: u64,
 }
 /// Index of a credential on an account.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CredentialIndex {
     #[prost(uint32, tag = "1")]
     pub value: u32,
 }
 /// The number of signatures required to sign.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SignatureThreshold {
     #[prost(uint32, tag = "1")]
     pub value: u32,
 }
 /// The number of credentials required to sign an account transaction.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountThreshold {
     #[prost(uint32, tag = "1")]
     pub value: u32,
 }
 /// An account encryption key. Always 96 bytes.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EncryptionKey {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
 /// An address of an account. Always 32 bytes.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountAddress {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
 /// An address of either a contract or an account.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Address {
     #[prost(oneof = "address::Type", tags = "1, 2")]
@@ -407,6 +452,7 @@ pub struct Address {
 }
 /// Nested message and enum types in `Address`.
 pub mod address {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Type {
         #[prost(message, tag = "1")]
@@ -416,6 +462,7 @@ pub mod address {
     }
 }
 /// A public key used to verify transaction signatures from an account.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountVerifyKey {
     #[prost(oneof = "account_verify_key::Key", tags = "1")]
@@ -423,6 +470,7 @@ pub struct AccountVerifyKey {
 }
 /// Nested message and enum types in `AccountVerifyKey`.
 pub mod account_verify_key {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Key {
         #[prost(bytes, tag = "1")]
@@ -430,6 +478,7 @@ pub mod account_verify_key {
     }
 }
 /// Public keys of a single credential.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CredentialPublicKeys {
     #[prost(map = "uint32, message", tag = "1")]
@@ -439,6 +488,7 @@ pub struct CredentialPublicKeys {
 }
 /// A registration ID of a credential, derived from the secret PRF key and a
 /// nonce. This is always 48 bytes long.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CredentialRegistrationId {
     #[prost(bytes = "vec", tag = "1")]
@@ -446,12 +496,14 @@ pub struct CredentialRegistrationId {
 }
 /// An index of the identity provider that identifies them uniquely in the
 /// context of a specific chain.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IdentityProviderIdentity {
     #[prost(uint32, tag = "1")]
     pub value: u32,
 }
 /// Representation of the pair of a year and month.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct YearMonth {
     #[prost(uint32, tag = "1")]
@@ -460,6 +512,7 @@ pub struct YearMonth {
     pub month: u32,
 }
 /// Policy on a credential.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Policy {
     /// The year and month when the identity object from which the credential is
@@ -477,6 +530,7 @@ pub struct Policy {
     pub attributes: ::std::collections::HashMap<u32, ::prost::alloc::vec::Vec<u8>>,
 }
 /// Values contained in an initial credential.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InitialCredentialValues {
     /// Public keys of the credential.
@@ -495,6 +549,7 @@ pub struct InitialCredentialValues {
 }
 /// Data relating to a single anonymity revoker sent by the account holder to
 /// the chain.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ChainArData {
     /// Share of the encryption of IdCredPub.
@@ -503,6 +558,7 @@ pub struct ChainArData {
 }
 /// The number of anonymity revokers needed to revoke anonymity of a credential
 /// holder.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ArThreshold {
     #[prost(uint32, tag = "1")]
@@ -510,12 +566,14 @@ pub struct ArThreshold {
 }
 /// A single commitment in the G1 group of the BLS curve. This is always 48
 /// bytes in length.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Commitment {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
 /// Commitments that are part of a normal credential.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CredentialCommitments {
     /// Commitment to the PRF key.
@@ -540,6 +598,7 @@ pub struct CredentialCommitments {
     pub id_cred_sec_sharing_coeff: ::prost::alloc::vec::Vec<Commitment>,
 }
 /// Values contained in a normal (non-initial) credential.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NormalCredentialValues {
     /// Public keys of the credential.
@@ -568,6 +627,7 @@ pub struct NormalCredentialValues {
     pub commitments:  ::core::option::Option<CredentialCommitments>,
 }
 /// Credential that is part of an account.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountCredential {
     #[prost(oneof = "account_credential::CredentialValues", tags = "1, 2")]
@@ -575,6 +635,7 @@ pub struct AccountCredential {
 }
 /// Nested message and enum types in `AccountCredential`.
 pub mod account_credential {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum CredentialValues {
         #[prost(message, tag = "1")]
@@ -584,6 +645,7 @@ pub mod account_credential {
     }
 }
 /// Information about the account at a particular point in time.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountInfo {
     /// Next sequence number to be used for transactions signed from this
@@ -630,6 +692,7 @@ pub struct AccountInfo {
     pub address:           ::core::option::Option<AccountAddress>,
 }
 /// Input to queries which take a block as a parameter.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockHashInput {
     #[prost(oneof = "block_hash_input::BlockHashInput", tags = "1, 2, 3, 4, 5")]
@@ -638,6 +701,7 @@ pub struct BlockHashInput {
 /// Nested message and enum types in `BlockHashInput`.
 pub mod block_hash_input {
     /// Request using a relative block height.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct RelativeHeight {
         /// Genesis index to start from.
@@ -652,6 +716,7 @@ pub mod block_hash_input {
         #[prost(bool, tag = "3")]
         pub restrict:      bool,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum BlockHashInput {
         /// Query for the best block.
@@ -674,6 +739,7 @@ pub mod block_hash_input {
     }
 }
 /// Input to queries which take an account as a parameter.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountIdentifierInput {
     #[prost(
@@ -685,6 +751,7 @@ pub struct AccountIdentifierInput {
 }
 /// Nested message and enum types in `AccountIdentifierInput`.
 pub mod account_identifier_input {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum AccountIdentifierInput {
         /// Identify the account by the address of the account.
@@ -700,6 +767,7 @@ pub mod account_identifier_input {
     }
 }
 /// Request for account information.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountInfoRequest {
     /// Block in which to query the account information.
@@ -710,6 +778,7 @@ pub struct AccountInfoRequest {
     pub account_identifier: ::core::option::Option<AccountIdentifierInput>,
 }
 /// Information about a finalized block that is part of the streaming response.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FinalizedBlockInfo {
     /// Hash of the block.
@@ -720,6 +789,7 @@ pub struct FinalizedBlockInfo {
     pub height: ::core::option::Option<AbsoluteBlockHeight>,
 }
 /// Request the ancestors for the given block.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AncestorsRequest {
     /// The block to get ancestors of.
@@ -730,6 +800,7 @@ pub struct AncestorsRequest {
     pub amount:     u64,
 }
 /// Request for getting the source of a smart contract module.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ModuleSourceRequest {
     /// The block to be used for the query.
@@ -740,6 +811,7 @@ pub struct ModuleSourceRequest {
     pub module_ref: ::core::option::Option<ModuleRef>,
 }
 /// Address of a smart contract instance.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ContractAddress {
     /// The index of the smart contract.
@@ -751,6 +823,7 @@ pub struct ContractAddress {
     pub subindex: u64,
 }
 /// Request for getting information about a smart contract instance.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InstanceInfoRequest {
     /// The block to be used for the query.
@@ -761,6 +834,7 @@ pub struct InstanceInfoRequest {
     pub address:    ::core::option::Option<ContractAddress>,
 }
 /// Information about a smart contract instance.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InstanceInfo {
     /// The information depends on the smart contract version used by the
@@ -771,6 +845,7 @@ pub struct InstanceInfo {
 /// Nested message and enum types in `InstanceInfo`.
 pub mod instance_info {
     /// Version 0 smart contract instance information.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct V0 {
         /// The state of the instance.
@@ -793,6 +868,7 @@ pub mod instance_info {
         pub source_module: ::core::option::Option<super::ModuleRef>,
     }
     /// Version 1 smart contract instance information.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct V1 {
         /// The account address which deployed the instance.
@@ -813,6 +889,7 @@ pub mod instance_info {
     }
     /// The information depends on the smart contract version used by the
     /// instance.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Version {
         #[prost(message, tag = "1")]
@@ -822,6 +899,7 @@ pub mod instance_info {
     }
 }
 /// A smart contract instance key-value pair.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InstanceStateKvPair {
     #[prost(bytes = "vec", tag = "1")]
@@ -830,6 +908,7 @@ pub struct InstanceStateKvPair {
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
 /// Request for a specific key of a smart contract instance state.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InstanceStateLookupRequest {
     /// The block to be used for the query.
@@ -845,6 +924,7 @@ pub struct InstanceStateLookupRequest {
 }
 /// Value at the requested key of a smart contract instance state. For V0
 /// contracts this will always be the entire state of the contract.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InstanceStateValueAtKey {
     #[prost(bytes = "vec", tag = "1")]
@@ -853,6 +933,7 @@ pub struct InstanceStateValueAtKey {
 /// The receive name of a smart contract function. Expected format:
 /// `<contract_name>.<func_name>`. It must only consist of atmost 100 ASCII
 /// alphanumeric or punctuation characters, and must contain a '.'.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ReceiveName {
     #[prost(string, tag = "1")]
@@ -862,24 +943,28 @@ pub struct ReceiveName {
 /// `init_<contract_name>`. It must only consist of atmost 100 ASCII
 /// alphanumeric or punctuation characters, must not contain a '.' and must
 /// start with 'init_'.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InitName {
     #[prost(string, tag = "1")]
     pub value: ::prost::alloc::string::String,
 }
 /// Parameter to a smart contract initialization or invocation.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Parameter {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
 /// A smart contract v0 state.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ContractStateV0 {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
 /// Status of a block item known to the node.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockItemStatus {
     #[prost(oneof = "block_item_status::Status", tags = "1, 2, 3")]
@@ -887,16 +972,19 @@ pub struct BlockItemStatus {
 }
 /// Nested message and enum types in `BlockItemStatus`.
 pub mod block_item_status {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Committed {
         #[prost(message, repeated, tag = "1")]
         pub outcomes: ::prost::alloc::vec::Vec<super::BlockItemSummaryInBlock>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Finalized {
         #[prost(message, optional, tag = "1")]
         pub outcome: ::core::option::Option<super::BlockItemSummaryInBlock>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Status {
         /// Block item is received, but not yet in any blocks.
@@ -914,6 +1002,7 @@ pub mod block_item_status {
     }
 }
 /// A block item summary together with a block hash. Used in BlockItemStatus.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockItemSummaryInBlock {
     /// The block hash.
@@ -925,18 +1014,21 @@ pub struct BlockItemSummaryInBlock {
 }
 /// Energy is used to count exact execution cost.
 /// This cost is then converted to CCD amounts.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Energy {
     #[prost(uint64, tag = "1")]
     pub value: u64,
 }
 /// A number representing a slot for baking a block.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Slot {
     #[prost(uint64, tag = "1")]
     pub value: u64,
 }
 /// The response for getNextAccountSequenceNumber.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NextAccountSequenceNumber {
     /// The best guess for the available account sequence number.
@@ -948,6 +1040,7 @@ pub struct NextAccountSequenceNumber {
     pub all_final:       bool,
 }
 /// A duration of milliseconds.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Duration {
     #[prost(uint64, tag = "1")]
@@ -956,6 +1049,7 @@ pub struct Duration {
 /// A reason for why a transaction was rejected. Rejected means included in a
 /// block, but the desired action was not achieved. The only effect of a
 /// rejected transaction is payment.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RejectReason {
     #[prost(
@@ -968,6 +1062,7 @@ pub struct RejectReason {
 }
 /// Nested message and enum types in `RejectReason`.
 pub mod reject_reason {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct InvalidInitMethod {
         #[prost(message, optional, tag = "1")]
@@ -975,6 +1070,7 @@ pub mod reject_reason {
         #[prost(message, optional, tag = "2")]
         pub init_name:  ::core::option::Option<super::InitName>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct InvalidReceiveMethod {
         #[prost(message, optional, tag = "1")]
@@ -982,6 +1078,7 @@ pub mod reject_reason {
         #[prost(message, optional, tag = "2")]
         pub receive_name: ::core::option::Option<super::ReceiveName>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct AmountTooLarge {
         #[prost(message, optional, tag = "1")]
@@ -989,11 +1086,13 @@ pub mod reject_reason {
         #[prost(message, optional, tag = "2")]
         pub amount:  ::core::option::Option<super::Amount>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct RejectedInit {
         #[prost(int32, tag = "1")]
         pub reject_reason: i32,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct RejectedReceive {
         #[prost(int32, tag = "1")]
@@ -1005,16 +1104,19 @@ pub mod reject_reason {
         #[prost(message, optional, tag = "4")]
         pub parameter:        ::core::option::Option<super::Parameter>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct DuplicateCredIds {
         #[prost(message, repeated, tag = "1")]
         pub ids: ::prost::alloc::vec::Vec<super::CredentialRegistrationId>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct NonExistentCredIds {
         #[prost(message, repeated, tag = "1")]
         pub ids: ::prost::alloc::vec::Vec<super::CredentialRegistrationId>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Reason {
         /// Raised while validating a Wasm module that is not well formed.
@@ -1206,6 +1308,7 @@ pub mod reject_reason {
     }
 }
 /// Data generated as part of initializing a single contract instance.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ContractInitializedEvent {
     /// Contract version.
@@ -1229,6 +1332,7 @@ pub struct ContractInitializedEvent {
     pub events:           ::prost::alloc::vec::Vec<ContractEvent>,
 }
 /// An event generated by a smart contract.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ContractEvent {
     #[prost(bytes = "vec", tag = "1")]
@@ -1237,6 +1341,7 @@ pub struct ContractEvent {
 /// Data generated as part of updating a single contract instance.
 /// In general a single Update transaction will
 /// generate one or more of these events, together with possibly some transfers.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InstanceUpdatedEvent {
     /// Contract version.
@@ -1265,6 +1370,7 @@ pub struct InstanceUpdatedEvent {
 }
 /// Effects produced by successful smart contract invocations.
 /// A single invocation will produce a sequence of these effects.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ContractTraceElement {
     #[prost(oneof = "contract_trace_element::Element", tags = "1, 2, 3, 4, 5")]
@@ -1273,6 +1379,7 @@ pub struct ContractTraceElement {
 /// Nested message and enum types in `ContractTraceElement`.
 pub mod contract_trace_element {
     /// A contract transferred an amount to an account.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Transferred {
         /// Sender contract.
@@ -1288,6 +1395,7 @@ pub mod contract_trace_element {
     /// A contract was interrupted.
     /// This occurs when a contract invokes another contract or makes a transfer
     /// to an account.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Interrupted {
         /// The contract interrupted.
@@ -1298,6 +1406,7 @@ pub mod contract_trace_element {
         pub events:  ::prost::alloc::vec::Vec<super::ContractEvent>,
     }
     /// A previously interrupted contract was resumed.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Resumed {
         /// The contract resumed.
@@ -1309,6 +1418,7 @@ pub mod contract_trace_element {
         pub success: bool,
     }
     /// A previously interrupted contract was resumed.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Upgraded {
         /// The that was upgraded.
@@ -1321,6 +1431,7 @@ pub mod contract_trace_element {
         #[prost(message, optional, tag = "3")]
         pub to:      ::core::option::Option<super::ModuleRef>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Element {
         /// A contract instance was updated.
@@ -1343,6 +1454,7 @@ pub mod contract_trace_element {
     }
 }
 /// Result of a successful change of baker keys.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerKeysEvent {
     /// ID of the baker whose keys were changed.
@@ -1363,11 +1475,13 @@ pub struct BakerKeysEvent {
     pub aggregation_key: ::core::option::Option<BakerAggregationVerifyKey>,
 }
 /// A memo which can be included as part of a transfer. Max size is 256 bytes.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Memo {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerStakeUpdatedData {
     /// Affected baker.
@@ -1383,6 +1497,7 @@ pub struct BakerStakeUpdatedData {
 }
 /// Event generated when one or more encrypted amounts are consumed from the
 /// account.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EncryptedAmountRemovedEvent {
     /// The affected account.
@@ -1399,6 +1514,7 @@ pub struct EncryptedAmountRemovedEvent {
     pub up_to_index:  u64,
 }
 /// Event generated when an account receives a new encrypted amount.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewEncryptedAmountEvent {
     /// The account onto which the amount was added.
@@ -1411,6 +1527,7 @@ pub struct NewEncryptedAmountEvent {
     #[prost(message, optional, tag = "3")]
     pub encrypted_amount: ::core::option::Option<EncryptedAmount>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EncryptedSelfAmountAddedEvent {
     /// The affected account.
@@ -1424,12 +1541,14 @@ pub struct EncryptedSelfAmountAddedEvent {
     pub amount:     ::core::option::Option<Amount>,
 }
 /// Data registered on the chain with a register data transaction.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RegisteredData {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
 /// Events that may result from the ConfigureBaker transaction.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerEvent {
     #[prost(
@@ -1441,6 +1560,7 @@ pub struct BakerEvent {
 /// Nested message and enum types in `BakerEvent`.
 pub mod baker_event {
     /// A baker was added.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BakerAdded {
         /// The keys with which the baker registered.
@@ -1456,6 +1576,7 @@ pub mod baker_event {
         pub restake_earnings: bool,
     }
     /// Baker stake increased.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BakerStakeIncreased {
         /// Baker's id.
@@ -1465,6 +1586,7 @@ pub mod baker_event {
         #[prost(message, optional, tag = "2")]
         pub new_stake: ::core::option::Option<super::Amount>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BakerStakeDecreased {
         /// Baker's id.
@@ -1474,6 +1596,7 @@ pub mod baker_event {
         #[prost(message, optional, tag = "2")]
         pub new_stake: ::core::option::Option<super::Amount>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BakerRestakeEarningsUpdated {
         /// Baker's id.
@@ -1484,6 +1607,7 @@ pub mod baker_event {
         pub restake_earnings: bool,
     }
     /// Updated open status for a baker pool.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BakerSetOpenStatus {
         /// Baker's id.
@@ -1494,6 +1618,7 @@ pub mod baker_event {
         pub open_status: i32,
     }
     /// Updated metadata url for a baker pool.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BakerSetMetadataUrl {
         /// Baker's id.
@@ -1504,6 +1629,7 @@ pub mod baker_event {
         pub url:      ::prost::alloc::string::String,
     }
     /// Updated transaction fee commission for a baker pool.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BakerSetTransactionFeeCommission {
         /// Baker's id.
@@ -1514,6 +1640,7 @@ pub mod baker_event {
         pub transaction_fee_commission: ::core::option::Option<super::AmountFraction>,
     }
     /// Updated baking reward commission for baker pool
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BakerSetBakingRewardCommission {
         /// Baker's id
@@ -1524,6 +1651,7 @@ pub mod baker_event {
         pub baking_reward_commission: ::core::option::Option<super::AmountFraction>,
     }
     /// Updated finalization reward commission for baker pool
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BakerSetFinalizationRewardCommission {
         /// Baker's id
@@ -1533,6 +1661,7 @@ pub mod baker_event {
         #[prost(message, optional, tag = "2")]
         pub finalization_reward_commission: ::core::option::Option<super::AmountFraction>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Event {
         /// A baker was added.
@@ -1571,11 +1700,13 @@ pub mod baker_event {
     }
 }
 /// The identifier for a delegator.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DelegatorId {
     #[prost(message, optional, tag = "1")]
     pub id: ::core::option::Option<AccountIndex>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DelegationEvent {
     #[prost(oneof = "delegation_event::Event", tags = "1, 2, 3, 4, 5, 6")]
@@ -1583,6 +1714,7 @@ pub struct DelegationEvent {
 }
 /// Nested message and enum types in `DelegationEvent`.
 pub mod delegation_event {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct DelegationStakeIncreased {
         /// Delegator's id
@@ -1592,6 +1724,7 @@ pub mod delegation_event {
         #[prost(message, optional, tag = "2")]
         pub new_stake:    ::core::option::Option<super::Amount>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct DelegationStakeDecreased {
         /// Delegator's id
@@ -1601,6 +1734,7 @@ pub mod delegation_event {
         #[prost(message, optional, tag = "2")]
         pub new_stake:    ::core::option::Option<super::Amount>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct DelegationSetRestakeEarnings {
         /// Delegator's id
@@ -1610,6 +1744,7 @@ pub mod delegation_event {
         #[prost(bool, tag = "2")]
         pub restake_earnings: bool,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct DelegationSetDelegationTarget {
         /// Delegator's id
@@ -1619,6 +1754,7 @@ pub mod delegation_event {
         #[prost(message, optional, tag = "2")]
         pub delegation_target: ::core::option::Option<super::DelegationTarget>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Event {
         /// The delegator's stake increased.
@@ -1643,6 +1779,7 @@ pub mod delegation_event {
 }
 /// Effects of an account transaction. All variants except `None`
 /// correspond to a unique transaction that was successful.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountTransactionEffects {
     #[prost(
@@ -1655,6 +1792,7 @@ pub struct AccountTransactionEffects {
 pub mod account_transaction_effects {
     /// No effects other than payment from this transaction.
     /// The rejection reason indicates why the transaction failed.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct None {
         /// Transaction type of a failed transaction, if known.
@@ -1667,6 +1805,7 @@ pub mod account_transaction_effects {
     }
     /// A contract update transaction was issued and produced the given trace.
     /// This is the result of Update transaction.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct ContractUpdateIssued {
         #[prost(message, repeated, tag = "1")]
@@ -1674,6 +1813,7 @@ pub mod account_transaction_effects {
     }
     /// A simple account to account transfer occurred. This is the result of a
     /// successful Transfer transaction.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct AccountTransfer {
         /// Amount that was transferred.
@@ -1688,6 +1828,7 @@ pub mod account_transaction_effects {
     }
     /// An account was deregistered as a baker. This is the result of a
     /// successful UpdateBakerStake transaction.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BakerStakeUpdated {
         /// If the stake was updated (that is, it changed and did not stay the
@@ -1697,6 +1838,7 @@ pub mod account_transaction_effects {
     }
     /// An encrypted amount was transferred. This is the result of a successful
     /// EncryptedAmountTransfer transaction.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct EncryptedAmountTransferred {
         #[prost(message, optional, tag = "1")]
@@ -1709,6 +1851,7 @@ pub mod account_transaction_effects {
     /// An account transferred part of its encrypted balance to its public
     /// balance. This is the result of a successful TransferToPublic
     /// transaction.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct TransferredToPublic {
         #[prost(message, optional, tag = "1")]
@@ -1718,6 +1861,7 @@ pub mod account_transaction_effects {
     }
     /// A transfer with schedule was performed. This is the result of a
     /// successful TransferWithSchedule transaction.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct TransferredWithSchedule {
         /// Receiver account.
@@ -1732,6 +1876,7 @@ pub mod account_transaction_effects {
     }
     /// Account's credentials were updated. This is the result of a
     /// successful UpdateCredentials transaction.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct CredentialsUpdated {
         /// The credential ids that were added.
@@ -1746,6 +1891,7 @@ pub mod account_transaction_effects {
     }
     /// A baker was configured. The details of what happened are contained in
     /// the list of BakerEvents.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BakerConfigured {
         #[prost(message, repeated, tag = "1")]
@@ -1753,11 +1899,13 @@ pub mod account_transaction_effects {
     }
     /// An account configured delegation. The details of what happened are
     /// contained in the list of DelegationEvents.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct DelegationConfigured {
         #[prost(message, repeated, tag = "1")]
         pub events: ::prost::alloc::vec::Vec<super::DelegationEvent>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Effect {
         /// No effects other than payment from this transaction.
@@ -1825,6 +1973,7 @@ pub mod account_transaction_effects {
     }
 }
 /// Election difficulty parameter.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ElectionDifficulty {
     #[prost(message, optional, tag = "1")]
@@ -1832,6 +1981,7 @@ pub struct ElectionDifficulty {
 }
 /// Parameters that determine timeouts in the consensus protocol used from
 /// protocol version 6.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TimeoutParameters {
     /// The base value for triggering a timeout
@@ -1845,6 +1995,7 @@ pub struct TimeoutParameters {
     pub timeout_decrease: ::core::option::Option<Ratio>,
 }
 /// Finalization committee parameters used from protocol version 6
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FinalizationCommitteeParameters {
     /// The minimum size of a finalization committee before
@@ -1861,6 +2012,7 @@ pub struct FinalizationCommitteeParameters {
     pub finalizer_relative_stake_threshold: ::core::option::Option<AmountFraction>,
 }
 /// Parameters for the consensus protocol used from protocol version 6.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ConsensusParametersV1 {
     /// Parameters controlling round timeouts.
@@ -1874,12 +2026,14 @@ pub struct ConsensusParametersV1 {
     pub block_energy_limit: ::core::option::Option<Energy>,
 }
 /// Represents an exchange rate.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ExchangeRate {
     #[prost(message, optional, tag = "1")]
     pub value: ::core::option::Option<Ratio>,
 }
 /// Represents a ratio, i.e., 'numerator / denominator'.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Ratio {
     /// The numerator.
@@ -1890,6 +2044,7 @@ pub struct Ratio {
     pub denominator: u64,
 }
 /// A public key used for chain updates.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdatePublicKey {
     #[prost(bytes = "vec", tag = "1")]
@@ -1897,6 +2052,7 @@ pub struct UpdatePublicKey {
 }
 /// The threshold for how many UpdatePublicKeys are need to make a certain chain
 /// update.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateKeysThreshold {
     /// Is ensured to be within between 1 and 2^16.
@@ -1904,12 +2060,14 @@ pub struct UpdateKeysThreshold {
     pub value: u32,
 }
 /// Index of a key in an authorizations update payload.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateKeysIndex {
     #[prost(uint32, tag = "1")]
     pub value: u32,
 }
 /// Represents root or level 1 keys.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct HigherLevelKeys {
     /// The keys.
@@ -1923,6 +2081,7 @@ pub struct HigherLevelKeys {
 /// HigherLevelKeys that are allowed to make chain update of a specific type.
 /// The threshold defines the minimum number of allowed keys needed to make the
 /// actual update.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccessStructure {
     /// Unique indexes into the set of keys in AuthorizationV0.
@@ -1935,6 +2094,7 @@ pub struct AccessStructure {
 /// The set of keys authorized for chain updates, together with access
 /// structures determining which keys are authorized for which update types.
 /// This is the payload of an update to authorization.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AuthorizationsV0 {
     /// The set of keys authorized for chain updates.
@@ -1982,6 +2142,7 @@ pub struct AuthorizationsV0 {
 /// The set of keys authorized for chain updates, together with access
 /// structures determining which keys are authorized for which update types.
 /// This is the payload of an update to authorization.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AuthorizationsV1 {
     #[prost(message, optional, tag = "1")]
@@ -1996,6 +2157,7 @@ pub struct AuthorizationsV1 {
 }
 /// Description either of an anonymity revoker or identity provider.
 /// Metadata that should be visible on the chain.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Description {
     /// The name.
@@ -2011,6 +2173,7 @@ pub struct Description {
 }
 /// Information on a single anonymity revoker help by the identity provider.
 /// Typically an identity provider will hold more than one.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ArInfo {
     /// Unique identifier of the anonymity revoker.
@@ -2027,12 +2190,14 @@ pub struct ArInfo {
 pub mod ar_info {
     /// Identity of the anonymity revoker on the chain. This defines their
     /// evaluateion point for secret sharing, and thus it cannot be 0.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct ArIdentity {
         #[prost(uint32, tag = "1")]
         pub value: u32,
     }
     /// Public key of an anonymity revoker.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct ArPublicKey {
         #[prost(bytes = "vec", tag = "1")]
@@ -2042,12 +2207,14 @@ pub mod ar_info {
 /// A succinct identifier of an identity provider on the chain.
 /// In credential deployments, and other interactions with the chain this is
 /// used to identify which identity provider is meant.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IpIdentity {
     #[prost(uint32, tag = "1")]
     pub value: u32,
 }
 /// Public information about an identity provider.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IpInfo {
     /// Unique identifier of the identity provider.
@@ -2066,12 +2233,14 @@ pub struct IpInfo {
 /// Nested message and enum types in `IpInfo`.
 pub mod ip_info {
     /// Pointcheval-Sanders public key of the identity provider.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct IpVerifyKey {
         #[prost(bytes = "vec", tag = "1")]
         pub value: ::prost::alloc::vec::Vec<u8>,
     }
     /// Ed25519 public key of the identity provider.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct IpCdiVerifyKey {
         #[prost(bytes = "vec", tag = "1")]
@@ -2079,12 +2248,14 @@ pub mod ip_info {
     }
 }
 /// A duration in seconds.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DurationSeconds {
     #[prost(uint64, tag = "1")]
     pub value: u64,
 }
 /// Inclusive range of amount fractions.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InclusiveRangeAmountFraction {
     #[prost(message, optional, tag = "1")]
@@ -2093,6 +2264,7 @@ pub struct InclusiveRangeAmountFraction {
     pub max: ::core::option::Option<AmountFraction>,
 }
 /// Ranges of allowed commission values that pools may choose from.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CommissionRanges {
     /// The range of allowed finalization commissions.
@@ -2107,24 +2279,28 @@ pub struct CommissionRanges {
 }
 /// A bound on the relative share of the total staked capital that a baker can
 /// have as its stake. This is required to be greater than 0.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CapitalBound {
     #[prost(message, optional, tag = "1")]
     pub value: ::core::option::Option<AmountFraction>,
 }
 /// A leverage factor.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct LeverageFactor {
     #[prost(message, optional, tag = "1")]
     pub value: ::core::option::Option<Ratio>,
 }
 /// A chain epoch.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Epoch {
     #[prost(uint64, tag = "1")]
     pub value: u64,
 }
 /// A round.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Round {
     #[prost(uint64, tag = "1")]
@@ -2132,6 +2308,7 @@ pub struct Round {
 }
 /// Length of a reward period in epochs.
 /// Must always be a strictly positive number.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RewardPeriodLength {
     #[prost(message, optional, tag = "1")]
@@ -2139,6 +2316,7 @@ pub struct RewardPeriodLength {
 }
 /// A minting rate of CCD.
 /// The value is `mantissa * 10^(-exponent)`.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MintRate {
     #[prost(uint32, tag = "1")]
@@ -2147,6 +2325,7 @@ pub struct MintRate {
     #[prost(uint32, tag = "2")]
     pub exponent: u32,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CooldownParametersCpv1 {
     /// Number of seconds that pool owners must cooldown
@@ -2159,6 +2338,7 @@ pub struct CooldownParametersCpv1 {
     pub delegator_cooldown:  ::core::option::Option<DurationSeconds>,
 }
 /// Parameters related to staking pools.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PoolParametersCpv1 {
     /// Fraction of finalization rewards charged by the passive delegation.
@@ -2188,6 +2368,7 @@ pub struct PoolParametersCpv1 {
 /// The time parameters are introduced as of protocol version 4, and consist of
 /// the reward period length and the mint rate per payday. These are coupled as
 /// a change to either affects the overall rate of minting.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TimeParametersCpv1 {
     #[prost(message, optional, tag = "1")]
@@ -2196,6 +2377,7 @@ pub struct TimeParametersCpv1 {
     pub mint_per_payday:      ::core::option::Option<MintRate>,
 }
 /// Mint distribution payload as it looks in protocol version 4 and onward.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MintDistributionCpv1 {
     #[prost(message, optional, tag = "1")]
@@ -2203,6 +2385,7 @@ pub struct MintDistributionCpv1 {
     #[prost(message, optional, tag = "2")]
     pub finalization_reward: ::core::option::Option<AmountFraction>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ProtocolUpdate {
     /// A brief message about the update.
@@ -2222,6 +2405,7 @@ pub struct ProtocolUpdate {
 /// finalizers, and the foundation account. It must be the case that
 /// baking_reward + finalization_reward <= 1. The remaining amount is the
 /// platform development charge.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MintDistributionCpv0 {
     /// Mint rate per slot.
@@ -2235,6 +2419,7 @@ pub struct MintDistributionCpv0 {
     pub finalization_reward: ::core::option::Option<AmountFraction>,
 }
 /// Parameters determining the distribution of transaction fees.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TransactionFeeDistribution {
     /// The fraction allocated to the baker.
@@ -2245,6 +2430,7 @@ pub struct TransactionFeeDistribution {
     pub gas_account: ::core::option::Option<AmountFraction>,
 }
 /// Distribution of gas rewards for chain parameters version 0 and 1.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GasRewards {
     /// The fraction paid to the baker.
@@ -2262,6 +2448,7 @@ pub struct GasRewards {
     pub chain_update:       ::core::option::Option<AmountFraction>,
 }
 /// Distribution of gas rewards for chain parameters version 2.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GasRewardsCpv2 {
     /// The fraction paid to the baker.
@@ -2277,6 +2464,7 @@ pub struct GasRewardsCpv2 {
 }
 /// Minimum stake needed to become a baker. This only applies to protocol
 /// version 1-3.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerStakeThreshold {
     /// Minimum threshold required for registering as a baker.
@@ -2286,6 +2474,7 @@ pub struct BakerStakeThreshold {
 /// Root updates are the highest kind of key updates. They can update every
 /// other set of keys, even themselves. They can only be performed by Root level
 /// keys.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RootUpdate {
     #[prost(oneof = "root_update::UpdateType", tags = "1, 2, 3, 4")]
@@ -2293,6 +2482,7 @@ pub struct RootUpdate {
 }
 /// Nested message and enum types in `RootUpdate`.
 pub mod root_update {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum UpdateType {
         /// The root keys were updated.
@@ -2313,6 +2503,7 @@ pub mod root_update {
 /// Level 1 updates are the intermediate update kind.
 /// They can update themselves or level 2 keys. They can only be performed by
 /// level 1 keys.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Level1Update {
     #[prost(oneof = "level1_update::UpdateType", tags = "1, 2, 3")]
@@ -2320,6 +2511,7 @@ pub struct Level1Update {
 }
 /// Nested message and enum types in `Level1Update`.
 pub mod level1_update {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum UpdateType {
         /// The level 1 keys were updated.
@@ -2335,6 +2527,7 @@ pub mod level1_update {
     }
 }
 /// The payload of a chain update.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdatePayload {
     #[prost(
@@ -2345,6 +2538,7 @@ pub struct UpdatePayload {
 }
 /// Nested message and enum types in `UpdatePayload`.
 pub mod update_payload {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Payload {
         /// The protocol version was updated.
@@ -2417,6 +2611,7 @@ pub mod update_payload {
     }
 }
 /// Details about an account transaction.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountTransactionDetails {
     /// The cost of the transaction. Paid by the sender.
@@ -2432,6 +2627,7 @@ pub struct AccountTransactionDetails {
 /// Details of an account creation. These transactions are free, and we only
 /// ever get a response for them if the account is created, hence no failure
 /// cases.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountCreationDetails {
     /// Whether this is an initial or normal account.
@@ -2445,6 +2641,7 @@ pub struct AccountCreationDetails {
     pub reg_id:          ::core::option::Option<CredentialRegistrationId>,
 }
 /// Transaction time specified as seconds since unix epoch.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TransactionTime {
     #[prost(uint64, tag = "1")]
@@ -2453,6 +2650,7 @@ pub struct TransactionTime {
 /// Details of an update instruction. These are free, and we only ever get a
 /// response for them if the update is successfully enqueued, hence no failure
 /// cases.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateDetails {
     /// The time at which the update will be effective.
@@ -2464,6 +2662,7 @@ pub struct UpdateDetails {
 }
 /// Summary of the outcome of a block item in structured form.
 /// The summary determines which transaction type it was.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockItemSummary {
     /// Index of the transaction in the block where it is included.
@@ -2481,12 +2680,14 @@ pub struct BlockItemSummary {
 }
 /// Nested message and enum types in `BlockItemSummary`.
 pub mod block_item_summary {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct TransactionIndex {
         #[prost(uint64, tag = "1")]
         pub value: u64,
     }
     /// Details that are specific to different transaction types.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Details {
         /// Detailsa about an account transaction.
@@ -2504,12 +2705,14 @@ pub mod block_item_summary {
 /// protocol update instruction might not change the protocol version
 /// specified in the previous field, but it always increments the genesis
 /// index.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GenesisIndex {
     #[prost(uint32, tag = "1")]
     pub value: u32,
 }
 /// The response for GetConsensusInfo.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ConsensusInfo {
     /// Hash of the current best block.
@@ -2632,6 +2835,7 @@ pub struct ConsensusInfo {
     pub trigger_block_time:          ::core::option::Option<Timestamp>,
 }
 /// Information about an arrived block that is part of the streaming response.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ArrivedBlockInfo {
     /// Hash of the block.
@@ -2642,6 +2846,7 @@ pub struct ArrivedBlockInfo {
     pub height: ::core::option::Option<AbsoluteBlockHeight>,
 }
 /// The response for GetCryptographicParameters.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CryptographicParameters {
     /// A free-form string used to distinguish between different chains even if
@@ -2662,6 +2867,7 @@ pub struct CryptographicParameters {
     pub on_chain_commitment_key: ::prost::alloc::vec::Vec<u8>,
 }
 /// The response for GetBlockInfo.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockInfo {
     /// Hash of the block.
@@ -2729,6 +2935,7 @@ pub struct BlockInfo {
     pub epoch:                    ::core::option::Option<Epoch>,
 }
 /// Request for GetPoolInfo.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PoolInfoRequest {
     /// Block in which to query the pool information.
@@ -2739,6 +2946,7 @@ pub struct PoolInfoRequest {
     pub baker:      ::core::option::Option<BakerId>,
 }
 /// A pending change to a baker pool.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PoolPendingChange {
     #[prost(oneof = "pool_pending_change::Change", tags = "1, 2")]
@@ -2747,6 +2955,7 @@ pub struct PoolPendingChange {
 /// Nested message and enum types in `PoolPendingChange`.
 pub mod pool_pending_change {
     /// A reduction in baker equity capital is pending.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Reduce {
         /// New baker equity capital.
@@ -2757,12 +2966,14 @@ pub mod pool_pending_change {
         pub effective_time:         ::core::option::Option<super::Timestamp>,
     }
     /// Removal of the pool is pending.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Remove {
         /// Timestamp when the change takes effect.
         #[prost(message, optional, tag = "1")]
         pub effective_time: ::core::option::Option<super::Timestamp>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Change {
         #[prost(message, tag = "1")]
@@ -2772,6 +2983,7 @@ pub mod pool_pending_change {
     }
 }
 /// Information about a baker pool in the current reward period.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PoolCurrentPaydayInfo {
     /// The number of blocks baked in the current reward period.
@@ -2800,6 +3012,7 @@ pub struct PoolCurrentPaydayInfo {
 }
 /// Type for the response of GetPoolInfo.
 /// Contains information about a given pool at the end of a given block.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PoolInfoResponse {
     /// The 'BakerId' of the pool owner.
@@ -2834,6 +3047,7 @@ pub struct PoolInfoResponse {
 }
 /// Type for the response of GetPassiveDelegationInfo.
 /// Contains information about passive delegators at the end of a given block.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PassiveDelegationInfo {
     /// The total capital delegated passively.
@@ -2855,6 +3069,7 @@ pub struct PassiveDelegationInfo {
     pub all_pool_total_capital: ::core::option::Option<Amount>,
 }
 /// Request for GetBlocksAtHeight.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlocksAtHeightRequest {
     #[prost(oneof = "blocks_at_height_request::BlocksAtHeight", tags = "1, 2")]
@@ -2863,6 +3078,7 @@ pub struct BlocksAtHeightRequest {
 /// Nested message and enum types in `BlocksAtHeightRequest`.
 pub mod blocks_at_height_request {
     /// Request using an absolute block height.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Absolute {
         /// The absolute block height.
@@ -2870,6 +3086,7 @@ pub mod blocks_at_height_request {
         pub height: ::core::option::Option<super::AbsoluteBlockHeight>,
     }
     /// Request using a relative block height.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Relative {
         /// Genesis index to start from.
@@ -2884,6 +3101,7 @@ pub mod blocks_at_height_request {
         #[prost(bool, tag = "3")]
         pub restrict:      bool,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum BlocksAtHeight {
         #[prost(message, tag = "1")]
@@ -2893,6 +3111,7 @@ pub mod blocks_at_height_request {
     }
 }
 /// Response for GetBlocksAtHeight.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlocksAtHeightResponse {
     /// Live blocks at the given height.
@@ -2901,6 +3120,7 @@ pub struct BlocksAtHeightResponse {
 }
 /// Type for the response of GetTokenomicsInfo.
 /// Contains information related to tokenomics at the end of a given block.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TokenomicsInfo {
     #[prost(oneof = "tokenomics_info::Tokenomics", tags = "1, 2")]
@@ -2909,6 +3129,7 @@ pub struct TokenomicsInfo {
 /// Nested message and enum types in `TokenomicsInfo`.
 pub mod tokenomics_info {
     /// Version 0 tokenomics.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct V0 {
         /// The total CCD in existence.
@@ -2931,6 +3152,7 @@ pub mod tokenomics_info {
         pub protocol_version:            i32,
     }
     /// Version 1 tokenomics.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct V1 {
         /// The total CCD in existence.
@@ -2966,6 +3188,7 @@ pub mod tokenomics_info {
         #[prost(enumeration = "super::ProtocolVersion", tag = "10")]
         pub protocol_version:               i32,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Tokenomics {
         #[prost(message, tag = "1")]
@@ -2975,6 +3198,7 @@ pub mod tokenomics_info {
     }
 }
 /// Request for InvokeInstance.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InvokeInstanceRequest {
     /// Block to invoke the contract. The invocation will be at the end of the
@@ -3007,6 +3231,7 @@ pub struct InvokeInstanceRequest {
     pub energy:     ::core::option::Option<Energy>,
 }
 /// Response type for InvokeInstance.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InvokeInstanceResponse {
     #[prost(oneof = "invoke_instance_response::Result", tags = "1, 2")]
@@ -3015,6 +3240,7 @@ pub struct InvokeInstanceResponse {
 /// Nested message and enum types in `InvokeInstanceResponse`.
 pub mod invoke_instance_response {
     /// Contract execution failed.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Failure {
         /// If invoking a V0 contract this is not provided, otherwise it is
@@ -3032,6 +3258,7 @@ pub mod invoke_instance_response {
         pub reason:       ::core::option::Option<super::RejectReason>,
     }
     /// Contract execution succeeded.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Success {
         /// If invoking a V0 contract this is absent. Otherwise it is the return
@@ -3045,6 +3272,7 @@ pub mod invoke_instance_response {
         #[prost(message, repeated, tag = "3")]
         pub effects:      ::prost::alloc::vec::Vec<super::ContractTraceElement>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Result {
         #[prost(message, tag = "1")]
@@ -3054,6 +3282,7 @@ pub mod invoke_instance_response {
     }
 }
 /// Request for GetPoolDelegators and GetPoolDelegatorsRewardPeriod.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetPoolDelegatorsRequest {
     /// Block in which to query the delegators.
@@ -3064,6 +3293,7 @@ pub struct GetPoolDelegatorsRequest {
     pub baker:      ::core::option::Option<BakerId>,
 }
 /// Stream item for GetPoolDelegators and GetPassiveDelegators.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DelegatorInfo {
     /// The delegator account address.
@@ -3078,6 +3308,7 @@ pub struct DelegatorInfo {
 }
 /// Stream item for GetPoolDelegatorsRewardPeriod and
 /// GetPassiveDelegatorsRewardPeriod.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DelegatorRewardPeriodInfo {
     /// The delegator account address.
@@ -3088,6 +3319,7 @@ pub struct DelegatorRewardPeriodInfo {
     pub stake:   ::core::option::Option<Amount>,
 }
 /// Response type for GetBranches.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Branch {
     /// The hash of the block.
@@ -3100,6 +3332,7 @@ pub struct Branch {
 /// The leadership election nonce is an unpredictable value updated once an
 /// epoch to make sure that bakers cannot predict too far in the future when
 /// they will win the right to bake blocks.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct LeadershipElectionNonce {
     #[prost(bytes = "vec", tag = "1")]
@@ -3107,6 +3340,7 @@ pub struct LeadershipElectionNonce {
 }
 /// Response type for GetElectionInfo.
 /// Contains information related to baker election for a perticular block.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ElectionInfo {
     /// Baking lottery election difficulty. Present only in protocol versions
@@ -3122,6 +3356,7 @@ pub struct ElectionInfo {
 }
 /// Nested message and enum types in `ElectionInfo`.
 pub mod election_info {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Baker {
         /// The ID of the baker.
@@ -3139,6 +3374,7 @@ pub mod election_info {
 /// A protocol generated event that is not directly caused by a transaction.
 /// This includes minting new CCD, rewarding different bakers and delegators,
 /// etc.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockSpecialEvent {
     #[prost(oneof = "block_special_event::Event", tags = "1, 2, 3, 4, 5, 6, 7, 8")]
@@ -3147,6 +3383,7 @@ pub struct BlockSpecialEvent {
 /// Nested message and enum types in `BlockSpecialEvent`.
 pub mod block_special_event {
     /// A representation of a mapping from an account address to an amount.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct AccountAmounts {
         #[prost(message, repeated, tag = "1")]
@@ -3155,6 +3392,7 @@ pub mod block_special_event {
     /// Nested message and enum types in `AccountAmounts`.
     pub mod account_amounts {
         /// The entry for the map.
+        #[allow(clippy::derive_partial_eq_without_eq)]
         #[derive(Clone, PartialEq, ::prost::Message)]
         pub struct Entry {
             /// The key type
@@ -3167,6 +3405,7 @@ pub mod block_special_event {
     }
     /// Payment to each baker of a previous epoch, in proportion to the number
     /// of blocks they contributed.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BakingRewards {
         /// The amount awarded to each baker.
@@ -3177,6 +3416,7 @@ pub mod block_special_event {
         pub remainder:     ::core::option::Option<super::Amount>,
     }
     /// Minting of new CCD.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Mint {
         /// The amount allocated to the banking reward account.
@@ -3194,6 +3434,7 @@ pub mod block_special_event {
     }
     /// Payment to each finalizer on inclusion of a finalization record in a
     /// block.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct FinalizationRewards {
         /// The amount awarded to each finalizer.
@@ -3208,6 +3449,7 @@ pub mod block_special_event {
     ///
     /// ```transaction_fees + old_gas_account = new_gas_account + baker_reward +
     /// foundation_charge```
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BlockReward {
         /// The total fees paid for transactions in the block.
@@ -3233,6 +3475,7 @@ pub mod block_special_event {
         pub foundation_account: ::core::option::Option<super::AccountAddress>,
     }
     /// Foundation tax.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct PaydayFoundationReward {
         /// The account that got rewarded.
@@ -3243,6 +3486,7 @@ pub mod block_special_event {
         pub development_charge: ::core::option::Option<super::Amount>,
     }
     /// Reward payment to the given account.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct PaydayAccountReward {
         /// The account that got rewarded.
@@ -3259,6 +3503,7 @@ pub mod block_special_event {
         pub finalization_reward: ::core::option::Option<super::Amount>,
     }
     /// Amounts accrued to accounts for each baked block.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BlockAccrueReward {
         /// The total fees paid for transactions in the block.
@@ -3284,6 +3529,7 @@ pub mod block_special_event {
         pub baker:             ::core::option::Option<super::BakerId>,
     }
     /// Payment distributed to a pool or passive delegators.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct PaydayPoolReward {
         /// The pool owner (passive delegators when not present).
@@ -3299,6 +3545,7 @@ pub mod block_special_event {
         #[prost(message, optional, tag = "4")]
         pub finalization_reward: ::core::option::Option<super::Amount>,
     }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Event {
         #[prost(message, tag = "1")]
@@ -3320,6 +3567,7 @@ pub mod block_special_event {
     }
 }
 /// A pending update.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PendingUpdate {
     /// The effective time of the update.
@@ -3336,6 +3584,7 @@ pub struct PendingUpdate {
 /// Nested message and enum types in `PendingUpdate`.
 pub mod pending_update {
     /// The effect of the update.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Effect {
         /// Updates to the root keys.
@@ -3420,6 +3669,7 @@ pub mod pending_update {
     }
 }
 /// The response for `GetNextUpdateSequenceNumbers`.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NextUpdateSequenceNumbers {
     /// Updates to the root keys.
@@ -3488,6 +3738,7 @@ pub struct NextUpdateSequenceNumbers {
 }
 /// A request to send a new block item to the chain.
 /// An IP address
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IpAddress {
     #[prost(string, tag = "1")]
@@ -3496,6 +3747,7 @@ pub struct IpAddress {
 /// A port
 /// Valid port numbers are expected thus
 /// the value is expected to be in the range (0..u16::MAX).
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Port {
     #[prost(uint32, tag = "1")]
@@ -3503,6 +3755,7 @@ pub struct Port {
 }
 /// A socket address consisting of
 /// an IP + port.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IpSocketAddress {
     #[prost(message, optional, tag = "1")]
@@ -3516,12 +3769,14 @@ pub struct IpSocketAddress {
 /// The underlying value is simply a u64.
 /// Note. There is no authenticity of the peer id and
 /// as such it is only used for logging purposes.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PeerId {
     #[prost(string, tag = "1")]
     pub value: ::prost::alloc::string::String,
 }
 /// A banned peer
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BannedPeer {
     /// The IP address of the banned peer.
@@ -3530,6 +3785,7 @@ pub struct BannedPeer {
 }
 /// The banned peers given by
 /// their IP addresses.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BannedPeers {
     #[prost(message, repeated, tag = "1")]
@@ -3538,12 +3794,14 @@ pub struct BannedPeers {
 /// A peer to ban specified by its IP.
 /// Note. This will ban all peers located behind the
 /// specified IP even though they are using different ports.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PeerToBan {
     #[prost(message, optional, tag = "1")]
     pub ip_address: ::core::option::Option<IpAddress>,
 }
 /// Request to enable dumping of network packages.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DumpRequest {
     /// Which file to dump the packages into.
@@ -3555,6 +3813,7 @@ pub struct DumpRequest {
     pub raw:  bool,
 }
 /// Peers and their associated network related statistics
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PeersInfo {
     #[prost(message, repeated, tag = "1")]
@@ -3563,6 +3822,7 @@ pub struct PeersInfo {
 /// Nested message and enum types in `PeersInfo`.
 pub mod peers_info {
     /// A peer that the node is connected to.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Peer {
         /// The identifier of the peer that it
@@ -3582,6 +3842,7 @@ pub mod peers_info {
     /// Nested message and enum types in `Peer`.
     pub mod peer {
         /// Network statistics for the peer
+        #[allow(clippy::derive_partial_eq_without_eq)]
         #[derive(Clone, PartialEq, ::prost::Message)]
         pub struct NetworkStats {
             /// The number of messages sent to the peer.
@@ -3639,8 +3900,20 @@ pub mod peers_info {
                     CatchupStatus::Catchingup => "CATCHINGUP",
                 }
             }
+
+            /// Creates an enum from field names used in the ProtoBuf
+            /// definition.
+            pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+                match value {
+                    "UPTODATE" => Some(Self::Uptodate),
+                    "PENDING" => Some(Self::Pending),
+                    "CATCHINGUP" => Some(Self::Catchingup),
+                    _ => None,
+                }
+            }
         }
         /// consensus related information of the peer.
+        #[allow(clippy::derive_partial_eq_without_eq)]
         #[derive(Clone, PartialEq, ::prost::Oneof)]
         pub enum ConsensusInfo {
             /// The peer is of type `Bootstrapper` is not participating in
@@ -3657,6 +3930,7 @@ pub mod peers_info {
 /// Node info response
 /// Contains various information of the
 /// enquired node.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NodeInfo {
     /// The version of the node.
@@ -3679,6 +3953,7 @@ pub struct NodeInfo {
 /// Nested message and enum types in `NodeInfo`.
 pub mod node_info {
     /// Network related information of the node.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct NetworkInfo {
         /// The node id.
@@ -3698,6 +3973,7 @@ pub mod node_info {
         pub avg_bps_out:         u64,
     }
     /// Consensus info for a node configured with baker keys.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BakerConsensusInfo {
         #[prost(message, optional, tag = "1")]
@@ -3711,11 +3987,13 @@ pub mod node_info {
         /// Tagging message type for a node that
         /// is configured with baker keys and active in
         /// the current baking committee
+        #[allow(clippy::derive_partial_eq_without_eq)]
         #[derive(Clone, PartialEq, ::prost::Message)]
         pub struct ActiveBakerCommitteeInfo {}
         /// Tagging message type for a node that
         /// is configured with baker keys and active in
         /// the current finalizer committee (and also baking committee).
+        #[allow(clippy::derive_partial_eq_without_eq)]
         #[derive(Clone, PartialEq, ::prost::Message)]
         pub struct ActiveFinalizerCommitteeInfo {}
         /// The committee information of a node configured with
@@ -3753,8 +4031,20 @@ pub mod node_info {
                     PassiveCommitteeInfo::AddedButWrongKeys => "ADDED_BUT_WRONG_KEYS",
                 }
             }
+
+            /// Creates an enum from field names used in the ProtoBuf
+            /// definition.
+            pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+                match value {
+                    "NOT_IN_COMMITTEE" => Some(Self::NotInCommittee),
+                    "ADDED_BUT_NOT_ACTIVE_IN_COMMITTEE" => Some(Self::AddedButNotActiveInCommittee),
+                    "ADDED_BUT_WRONG_KEYS" => Some(Self::AddedButWrongKeys),
+                    _ => None,
+                }
+            }
         }
         /// Status of the baker configured node.
+        #[allow(clippy::derive_partial_eq_without_eq)]
         #[derive(Clone, PartialEq, ::prost::Oneof)]
         pub enum Status {
             /// The node is currently not baking.
@@ -3771,6 +4061,7 @@ pub mod node_info {
         }
     }
     /// The node is a regular node.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Node {
         #[prost(oneof = "node::ConsensusStatus", tags = "1, 2, 3")]
@@ -3778,6 +4069,7 @@ pub mod node_info {
     }
     /// Nested message and enum types in `Node`.
     pub mod node {
+        #[allow(clippy::derive_partial_eq_without_eq)]
         #[derive(Clone, PartialEq, ::prost::Oneof)]
         pub enum ConsensusStatus {
             /// The node is not running consensus.
@@ -3800,6 +4092,7 @@ pub mod node_info {
         }
     }
     /// Details of the node.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Details {
         /// The node is a bootstrapper and is not running consensus.
@@ -3811,6 +4104,7 @@ pub mod node_info {
         Node(Node),
     }
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SendBlockItemRequest {
     #[prost(oneof = "send_block_item_request::BlockItem", tags = "1, 2, 3")]
@@ -3818,6 +4112,7 @@ pub struct SendBlockItemRequest {
 }
 /// Nested message and enum types in `SendBlockItemRequest`.
 pub mod send_block_item_request {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum BlockItem {
         /// Account transactions are messages which are signed and paid for by
@@ -3839,6 +4134,7 @@ pub mod send_block_item_request {
 /// Credential deployments create new accounts. They are not paid for
 /// directly by the sender. Instead, bakers are rewarded by the protocol for
 /// including them.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CredentialDeployment {
     #[prost(message, optional, tag = "1")]
@@ -3850,6 +4146,7 @@ pub struct CredentialDeployment {
 /// Nested message and enum types in `CredentialDeployment`.
 pub mod credential_deployment {
     /// The credential to be added.
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Payload {
         /// A raw payload, which is just the encoded payload.
@@ -3860,6 +4157,7 @@ pub mod credential_deployment {
 }
 /// A single signature. Used when sending block items to a node with
 /// `SendBlockItem`.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Signature {
     #[prost(bytes = "vec", tag = "1")]
@@ -3867,6 +4165,7 @@ pub struct Signature {
 }
 /// Wrapper for a map from indexes to signatures.
 /// Needed because protobuf doesn't allow nested maps directly.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SignatureMap {
     #[prost(map = "uint32, message", tag = "1")]
@@ -3875,11 +4174,13 @@ pub struct SignatureMap {
 /// Wrapper for a map from indexes to signatures.
 /// Needed because protobuf doesn't allow nested maps directly.
 /// The keys in the SignatureMap must not exceed 2^8.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountSignatureMap {
     #[prost(map = "uint32, message", tag = "1")]
     pub signatures: ::std::collections::HashMap<u32, Signature>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountTransactionSignature {
     /// A map from `CredentialIndex` to `SignatureMap`s.
@@ -3891,6 +4192,7 @@ pub struct AccountTransactionSignature {
 /// Header of an account transaction that contains basic data to check whether
 /// the sender and the transaction are valid. The header is shared by all
 /// transaction types.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountTransactionHeader {
     /// Sender of the transaction.
@@ -3907,6 +4209,7 @@ pub struct AccountTransactionHeader {
     pub expiry:          ::core::option::Option<TransactionTime>,
 }
 /// Data required to initialize a new contract instance.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InitContractPayload {
     /// Amount of CCD to send to the instance.
@@ -3924,6 +4227,7 @@ pub struct InitContractPayload {
     pub parameter:  ::core::option::Option<Parameter>,
 }
 /// Data required to update a contract instance.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateContractPayload {
     /// Amount of CCD to send to the instance.
@@ -3941,6 +4245,7 @@ pub struct UpdateContractPayload {
     pub parameter:    ::core::option::Option<Parameter>,
 }
 /// Payload of a transfer between two accounts.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TransferPayload {
     /// Amount of CCD to send.
@@ -3951,6 +4256,7 @@ pub struct TransferPayload {
     pub receiver: ::core::option::Option<AccountAddress>,
 }
 /// Payload of a transfer between two accounts with a memo.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TransferWithMemoPayload {
     /// Amount of CCD to send.
@@ -3964,6 +4270,7 @@ pub struct TransferWithMemoPayload {
     pub memo:     ::core::option::Option<Memo>,
 }
 /// The payload for an account transaction.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountTransactionPayload {
     #[prost(
@@ -3974,6 +4281,7 @@ pub struct AccountTransactionPayload {
 }
 /// Nested message and enum types in `AccountTransactionPayload`.
 pub mod account_transaction_payload {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Payload {
         /// A pre-serialized payload in the binary serialization format defined
@@ -3997,6 +4305,7 @@ pub mod account_transaction_payload {
 }
 /// An unsigned account transaction. This is used with the
 /// `GetTransactionSignHash` endpoint to obtain the message to sign.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PreAccountTransaction {
     #[prost(message, optional, tag = "1")]
@@ -4006,6 +4315,7 @@ pub struct PreAccountTransaction {
 }
 /// Account transactions are messages which are signed and paid for by the
 /// sender account.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountTransaction {
     #[prost(message, optional, tag = "1")]
@@ -4015,6 +4325,7 @@ pub struct AccountTransaction {
     #[prost(message, optional, tag = "3")]
     pub payload:   ::core::option::Option<AccountTransactionPayload>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateInstructionSignature {
     /// A map from `UpdateKeysIndex` to `Signature`.
@@ -4023,6 +4334,7 @@ pub struct UpdateInstructionSignature {
     #[prost(map = "uint32, message", tag = "1")]
     pub signatures: ::std::collections::HashMap<u32, Signature>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateInstructionHeader {
     #[prost(message, optional, tag = "1")]
@@ -4033,6 +4345,7 @@ pub struct UpdateInstructionHeader {
     pub timeout:         ::core::option::Option<TransactionTime>,
 }
 /// The payload for an UpdateInstruction.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateInstructionPayload {
     #[prost(oneof = "update_instruction_payload::Payload", tags = "3")]
@@ -4040,6 +4353,7 @@ pub struct UpdateInstructionPayload {
 }
 /// Nested message and enum types in `UpdateInstructionPayload`.
 pub mod update_instruction_payload {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Payload {
         /// A raw payload encoded according to the format defined by the
@@ -4048,6 +4362,7 @@ pub mod update_instruction_payload {
         RawPayload(::prost::alloc::vec::Vec<u8>),
     }
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateInstruction {
     /// A map from `UpdateKeysIndex` to `Signature`. Keys must not exceed 2^16.
@@ -4060,6 +4375,7 @@ pub struct UpdateInstruction {
 }
 /// Signature on an account transaction is defined to be the signature on the
 /// hash of the `PreAccountTransaction`.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountTransactionSignHash {
     #[prost(bytes = "vec", tag = "1")]
@@ -4067,12 +4383,14 @@ pub struct AccountTransactionSignHash {
 }
 /// The number of credential deployments allowed in a block. This in effect
 /// determines the number of accounts that can be created in a block.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CredentialsPerBlockLimit {
     #[prost(uint32, tag = "1")]
     pub value: u32,
 }
 /// Updatable chain parameters that apply to protocol versions 1-3.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ChainParametersV0 {
     /// Election difficulty for consensus lottery.
@@ -4117,6 +4435,7 @@ pub struct ChainParametersV0 {
     pub level2_keys:                  ::core::option::Option<AuthorizationsV0>,
 }
 /// Updatable chain parameters that apply to protocol versions 4-5.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ChainParametersV1 {
     /// Election difficulty for consensus lottery.
@@ -4166,6 +4485,7 @@ pub struct ChainParametersV1 {
     pub level2_keys:                  ::core::option::Option<AuthorizationsV1>,
 }
 /// Updatable chain parameters that apply to protocol versions 6.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ChainParametersV2 {
     /// Consensus parameters.
@@ -4218,6 +4538,7 @@ pub struct ChainParametersV2 {
     pub finalization_committee_parameters: ::core::option::Option<FinalizationCommitteeParameters>,
 }
 /// Chain parameters.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ChainParameters {
     #[prost(oneof = "chain_parameters::Parameters", tags = "1, 2, 3")]
@@ -4225,6 +4546,7 @@ pub struct ChainParameters {
 }
 /// Nested message and enum types in `ChainParameters`.
 pub mod chain_parameters {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Parameters {
         /// Chain parameters that apply when the block is a protocol version 1-3
@@ -4242,6 +4564,7 @@ pub mod chain_parameters {
     }
 }
 /// Details about a finalizer for the finalization round.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FinalizationSummaryParty {
     /// Baker ID. Every finalizer is in particular a baker.
@@ -4258,12 +4581,14 @@ pub struct FinalizationSummaryParty {
 }
 /// Index of the finalization round. This increases on each successfully
 /// completed finalization.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FinalizationIndex {
     #[prost(uint64, tag = "1")]
     pub value: u64,
 }
 /// Details about a finalization record included in a block.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FinalizationSummary {
     /// Block that was finalized by the finalization record.
@@ -4281,6 +4606,7 @@ pub struct FinalizationSummary {
     pub finalizers: ::prost::alloc::vec::Vec<FinalizationSummaryParty>,
 }
 /// Finalization summary that may or may not be part of the block.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockFinalizationSummary {
     #[prost(oneof = "block_finalization_summary::Summary", tags = "1, 2")]
@@ -4288,6 +4614,7 @@ pub struct BlockFinalizationSummary {
 }
 /// Nested message and enum types in `BlockFinalizationSummary`.
 pub mod block_finalization_summary {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Summary {
         /// There is no finalization data in the block.
@@ -4298,6 +4625,7 @@ pub mod block_finalization_summary {
         Record(super::FinalizationSummary),
     }
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockItem {
     /// The hash of the block item that identifies it to the chain.
@@ -4308,6 +4636,7 @@ pub struct BlockItem {
 }
 /// Nested message and enum types in `BlockItem`.
 pub mod block_item {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum BlockItem {
         /// Account transactions are messages which are signed and paid for by
@@ -4326,6 +4655,7 @@ pub mod block_item {
         UpdateInstruction(super::UpdateInstruction),
     }
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerRewardPeriodInfo {
     /// The baker id and public keys for the baker.
@@ -4371,6 +4701,16 @@ impl OpenStatus {
             OpenStatus::ClosedForAll => "OPEN_STATUS_CLOSED_FOR_ALL",
         }
     }
+
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "OPEN_STATUS_OPEN_FOR_ALL" => Some(Self::OpenForAll),
+            "OPEN_STATUS_CLOSED_FOR_NEW" => Some(Self::ClosedForNew),
+            "OPEN_STATUS_CLOSED_FOR_ALL" => Some(Self::ClosedForAll),
+            _ => None,
+        }
+    }
 }
 /// Version of smart contract.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
@@ -4389,6 +4729,15 @@ impl ContractVersion {
         match self {
             ContractVersion::V0 => "V0",
             ContractVersion::V1 => "V1",
+        }
+    }
+
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "V0" => Some(Self::V0),
+            "V1" => Some(Self::V1),
+            _ => None,
         }
     }
 }
@@ -4411,6 +4760,15 @@ impl CredentialType {
         match self {
             CredentialType::Initial => "CREDENTIAL_TYPE_INITIAL",
             CredentialType::Normal => "CREDENTIAL_TYPE_NORMAL",
+        }
+    }
+
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "CREDENTIAL_TYPE_INITIAL" => Some(Self::Initial),
+            "CREDENTIAL_TYPE_NORMAL" => Some(Self::Normal),
+            _ => None,
         }
     }
 }
@@ -4469,6 +4827,35 @@ impl UpdateType {
             UpdateType::UpdateFinalizationCommitteeParameters => {
                 "UPDATE_FINALIZATION_COMMITTEE_PARAMETERS"
             }
+        }
+    }
+
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "UPDATE_PROTOCOL" => Some(Self::UpdateProtocol),
+            "UPDATE_ELECTION_DIFFICULTY" => Some(Self::UpdateElectionDifficulty),
+            "UPDATE_EURO_PER_ENERGY" => Some(Self::UpdateEuroPerEnergy),
+            "UPDATE_MICRO_CCD_PER_EURO" => Some(Self::UpdateMicroCcdPerEuro),
+            "UPDATE_FOUNDATION_ACCOUNT" => Some(Self::UpdateFoundationAccount),
+            "UPDATE_MINT_DISTRIBUTION" => Some(Self::UpdateMintDistribution),
+            "UPDATE_TRANSACTION_FEE_DISTRIBUTION" => Some(Self::UpdateTransactionFeeDistribution),
+            "UPDATE_GAS_REWARDS" => Some(Self::UpdateGasRewards),
+            "UPDATE_POOL_PARAMETERS" => Some(Self::UpdatePoolParameters),
+            "ADD_ANONYMITY_REVOKER" => Some(Self::AddAnonymityRevoker),
+            "ADD_IDENTITY_PROVIDER" => Some(Self::AddIdentityProvider),
+            "UPDATE_ROOT_KEYS" => Some(Self::UpdateRootKeys),
+            "UPDATE_LEVEL1_KEYS" => Some(Self::UpdateLevel1Keys),
+            "UPDATE_LEVEL2_KEYS" => Some(Self::UpdateLevel2Keys),
+            "UPDATE_COOLDOWN_PARAMETERS" => Some(Self::UpdateCooldownParameters),
+            "UPDATE_TIME_PARAMETERS" => Some(Self::UpdateTimeParameters),
+            "UPDATE_TIMEOUT_PARAMETERS" => Some(Self::UpdateTimeoutParameters),
+            "UPDATE_MIN_BLOCK_TIME" => Some(Self::UpdateMinBlockTime),
+            "UPDATE_BLOCK_ENERGY_LIMIT" => Some(Self::UpdateBlockEnergyLimit),
+            "UPDATE_FINALIZATION_COMMITTEE_PARAMETERS" => {
+                Some(Self::UpdateFinalizationCommitteeParameters)
+            }
+            _ => None,
         }
     }
 }
@@ -4531,6 +4918,34 @@ impl TransactionType {
             TransactionType::ConfigureDelegation => "CONFIGURE_DELEGATION",
         }
     }
+
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "DEPLOY_MODULE" => Some(Self::DeployModule),
+            "INIT_CONTRACT" => Some(Self::InitContract),
+            "UPDATE" => Some(Self::Update),
+            "TRANSFER" => Some(Self::Transfer),
+            "ADD_BAKER" => Some(Self::AddBaker),
+            "REMOVE_BAKER" => Some(Self::RemoveBaker),
+            "UPDATE_BAKER_STAKE" => Some(Self::UpdateBakerStake),
+            "UPDATE_BAKER_RESTAKE_EARNINGS" => Some(Self::UpdateBakerRestakeEarnings),
+            "UPDATE_BAKER_KEYS" => Some(Self::UpdateBakerKeys),
+            "UPDATE_CREDENTIAL_KEYS" => Some(Self::UpdateCredentialKeys),
+            "ENCRYPTED_AMOUNT_TRANSFER" => Some(Self::EncryptedAmountTransfer),
+            "TRANSFER_TO_ENCRYPTED" => Some(Self::TransferToEncrypted),
+            "TRANSFER_TO_PUBLIC" => Some(Self::TransferToPublic),
+            "TRANSFER_WITH_SCHEDULE" => Some(Self::TransferWithSchedule),
+            "UPDATE_CREDENTIALS" => Some(Self::UpdateCredentials),
+            "REGISTER_DATA" => Some(Self::RegisterData),
+            "TRANSFER_WITH_MEMO" => Some(Self::TransferWithMemo),
+            "ENCRYPTED_AMOUNT_TRANSFER_WITH_MEMO" => Some(Self::EncryptedAmountTransferWithMemo),
+            "TRANSFER_WITH_SCHEDULE_AND_MEMO" => Some(Self::TransferWithScheduleAndMemo),
+            "CONFIGURE_BAKER" => Some(Self::ConfigureBaker),
+            "CONFIGURE_DELEGATION" => Some(Self::ConfigureDelegation),
+            _ => None,
+        }
+    }
 }
 /// The different versions of the protocol.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
@@ -4557,6 +4972,19 @@ impl ProtocolVersion {
             ProtocolVersion::ProtocolVersion4 => "PROTOCOL_VERSION_4",
             ProtocolVersion::ProtocolVersion5 => "PROTOCOL_VERSION_5",
             ProtocolVersion::ProtocolVersion6 => "PROTOCOL_VERSION_6",
+        }
+    }
+
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "PROTOCOL_VERSION_1" => Some(Self::ProtocolVersion1),
+            "PROTOCOL_VERSION_2" => Some(Self::ProtocolVersion2),
+            "PROTOCOL_VERSION_3" => Some(Self::ProtocolVersion3),
+            "PROTOCOL_VERSION_4" => Some(Self::ProtocolVersion4),
+            "PROTOCOL_VERSION_5" => Some(Self::ProtocolVersion5),
+            "PROTOCOL_VERSION_6" => Some(Self::ProtocolVersion6),
+            _ => None,
         }
     }
 }
@@ -5502,8 +5930,8 @@ pub mod queries_client {
             self.inner.unary(request.into_request(), path, codec).await
         }
 
-        //// Get a list of the peers that the node is connected to
-        //// and assoicated network related information for each peer.
+        /// / Get a list of the peers that the node is connected to
+        /// / and assoicated network related information for each peer.
         pub async fn get_peers_info(
             &mut self,
             request: impl tonic::IntoRequest<super::Empty>,
