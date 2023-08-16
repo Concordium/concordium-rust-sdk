@@ -1,4 +1,4 @@
-//! Test the `GetBakerEarlistWinTime` endpoint.
+//! Test the `GetBakerEarliestWinTime` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
 use structopt::StructOpt;
