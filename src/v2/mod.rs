@@ -2081,6 +2081,12 @@ impl Client {
 
     /// Get the projected earliest time a baker wins the opportunity to bake a
     /// block.
+    /// If the baker is not a baker for the current reward period then then the
+    /// timestamp returned is the projected time of the first block of the
+    /// new reward period.
+    /// Note that the endpoint is only available on a node running consensus
+    /// version 1, if the node is running consensus version 0, then an error
+    /// will be returned.
     pub async fn get_baker_earliest_win_time(
         &mut self,
         bid: types::BakerId,
