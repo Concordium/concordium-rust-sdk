@@ -876,7 +876,7 @@ mod block_summary_parser {
         protocol_version: super::ProtocolVersion,
         #[serde(flatten)]
         // parse first into a value
-        data: super::BlockSummaryData<serde_json::Value>,
+        data:             super::BlockSummaryData<serde_json::Value>,
     }
 
     impl std::convert::TryFrom<BlockSummaryRaw> for super::BlockSummary {
@@ -2236,6 +2236,18 @@ pub struct NodeInfo {
     pub network_info: NetworkInfo,
     /// Information related to consensus for the node.
     pub details:      NodeDetails,
+}
+
+/// A baker that has won a round in consensus version 1.
+#[derive(Debug)]
+pub struct WinningBaker {
+    /// The round that was won.
+    pub round:   Round,
+    /// The id of the baker that won the round.
+    pub winner:  BakerId,
+    /// Whether the block that was made (if any) is
+    /// part of the authorative chain i.e. the block became finalized.
+    pub present: bool,
 }
 
 #[derive(Debug, SerdeDeserialize)]
