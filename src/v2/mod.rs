@@ -852,6 +852,14 @@ impl IntoRequest<generated::PoolInfoRequest> for (&BlockIdentifier, types::Baker
     }
 }
 
+impl IntoRequest<generated::BakerId> for types::BakerId {
+    fn into_request(self) -> tonic::Request<generated::BakerId> {
+        tonic::Request::new(generated::BakerId {
+            value: self.id.index,
+        })
+    }
+}
+
 impl IntoRequest<generated::BlocksAtHeightRequest> for &endpoints::BlocksAtHeightInput {
     fn into_request(self) -> tonic::Request<generated::BlocksAtHeightRequest> {
         tonic::Request::new(self.into())
@@ -2069,6 +2077,18 @@ impl Client {
             .await?;
         let node_info = types::NodeInfo::try_from(response.into_inner())?;
         Ok(node_info)
+    }
+
+    /// Get the projected earliest time a baker wins the opportunity to bake a
+    /// block.
+    pub async fn get_baker_earliest_win_time(
+        &mut self,
+        bid: types::BakerId,
+    ) -> endpoints::RPCResult<chrono::DateTime<chrono::Utc>> {
+        let ts = self.client.get_baker_earliest_win_time(bid).await?;
+        let local_time = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
+            + chrono::Duration::milliseconds(ts.into_inner().value as i64);
+        Ok(local_time)
     }
 
     /// Get the transaction events in a given block. If the block does not exist

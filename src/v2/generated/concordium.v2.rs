@@ -3009,6 +3009,9 @@ pub struct PoolCurrentPaydayInfo {
     /// period.
     #[prost(message, optional, tag = "7")]
     pub delegated_capital:       ::core::option::Option<Amount>,
+    /// The commission rates that apply for the current reward period.
+    #[prost(message, optional, tag = "8")]
+    pub commission_rates:        ::core::option::Option<CommissionRates>,
 }
 /// Type for the response of GetPoolInfo.
 /// Contains information about a given pool at the end of a given block.
@@ -4655,6 +4658,166 @@ pub mod block_item {
         UpdateInstruction(super::UpdateInstruction),
     }
 }
+/// Information about a particular baker with respect to
+/// the current reward period.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct BakerRewardPeriodInfo {
+    /// The baker id and public keys for the baker.
+    #[prost(message, optional, tag = "1")]
+    pub baker:             ::core::option::Option<BakerInfo>,
+    /// The effective stake of the baker for the consensus protocol.
+    /// The returned amount accounts for delegation, capital bounds and leverage
+    /// bounds.
+    #[prost(message, optional, tag = "2")]
+    pub effective_stake:   ::core::option::Option<Amount>,
+    /// The effective commission rate for the baker that applies for the reward
+    /// period.
+    #[prost(message, optional, tag = "3")]
+    pub commission_rates:  ::core::option::Option<CommissionRates>,
+    /// The amount staked by the baker itself.
+    #[prost(message, optional, tag = "4")]
+    pub equity_capital:    ::core::option::Option<Amount>,
+    /// The total amount of capital delegated to this baker pool.
+    #[prost(message, optional, tag = "5")]
+    pub delegated_capital: ::core::option::Option<Amount>,
+    /// Whether the baker is a finalizer or not.
+    #[prost(bool, tag = "6")]
+    pub is_finalizer:      bool,
+}
+/// The signature of a 'QuorumCertificate'.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct QuorumSignature {
+    /// The bytes representing the raw aggregate signature.
+    /// The bytes have a fixed length of 48 bytes.
+    #[prost(bytes = "vec", tag = "1")]
+    pub value: ::prost::alloc::vec::Vec<u8>,
+}
+/// A quorum certificate is the certificate that the
+/// finalization comittee issues in order to certify a block.
+/// A block must be certified before it will be part of the
+/// authorative part of the chain.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct QuorumCertificate {
+    /// The hash of the block that the quorum certificate refers to.
+    #[prost(message, optional, tag = "1")]
+    pub block_hash:          ::core::option::Option<BlockHash>,
+    /// The round of the block.
+    #[prost(message, optional, tag = "2")]
+    pub round:               ::core::option::Option<Round>,
+    /// The epoch of the block.
+    #[prost(message, optional, tag = "3")]
+    pub epoch:               ::core::option::Option<Epoch>,
+    /// The aggregated signature by the finalization committee on the block.
+    #[prost(message, optional, tag = "4")]
+    pub aggregate_signature: ::core::option::Option<QuorumSignature>,
+    /// A list of the finalizers that formed the quorum certificate
+    /// i.e., the ones who have contributed to the 'aggregate_siganture'.
+    /// The finalizers are identified by their baker id as this is stable
+    /// across protocols and epochs.
+    #[prost(message, repeated, tag = "5")]
+    pub signatories:         ::prost::alloc::vec::Vec<BakerId>,
+}
+/// The finalizer round is a map from a 'Round'
+/// to the list of finalizers (identified by their 'BakerId') that signed
+/// off the round.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FinalizerRound {
+    /// The round that was signed off.
+    #[prost(message, optional, tag = "1")]
+    pub round:      ::core::option::Option<Round>,
+    /// The finalizers (identified by their 'BakerId' that
+    /// signed off the in 'round'.
+    #[prost(message, repeated, tag = "2")]
+    pub finalizers: ::prost::alloc::vec::Vec<BakerId>,
+}
+/// The signature of a 'TimeoutCertificate'.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TimeoutSignature {
+    /// The bytes representing the raw aggregate signature.
+    /// The bytes have a fixed length of 48 bytes.
+    #[prost(bytes = "vec", tag = "1")]
+    pub value: ::prost::alloc::vec::Vec<u8>,
+}
+/// A timeout certificate is the certificate that the
+/// finalization committee issues when a round times out,
+/// thus making it possible for the protocol to proceed to the
+/// next round.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TimeoutCertificate {
+    /// The round that timed out.
+    #[prost(message, optional, tag = "1")]
+    pub round:                  ::core::option::Option<Round>,
+    /// The minimum epoch of which signatures are included
+    /// in the 'aggregate_signature'.
+    #[prost(message, optional, tag = "2")]
+    pub min_epoch:              ::core::option::Option<Epoch>,
+    /// The rounds of which finalizers have their best
+    /// QCs in the 'min_epoch'.
+    #[prost(message, repeated, tag = "3")]
+    pub qc_rounds_first_epoch:  ::prost::alloc::vec::Vec<FinalizerRound>,
+    /// The rounds of which finalizers have their best
+    /// QCs in the epoch 'min_epoch' + 1.
+    #[prost(message, repeated, tag = "4")]
+    pub qc_rounds_second_epoch: ::prost::alloc::vec::Vec<FinalizerRound>,
+    /// The aggregated signature by the finalization committee that witnessed
+    /// the 'round' timed out.
+    #[prost(message, optional, tag = "5")]
+    pub aggregate_signature:    ::core::option::Option<TimeoutSignature>,
+}
+/// A proof that establishes that the successor block of
+/// a 'EpochFinalizationEntry' is the immediate successor of
+/// the finalized block.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SuccessorProof {
+    /// The proof represented as raw bytes.
+    /// The bytes have a fixed length of 32 bytes.
+    #[prost(bytes = "vec", tag = "1")]
+    pub value: ::prost::alloc::vec::Vec<u8>,
+}
+/// The epoch finalization entry is the proof that
+/// makes the protocol able to advance to a new epoch.
+/// I.e. the 'EpochFinalizationEntry' is present if and only if
+/// the block is the first block of a new 'Epoch'.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EpochFinalizationEntry {
+    /// The quorum certificate for the finalized block.
+    #[prost(message, optional, tag = "1")]
+    pub finalized_qc:    ::core::option::Option<QuorumCertificate>,
+    /// The quorum certificate for the block that finalizes
+    /// the block that 'finalized_qc' points to.
+    #[prost(message, optional, tag = "2")]
+    pub successor_qc:    ::core::option::Option<QuorumCertificate>,
+    /// A proof that the successor block is an immediate
+    /// successor of the finalized block.
+    #[prost(message, optional, tag = "3")]
+    pub successor_proof: ::core::option::Option<SuccessorProof>,
+}
+/// Certificates for a block for protocols supporting
+/// ConcordiumBFT.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct BlockCertificates {
+    /// The quorum certificate. Is present if and only if the block is
+    /// not a genesis block.
+    #[prost(message, optional, tag = "1")]
+    pub quorum_certificate:       ::core::option::Option<QuorumCertificate>,
+    /// The timeout certificate. Is present only if the round prior to the
+    /// round of the block timed out.
+    #[prost(message, optional, tag = "2")]
+    pub timeout_certificate:      ::core::option::Option<TimeoutCertificate>,
+    /// The epoch finalization entry. Is present only if the block initiates
+    /// a new epoch.
+    #[prost(message, optional, tag = "3")]
+    pub epoch_finalization_entry: ::core::option::Option<EpochFinalizationEntry>,
+}
 /// Information about how open the pool is to new delegators.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
@@ -5761,6 +5924,43 @@ pub mod queries_client {
             self.inner.unary(request.into_request(), path, codec).await
         }
 
+        /// Get the projected earliest time at which a particular baker will be
+        /// required to bake a block. If the current consensus version
+        /// is 0, this returns the status 'Unavailable', as the endpoint
+        /// is only supported by consensus version 1.
+        ///
+        /// If the baker is not a baker for the current reward period, this
+        /// returns a timestamp at the start of the next reward period.
+        /// If the baker is a baker for the current reward period, the
+        /// earliest win time is projected from the current round forward,
+        /// assuming that each round after the last finalized round will
+        /// take the minimum block time. (If blocks take longer, or timeouts
+        /// occur, the actual time may be later, and the reported time in
+        /// subsequent queries may reflect this.) At the end of an epoch
+        /// (or if the baker is not projected to bake before the end of the
+        /// epoch) the earliest win time for a (current) baker will be projected
+        /// as the start of the next epoch. This is because the seed for
+        /// the leader election is updated at the epoch boundary, and so
+        /// the winners cannot be predicted beyond that. Note that in some
+        /// circumstances the returned timestamp can be in the past,
+        /// especially at the end of an epoch.
+        pub async fn get_baker_earliest_win_time(
+            &mut self,
+            request: impl tonic::IntoRequest<super::BakerId>,
+        ) -> Result<tonic::Response<super::Timestamp>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetBakerEarliestWinTime",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
+        }
+
         /// Shut down the node.
         /// Return a GRPC error if the shutdown failed.
         pub async fn shutdown(
@@ -6049,6 +6249,55 @@ pub mod queries_client {
             self.inner
                 .server_streaming(request.into_request(), path, codec)
                 .await
+        }
+
+        /// Get all bakers in the reward period of a block.
+        /// This endpoint is only supported for protocol version 6 and onwards.
+        /// If the protocol does not support the endpoint then an
+        /// 'IllegalArgument' error is returned.
+        pub async fn get_bakers_reward_period(
+            &mut self,
+            request: impl tonic::IntoRequest<super::BlockHashInput>,
+        ) -> Result<
+            tonic::Response<tonic::codec::Streaming<super::BakerRewardPeriodInfo>>,
+            tonic::Status,
+        > {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetBakersRewardPeriod",
+            );
+            self.inner
+                .server_streaming(request.into_request(), path, codec)
+                .await
+        }
+
+        /// For a non-genesis block, this returns the quorum certificate, a
+        /// timeout certificate (if present) and epoch finalization
+        /// entry (if present). Note that, if the block being pointed to
+        /// is not a product of ConcordiumBFT, then the response will be
+        /// a grpc error (invalid argument). If the endpoint is not
+        /// enabled by the node, then an 'unimplemented' error
+        /// will be returned.
+        pub async fn get_block_certificates(
+            &mut self,
+            request: impl tonic::IntoRequest<super::BlockHashInput>,
+        ) -> Result<tonic::Response<super::BlockCertificates>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path =
+                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetBlockCertificates");
+            self.inner.unary(request.into_request(), path, codec).await
         }
     }
 }
