@@ -19,6 +19,7 @@
 - Add a new `web3id` module that contains types and functionality for
   construcing Web3ID credentials and verifying Web3ID proofs.
 - Support for `GetWinningBakersEpoch`.
+- Support for `GetFirstBlockEpoch`.
 
 ### Breaking changes in types
 - `ConsensusInfo`
