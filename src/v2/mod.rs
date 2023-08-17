@@ -14,7 +14,6 @@ use crate::{
         transactions::{self, InitContractPayload, UpdateContractPayload, UpdateInstruction},
         AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, Energy, Memo, Nonce,
         RegisteredData, SpecialTransactionOutcome, TransactionStatus, UpdateSequenceNumber,
-        WinningBaker,
     },
 };
 use concordium_base::{
@@ -249,7 +248,7 @@ pub enum EpochIdentifierFromStrError {
 /// Parse a string as an [`EpochIdentifier`]. The format is one of the
 /// following:
 ///
-/// - a string starting with `%` followed by two integers separated by `/` for
+/// - a string starting with `%` followed by two integers separated by `,` for
 ///   [`Relative`](EpochIdentifier::Relative). First componet is treated as the
 ///   genesis index and the second component as the epoch.
 /// - a string starting with `@` followed by a [`BlockIdentifier`] for
@@ -259,9 +258,9 @@ impl std::str::FromStr for EpochIdentifier {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Some(rest) = s.strip_prefix('%') {
-            if let Some((gen_idx_str, epoch_str)) = rest.split_once('/') {
+            if let Some((gen_idx_str, epoch_str)) = rest.split_once(',') {
                 let genesis_index = GenesisIndex::from_str(gen_idx_str)
-                    .map_err(|_| EpochIdentifierFromStrError::InvalidEpoch)?;
+                    .map_err(|_| EpochIdentifierFromStrError::InvalidGenesis)?;
                 let epoch = Epoch::from_str(epoch_str)
                     .map_err(|_| EpochIdentifierFromStrError::InvalidEpoch)?;
                 Ok(Self::Relative(RelativeEpoch {
@@ -273,6 +272,39 @@ impl std::str::FromStr for EpochIdentifier {
             }
         } else {
             Ok(Self::Block(BlockIdentifier::from_str(s)?))
+        }
+    }
+}
+
+impl IntoRequest<generated::EpochRequest> for &EpochIdentifier {
+    fn into_request(self) -> tonic::Request<generated::EpochRequest> {
+        tonic::Request::new(self.into())
+    }
+}
+
+impl From<&EpochIdentifier> for generated::EpochRequest {
+    fn from(ei: &EpochIdentifier) -> Self {
+        match ei {
+            EpochIdentifier::Relative(RelativeEpoch {
+                genesis_index,
+                epoch,
+            }) => generated::EpochRequest {
+                epoch_request_input: Some(
+                    generated::epoch_request::EpochRequestInput::RelativeEpoch(
+                        generated::epoch_request::RelativeEpoch {
+                            genesis_index: Some(generated::GenesisIndex {
+                                value: genesis_index.height,
+                            }),
+                            epoch:         Some(generated::Epoch { value: epoch.epoch }),
+                        },
+                    ),
+                ),
+            },
+            EpochIdentifier::Block(bi) => generated::EpochRequest {
+                epoch_request_input: Some(generated::epoch_request::EpochRequestInput::BlockHash(
+                    bi.into(),
+                )),
+            },
         }
     }
 }
@@ -1127,7 +1159,7 @@ impl IntoEpochIdentifier for EpochIdentifier {
     fn into_epoch_identifier(self) -> EpochIdentifier { self }
 }
 
-pub impl IntoEpochIdentifier for RelativeEpoch {
+impl IntoEpochIdentifier for RelativeEpoch {
     fn into_epoch_identifier(self) -> EpochIdentifier { EpochIdentifier::Relative(self) }
 }
 
@@ -2225,6 +2257,24 @@ impl Client {
         })
     }
 
+    /// Get the winning bakers of an historical `Epoch`.
+    /// The stream ends when there are no more rounds for the epoch specified.
+    pub async fn get_winning_bakers_epoch(
+        &mut self,
+        ei: impl IntoEpochIdentifier,
+    ) -> endpoints::QueryResult<impl Stream<Item = Result<types::WinningBaker, tonic::Status>>>
+    {
+        let response = self
+            .client
+            .get_winning_bakers_epoch(&ei.into_epoch_identifier())
+            .await?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(wb) => wb.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(stream)
+    }
+
     /// Get next available sequence numbers for updating chain parameters after
     /// a given block. If the block does not exist then [`QueryError::NotFound`]
     /// is returned.
@@ -2281,28 +2331,6 @@ impl Client {
         Ok(QueryResponse {
             block_hash,
             response,
-        })
-    }
-
-    /// Get the winning bakers of an historical `Epoch`,
-    /// hence the epoch queried must be finalized.
-    pub async fn get_winning_bakers_epoch(
-        &mut self,
-        eid: impl IntoEpochIdentifier,
-    ) -> endpoints::QueryResult<impl Stream<Item = Result<types::WinningBaker, tonic::Status>>>
-    {
-        let response = self
-            .client
-            .get_winning_bakers_epoch(&eid.into_epoch_identifier())
-            .await?;
-        let block_hash = extract_metadata(&response)?;
-        let stream = response.into_inner().map(|result| match result {
-            Ok(update) => update.try_into(),
-            Err(err) => Err(err),
-        });
-        Ok(QueryResponse {
-            block_hash,
-            response: stream,
         })
     }
 
