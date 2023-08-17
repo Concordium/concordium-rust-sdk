@@ -18,6 +18,7 @@
 - Add a `Cis4Contract` for interacting with Cis4 contracts.
 - Add a new `web3id` module that contains types and functionality for
   construcing Web3ID credentials and verifying Web3ID proofs.
+- Support for `GetWinningBakersEpoch`.
 
 ### Breaking changes in types
 - `ConsensusInfo`
