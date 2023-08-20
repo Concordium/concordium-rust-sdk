@@ -185,7 +185,7 @@ async fn main() -> anyhow::Result<()> {
     println!("{}", serde_json::to_string_pretty(&params_p4).unwrap());
     println!("{}", base16_encode_string(&params_p4));
     {
-        std::fs::write("p4-payload.bin", &to_bytes(&params_p4))?;
+        std::fs::write("p4-payload.bin", to_bytes(&params_p4))?;
     }
 
     let p4 = ProtocolUpdate {

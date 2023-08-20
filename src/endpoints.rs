@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use crate::{
     constants::DEFAULT_NETWORK_ID,
     generated_types::{
@@ -154,6 +155,7 @@ pub enum BlocksAtHeightInput {
 }
 
 #[derive(Debug, Clone)]
+#[deprecated(note = "Use the v2 [`Client`](../v2/struct.Client.html) instead.")]
 /// Client that can perform queries.
 /// All endpoints take a `&mut self` as an argument which means that a single
 /// instance cannot be used concurrently. However instead of putting the Client

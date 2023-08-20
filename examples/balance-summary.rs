@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! List accounts with the most liquid balance, and total stake, total amount,
 //! and total liquid amount of accounts. Additionally list contracts with at
 //! most CCD owned.

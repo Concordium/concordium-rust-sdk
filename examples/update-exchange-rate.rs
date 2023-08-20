@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! An example showing how to do a simple update of the exchange rate between
 //! CCD and EUR.
 use anyhow::Context;
