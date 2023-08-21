@@ -26,7 +26,7 @@ pub enum Cis4QueryError {
     #[error("Invalid receive name: {0}")]
     InvalidReceiveName(#[from] contracts_common::NewReceiveNameError),
 
-    /// A general RPC error occured.
+    /// A general RPC error occurred.
     #[error("RPC error: {0}")]
     RPCError(#[from] super::v2::QueryError),
 
@@ -67,7 +67,7 @@ pub enum Cis4TransactionError {
     #[error("Parameter is too large: {0}")]
     InvalidParams(#[from] ExceedsParameterSize),
 
-    /// A general RPC error occured.
+    /// A general RPC error occurred.
     #[error("RPC error: {0}")]
     RPCError(#[from] super::v2::RPCError),
 
