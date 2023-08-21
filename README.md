@@ -124,7 +124,7 @@ The SDK relies on files generated from [protobuf schemas](https://github.com/Con
 These files are committed to the repository so that users of the SDK do not have to have the
 protobuf compiler installed in order to use the SDK.
 
-Occassionally there is a need to update the generated files, if the schemas
+Occasionally there is a need to update the generated files, if the schemas
 change. This can be done by compiling the SDK using the `generate-protos`
 feature, i.e.,
 
