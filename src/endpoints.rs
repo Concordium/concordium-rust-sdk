@@ -896,7 +896,7 @@ impl Client {
     /// This is a low-level function that can be useful in case a transaction is
     /// constructed by a third party. It avoids deserializing and converting
     /// data.
-    /// If the transaciton is accepted by the node then the transaction hash
+    /// If the transaction is accepted by the node then the transaction hash
     /// that can be used to query the status is returned.
     pub async fn send_raw_account_transaction(
         &mut self,
