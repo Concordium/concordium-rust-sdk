@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{

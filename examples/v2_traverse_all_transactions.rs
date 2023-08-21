@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Traverse all transactions on the chain from a given block backwards.
 //! This is mainly used to test integration and compatibility of the SDK with
 //! the node.

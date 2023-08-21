@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! List initial accounts created between two given timestamps.
 use anyhow::Context;
 use clap::AppSettings;
@@ -140,7 +141,7 @@ async fn main() -> anyhow::Result<()> {
     let accounts = client.get_account_list(&end_block.block_hash).await?;
 
     for accs in accounts.chunks(app.num) {
-        let mut handles = Vec::with_capacity(app.num as usize);
+        let mut handles = Vec::with_capacity(app.num);
         for &acc in accs {
             let mut client = client.clone();
             let block = end_block.block_hash;

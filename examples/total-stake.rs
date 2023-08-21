@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! List total equity, total delegated stake, and effective stake.
 use clap::AppSettings;
 use concordium_rust_sdk::{

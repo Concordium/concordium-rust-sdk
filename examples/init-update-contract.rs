@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Basic example that shows how to initialize and update a smart contract.
 //!
 //! In particular, it uses the "weather" contract which is part of the
