@@ -23,7 +23,7 @@ pub enum DatabaseSummaryEntry {
     /// result of user actions, e.g., transfers, account creations.
     BlockItem(BlockItemSummary),
     #[serde(rename = "Right")]
-    /// Protocol genereated event, such as baking and finalization rewards, and
+    /// Protocol generated event, such as baking and finalization rewards, and
     /// minting.
     ProtocolEvent(SpecialTransactionOutcome),
 }
