@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! List all account creations in a given time span.
 use anyhow::Context;
 use clap::AppSettings;
