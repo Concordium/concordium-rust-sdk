@@ -2244,11 +2244,11 @@ pub struct NodeInfo {
 /// Information of a baker for a certain reward period.
 #[derive(Debug)]
 pub struct BakerRewardPeriodInfo {
-    /// Metadata for the baker.
+    /// Baker id and public keys.
     pub baker:             BakerInfo,
     /// The stake of the baker that the
     /// consensus protocol uses to determine lottery weight.
-    /// I.e. this is the stake after applying leverage bound and caps.
+    /// This is the stake after applying leverage bound and caps.
     /// If the baker is also a finalizer then the effective stake is
     /// also used to calculate the weight that the baker votes with as part of
     /// the finalization committee.
