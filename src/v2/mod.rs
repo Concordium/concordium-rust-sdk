@@ -2247,6 +2247,7 @@ impl Client {
 
     /// Get the winning bakers of an historical `Epoch`.
     /// The stream ends when there are no more rounds for the epoch specified.
+    /// This only works for epochs in at least protocol version 6.
     pub async fn get_winning_bakers_epoch(
         &mut self,
         ei: impl Into<EpochIdentifier>,
