@@ -2249,7 +2249,7 @@ pub struct WinningBaker {
     /// The id of the baker that won the round.
     pub winner:  BakerId,
     /// Whether the block that was made (if any) is
-    /// part of the authorative chain i.e. the block became finalized.
+    /// part of the finalized chain.
     pub present: bool,
 }
 

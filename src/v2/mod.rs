@@ -215,9 +215,9 @@ pub enum AccountIdentifier {
     Index(crate::types::AccountIndex),
 }
 
-/// Identifier for a relative epoch.
+/// Identifier for an [`Epoch`] relative to the specified genesis index.
 #[derive(Debug, Copy, Clone)]
-pub struct RelativeEpoch {
+pub struct SpecifiedEpoch {
     /// Genesis index to query in.
     pub genesis_index: types::GenesisIndex,
     /// The epoch of the genesis to query.
@@ -228,7 +228,7 @@ pub struct RelativeEpoch {
 #[derive(Copy, Clone, Debug, derive_more::From)]
 pub enum EpochIdentifier {
     /// A relative epoch to query.
-    Relative(RelativeEpoch),
+    Specified(SpecifiedEpoch),
     /// Query the epoch of the block.
     Block(BlockIdentifier),
 }
@@ -249,8 +249,8 @@ pub enum EpochIdentifierFromStrError {
 /// following:
 ///
 /// - a string starting with `%` followed by two integers separated by `,` for
-///   [`Relative`](EpochIdentifier::Relative). First componet is treated as the
-///   genesis index and the second component as the epoch.
+///   [`Specified`](EpochIdentifier::Specified). First component is treated as
+///   the genesis index and the second component as the epoch.
 /// - a string starting with `@` followed by a [`BlockIdentifier`] for
 ///   [`Block`](EpochIdentifier::Block).
 impl std::str::FromStr for EpochIdentifier {
@@ -263,7 +263,7 @@ impl std::str::FromStr for EpochIdentifier {
                     .map_err(|_| EpochIdentifierFromStrError::InvalidGenesis)?;
                 let epoch = Epoch::from_str(epoch_str)
                     .map_err(|_| EpochIdentifierFromStrError::InvalidEpoch)?;
-                Ok(Self::Relative(RelativeEpoch {
+                Ok(Self::Specified(SpecifiedEpoch {
                     genesis_index,
                     epoch,
                 }))
@@ -285,7 +285,7 @@ impl IntoRequest<generated::EpochRequest> for &EpochIdentifier {
 impl From<&EpochIdentifier> for generated::EpochRequest {
     fn from(ei: &EpochIdentifier) -> Self {
         match ei {
-            EpochIdentifier::Relative(RelativeEpoch {
+            EpochIdentifier::Specified(SpecifiedEpoch {
                 genesis_index,
                 epoch,
             }) => generated::EpochRequest {
@@ -1153,18 +1153,6 @@ impl IntoBlockIdentifier for RelativeBlockHeight {
 
 pub trait IntoEpochIdentifier {
     fn into_epoch_identifier(self) -> EpochIdentifier;
-}
-
-impl IntoEpochIdentifier for EpochIdentifier {
-    fn into_epoch_identifier(self) -> EpochIdentifier { self }
-}
-
-impl IntoEpochIdentifier for RelativeEpoch {
-    fn into_epoch_identifier(self) -> EpochIdentifier { EpochIdentifier::Relative(self) }
-}
-
-impl IntoEpochIdentifier for BlockIdentifier {
-    fn into_epoch_identifier(self) -> EpochIdentifier { EpochIdentifier::Block(self) }
 }
 
 impl Client {
@@ -2261,13 +2249,10 @@ impl Client {
     /// The stream ends when there are no more rounds for the epoch specified.
     pub async fn get_winning_bakers_epoch(
         &mut self,
-        ei: impl IntoEpochIdentifier,
+        ei: impl Into<EpochIdentifier>,
     ) -> endpoints::QueryResult<impl Stream<Item = Result<types::WinningBaker, tonic::Status>>>
     {
-        let response = self
-            .client
-            .get_winning_bakers_epoch(&ei.into_epoch_identifier())
-            .await?;
+        let response = self.client.get_winning_bakers_epoch(&ei.into()).await?;
         let stream = response.into_inner().map(|result| match result {
             Ok(wb) => wb.try_into(),
             Err(err) => Err(err),
