@@ -2264,7 +2264,7 @@ impl Client {
     /// Get the first block of the epoch.
     pub async fn get_first_block_epoch(
         &mut self,
-        ei: impl IntoEpochIdentifier,
+        ei: impl Into<EpochIdentifier>,
     ) -> endpoints::QueryResult<BlockHash> {
         let response = self
             .client
