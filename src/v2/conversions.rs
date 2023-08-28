@@ -3,9 +3,11 @@
 
 use super::generated::*;
 
-use crate::types::{queries::ConcordiumBFTDetails, UpdateKeysCollectionSkeleton};
-
 use super::Require;
+use crate::{
+    types::{queries::ConcordiumBFTDetails, UpdateKeysCollectionSkeleton},
+    v2::generated::BlockCertificates,
+};
 use chrono::TimeZone;
 use concordium_base::{
     base,
@@ -3241,15 +3243,15 @@ impl TryFrom<BlockCertificates> for super::types::block_certificates::BlockCerti
         Ok(Self {
             quorum_certificate:       message
                 .quorum_certificate
-                .map(TryInto::try_into)
+                .map(TryFrom::try_from)
                 .transpose()?,
             timeout_certificate:      message
                 .timeout_certificate
-                .map(TryInto::try_into)
+                .map(TryFrom::try_from)
                 .transpose()?,
             epoch_finalization_entry: message
                 .epoch_finalization_entry
-                .map(TryInto::try_into)
+                .map(TryFrom::try_from)
                 .transpose()?,
         })
     }
