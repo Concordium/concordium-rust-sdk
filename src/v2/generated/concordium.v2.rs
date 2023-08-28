@@ -6366,6 +6366,8 @@ pub mod queries_client {
         ///    finalized for a past genesis index.
         ///  * `INVALID_ARGUMENT` if the query is for a genesis index at
         ///    consensus version 0.
+        ///  * `INVALID_ARGUMENT` if the input `EpochRequest` is malformed.
+        ///  * `UNAVAILABLE` if the endpoint is disabled on the node.
         pub async fn get_winning_bakers_epoch(
             &mut self,
             request: impl tonic::IntoRequest<super::EpochRequest>,
@@ -6395,6 +6397,8 @@ pub mod queries_client {
         ///    in the current genesis index, or is for a future genesis index.
         ///  * `INVALID_ARGUMENT` if the query is for an epoch with no finalized
         ///    blocks for a past genesis index.
+        ///  * `INVALID_ARGUMENT` if the input `EpochRequest` is malformed.
+        ///  * `UNAVAILABLE` if the endpoint is disabled on the node.
         pub async fn get_first_block_epoch(
             &mut self,
             request: impl tonic::IntoRequest<super::EpochRequest>,
