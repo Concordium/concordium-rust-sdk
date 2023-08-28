@@ -278,12 +278,12 @@ impl std::str::FromStr for EpochIdentifier {
 
 impl IntoRequest<generated::EpochRequest> for &EpochIdentifier {
     fn into_request(self) -> tonic::Request<generated::EpochRequest> {
-        tonic::Request::new(self.into())
+        tonic::Request::new((*self).into())
     }
 }
 
-impl From<&EpochIdentifier> for generated::EpochRequest {
-    fn from(ei: &EpochIdentifier) -> Self {
+impl From<EpochIdentifier> for generated::EpochRequest {
+    fn from(ei: EpochIdentifier) -> Self {
         match ei {
             EpochIdentifier::Specified(SpecifiedEpoch {
                 genesis_index,
@@ -302,7 +302,7 @@ impl From<&EpochIdentifier> for generated::EpochRequest {
             },
             EpochIdentifier::Block(bi) => generated::EpochRequest {
                 epoch_request_input: Some(generated::epoch_request::EpochRequestInput::BlockHash(
-                    bi.into(),
+                    (&bi).into(),
                 )),
             },
         }
