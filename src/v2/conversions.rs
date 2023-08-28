@@ -3138,11 +3138,7 @@ impl TryFrom<NextUpdateSequenceNumbers> for super::types::queries::NextUpdateSeq
 impl TryFrom<QuorumSignature> for super::types::block_certificates::QuorumSignature {
     type Error = tonic::Status;
 
-    fn try_from(message: QuorumSignature) -> Result<Self, Self::Error> {
-        Ok(Self(message.value.try_into().map_err(|_| {
-            tonic::Status::invalid_argument("Malformed QuorumSignature.")
-        })?))
-    }
+    fn try_from(message: QuorumSignature) -> Result<Self, Self::Error> { consume(&message.value) }
 }
 
 impl TryFrom<QuorumCertificate> for super::types::block_certificates::QuorumCertificate {
@@ -3203,11 +3199,7 @@ impl TryFrom<FinalizerRound> for super::types::block_certificates::FinalizerRoun
 impl TryFrom<TimeoutSignature> for super::types::block_certificates::TimeoutSignature {
     type Error = tonic::Status;
 
-    fn try_from(message: TimeoutSignature) -> Result<Self, Self::Error> {
-        Ok(Self(message.value.try_into().map_err(|_| {
-            tonic::Status::invalid_argument("Malformed TimeoutSignature.")
-        })?))
-    }
+    fn try_from(message: TimeoutSignature) -> Result<Self, Self::Error> { consume(&message.value) }
 }
 
 impl TryFrom<TimeoutCertificate> for super::types::block_certificates::TimeoutCertificate {

@@ -509,7 +509,7 @@ pub mod block_certificates {
 
     /// An aggregate signature on a [`QuorumCertificate`] created
     /// by members of the finalization committee.
-    #[derive(Debug)]
+    #[derive(concordium_base::common::Serialize, Clone, Debug, PartialEq)]
     pub struct QuorumSignature(
         pub concordium_base::aggregate_sig::Signature<concordium_base::base::AggregateSigPairing>,
     );
@@ -554,7 +554,7 @@ pub mod block_certificates {
 
     /// An aggregate signature on a [`TimeoutCertificate`] created
     /// by members of the finalization committee.
-    #[derive(Debug)]
+    #[derive(concordium_base::common::Serialize, Clone, Debug, PartialEq)]
     pub struct TimeoutSignature(
         pub concordium_base::aggregate_sig::Signature<concordium_base::base::AggregateSigPairing>,
     );
