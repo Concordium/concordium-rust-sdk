@@ -2494,6 +2494,7 @@ impl TryFrom<PoolCurrentPaydayInfo> for super::types::CurrentPaydayBakerPoolStat
             lottery_power:           value.lottery_power,
             baker_equity_capital:    value.baker_equity_capital.require()?.into(),
             delegated_capital:       value.delegated_capital.require()?.into(),
+            commission_rates:        value.commission_rates.require()?.try_into()?,
         })
     }
 }

@@ -2091,7 +2091,7 @@ impl Client {
         bid: types::BakerId,
     ) -> endpoints::RPCResult<chrono::DateTime<chrono::Utc>> {
         let ts = self.client.get_baker_earliest_win_time(bid).await?;
-        let local_time = ts.try_into();
+        let local_time = ts.into_inner().try_into()?;
         Ok(local_time)
     }
 
