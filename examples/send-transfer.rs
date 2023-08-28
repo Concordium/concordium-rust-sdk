@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Basic example that shows how to send a transaction, in this case a transfer
 //! from the account to itself.
 use anyhow::Context;

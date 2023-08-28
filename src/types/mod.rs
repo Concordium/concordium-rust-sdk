@@ -51,8 +51,8 @@ pub struct AccountEncryptedAmount {
     /// Encrypted amount that is a result of this accounts' actions.
     /// In particular this list includes the aggregate of
     ///
-    /// - remaining amounts that result when transfering to public balance
-    /// - remaining amounts when transfering to another account
+    /// - remaining amounts that result when transferring to public balance
+    /// - remaining amounts when transferring to another account
     /// - encrypted amounts that are transferred from public balance
     ///
     /// When a transfer is made all of these must always be used.
@@ -540,6 +540,9 @@ pub struct CurrentPaydayBakerPoolStatus {
     /// The effective delegated capital to the pool for the current reward
     /// period.
     pub delegated_capital:       Amount,
+    /// The commission rates that apply for the current reward period for the
+    /// baker pool.
+    pub commission_rates:        CommissionRates,
 }
 
 // hack due to a bug in Serde that is caused by the combination of
@@ -2246,7 +2249,7 @@ pub struct WinningBaker {
     /// The id of the baker that won the round.
     pub winner:  BakerId,
     /// Whether the block that was made (if any) is
-    /// part of the authorative chain i.e. the block became finalized.
+    /// part of the finalized chain.
     pub present: bool,
 }
 

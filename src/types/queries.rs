@@ -267,7 +267,7 @@ pub enum BanMethod {
 pub struct PendingUpdate {
     /// Time when it will become effective.
     pub effective_time: TransactionTime,
-    /// The effect the udpate will have.
+    /// The effect the update will have.
     pub effect:         PendingUpdateEffect,
 }
 

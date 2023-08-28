@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use crate::{
     constants::DEFAULT_NETWORK_ID,
     generated_types::{
@@ -154,6 +155,7 @@ pub enum BlocksAtHeightInput {
 }
 
 #[derive(Debug, Clone)]
+#[deprecated(note = "Use the v2 [`Client`](../v2/struct.Client.html) instead.")]
 /// Client that can perform queries.
 /// All endpoints take a `&mut self` as an argument which means that a single
 /// instance cannot be used concurrently. However instead of putting the Client
@@ -894,7 +896,7 @@ impl Client {
     /// This is a low-level function that can be useful in case a transaction is
     /// constructed by a third party. It avoids deserializing and converting
     /// data.
-    /// If the transaciton is accepted by the node then the transaction hash
+    /// If the transaction is accepted by the node then the transaction hash
     /// that can be used to query the status is returned.
     pub async fn send_raw_account_transaction(
         &mut self,

@@ -140,7 +140,7 @@ async fn main() -> anyhow::Result<()> {
             baking:       "0.1".parse().unwrap(),
             transaction:  "0.1".parse().unwrap(),
         },
-        update_default_pool_state: OpenStatus::ClosedForAll,
+        update_default_pool_state: OpenStatus::OpenForAll,
         update_cooldown_parameters_access_structure: summary
             .common_update_keys()
             .pool_parameters
@@ -150,12 +150,12 @@ async fn main() -> anyhow::Result<()> {
             .pool_parameters
             .clone(),
         update_cooldown_parameters: CooldownParameters {
-            pool_owner_cooldown: 1500.into(),
-            delegator_cooldown:  1200.into(),
+            pool_owner_cooldown: 1800.into(),
+            delegator_cooldown:  900.into(),
         },
         update_time_parameters: TimeParameters {
             reward_period_length: Epoch::from(4u64).into(),
-            mint_per_payday:      "0.00000261157877".parse().unwrap(),
+            mint_per_payday:      "0.00035997".parse().unwrap(),
         },
         update_pool_parameters: PoolParameters {
             passive_finalization_commission: "1".parse()?,
@@ -175,7 +175,7 @@ async fn main() -> anyhow::Result<()> {
                     max: "0.1".parse()?,
                 },
             },
-            minimum_equity_capital:          Amount::from_ccd(14_000),
+            minimum_equity_capital:          Amount::from_ccd(100),
             capital_bound:                   "0.1".parse()?,
             leverage_bound:                  LeverageFactor::new_integral(3),
         },
@@ -185,7 +185,7 @@ async fn main() -> anyhow::Result<()> {
     println!("{}", serde_json::to_string_pretty(&params_p4).unwrap());
     println!("{}", base16_encode_string(&params_p4));
     {
-        std::fs::write("p4-payload.bin", &to_bytes(&params_p4))?;
+        std::fs::write("p4-payload.bin", to_bytes(&params_p4))?;
     }
 
     let p4 = ProtocolUpdate {
@@ -211,15 +211,15 @@ async fn main() -> anyhow::Result<()> {
     let params_p6 = ProtocolUpdateDataP6 {
         timeout_parameters:    TimeoutParameters {
             base:     Duration::from_seconds(10),
-            increase: Ratio::new(5, 4)?,
-            decrease: Ratio::new(4, 5)?,
+            increase: Ratio::new(6, 5)?,
+            decrease: Ratio::new(3, 4)?,
         },
-        min_block_time:        Duration::from_millis(500),
+        min_block_time:        Duration::from_millis(2000),
         block_energy_limit:    Energy { energy: 3_000_000 },
         finalization_commitee: FinalizationCommitteeParameters {
-            min_finalizers: 20,
-            max_finalizers: 100,
-            finalizers_relative_stake_threshold: "0.0001".parse()?,
+            min_finalizers: 40,
+            max_finalizers: 1000,
+            finalizers_relative_stake_threshold: "0.001".parse()?,
         },
     };
 
@@ -228,10 +228,16 @@ async fn main() -> anyhow::Result<()> {
         specification_url:
             "https://github.com/Concordium/concordium-update-proposals/blob/main/updates/P6.txt"
                 .into(),
-        specification_hash: "0000000000000000000000000000000000000000000000000000000000000000"
+        specification_hash: "ede9cf0b2185e9e8657f5c3fd8b6f30cef2f1ef4d9692aa4f6ef6a9fb4a762cd"
             .parse()?,
         specification_auxiliary_data: to_bytes(&params_p6),
     };
+
+    println!("{}", serde_json::to_string_pretty(&params_p6).unwrap());
+    println!("{}", base16_encode_string(&params_p6));
+    {
+        std::fs::write("p6-payload.bin", to_bytes(&params_p6))?;
+    }
 
     let block_item: BlockItem<Payload> = update::update(
         &signer,
@@ -285,6 +291,10 @@ async fn main() -> anyhow::Result<()> {
     .into();
 
     send_and_wait(&mut client, &block_item, ProtocolVersion::P4).await?;
+
+    if sent {
+        seq_number.next_mut();
+    }
 
     let block_item: BlockItem<Payload> = update::update(
         &signer,
