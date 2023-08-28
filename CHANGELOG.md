@@ -2,6 +2,10 @@
 - Add a `commission_rates` field to `CurrentPaydayBakerPoolStatus` which yields the commission rates 
   of the baker for the reward period (requires a node with version at least 6.1).
 
+## 3.0.1
+
+- Update `concordium_base` dependency to 3.0.1.
+
 ## 3.0.0
 
 - The SDK requires node version 6 or later.
