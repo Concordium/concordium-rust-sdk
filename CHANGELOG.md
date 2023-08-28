@@ -1,4 +1,8 @@
 ## Unreleased changes
+- Add a `commission_rates` field to `CurrentPaydayBakerPoolStatus` which yields the commission rates 
+  of the baker for the reward period (requires a node with version at least 6.1).
+
+## 3.0.0
 
 - The SDK requires node version 6 or later.
 - Support relative and absolute block height as the block identifier in block queries.
@@ -18,8 +22,7 @@
 - Add a `Cis4Contract` for interacting with Cis4 contracts.
 - Add a new `web3id` module that contains types and functionality for
   construcing Web3ID credentials and verifying Web3ID proofs.
-- Add a `commission_rates` field to `CurrentPaydayBakerPoolStatus` which yields the commission rates 
-  of the baker for the reward period (requires a node with version at least 6.1).
+- Deprecate the client for V1 of the node's API.
 
 ### Breaking changes in types
 - `ConsensusInfo`
@@ -34,8 +37,6 @@
 - `NextUpdateSequenceNumbers`
   - Add `timeout_parameters`, `min_block_time`, `block_energy_limit`, and
     `finalization_committee_parameters` sequence numbers.
-
-
 
 ## 2.4.0
 

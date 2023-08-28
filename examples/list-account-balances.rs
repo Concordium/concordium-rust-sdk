@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! List accounts and their balances ordered by decreasing CCD amount in a CSV
 //! file.
 use anyhow::Context;
