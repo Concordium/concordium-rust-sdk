@@ -1,5 +1,5 @@
 ## Unreleased changes
-- Support for `GetBakerEarliestWinTime`.
+- Support for `GetBakerEarliestWinTime`. Requires node version at least 6.1.
 
 ## 3.0.0
 

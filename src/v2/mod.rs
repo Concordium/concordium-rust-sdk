@@ -2084,16 +2084,14 @@ impl Client {
     /// If the baker is not a baker for the current reward period then then the
     /// timestamp returned is the projected time of the first block of the
     /// new reward period.
-    /// Note that the endpoint is only available on a node running consensus
-    /// version 1, if the node is running consensus version 0, then an error
-    /// will be returned.
+    /// Note that the endpoint is only available on a node running at least
+    /// protocol version 6.
     pub async fn get_baker_earliest_win_time(
         &mut self,
         bid: types::BakerId,
     ) -> endpoints::RPCResult<chrono::DateTime<chrono::Utc>> {
         let ts = self.client.get_baker_earliest_win_time(bid).await?;
-        let local_time = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
-            + chrono::Duration::milliseconds(ts.into_inner().value as i64);
+        let local_time = ts.try_into();
         Ok(local_time)
     }
 
