@@ -2266,10 +2266,7 @@ impl Client {
         &mut self,
         ei: impl Into<EpochIdentifier>,
     ) -> endpoints::QueryResult<BlockHash> {
-        let response = self
-            .client
-            .get_first_block_epoch(&ei.into_epoch_identifier())
-            .await?;
+        let response = self.client.get_first_block_epoch(&ei.into()).await?;
         Ok(response.into_inner().try_into()?)
     }
 
