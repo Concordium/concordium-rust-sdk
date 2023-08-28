@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Generate initial account transactions and send them to the chain.
 //! Generated account keys are stored in the `created-accounts` directory.
 use anyhow::Context;

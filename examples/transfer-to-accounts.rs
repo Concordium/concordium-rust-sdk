@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Send a given amount of CCD to the account listed in a provided file.
 //! The file format should be one account address per line.
 use anyhow::Context;

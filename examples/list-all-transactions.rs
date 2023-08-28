@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! List account transactions in a given time span. Either all, or
 //! just the specified types.
 use anyhow::Context;
