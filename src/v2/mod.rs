@@ -2261,6 +2261,18 @@ impl Client {
         Ok(stream)
     }
 
+    /// Get the first block of the epoch.
+    pub async fn get_first_block_epoch(
+        &mut self,
+        ei: impl IntoEpochIdentifier,
+    ) -> endpoints::QueryResult<BlockHash> {
+        let response = self
+            .client
+            .get_first_block_epoch(&ei.into_epoch_identifier())
+            .await?;
+        Ok(response.into_inner().try_into()?)
+    }
+
     /// Get next available sequence numbers for updating chain parameters after
     /// a given block. If the block does not exist then [`QueryError::NotFound`]
     /// is returned.
