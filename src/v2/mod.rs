@@ -2269,8 +2269,15 @@ impl Client {
     }
 
     /// Get the winning bakers of an historical `Epoch`.
-    /// The stream ends when there are no more rounds for the epoch specified.
-    /// This only works for epochs in at least protocol version 6.
+    /// Hence, when this function is invoked using [`EpochIdentifier::Block`]
+    /// and the [`BlockIdentifier`] is either [`BlockIdentifier::BEST`] or
+    /// [`BlockIdentifier::LAST_FINAL`], then [`tonic::Code::Unavailable`] is
+    /// returned, as these identifiers are not historical by definition.
+    ///
+    /// The stream ends when there
+    /// are no more rounds for the epoch specified. This only works for
+    /// epochs in at least protocol version 6. Note that the endpoint is
+    /// only available on a node running at least protocol version 6.
     pub async fn get_winning_bakers_epoch(
         &mut self,
         ei: impl Into<EpochIdentifier>,
