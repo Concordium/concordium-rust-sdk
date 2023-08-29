@@ -2,6 +2,7 @@
 - Add a `commission_rates` field to `CurrentPaydayBakerPoolStatus` which yields the commission rates 
   of the baker for the reward period (requires a node with version at least 6.1).
 - Add support for `GetBakersRewardPeriod` endpoint. Requires a node with version at least 6.1.
+- Add Support for `GetBakerEarliestWinTime` endpoint. Requires a node with version at least 6.1.
 
 ## 3.0.1
 
