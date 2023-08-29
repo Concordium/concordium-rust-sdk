@@ -3,6 +3,10 @@
   of the baker for the reward period (requires a node with version at least 6.1).
 - Add support for `GetBakersRewardPeriod` endpoint. Requires a node with version at least 6.1.
 
+## 3.0.1
+
+- Update `concordium_base` dependency to 3.0.1.
+
 ## 3.0.0
 
 - The SDK requires node version 6 or later.
