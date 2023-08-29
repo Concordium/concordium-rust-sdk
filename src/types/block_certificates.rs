@@ -7,10 +7,11 @@ use concordium_base::{
     common::Serial,
     hashes::BlockHash,
 };
+use std::collections::BTreeSet;
 
 /// An aggregate signature on a [`QuorumCertificate`] created
 /// by members of the finalization committee.
-#[derive(concordium_base::common::Serialize, Clone, Debug, PartialEq)]
+#[derive(concordium_base::common::Serialize, Clone, Copy, Debug, PartialEq)]
 pub struct QuorumSignature(
     pub concordium_base::aggregate_sig::Signature<concordium_base::base::AggregateSigPairing>,
 );
@@ -34,9 +35,8 @@ pub struct QuorumCertificate {
     pub aggregate_signature: QuorumSignature,
     /// The baker ids of the finalizers that formed
     /// the `aggregate_signature`.
-    /// Note that the baker ids are sorted in ascending order and are
-    /// distinct.
-    pub signatories:         Vec<BakerId>,
+    /// Note that the signatories are sorted in ascending order of [`BakerId`].
+    pub signatories:         BTreeSet<BakerId>,
 }
 
 /// A map from a [`Round`] to the set of finalizers
@@ -55,7 +55,7 @@ pub struct FinalizerRound {
 
 /// An aggregate signature on a [`TimeoutCertificate`] created
 /// by members of the finalization committee.
-#[derive(concordium_base::common::Serialize, Clone, Debug, PartialEq)]
+#[derive(concordium_base::common::Serialize, Clone, Copy, Debug, PartialEq)]
 pub struct TimeoutSignature(
     pub concordium_base::aggregate_sig::Signature<concordium_base::base::AggregateSigPairing>,
 );

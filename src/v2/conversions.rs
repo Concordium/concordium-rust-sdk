@@ -21,7 +21,7 @@ use concordium_base::{
     },
     updates,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
     let mut cursor = std::io::Cursor::new(bytes);
@@ -3156,7 +3156,7 @@ impl TryFrom<QuorumCertificate> for super::types::block_certificates::QuorumCert
                 .signatories
                 .into_iter()
                 .map(From::from)
-                .collect::<Vec<super::types::BakerId>>(),
+                .collect::<BTreeSet<super::types::BakerId>>(),
         })
     }
 }
