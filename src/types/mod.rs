@@ -51,8 +51,8 @@ pub struct AccountEncryptedAmount {
     /// Encrypted amount that is a result of this accounts' actions.
     /// In particular this list includes the aggregate of
     ///
-    /// - remaining amounts that result when transfering to public balance
-    /// - remaining amounts when transfering to another account
+    /// - remaining amounts that result when transferring to public balance
+    /// - remaining amounts when transferring to another account
     /// - encrypted amounts that are transferred from public balance
     ///
     /// When a transfer is made all of these must always be used.
@@ -540,6 +540,9 @@ pub struct CurrentPaydayBakerPoolStatus {
     /// The effective delegated capital to the pool for the current reward
     /// period.
     pub delegated_capital:       Amount,
+    /// The commission rates that apply for the current reward period for the
+    /// baker pool.
+    pub commission_rates:        CommissionRates,
 }
 
 // hack due to a bug in Serde that is caused by the combination of
@@ -2236,6 +2239,32 @@ pub struct NodeInfo {
     pub network_info: NetworkInfo,
     /// Information related to consensus for the node.
     pub details:      NodeDetails,
+}
+
+/// Information of a baker for a certain reward period.
+#[derive(Debug)]
+pub struct BakerRewardPeriodInfo {
+    /// Baker id and public keys.
+    pub baker:             BakerInfo,
+    /// The stake of the baker that the
+    /// consensus protocol uses to determine lottery weight.
+    /// This is the stake after applying leverage bound and caps.
+    /// If the baker is also a finalizer then the effective stake is
+    /// also used to calculate the weight that the baker votes with as part of
+    /// the finalization committee.
+    pub effective_stake:   Amount,
+    /// The effective commission rates for the baker that applies
+    /// in the reward period.
+    pub commission_rates:  CommissionRates,
+    /// The amount that the baker staked itself in the
+    /// reward period.
+    pub equity_capital:    Amount,
+    /// The amount that was delegated to the baker in the
+    /// reward period.
+    pub delegated_capital: Amount,
+    /// Whether the baker is part of the finalization committee
+    /// in the reward period.
+    pub is_finalizer:      bool,
 }
 
 #[derive(Debug, SerdeDeserialize)]

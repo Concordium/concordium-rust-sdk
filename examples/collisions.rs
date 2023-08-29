@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! A simple script to check how many bytes in an address are needed to
 //! distinguish accounts. The script gets the account list from the node.
 use clap::AppSettings;

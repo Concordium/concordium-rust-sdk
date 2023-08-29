@@ -738,6 +738,39 @@ pub mod block_hash_input {
         RelativeHeight(RelativeHeight),
     }
 }
+/// Input to queries which take an epoch as a parameter.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EpochRequest {
+    #[prost(oneof = "epoch_request::EpochRequestInput", tags = "1, 2")]
+    pub epoch_request_input: ::core::option::Option<epoch_request::EpochRequestInput>,
+}
+/// Nested message and enum types in `EpochRequest`.
+pub mod epoch_request {
+    /// Request an epoch by number at a given genesis index.
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct RelativeEpoch {
+        /// The genesis index to query at. The query is restricted to this
+        /// genesis index, and will not return results for other indices
+        /// even if the epoch number is out of bounds.
+        #[prost(message, optional, tag = "1")]
+        pub genesis_index: ::core::option::Option<super::GenesisIndex>,
+        /// The epoch number to query at.
+        #[prost(message, optional, tag = "2")]
+        pub epoch:         ::core::option::Option<super::Epoch>,
+    }
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum EpochRequestInput {
+        /// Query by genesis index and epoch number.
+        #[prost(message, tag = "1")]
+        RelativeEpoch(RelativeEpoch),
+        /// Query for the epoch of a specified block.
+        #[prost(message, tag = "2")]
+        BlockHash(super::BlockHashInput),
+    }
+}
 /// Input to queries which take an account as a parameter.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -4818,6 +4851,22 @@ pub struct BlockCertificates {
     #[prost(message, optional, tag = "3")]
     pub epoch_finalization_entry: ::core::option::Option<EpochFinalizationEntry>,
 }
+/// Details of which baker won the lottery in a given round in consensus version
+/// 1.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct WinningBaker {
+    /// The round number.
+    #[prost(message, optional, tag = "1")]
+    pub round:   ::core::option::Option<Round>,
+    /// The baker that won the round.
+    #[prost(message, optional, tag = "2")]
+    pub winner:  ::core::option::Option<BakerId>,
+    /// True if the baker produced a block in this round on the finalized chain,
+    /// and False otherwise.
+    #[prost(bool, tag = "3")]
+    pub present: bool,
+}
 /// Information about how open the pool is to new delegators.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
@@ -6297,6 +6346,72 @@ pub mod queries_client {
             let codec = tonic::codec::ProstCodec::default();
             let path =
                 http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetBlockCertificates");
+            self.inner.unary(request.into_request(), path, codec).await
+        }
+
+        /// Get the list of bakers that won the lottery in a particular
+        /// historical epoch (i.e. the last finalized block is in a
+        /// later epoch). This lists the winners for each round in the
+        /// epoch, starting from the round after the last block in the previous
+        /// epoch, running to the round before the first block in the
+        /// next epoch. It also indicates if a block in each
+        /// round was included in the finalized chain.
+        ///
+        /// The following error cases are possible:
+        ///  * `NOT_FOUND` if the query specifies an unknown block.
+        ///  * `UNAVAILABLE` if the query is for an epoch that is not finalized
+        ///    in the current genesis
+        /// /    index, or is for a future genesis index.
+        ///  * `INVALID_ARGUMENT` if the query is for an epoch that is not
+        ///    finalized for a past genesis index.
+        ///  * `INVALID_ARGUMENT` if the query is for a genesis index at
+        ///    consensus version 0.
+        ///  * `INVALID_ARGUMENT` if the input `EpochRequest` is malformed.
+        ///  * `UNAVAILABLE` if the endpoint is disabled on the node.
+        pub async fn get_winning_bakers_epoch(
+            &mut self,
+            request: impl tonic::IntoRequest<super::EpochRequest>,
+        ) -> Result<tonic::Response<tonic::codec::Streaming<super::WinningBaker>>, tonic::Status>
+        {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetWinningBakersEpoch",
+            );
+            self.inner
+                .server_streaming(request.into_request(), path, codec)
+                .await
+        }
+
+        /// Get the block hash of the first finalized block in a specified
+        /// epoch.
+        ///
+        /// The following error cases are possible:
+        ///  * `NOT_FOUND` if the query specifies an unknown block.
+        ///  * `UNAVAILABLE` if the query is for an epoch that is not finalized
+        ///    in the current genesis index, or is for a future genesis index.
+        ///  * `INVALID_ARGUMENT` if the query is for an epoch with no finalized
+        ///    blocks for a past genesis index.
+        ///  * `INVALID_ARGUMENT` if the input `EpochRequest` is malformed.
+        ///  * `UNAVAILABLE` if the endpoint is disabled on the node.
+        pub async fn get_first_block_epoch(
+            &mut self,
+            request: impl tonic::IntoRequest<super::EpochRequest>,
+        ) -> Result<tonic::Response<super::BlockHash>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path =
+                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetFirstBlockEpoch");
             self.inner.unary(request.into_request(), path, codec).await
         }
     }
