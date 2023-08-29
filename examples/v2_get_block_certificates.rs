@@ -13,6 +13,8 @@ struct App {
         default_value = "http://localhost:20000"
     )]
     endpoint: v2::Endpoint,
+    #[structopt(long = "block", help = "Block to query", default_value = "lastfinal")]
+    bi:       v2::BlockIdentifier,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -27,9 +29,7 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect.")?;
 
-    let certificates = client
-        .get_block_certificates(&v2::BlockIdentifier::LastFinal)
-        .await?;
+    let certificates = client.get_block_certificates(&app.bi).await?;
     println!("{:#?}", certificates);
 
     Ok(())

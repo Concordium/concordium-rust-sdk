@@ -29,6 +29,6 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect.")?;
     let fb = client.get_first_block_epoch(app.epoch).await?;
-    println!("{:?}", fb);
+    println!("{}", fb);
     Ok(())
 }
