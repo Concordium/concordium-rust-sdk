@@ -3149,6 +3149,21 @@ impl TryFrom<WinningBaker> for super::types::WinningBaker {
     }
 }
 
+impl TryFrom<BakerRewardPeriodInfo> for super::types::BakerRewardPeriodInfo {
+    type Error = tonic::Status;
+
+    fn try_from(message: BakerRewardPeriodInfo) -> Result<Self, Self::Error> {
+        Ok(Self {
+            baker:             message.baker.require()?.try_into()?,
+            effective_stake:   message.effective_stake.require()?.into(),
+            commission_rates:  message.commission_rates.require()?.try_into()?,
+            equity_capital:    message.equity_capital.require()?.into(),
+            delegated_capital: message.delegated_capital.require()?.into(),
+            is_finalizer:      message.is_finalizer,
+        })
+    }
+}
+
 #[cfg(test)]
 mod test {
 
