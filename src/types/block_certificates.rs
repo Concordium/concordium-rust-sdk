@@ -62,7 +62,7 @@ pub struct TimeoutSignature(
 
 /// The timeout certificate serves as a proof that no block
 /// was created and/or distributed to the network in time.
-/// The [`TimeoutCertificate`] makes it possible for the consenssus protocol
+/// The [`TimeoutCertificate`] makes it possible for the consensus protocol
 /// to advance to the following round, thus giving (possibly) another baker
 /// the chance to bake a block.
 #[derive(Debug)]
