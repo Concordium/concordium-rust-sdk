@@ -1,9 +1,8 @@
 //! Test the `GetBakerEarliestWinTime` endpoint.
 use anyhow::Context;
 use clap::AppSettings;
-use structopt::StructOpt;
-
 use concordium_rust_sdk::{types::BakerId, v2};
+use structopt::StructOpt;
 
 #[derive(StructOpt)]
 struct App {
