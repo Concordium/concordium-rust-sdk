@@ -4,6 +4,10 @@
 - Add support for `GetWinningBakersEpoch`. Requires a node with version at least 6.1.
 - Support for `GetFirstBlockEpoch`. Requires a node with version at least 6.1.
 
+## 3.0.1
+
+- Update `concordium_base` dependency to 3.0.1.
+
 ## 3.0.0
 
 - The SDK requires node version 6 or later.
