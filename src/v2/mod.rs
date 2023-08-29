@@ -2447,7 +2447,7 @@ impl Client {
     /// Get all bakers in the reward period of a block.
     /// This endpoint is only supported for protocol version 6 and onwards.
     /// If the protocol does not support the endpoint then an
-    /// 'IllegalArgument' error is returned.
+    /// [`IllegalArgument`](tonic::Code::InvalidArgument) is returned.
     pub async fn get_bakers_reward_period(
         &mut self,
         bi: impl IntoBlockIdentifier,
