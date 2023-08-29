@@ -2,6 +2,7 @@ use anyhow::Context;
 pub use concordium_base::hashes;
 // re-export to maintain backwards compatibility.
 pub use concordium_base::id::types::CredentialType;
+pub mod block_certificates;
 pub mod network;
 pub mod queries;
 pub mod smart_contracts;

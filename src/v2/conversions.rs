@@ -3,9 +3,11 @@
 
 use super::generated::*;
 
-use crate::types::{queries::ConcordiumBFTDetails, UpdateKeysCollectionSkeleton};
-
 use super::Require;
+use crate::{
+    types::{queries::ConcordiumBFTDetails, UpdateKeysCollectionSkeleton},
+    v2::generated::BlockCertificates,
+};
 use chrono::TimeZone;
 use concordium_base::{
     base,
@@ -19,7 +21,7 @@ use concordium_base::{
     },
     updates,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
     let mut cursor = std::io::Cursor::new(bytes);
@@ -3131,6 +3133,129 @@ impl TryFrom<NextUpdateSequenceNumbers> for super::types::queries::NextUpdateSeq
                 .finalization_committee_parameters
                 .require()?
                 .into(),
+        })
+    }
+}
+
+impl TryFrom<QuorumSignature> for super::types::block_certificates::QuorumSignature {
+    type Error = tonic::Status;
+
+    fn try_from(message: QuorumSignature) -> Result<Self, Self::Error> { consume(&message.value) }
+}
+
+impl TryFrom<QuorumCertificate> for super::types::block_certificates::QuorumCertificate {
+    type Error = tonic::Status;
+
+    fn try_from(message: QuorumCertificate) -> Result<Self, Self::Error> {
+        Ok(Self {
+            block_hash:          message.block_hash.require()?.try_into()?,
+            round:               message.round.require()?.into(),
+            epoch:               message.epoch.require()?.into(),
+            aggregate_signature: message.aggregate_signature.require()?.try_into()?,
+            signatories:         message
+                .signatories
+                .into_iter()
+                .map(From::from)
+                .collect::<BTreeSet<super::types::BakerId>>(),
+        })
+    }
+}
+
+impl TryFrom<SuccessorProof> for super::hashes::SuccessorProof {
+    type Error = tonic::Status;
+
+    fn try_from(message: SuccessorProof) -> Result<Self, Self::Error> {
+        match message.value.try_into() {
+            Ok(hash) => Ok(Self::new(hash)),
+            Err(_) => Err(tonic::Status::internal(
+                "Unexpected successor proof format.",
+            )),
+        }
+    }
+}
+
+impl TryFrom<EpochFinalizationEntry> for super::types::block_certificates::EpochFinalizationEntry {
+    type Error = tonic::Status;
+
+    fn try_from(message: EpochFinalizationEntry) -> Result<Self, Self::Error> {
+        Ok(Self {
+            finalized_qc:    message.finalized_qc.require()?.try_into()?,
+            successor_qc:    message.successor_qc.require()?.try_into()?,
+            successor_proof: message.successor_proof.require()?.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<FinalizerRound> for super::types::block_certificates::FinalizerRound {
+    type Error = tonic::Status;
+
+    fn try_from(message: FinalizerRound) -> Result<Self, Self::Error> {
+        Ok(Self {
+            round:      message.round.require()?.into(),
+            finalizers: message
+                .finalizers
+                .into_iter()
+                .map(From::from)
+                .collect::<Vec<super::types::BakerId>>(),
+        })
+    }
+}
+
+impl TryFrom<TimeoutSignature> for super::types::block_certificates::TimeoutSignature {
+    type Error = tonic::Status;
+
+    fn try_from(message: TimeoutSignature) -> Result<Self, Self::Error> { consume(&message.value) }
+}
+
+impl TryFrom<TimeoutCertificate> for super::types::block_certificates::TimeoutCertificate {
+    type Error = tonic::Status;
+
+    fn try_from(message: TimeoutCertificate) -> Result<Self, Self::Error> {
+        Ok(
+            Self {
+                round:                  message.round.require()?.into(),
+                min_epoch:              message.min_epoch.require()?.into(),
+                qc_rounds_first_epoch:
+                    message
+                        .qc_rounds_first_epoch
+                        .into_iter()
+                        .map(TryFrom::try_from)
+                        .collect::<Result<
+                            Vec<super::types::block_certificates::FinalizerRound>,
+                            tonic::Status,
+                        >>()?,
+                qc_rounds_second_epoch:
+                    message
+                        .qc_rounds_second_epoch
+                        .into_iter()
+                        .map(TryFrom::try_from)
+                        .collect::<Result<
+                            Vec<super::types::block_certificates::FinalizerRound>,
+                            tonic::Status,
+                        >>()?,
+                aggregate_signature:    message.aggregate_signature.require()?.try_into()?,
+            },
+        )
+    }
+}
+
+impl TryFrom<BlockCertificates> for super::types::block_certificates::BlockCertificates {
+    type Error = tonic::Status;
+
+    fn try_from(message: BlockCertificates) -> Result<Self, Self::Error> {
+        Ok(Self {
+            quorum_certificate:       message
+                .quorum_certificate
+                .map(TryFrom::try_from)
+                .transpose()?,
+            timeout_certificate:      message
+                .timeout_certificate
+                .map(TryFrom::try_from)
+                .transpose()?,
+            epoch_finalization_entry: message
+                .epoch_finalization_entry
+                .map(TryFrom::try_from)
+                .transpose()?,
         })
     }
 }
