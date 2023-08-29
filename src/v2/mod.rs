@@ -2270,8 +2270,8 @@ impl Client {
 
     /// Get the winning bakers of an historical `Epoch`.
     /// Hence, when this function is invoked using [`EpochIdentifier::Block`]
-    /// and the [`BlockIdentifier`] is either [`BlockIdentifier::BEST`] or
-    /// [`BlockIdentifier::LAST_FINAL`], then [`tonic::Code::Unavailable`] is
+    /// and the [`BlockIdentifier`] is either [`BlockIdentifier::Best`] or
+    /// [`BlockIdentifier::LastFinal`], then [`tonic::Code::Unavailable`] is
     /// returned, as these identifiers are not historical by definition.
     ///
     /// The stream ends when there
