@@ -2443,6 +2443,31 @@ impl Client {
         }
         last_found.ok_or(QueryError::NotFound)
     }
+
+    /// Get all bakers in the reward period of a block.
+    /// This endpoint is only supported for protocol version 6 and onwards.
+    /// If the protocol does not support the endpoint then an
+    /// [`IllegalArgument`](tonic::Code::InvalidArgument) is returned.
+    pub async fn get_bakers_reward_period(
+        &mut self,
+        bi: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<types::BakerRewardPeriodInfo, tonic::Status>>>,
+    > {
+        let response = self
+            .client
+            .get_bakers_reward_period(&bi.into_block_identifier())
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(baker) => baker.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
 }
 
 /// A stream of finalized blocks. This contains a background task that polls
