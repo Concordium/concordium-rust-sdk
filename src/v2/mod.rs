@@ -227,12 +227,15 @@ pub struct SpecifiedEpoch {
 /// An identifier of an epoch used in queries.
 #[derive(Copy, Clone, Debug, derive_more::From)]
 pub enum EpochIdentifier {
-    /// A relative epoch to query.
+    /// A specified epoch to query.
     Specified(SpecifiedEpoch),
     /// Query the epoch of the block.
     Block(BlockIdentifier),
 }
 
+/// Errors that may occur as a result of
+/// parsing a [`EpochIdentifier`] from a string via
+/// [from_str(&str)][std::str::FromStr].
 #[derive(Debug, thiserror::Error)]
 pub enum EpochIdentifierFromStrError {
     #[error("The input is not recognized.")]
@@ -1149,10 +1152,6 @@ impl IntoBlockIdentifier for AbsoluteBlockHeight {
 
 impl IntoBlockIdentifier for RelativeBlockHeight {
     fn into_block_identifier(self) -> BlockIdentifier { BlockIdentifier::RelativeHeight(self) }
-}
-
-pub trait IntoEpochIdentifier {
-    fn into_epoch_identifier(self) -> EpochIdentifier;
 }
 
 impl Client {
