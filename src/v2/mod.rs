@@ -215,6 +215,103 @@ pub enum AccountIdentifier {
     Index(crate::types::AccountIndex),
 }
 
+/// Identifier for an [`Epoch`] relative to the specified genesis index.
+#[derive(Debug, Copy, Clone)]
+pub struct SpecifiedEpoch {
+    /// Genesis index to query in.
+    pub genesis_index: types::GenesisIndex,
+    /// The epoch of the genesis to query.
+    pub epoch:         types::Epoch,
+}
+
+/// An identifier of an epoch used in queries.
+#[derive(Copy, Clone, Debug, derive_more::From)]
+pub enum EpochIdentifier {
+    /// A specified epoch to query.
+    Specified(SpecifiedEpoch),
+    /// Query the epoch of the block.
+    Block(BlockIdentifier),
+}
+
+/// Errors that may occur as a result of
+/// parsing a [`EpochIdentifier`] from a string via
+/// [from_str(&str)][std::str::FromStr].
+#[derive(Debug, thiserror::Error)]
+pub enum EpochIdentifierFromStrError {
+    #[error("The input is not recognized.")]
+    InvalidFormat,
+    #[error("The genesis index is not a valid unsigned integer")]
+    InvalidGenesis,
+    #[error("The epoch index is not a valid unsigned integer")]
+    InvalidEpoch,
+    #[error("The input is not a valid block identifier: {0}.")]
+    InvalidBlockIdentifier(#[from] BlockIdentifierFromStrError),
+}
+
+/// Parse a string as an [`EpochIdentifier`]. The format is one of the
+/// following:
+///
+/// - a string starting with `%` followed by two integers separated by `,` for
+///   [`Specified`](EpochIdentifier::Specified). First component is treated as
+///   the genesis index and the second component as the epoch.
+/// - a string starting with `@` followed by a [`BlockIdentifier`] for
+///   [`Block`](EpochIdentifier::Block).
+impl std::str::FromStr for EpochIdentifier {
+    type Err = EpochIdentifierFromStrError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some(rest) = s.strip_prefix('%') {
+            if let Some((gen_idx_str, epoch_str)) = rest.split_once(',') {
+                let genesis_index = GenesisIndex::from_str(gen_idx_str)
+                    .map_err(|_| EpochIdentifierFromStrError::InvalidGenesis)?;
+                let epoch = Epoch::from_str(epoch_str)
+                    .map_err(|_| EpochIdentifierFromStrError::InvalidEpoch)?;
+                Ok(Self::Specified(SpecifiedEpoch {
+                    genesis_index,
+                    epoch,
+                }))
+            } else {
+                Err(EpochIdentifierFromStrError::InvalidFormat)
+            }
+        } else {
+            Ok(Self::Block(BlockIdentifier::from_str(s)?))
+        }
+    }
+}
+
+impl IntoRequest<generated::EpochRequest> for &EpochIdentifier {
+    fn into_request(self) -> tonic::Request<generated::EpochRequest> {
+        tonic::Request::new((*self).into())
+    }
+}
+
+impl From<EpochIdentifier> for generated::EpochRequest {
+    fn from(ei: EpochIdentifier) -> Self {
+        match ei {
+            EpochIdentifier::Specified(SpecifiedEpoch {
+                genesis_index,
+                epoch,
+            }) => generated::EpochRequest {
+                epoch_request_input: Some(
+                    generated::epoch_request::EpochRequestInput::RelativeEpoch(
+                        generated::epoch_request::RelativeEpoch {
+                            genesis_index: Some(generated::GenesisIndex {
+                                value: genesis_index.height,
+                            }),
+                            epoch:         Some(generated::Epoch { value: epoch.epoch }),
+                        },
+                    ),
+                ),
+            },
+            EpochIdentifier::Block(bi) => generated::EpochRequest {
+                epoch_request_input: Some(generated::epoch_request::EpochRequestInput::BlockHash(
+                    (&bi).into(),
+                )),
+            },
+        }
+    }
+}
+
 /// Information of a finalized block.
 #[derive(Copy, Clone, Debug)]
 pub struct FinalizedBlockInfo {
@@ -2169,6 +2266,38 @@ impl Client {
             block_hash,
             response: stream,
         })
+    }
+
+    /// Get the winning bakers of an historical `Epoch`.
+    /// Hence, when this function is invoked using [`EpochIdentifier::Block`]
+    /// and the [`BlockIdentifier`] is either [`BlockIdentifier::Best`] or
+    /// [`BlockIdentifier::LastFinal`], then [`tonic::Code::Unavailable`] is
+    /// returned, as these identifiers are not historical by definition.
+    ///
+    /// The stream ends when there
+    /// are no more rounds for the epoch specified. This only works for
+    /// epochs in at least protocol version 6. Note that the endpoint is
+    /// only available on a node running at least protocol version 6.
+    pub async fn get_winning_bakers_epoch(
+        &mut self,
+        ei: impl Into<EpochIdentifier>,
+    ) -> endpoints::QueryResult<impl Stream<Item = Result<types::WinningBaker, tonic::Status>>>
+    {
+        let response = self.client.get_winning_bakers_epoch(&ei.into()).await?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(wb) => wb.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(stream)
+    }
+
+    /// Get the first block of the epoch.
+    pub async fn get_first_block_epoch(
+        &mut self,
+        ei: impl Into<EpochIdentifier>,
+    ) -> endpoints::QueryResult<BlockHash> {
+        let response = self.client.get_first_block_epoch(&ei.into()).await?;
+        Ok(response.into_inner().try_into()?)
     }
 
     /// Get next available sequence numbers for updating chain parameters after

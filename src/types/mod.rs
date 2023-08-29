@@ -2241,6 +2241,18 @@ pub struct NodeInfo {
     pub details:      NodeDetails,
 }
 
+/// A baker that has won a round in consensus version 1.
+#[derive(Debug)]
+pub struct WinningBaker {
+    /// The round that was won.
+    pub round:   Round,
+    /// The id of the baker that won the round.
+    pub winner:  BakerId,
+    /// Whether the block that was made (if any) is
+    /// part of the finalized chain.
+    pub present: bool,
+}
+
 /// Information of a baker for a certain reward period.
 #[derive(Debug)]
 pub struct BakerRewardPeriodInfo {

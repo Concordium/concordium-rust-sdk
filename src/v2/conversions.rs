@@ -3135,6 +3135,20 @@ impl TryFrom<NextUpdateSequenceNumbers> for super::types::queries::NextUpdateSeq
     }
 }
 
+impl TryFrom<WinningBaker> for super::types::WinningBaker {
+    type Error = tonic::Status;
+
+    fn try_from(wb: WinningBaker) -> Result<Self, Self::Error> {
+        Ok(Self {
+            round:   wb.round.require()?.value.into(),
+            winner:  super::types::BakerId {
+                id: wb.winner.require()?.value.into(),
+            },
+            present: wb.present,
+        })
+    }
+}
+
 impl TryFrom<BakerRewardPeriodInfo> for super::types::BakerRewardPeriodInfo {
     type Error = tonic::Status;
 
