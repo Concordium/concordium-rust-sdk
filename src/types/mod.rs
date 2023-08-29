@@ -2242,6 +2242,44 @@ pub struct NodeInfo {
     pub details:      NodeDetails,
 }
 
+/// A baker that has won a round in consensus version 1.
+#[derive(Debug)]
+pub struct WinningBaker {
+    /// The round that was won.
+    pub round:   Round,
+    /// The id of the baker that won the round.
+    pub winner:  BakerId,
+    /// Whether the block that was made (if any) is
+    /// part of the finalized chain.
+    pub present: bool,
+}
+
+/// Information of a baker for a certain reward period.
+#[derive(Debug)]
+pub struct BakerRewardPeriodInfo {
+    /// Baker id and public keys.
+    pub baker:             BakerInfo,
+    /// The stake of the baker that the
+    /// consensus protocol uses to determine lottery weight.
+    /// This is the stake after applying leverage bound and caps.
+    /// If the baker is also a finalizer then the effective stake is
+    /// also used to calculate the weight that the baker votes with as part of
+    /// the finalization committee.
+    pub effective_stake:   Amount,
+    /// The effective commission rates for the baker that applies
+    /// in the reward period.
+    pub commission_rates:  CommissionRates,
+    /// The amount that the baker staked itself in the
+    /// reward period.
+    pub equity_capital:    Amount,
+    /// The amount that was delegated to the baker in the
+    /// reward period.
+    pub delegated_capital: Amount,
+    /// Whether the baker is part of the finalization committee
+    /// in the reward period.
+    pub is_finalizer:      bool,
+}
+
 #[derive(Debug, SerdeDeserialize)]
 #[serde(try_from = "wallet_account_json::VersionedWalletAccount")]
 /// An account imported from one of the supported export formats.
