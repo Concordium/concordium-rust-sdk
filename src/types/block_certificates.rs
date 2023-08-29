@@ -5,6 +5,7 @@
 use concordium_base::{
     base::{BakerId, Epoch, Round},
     common::Serial,
+    hashes,
     hashes::BlockHash,
 };
 use std::collections::BTreeSet;
@@ -84,12 +85,6 @@ pub struct TimeoutCertificate {
     pub aggregate_signature:    TimeoutSignature,
 }
 
-/// A proof that establishes that a block of a
-/// [`EpochFinalizationEntry`] is an
-/// immediate successor of the finalized block.
-#[derive(Debug)]
-pub struct SuccessorProof(pub [u8; 32]);
-
 /// The epoch finalization entry serves as a proof that
 /// a quorum of the finalization committee has progressed
 /// to a new [`Epoch`].
@@ -102,7 +97,7 @@ pub struct EpochFinalizationEntry {
     pub successor_qc:    QuorumCertificate,
     /// The witness that proves that the block of the `successor_qc`
     /// is an immediate decendant of the block of the `finalized_qc`.
-    pub successor_proof: SuccessorProof,
+    pub successor_proof: hashes::SuccessorProof,
 }
 
 #[derive(Debug)]

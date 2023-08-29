@@ -3161,13 +3161,16 @@ impl TryFrom<QuorumCertificate> for super::types::block_certificates::QuorumCert
     }
 }
 
-impl TryFrom<SuccessorProof> for super::types::block_certificates::SuccessorProof {
+impl TryFrom<SuccessorProof> for super::hashes::SuccessorProof {
     type Error = tonic::Status;
 
     fn try_from(message: SuccessorProof) -> Result<Self, Self::Error> {
-        Ok(Self(message.value.try_into().map_err(|_| {
-            tonic::Status::invalid_argument("Malformed SuccessorProof.")
-        })?))
+        match message.value.try_into() {
+            Ok(hash) => Ok(Self::new(hash)),
+            Err(_) => Err(tonic::Status::internal(
+                "Unexpected successor proof format.",
+            )),
+        }
     }
 }
 
