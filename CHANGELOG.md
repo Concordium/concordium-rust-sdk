@@ -6,6 +6,7 @@
 - Add support for `GetBakersRewardPeriod` endpoint. Requires a node version at least 6.1.
 - Add Support for `GetBakerEarliestWinTime` endpoint. Requires a node version at least 6.1.
 - Add support for `GetBlockCertificates`. Requires a node version at least 6.1.
+- Update minimum supported rust version to `1.66`.
 
 ## 3.0.1
 
