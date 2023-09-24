@@ -243,7 +243,8 @@ impl<Type> ContractClient<Type> {
         Ok(hash)
     }
 
-    /// Like [`make_update`](Self::make_update) but expects a serialized parameter.
+    /// Like [`make_update`](Self::make_update) but expects a serialized
+    /// parameter.
     pub fn make_update_raw<E>(
         &mut self,
         signer: &impl transactions::ExactSizeTransactionSigner,
