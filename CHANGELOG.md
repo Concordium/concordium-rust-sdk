@@ -7,6 +7,13 @@
 - Add Support for `GetBakerEarliestWinTime` endpoint. Requires a node version at least 6.1.
 - Add support for `GetBlockCertificates`. Requires a node version at least 6.1.
 - Update minimum supported rust version to `1.66`.
+- Add `make_update` and `make_update_raw` methods to the `ContractClient`. They
+  are like `update` and `update_raw` but instead of sending a transaction they
+  only construct it and return it.
+- Add `make_register_credential`, `make_revoke_credential_as_issuer` and
+  `make_revoke_credential_other` to the CIS4 client. These are like the methods
+  without the `make_` prefix, except that they only construct the transaction,
+  they do not send it.
 
 ## 3.0.1
 

@@ -15,7 +15,7 @@ use concordium_base::{
     },
     hashes::TransactionHash,
     smart_contracts::{ExceedsParameterSize, OwnedContractName, OwnedParameter, OwnedReceiveName},
-    transactions::UpdateContractPayload,
+    transactions::{AccountTransaction, EncodedPayload, UpdateContractPayload},
 };
 pub use concordium_base::{cis2_types::MetadataUrl, cis4_types::*};
 use std::{marker::PhantomData, sync::Arc};
@@ -199,7 +199,21 @@ impl<Type> ContractClient<Type> {
         Ok(invoke_result)
     }
 
-    /// Send a transaction with the specified parameter.
+    /// Make the payload of a contract update with the specified parameter.
+    pub fn make_update<P: contracts_common::Serial, E>(
+        &mut self,
+        signer: &impl transactions::ExactSizeTransactionSigner,
+        metadata: &ContractTransactionMetadata,
+        entrypoint: &str,
+        message: &P,
+    ) -> Result<AccountTransaction<EncodedPayload>, E>
+    where
+        E: From<NewReceiveNameError> + From<ExceedsParameterSize>, {
+        let message = OwnedParameter::from_serial(message)?;
+        self.make_update_raw::<E>(signer, metadata, entrypoint, message)
+    }
+
+    /// Make **and send** a transaction with the specified parameter.
     pub async fn update<P: contracts_common::Serial, E>(
         &mut self,
         signer: &impl transactions::ExactSizeTransactionSigner,
@@ -224,6 +238,22 @@ impl<Type> ContractClient<Type> {
     ) -> Result<TransactionHash, E>
     where
         E: From<NewReceiveNameError> + From<v2::RPCError>, {
+        let tx = self.make_update_raw::<E>(signer, metadata, entrypoint, message)?;
+        let hash = self.client.send_account_transaction(tx).await?;
+        Ok(hash)
+    }
+
+    /// Like [`make_update`](Self::make_update) but expects a serialized
+    /// parameter.
+    pub fn make_update_raw<E>(
+        &mut self,
+        signer: &impl transactions::ExactSizeTransactionSigner,
+        metadata: &ContractTransactionMetadata,
+        entrypoint: &str,
+        message: OwnedParameter,
+    ) -> Result<AccountTransaction<EncodedPayload>, E>
+    where
+        E: From<NewReceiveNameError>, {
         let contract_name = self.contract_name.as_contract_name().contract_name();
         let receive_name = OwnedReceiveName::try_from(format!("{contract_name}.{entrypoint}"))?;
 
@@ -242,8 +272,6 @@ impl<Type> ContractClient<Type> {
             metadata.energy,
             transactions::Payload::Update { payload },
         );
-
-        let hash = self.client.send_account_transaction(tx).await?;
-        Ok(hash)
+        Ok(tx)
     }
 }

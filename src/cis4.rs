@@ -16,6 +16,7 @@ use concordium_base::{
     contracts_common,
     hashes::TransactionHash,
     smart_contracts::{ExceedsParameterSize, OwnedParameter},
+    transactions::{AccountTransaction, EncodedPayload},
     web3id::{CredentialHolderId, Web3IdSigner, REVOKE_DOMAIN_STRING},
 };
 
@@ -147,14 +148,15 @@ impl Cis4Contract {
         self.view_raw("issuer", parameter, bi).await
     }
 
-    /// Register a new credential.
-    pub async fn register_credential(
+    /// Construct a transaction for registering a new credential.
+    /// Note that this **does not** send the transaction.c
+    pub fn make_register_credential(
         &mut self,
         signer: &impl transactions::ExactSizeTransactionSigner,
         metadata: &Cis4TransactionMetadata,
         cred_info: &CredentialInfo,
         additional_data: &[u8],
-    ) -> Result<TransactionHash, Cis4TransactionError> {
+    ) -> Result<AccountTransaction<EncodedPayload>, Cis4TransactionError> {
         use contracts_common::Serial;
         let mut payload = contracts_common::to_bytes(cred_info);
         let actual = payload.len() + additional_data.len() + 2;
@@ -169,8 +171,33 @@ impl Cis4Contract {
             .expect("We checked lengths above, so this must succeed.");
         payload.extend_from_slice(additional_data);
         let parameter = OwnedParameter::try_from(payload)?;
-        self.update_raw(signer, metadata, "registerCredential", parameter)
-            .await
+        self.make_update_raw(signer, metadata, "registerCredential", parameter)
+    }
+
+    /// Register a new credential.
+    pub async fn register_credential(
+        &mut self,
+        signer: &impl transactions::ExactSizeTransactionSigner,
+        metadata: &Cis4TransactionMetadata,
+        cred_info: &CredentialInfo,
+        additional_data: &[u8],
+    ) -> Result<TransactionHash, Cis4TransactionError> {
+        let tx = self.make_register_credential(signer, metadata, cred_info, additional_data)?;
+        let hash = self.client.send_account_transaction(tx).await?;
+        Ok(hash)
+    }
+
+    /// Construct a transaction to revoke a credential as an issuer.
+    pub fn make_revoke_credential_as_issuer(
+        &mut self,
+        signer: &impl transactions::ExactSizeTransactionSigner,
+        metadata: &Cis4TransactionMetadata,
+        cred_id: CredentialHolderId,
+        reason: Option<Reason>,
+    ) -> Result<AccountTransaction<EncodedPayload>, Cis4TransactionError> {
+        let parameter = OwnedParameter::from_serial(&(cred_id, reason))?;
+
+        self.make_update_raw(signer, metadata, "revokeCredentialIssuer", parameter)
     }
 
     /// Revoke a credential as an issuer.
@@ -181,10 +208,9 @@ impl Cis4Contract {
         cred_id: CredentialHolderId,
         reason: Option<Reason>,
     ) -> Result<TransactionHash, Cis4TransactionError> {
-        let parameter = OwnedParameter::from_serial(&(cred_id, reason))?;
-
-        self.update_raw(signer, metadata, "revokeCredentialIssuer", parameter)
-            .await
+        let tx = self.make_revoke_credential_as_issuer(signer, metadata, cred_id, reason)?;
+        let hash = self.client.send_account_transaction(tx).await?;
+        Ok(hash)
     }
 
     /// Revoke a credential as the holder.
@@ -200,6 +226,25 @@ impl Cis4Contract {
         nonce: u64,
         reason: Option<Reason>,
     ) -> Result<TransactionHash, Cis4TransactionError> {
+        let tx =
+            self.make_revoke_credential_as_holder(signer, metadata, web3signer, nonce, reason)?;
+        let hash = self.client.send_account_transaction(tx).await?;
+        Ok(hash)
+    }
+
+    /// Revoke a credential as the holder.
+    ///
+    /// The extra nonce that must be provided is the holder's nonce inside the
+    /// contract. The signature on this revocation message is set to expire at
+    /// the same time as the transaction.
+    pub fn make_revoke_credential_as_holder(
+        &mut self,
+        signer: &impl transactions::ExactSizeTransactionSigner,
+        metadata: &Cis4TransactionMetadata,
+        web3signer: impl Web3IdSigner, // the holder
+        nonce: u64,
+        reason: Option<Reason>,
+    ) -> Result<AccountTransaction<EncodedPayload>, Cis4TransactionError> {
         use contracts_common::Serial;
         let mut to_sign = REVOKE_DOMAIN_STRING.to_vec();
         let cred_id: CredentialHolderId = web3signer.id().into();
@@ -227,8 +272,7 @@ impl Cis4Contract {
         parameter_vec.extend_from_slice(&to_sign[REVOKE_DOMAIN_STRING.len()..]);
         let parameter = OwnedParameter::try_from(parameter_vec)?;
 
-        self.update_raw(signer, metadata, "revokeCredentialHolder", parameter)
-            .await
+        self.make_update_raw(signer, metadata, "revokeCredentialHolder", parameter)
     }
 
     /// Revoke a credential as another party, distinct from issuer or holder.
@@ -246,6 +290,28 @@ impl Cis4Contract {
         cred_id: CredentialHolderId,
         reason: Option<&Reason>,
     ) -> Result<TransactionHash, Cis4TransactionError> {
+        let tx =
+            self.make_revoke_credential_other(signer, metadata, revoker, nonce, cred_id, reason)?;
+        let hash = self.client.send_account_transaction(tx).await?;
+        Ok(hash)
+    }
+
+    /// Construct a transaction to revoke a credential as another party,
+    /// distinct from issuer or holder.
+    ///
+    /// The extra nonce that must be provided is the nonce associated with the
+    /// key that signs the revocation message.
+    /// The signature on this revocation message is set to expire at
+    /// the same time as the transaction.
+    pub fn make_revoke_credential_other(
+        &mut self,
+        signer: &impl transactions::ExactSizeTransactionSigner,
+        metadata: &Cis4TransactionMetadata,
+        revoker: impl Web3IdSigner, // the revoker.
+        nonce: u64,
+        cred_id: CredentialHolderId,
+        reason: Option<&Reason>,
+    ) -> Result<AccountTransaction<EncodedPayload>, Cis4TransactionError> {
         use contracts_common::Serial;
         let mut to_sign = REVOKE_DOMAIN_STRING.to_vec();
         cred_id
@@ -275,7 +341,6 @@ impl Cis4Contract {
         parameter_vec.extend_from_slice(&to_sign[REVOKE_DOMAIN_STRING.len()..]);
         let parameter = OwnedParameter::try_from(parameter_vec)?;
 
-        self.update_raw(signer, metadata, "revokeCredentialOther", parameter)
-            .await
+        self.make_update_raw(signer, metadata, "revokeCredentialOther", parameter)
     }
 }
