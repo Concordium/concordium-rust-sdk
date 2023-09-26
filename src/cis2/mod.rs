@@ -10,6 +10,7 @@ use crate::{contract_client::*, types as sdk_types, v2::IntoBlockIdentifier};
 use concordium_base::{
     base::Energy,
     contracts_common::{Address, Amount},
+    transactions::{AccountTransaction, EncodedPayload},
 };
 use sdk_types::{smart_contracts, transactions};
 use smart_contracts::concordium_contracts_common;
@@ -165,7 +166,7 @@ impl Cis2Contract {
         self.transfer_dry_run(bi, sender, vec![transfer]).await
     }
 
-    /// Construct and send a CIS2 transfer smart contract update transaction
+    /// Construct **and send** a CIS2 transfer smart contract update transaction
     /// given a list of CIS2 transfers. Returns a Result with the
     /// transaction hash.
     ///
@@ -181,11 +182,31 @@ impl Cis2Contract {
         transaction_metadata: Cis2TransactionMetadata,
         transfers: Vec<Transfer>,
     ) -> Result<sdk_types::hashes::TransactionHash, Cis2TransactionError> {
+        let transfer = self.make_transfer(signer, transaction_metadata, transfers)?;
+        let hash = self.client.send_account_transaction(transfer).await?;
+        Ok(hash)
+    }
+
+    /// Construct a CIS2 transfer smart contract update transaction
+    /// given a list of CIS2 transfers. Returns a Result with the
+    /// transaction hash.
+    ///
+    /// # Arguments
+    ///
+    /// * `signer` - The account keys to use for signing the smart contract
+    ///   update transaction.
+    /// * `transaction_metadata` - Metadata for constructing the transaction.
+    /// * `transfers` - A list of CIS2 token transfers to execute.
+    pub fn make_transfer(
+        &self,
+        signer: &impl transactions::ExactSizeTransactionSigner,
+        transaction_metadata: Cis2TransactionMetadata,
+        transfers: Vec<Transfer>,
+    ) -> Result<AccountTransaction<EncodedPayload>, Cis2TransactionError> {
         let parameter = TransferParams::new(transfers)?;
         let message = smart_contracts::OwnedParameter::from_serial(&parameter)
             .map_err(|_| Cis2TransactionError::InvalidTransferParams(NewTransferParamsError))?;
-        self.update_raw(signer, &transaction_metadata, "transfer", message)
-            .await
+        self.make_update_raw(signer, &transaction_metadata, "transfer", message)
     }
 
     /// Like [`transfer`](Self::transfer), except it is more ergonomic
@@ -198,6 +219,17 @@ impl Cis2Contract {
     ) -> Result<sdk_types::hashes::TransactionHash, Cis2TransactionError> {
         self.transfer(signer, transaction_metadata, vec![transfer])
             .await
+    }
+
+    /// Like [`make_transfer`](Self::make_transfer), except it is more ergonomic
+    /// when transferring a single token.
+    pub fn make_transfer_single(
+        &self,
+        signer: &impl transactions::ExactSizeTransactionSigner,
+        transaction_metadata: Cis2TransactionMetadata,
+        transfer: Transfer,
+    ) -> Result<AccountTransaction<EncodedPayload>, Cis2TransactionError> {
+        self.make_transfer(signer, transaction_metadata, vec![transfer])
     }
 
     /// Dry run a CIS2 updateOperator transaction. This is analogous to
@@ -247,8 +279,30 @@ impl Cis2Contract {
             .await
     }
 
-    /// Send a CIS2 updateOperator transaction.
-    /// Construct and send a CIS2 updateOperator smart contract update
+    /// Construct a CIS2 updateOperator smart contract update
+    /// transaction given a list of CIS2 UpdateOperators. Returns a Result
+    /// with the transaction hash.
+    ///
+    /// # Arguments
+    ///
+    /// * `signer` - The account keys to use for signing the smart contract
+    ///   update transaction.
+    /// * `transaction_metadata` - Metadata for constructing the transaction.
+    /// * `updates` - A list of CIS2 UpdateOperators to update.
+    pub fn make_update_operator(
+        &self,
+        signer: &impl transactions::ExactSizeTransactionSigner,
+        transaction_metadata: Cis2TransactionMetadata,
+        updates: Vec<UpdateOperator>,
+    ) -> anyhow::Result<AccountTransaction<EncodedPayload>, Cis2TransactionError> {
+        let parameter = UpdateOperatorParams::new(updates)?;
+        let message = smart_contracts::OwnedParameter::from_serial(&parameter).map_err(|_| {
+            Cis2TransactionError::InvalidUpdateOperatorParams(NewUpdateOperatorParamsError)
+        })?;
+        self.make_update_raw(signer, &transaction_metadata, "updateOperator", message)
+    }
+
+    /// Construct **and send** a CIS2 updateOperator smart contract update
     /// transaction given a list of CIS2 UpdateOperators. Returns a Result
     /// with the transaction hash.
     ///
@@ -264,12 +318,9 @@ impl Cis2Contract {
         transaction_metadata: Cis2TransactionMetadata,
         updates: Vec<UpdateOperator>,
     ) -> anyhow::Result<sdk_types::hashes::TransactionHash, Cis2TransactionError> {
-        let parameter = UpdateOperatorParams::new(updates)?;
-        let message = smart_contracts::OwnedParameter::from_serial(&parameter).map_err(|_| {
-            Cis2TransactionError::InvalidUpdateOperatorParams(NewUpdateOperatorParamsError)
-        })?;
-        self.update_raw(signer, &transaction_metadata, "updateOperator", message)
-            .await
+        let update = self.make_update_operator(signer, transaction_metadata, updates)?;
+        let hash = self.client.send_account_transaction(update).await?;
+        Ok(hash)
     }
 
     /// Like [`update_operator`](Self::update_operator), but more ergonomic
@@ -286,6 +337,21 @@ impl Cis2Contract {
             operator,
         }])
         .await
+    }
+
+    /// Like [`make_update_operator`](Self::make_update_operator), but more
+    /// ergonomic when updating a single operator.
+    pub fn make_update_operator_single(
+        &self,
+        signer: &impl transactions::ExactSizeTransactionSigner,
+        transaction_metadata: Cis2TransactionMetadata,
+        operator: Address,
+        update: OperatorUpdate,
+    ) -> anyhow::Result<AccountTransaction<EncodedPayload>, Cis2TransactionError> {
+        self.make_update_operator(signer, transaction_metadata, vec![UpdateOperator {
+            update,
+            operator,
+        }])
     }
 
     /// Invoke the CIS2 balanceOf query given a list of BalanceOfQuery.

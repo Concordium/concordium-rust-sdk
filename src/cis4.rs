@@ -151,7 +151,7 @@ impl Cis4Contract {
     /// Construct a transaction for registering a new credential.
     /// Note that this **does not** send the transaction.c
     pub fn make_register_credential(
-        &mut self,
+        &self,
         signer: &impl transactions::ExactSizeTransactionSigner,
         metadata: &Cis4TransactionMetadata,
         cred_info: &CredentialInfo,
@@ -189,7 +189,7 @@ impl Cis4Contract {
 
     /// Construct a transaction to revoke a credential as an issuer.
     pub fn make_revoke_credential_as_issuer(
-        &mut self,
+        &self,
         signer: &impl transactions::ExactSizeTransactionSigner,
         metadata: &Cis4TransactionMetadata,
         cred_id: CredentialHolderId,
@@ -238,7 +238,7 @@ impl Cis4Contract {
     /// contract. The signature on this revocation message is set to expire at
     /// the same time as the transaction.
     pub fn make_revoke_credential_as_holder(
-        &mut self,
+        &self,
         signer: &impl transactions::ExactSizeTransactionSigner,
         metadata: &Cis4TransactionMetadata,
         web3signer: impl Web3IdSigner, // the holder
@@ -304,7 +304,7 @@ impl Cis4Contract {
     /// The signature on this revocation message is set to expire at
     /// the same time as the transaction.
     pub fn make_revoke_credential_other(
-        &mut self,
+        &self,
         signer: &impl transactions::ExactSizeTransactionSigner,
         metadata: &Cis4TransactionMetadata,
         revoker: impl Web3IdSigner, // the revoker.

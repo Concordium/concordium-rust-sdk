@@ -14,6 +14,9 @@
   `make_revoke_credential_other` to the CIS4 client. These are like the methods
   without the `make_` prefix, except that they only construct the transaction,
   they do not send it.
+- Add `make_transfer` and `make_update_operator` functions to the CIS2 client.
+  These are like the methods without the `make_`, except that they only
+  construct the transaction.
 
 ## 3.0.1
 
