@@ -2337,8 +2337,11 @@ impl Client {
         })
     }
 
-    /// For a non-genesis block, this returns the [`QuorumCertificate`], a
-    /// [`TimeoutCertificate`] (if present) and [`EpochFinalizationEntry`] (if
+    /// For a non-genesis block, this returns the
+    /// [`QuorumCertificate`](block_certificates::QuorumCertificate), a
+    /// [`TimeoutCertificate`](block_certificates::TimeoutCertificate) (if
+    /// present)
+    /// and [`EpochFinalizationEntry`](block_certificates::EpochFinalizationEntry) (if
     /// present).
     /// If the block being pointed to is *not* from protocol version 6 or
     /// above, then [`InvalidArgument`](`tonic::Code::InvalidArgument`)

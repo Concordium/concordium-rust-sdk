@@ -38,6 +38,26 @@ jobs:
         run: |
           cargo fmt -- --color=always --check
 
+  "lint_doc":
+    name: lint:doc
+    # Don't run on draft pull requests
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
+      - name: Docs
+        run: |
+          RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features --color=always
+
   "lint_clippy":
     name: lint:clippy
     # Don't run on draft pull requests
@@ -78,4 +98,3 @@ jobs:
           components: rustfmt
       - name: Test
         run: cargo test
-
