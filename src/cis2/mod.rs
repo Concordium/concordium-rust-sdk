@@ -188,8 +188,8 @@ impl Cis2Contract {
     }
 
     /// Construct a CIS2 transfer smart contract update transaction
-    /// given a list of CIS2 transfers. Returns a Result with the
-    /// transaction hash.
+    /// given a list of CIS2 transfers. Returns a [`Result`] with an account
+    /// transaction that can be sent.
     ///
     /// # Arguments
     ///
@@ -280,8 +280,8 @@ impl Cis2Contract {
     }
 
     /// Construct a CIS2 updateOperator smart contract update
-    /// transaction given a list of CIS2 UpdateOperators. Returns a Result
-    /// with the transaction hash.
+    /// transaction given a list of CIS2 UpdateOperators. Returns a [`Result`]
+    /// with the account transaction that can be sent.
     ///
     /// # Arguments
     ///
