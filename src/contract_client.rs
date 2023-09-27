@@ -201,7 +201,7 @@ impl<Type> ContractClient<Type> {
 
     /// Make the payload of a contract update with the specified parameter.
     pub fn make_update<P: contracts_common::Serial, E>(
-        &mut self,
+        &self,
         signer: &impl transactions::ExactSizeTransactionSigner,
         metadata: &ContractTransactionMetadata,
         entrypoint: &str,
@@ -246,7 +246,7 @@ impl<Type> ContractClient<Type> {
     /// Like [`make_update`](Self::make_update) but expects a serialized
     /// parameter.
     pub fn make_update_raw<E>(
-        &mut self,
+        &self,
         signer: &impl transactions::ExactSizeTransactionSigner,
         metadata: &ContractTransactionMetadata,
         entrypoint: &str,
