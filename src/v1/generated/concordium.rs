@@ -1,23 +1,19 @@
 /// An empty message.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Empty {}
 /// A numeric response.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NumberResponse {
     #[prost(uint64, tag = "1")]
     pub value: u64,
 }
 /// A response consisting of a boolean.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BoolResponse {
     #[prost(bool, tag = "1")]
     pub value: bool,
 }
 /// A response in string format.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StringResponse {
     #[prost(string, tag = "1")]
@@ -25,7 +21,6 @@ pub struct StringResponse {
 }
 /// A response that is encoded in JSON.
 /// JSON schemas are available at <https://developer.concordium.software/en/mainnet/net/references/grpc.html.>
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct JsonResponse {
     #[prost(string, tag = "1")]
@@ -33,14 +28,12 @@ pub struct JsonResponse {
 }
 /// A response in binary format.
 /// The encoding of the data is dependent on the endpoint.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BytesResponse {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
 /// A request that suggests the node to connect to the specified peer.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PeerConnectRequest {
     /// The IP of the peer.
@@ -51,7 +44,6 @@ pub struct PeerConnectRequest {
     pub port: ::core::option::Option<i32>,
 }
 /// A peer node.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PeerElement {
     /// The id of the node.
@@ -104,20 +96,9 @@ pub mod peer_element {
                 CatchupStatus::Catchingup => "CATCHINGUP",
             }
         }
-
-        /// Creates an enum from field names used in the ProtoBuf definition.
-        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
-            match value {
-                "UPTODATE" => Some(Self::Uptodate),
-                "PENDING" => Some(Self::Pending),
-                "CATCHINGUP" => Some(Self::Catchingup),
-                _ => None,
-            }
-        }
     }
 }
 /// A response containing a list of peers.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PeerListResponse {
     /// The type of the queried node.
@@ -129,7 +110,6 @@ pub struct PeerListResponse {
     pub peers:     ::prost::alloc::vec::Vec<PeerElement>,
 }
 /// A response containing information about a peer.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PeerStatsResponse {
     /// A list of stats for the peers.
@@ -144,7 +124,6 @@ pub struct PeerStatsResponse {
 }
 /// Nested message and enum types in `PeerStatsResponse`.
 pub mod peer_stats_response {
-    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct PeerStats {
         /// The node id.
@@ -162,7 +141,6 @@ pub mod peer_stats_response {
     }
 }
 /// A request to change the network.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NetworkChangeRequest {
     /// The identifier for the network.
@@ -170,7 +148,6 @@ pub struct NetworkChangeRequest {
     pub network_id: ::core::option::Option<i32>,
 }
 /// A response containing information about the node.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NodeInfoResponse {
     /// The unique node identifier.
@@ -244,22 +221,10 @@ pub mod node_info_response {
                 IsInBakingCommittee::ActiveInCommittee => "ACTIVE_IN_COMMITTEE",
             }
         }
-
-        /// Creates an enum from field names used in the ProtoBuf definition.
-        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
-            match value {
-                "NOT_IN_COMMITTEE" => Some(Self::NotInCommittee),
-                "ADDED_BUT_NOT_ACTIVE_IN_COMMITTEE" => Some(Self::AddedButNotActiveInCommittee),
-                "ADDED_BUT_WRONG_KEYS" => Some(Self::AddedButWrongKeys),
-                "ACTIVE_IN_COMMITTEE" => Some(Self::ActiveInCommittee),
-                _ => None,
-            }
-        }
     }
 }
 /// Hash of a block (encoded in hex). Is always 64 characters long.
 /// Example: "987d6c06256fbf874d6ba14f19baee4390a31c6ee58edd9cc4efef62e89d22d7"
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockHash {
     #[prost(string, tag = "1")]
@@ -268,7 +233,6 @@ pub struct BlockHash {
 /// An account address. Uses a base58-check encoding with a version byte set to
 /// 1. Is always 50 characters long.
 /// Example: "3DJoe7aUwMwVmdFdRU2QsnJfsBbCmQu1QHvEg7YtWFZWmsoBXe"
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountAddress {
     #[prost(string, tag = "1")]
@@ -276,14 +240,12 @@ pub struct AccountAddress {
 }
 /// Hash of a transaction (encoded in hex). Is always 64 characters long.
 /// Example: "987d6c06256fbf874d6ba14f19baee4390a31c6ee58edd9cc4efef62e89d22d7"
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TransactionHash {
     #[prost(string, tag = "1")]
     pub transaction_hash: ::prost::alloc::string::String,
 }
 /// Request for getting the ancestors of a block.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockHashAndAmount {
     /// The block to get ancestors of.
@@ -295,7 +257,6 @@ pub struct BlockHashAndAmount {
 }
 /// Submit a transaction to the node. The transaction is subject to basic
 /// validation and is then relayed to all the peers.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SendTransactionRequest {
     /// The network id (currently not used in this request).
@@ -308,7 +269,6 @@ pub struct SendTransactionRequest {
     pub payload:    ::prost::alloc::vec::Vec<u8>,
 }
 /// Request for getting information about an account address.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetAddressInfoRequest {
     /// Hash of the block (encoded in hex) at which the information should be
@@ -320,7 +280,6 @@ pub struct GetAddressInfoRequest {
     pub address:    ::prost::alloc::string::String,
 }
 /// Request for invoking a contract without a transaction.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InvokeContractRequest {
     /// Hash of the block (encoded in hex) at which to invoke the contract.
@@ -332,7 +291,6 @@ pub struct InvokeContractRequest {
     pub context:    ::prost::alloc::string::String,
 }
 /// Request for getting the source of a smart contract module.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetModuleSourceRequest {
     /// The block to be used for the query.
@@ -343,7 +301,6 @@ pub struct GetModuleSourceRequest {
     pub module_ref: ::prost::alloc::string::String,
 }
 /// Request to enable dumping of network packages.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DumpRequest {
     /// Which file to dump the packages into.
@@ -354,7 +311,6 @@ pub struct DumpRequest {
     pub raw:  bool,
 }
 /// Request for getting (information about) the peers.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PeersRequest {
     /// Whether bootstrapper nodes should be included in the result.
@@ -362,7 +318,6 @@ pub struct PeersRequest {
     pub include_bootstrappers: bool,
 }
 /// Request for getting the status of a transaction in a given block.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetTransactionStatusInBlockRequest {
     /// The transaction hash.
@@ -373,7 +328,6 @@ pub struct GetTransactionStatusInBlockRequest {
     pub block_hash:       ::prost::alloc::string::String,
 }
 /// Request for getting the status of a pool.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetPoolStatusRequest {
     /// The block from which the query should be processed.
@@ -388,7 +342,6 @@ pub struct GetPoolStatusRequest {
     pub baker_id:           u64,
 }
 /// Request for gettings the blocks at a specific height.
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockHeight {
     /// The block height.
