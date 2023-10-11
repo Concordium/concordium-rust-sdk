@@ -242,7 +242,7 @@ pub struct WithRemainingQuota<T> {
     pub quota_remaining: Energy,
 }
 
-/// The successful result of [DryRun::load_block_state].
+/// The successful result of [`DryRun::load_block_state()`].
 #[derive(Debug, Clone)]
 pub struct BlockStateLoaded {
     /// The timestamp of the block, taken to be the current timestamp when
@@ -399,7 +399,7 @@ impl From<&ContractContext> for DryRunInvokeInstance {
     }
 }
 
-/// The successful result of [DryRun::invoke_instance].
+/// The successful result of [`DryRun::invoke_instance()`].
 #[derive(Debug, Clone)]
 pub struct InvokeInstanceSuccess {
     /// The return value for a V1 contract call. Absent for a V0 contract call.
@@ -467,7 +467,7 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
     }
 }
 
-/// The successful result of [DryRun::set_timestamp].
+/// The successful result of [`DryRun::set_timestamp()`].
 #[derive(Clone, Debug)]
 pub struct TimestampSet {}
 
@@ -512,7 +512,7 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
     }
 }
 
-/// The successful result of [DryRun::mint_to_account].
+/// The successful result of [`DryRun::mint_to_account()`].
 #[derive(Clone, Debug)]
 pub struct MintedToAccount {}
 
@@ -619,7 +619,7 @@ impl From<DryRunTransaction> for generated::DryRunTransaction {
     }
 }
 
-/// The successful result of [DryRun::transaction].
+/// The successful result of [`DryRun::transaction()`].
 /// Note that a transaction can still be rejected (i.e. produce no effect beyond
 /// charging the sender) even if it is executed.
 #[derive(Clone, Debug)]
@@ -743,7 +743,7 @@ impl DryRun {
 
     /// Load the state from a specified block.
     /// This can result in an error if the dry-run session has already been
-    /// closed, either by [DryRun::close] or by the server closing the session.
+    /// closed, either by [`DryRun::close()`] or by the server closing the session.
     /// In this case, the response code indicates the cause.
     /// If successful, this returns a future that can be used to wait for the
     /// result of the operation. The following results are possible:
@@ -777,7 +777,7 @@ impl DryRun {
 
     /// Get the account information for a specified account in the current
     /// state. This can result in an error if the dry-run session has
-    /// already been closed, either by [DryRun::close] or by the server
+    /// already been closed, either by [`DryRun::close()`] or by the server
     /// closing the session. In this case, the response code indicates the
     /// cause. If successful, this returns a future that can be used to wait
     /// for the result of the operation. The following results are possible:
@@ -814,7 +814,7 @@ impl DryRun {
 
     /// Get the details of a specified smart contract instance in the current
     /// state. This operation can result in an error if the dry-run session has
-    /// already been closed, either by [DryRun::close] or by the server
+    /// already been closed, either by [`DryRun::close()`] or by the server
     /// closing the session. In this case, the response code indicates the
     /// cause. If successful, this returns a future that can be used to wait
     /// for the result of the operation. The following results are possible:
@@ -853,9 +853,9 @@ impl DryRun {
     /// Any changes this would make to the state will be rolled back so they are
     /// not observable by subsequent operations in the dry-run session. (To make
     /// updates that are observable within the dry-run session, use
-    /// [DryRun::run_transaction] instead.) This operation can result in an
+    /// [`DryRun::run_transaction()`] instead.) This operation can result in an
     /// error if the dry-run session has already been closed, either by
-    /// [DryRun::close] or by the server closing the session. In this case,
+    /// [`DryRun::close()`] or by the server closing the session. In this case,
     /// the response code indicates the cause. If successful, this returns a
     /// future that can be used to wait for the result of the operation. The
     /// following results are possible:
@@ -895,10 +895,10 @@ impl DryRun {
 
     /// Update the current timestamp for subsequent dry-run operations. The
     /// timestamp is automatically set to the timestamp of the block loaded
-    /// by [DryRun::load_block_state]. For smart contracts that are time
+    /// by [`DryRun::load_block_state()`]. For smart contracts that are time
     /// sensitive, overriding the timestamp can be useful. This operation can
     /// result in an error if the dry-run session has already been closed,
-    /// either by [DryRun::close] or by the server closing the session. In
+    /// either by [`DryRun::close()`] or by the server closing the session. In
     /// this case, the response code indicates the cause. If successful,
     /// this returns a future that can be used to wait for the result of the
     /// operation. The following results are possible:
@@ -936,7 +936,7 @@ impl DryRun {
 
     /// Mint a specified amount and award it to a specified account. This
     /// operation can result in an error if the dry-run session has already
-    /// been closed, either by [DryRun::close] or by the server closing the
+    /// been closed, either by [`DryRun::close()`] or by the server closing the
     /// session. In this case, the response code indicates the cause. If
     /// successful, this returns a future that can be used to wait for the
     /// result of the operation. The following results are possible:
@@ -982,7 +982,7 @@ impl DryRun {
 
     /// Dry-run a transaction, updating the state of the dry-run session
     /// accordingly. This operation can result in an error if the dry-run
-    /// session has already been closed, either by [DryRun::close] or by the
+    /// session has already been closed, either by [`DryRun::close()`] or by the
     /// server closing the session. In this case, the response code
     /// indicates the cause. If successful, this returns a future that can
     /// be used to wait for the result of the operation. The following
