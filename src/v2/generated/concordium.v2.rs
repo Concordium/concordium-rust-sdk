@@ -4539,6 +4539,8 @@ pub mod dry_run_request {
         /// requests. The state is taken at the end of execution of the
         /// block, and the block’s timestamp is used as the current
         /// timestamp.
+        ///
+        /// The energy cost for this operation is 2000.
         #[prost(message, tag = "1")]
         LoadBlockState(super::BlockHashInput),
         /// Run a query on the state.
@@ -4560,14 +4562,21 @@ pub mod dry_run_state_query {
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Query {
         /// Look up information on a particular account.
+        ///
+        /// The energy cost for this query is 200.
         #[prost(message, tag = "1")]
         GetAccountInfo(super::AccountIdentifierInput),
         /// Look up information about a particular smart contract.
+        ///
+        /// The energy cost for this query is 200.
         #[prost(message, tag = "2")]
         GetInstanceInfo(super::ContractAddress),
         /// Invoke an entrypoint on a smart contract instance.
         /// No changes made to the state are retained at the completion of the
         /// operation.
+        ///
+        /// The energy cost for this query is 200 plus the energy used by the
+        /// smart contract execution.
         #[prost(message, tag = "3")]
         InvokeInstance(super::DryRunInvokeInstance),
     }
@@ -4611,13 +4620,20 @@ pub mod dry_run_state_operation {
     pub enum Operation {
         /// Sets the current block time to the given timestamp for the purposes
         /// of future transactions.
+        ///
+        /// The energy cost of this operation is 50.
         #[prost(message, tag = "1")]
         SetTimestamp(super::Timestamp),
         /// Add a specified amount of newly-minted CCDs to a specified account.
         /// The amount cannot cause the total circulating supply to overflow.
+        ///
+        /// The energy cost of this operation is 400.
         #[prost(message, tag = "2")]
         MintToAccount(super::DryRunMintToAccount),
         /// Dry run a transaction, updating the state if it succeeds.
+        ///
+        /// The energy cost of this operation is 400 plus the energy used by
+        /// executing the transaction.
         #[prost(message, tag = "3")]
         RunTransaction(super::DryRunTransaction),
     }
@@ -4804,7 +4820,7 @@ pub struct DryRunErrorInvokeFailure {
 pub struct DryRunSuccessResponse {
     #[prost(
         oneof = "dry_run_success_response::Response",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8"
+        tags = "1, 2, 3, 4, 5, 6, 7"
     )]
     pub response: ::core::option::Option<dry_run_success_response::Response>,
 }
@@ -4824,10 +4840,9 @@ pub mod dry_run_success_response {
         /// Response to 'get_instance_info'.
         #[prost(message, tag = "3")]
         InstanceInfo(super::InstanceInfo),
-        /// The state of the contract instance at the specified key.
-        /// Response to 'get_instance_state'.
+        /// The smart contract instance was invoked successfully.
         #[prost(message, tag = "4")]
-        InstancePartialState(super::InstanceStateValueAtKey),
+        InvokeSucceeded(super::DryRunInvokeSuccess),
         /// The current timestamp was set successfully.
         /// Response to 'set_timestamp'.
         #[prost(message, tag = "5")]
@@ -4841,9 +4856,6 @@ pub mod dry_run_success_response {
         /// Response to 'run_transaction'.
         #[prost(message, tag = "7")]
         TransactionExecuted(super::DryRunTransactionExecuted),
-        /// The smart contract instance was invoked successfully.
-        #[prost(message, tag = "8")]
-        InvokeSucceeded(super::DryRunInvokeSuccess),
     }
 }
 /// The block state at the specified block was successfully loaded.
@@ -6352,7 +6364,33 @@ pub mod queries_client {
         /// subsequent requests, just as if the request causing the error
         /// did not happen.
         ///
-        /// The first request should be `load_block_at_state`
+        /// The first request should be `load_block_at_state` to determine the
+        /// block state that will be used for the dry run.
+        ///
+        /// The server associates each request with an energy cost, and limits
+        /// the total energy that may be expended in a single invocation
+        /// of `DryRun`. This limit is reported as `quota` in the
+        /// initial metadata returned by the server. If executing an operation
+        /// exceeds the limit, the server terminates the session with
+        /// `RESOURCE_EXHAUSTED`.
+        ///
+        /// The server also imposes a timeout for a dry-run session to complete.
+        /// The server reports the timeout duration in milliseconds in
+        /// the initial metadata field `timeout`. If the session
+        /// is not completed before the timeout elapses, the server terminates
+        /// the session with `DEADLINE_EXCEEDED`.
+        ///
+        /// The following error cases are possible:
+        ///  * `INVALID_ARGUMENT` if any `DryRunRequest` is malformed.
+        ///  * `RESOURCE_EXHAUSTED` if the energy quota is exceeded.
+        ///  * `DEADLINE_EXCEEDED` if the session does not complete before the
+        ///    server-imposed timeout.
+        ///  * `UNAVAILABLE` if the server is not currently accepting new
+        ///    `DryRun` sessions. (The server may impose a limit on the number
+        ///    of concurrent sessions.)
+        ///  * `INTERNAL` if an interal server error occurs. This should not
+        ///    happen, and likely indicates a bug.
+        ///  * `UNIMPLEMENTED` if the endpoint is disabled on the node.
         pub async fn dry_run(
             &mut self,
             request: impl tonic::IntoStreamingRequest<Message = super::DryRunRequest>,

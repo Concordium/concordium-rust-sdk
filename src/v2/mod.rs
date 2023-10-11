@@ -1597,7 +1597,7 @@ impl Client {
     /// Start a dry-run sequence that can be used to simulate a series of
     /// transactions and other operations on the node.
     pub async fn dry_run(&mut self) -> endpoints::QueryResult<dry_run::DryRun> {
-        dry_run::DryRun::new(&mut self.client).await
+        Ok(dry_run::DryRun::new(&mut self.client).await?)
     }
 
     /// Get information, such as height, timings, and transaction counts for the
