@@ -1,4 +1,7 @@
 ## Unreleased changes
+
+## 3.1.0
+
 - Add a `commission_rates` field to `CurrentPaydayBakerPoolStatus` which yields the commission rates
   of the baker for the reward period. Requires a node version at least 6.1.
 - Add support for `GetWinningBakersEpoch`. Requires a node version at least 6.1.
@@ -6,7 +9,6 @@
 - Add support for `GetBakersRewardPeriod` endpoint. Requires a node version at least 6.1.
 - Add Support for `GetBakerEarliestWinTime` endpoint. Requires a node version at least 6.1.
 - Add support for `GetBlockCertificates`. Requires a node version at least 6.1.
-- Update minimum supported rust version to `1.66`.
 - Add `make_update` and `make_update_raw` methods to the `ContractClient`. They
   are like `update` and `update_raw` but instead of sending a transaction they
   only construct it and return it.
@@ -17,6 +19,8 @@
 - Add `make_transfer` and `make_update_operator` functions to the CIS2 client.
   These are like the methods without the `make_`, except that they only
   construct the transaction.
+- Update minimum supported rust version to `1.66`.
+
 
 ## 3.0.1
 
