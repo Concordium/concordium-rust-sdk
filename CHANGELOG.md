@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+- The sdk now requires a `rustc` version at least 1.67 (Before it required version 1.66).
+
 ## 3.1.0
 
 - Add a `commission_rates` field to `CurrentPaydayBakerPoolStatus` which yields the commission rates
