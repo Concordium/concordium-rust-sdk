@@ -9,7 +9,7 @@ use concordium_rust_sdk::{
         self,
         types::{KeyIndex, TransactionTime},
     },
-    endpoints::{self, Endpoint},
+    endpoints::Endpoint,
     id,
     id::{
         constants::{ArCurve, IpPairing},
@@ -22,6 +22,7 @@ use concordium_rust_sdk::{
         },
     },
     types::transactions::{BlockItem, Payload},
+    v2,
 };
 use id::{
     constants::AttributeKind,
@@ -62,9 +63,19 @@ async fn main() -> anyhow::Result<()> {
     )
     .context("Could not parse the identity provider file.")?;
 
-    let mut client = endpoints::Client::connect(app.endpoint, "rpcadmin".to_string()).await?;
-    let last_final = client.get_consensus_status().await?.last_finalized_block;
-    let global_context = client.get_cryptographic_parameters(&last_final).await?;
+    let mut client = v2::Client::new(app.endpoint.clone())
+        .await
+        .context("cannot connect to node")?;
+    let last_final = client
+        .get_consensus_info()
+        .await
+        .context("Could not get consensus status")?
+        .last_finalized_block;
+    let global_context = client
+        .get_cryptographic_parameters(&last_final)
+        .await
+        .context("Could not get cryptograhic context")?
+        .response;
 
     // Create a channel between the task signing and the task sending transactions.
     let (sender, mut rx) = tokio::sync::mpsc::channel(100);
