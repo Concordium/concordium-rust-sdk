@@ -1,7 +1,5 @@
 ## Unreleased changes
 
-- Update the `create-initial-accounts` example to use `ClientV2`.
-
 ## 3.1.0
 
 - Add a `commission_rates` field to `CurrentPaydayBakerPoolStatus` which yields the commission rates

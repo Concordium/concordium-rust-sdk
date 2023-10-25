@@ -22,7 +22,7 @@ use concordium_rust_sdk::{
         },
     },
     types::transactions::{BlockItem, Payload},
-    v2,
+    v2::{self, BlockIdentifier},
 };
 use id::{
     constants::AttributeKind,
@@ -66,15 +66,10 @@ async fn main() -> anyhow::Result<()> {
     let mut client = v2::Client::new(app.endpoint.clone())
         .await
         .context("cannot connect to node")?;
-    let last_final = client
-        .get_consensus_info()
-        .await
-        .context("Could not get consensus status")?
-        .last_finalized_block;
     let global_context = client
-        .get_cryptographic_parameters(&last_final)
+        .get_cryptographic_parameters(&BlockIdentifier::LastFinal)
         .await
-        .context("Could not get cryptograhic context")?
+        .context("Could not get cryptographic context")?
         .response;
 
     // Create a channel between the task signing and the task sending transactions.
