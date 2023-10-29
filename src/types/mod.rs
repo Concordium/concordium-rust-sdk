@@ -1099,6 +1099,31 @@ impl BlockItemSummary {
         }
     }
 
+    /// If the block item is a smart contract update transaction then return the
+    /// list of contract instances that were updated. The order is the order
+    /// in which the updates finished, which is the reverse order of the
+    /// order in which they were called. Concretely, the instance that was
+    /// directly invoked by the transaction is the last.
+    pub fn contract_updates(&self) -> Option<impl Iterator<Item = &InstanceUpdatedEvent>> {
+        if let BlockItemSummaryDetails::AccountTransaction(at) = &self.details {
+            match &at.effects {
+                AccountTransactionEffects::ContractInitialized { .. } => None,
+                AccountTransactionEffects::ContractUpdateIssued { effects } => {
+                    Some(effects.iter().filter_map(|effect| match effect {
+                        ContractTraceElement::Updated { data } => Some(data),
+                        ContractTraceElement::Transferred { .. } => None,
+                        ContractTraceElement::Interrupted { .. } => None,
+                        ContractTraceElement::Resumed { .. } => None,
+                        ContractTraceElement::Upgraded { .. } => None,
+                    }))
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
     /// If the block item is a smart contract init transaction then
     /// return the initialization data.
     pub fn contract_init(&self) -> Option<&ContractInitializedEvent> {
