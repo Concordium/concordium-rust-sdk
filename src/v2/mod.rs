@@ -1596,6 +1596,10 @@ impl Client {
 
     /// Start a dry-run sequence that can be used to simulate a series of
     /// transactions and other operations on the node.
+    ///
+    /// Before invoking any other operations on the [`dry_run::DryRun`] object,
+    /// the state must be loaded by calling
+    /// [`dry_run::DryRun::load_block_state`].
     pub async fn dry_run(&mut self) -> endpoints::QueryResult<dry_run::DryRun> {
         Ok(dry_run::DryRun::new(&mut self.client).await?)
     }

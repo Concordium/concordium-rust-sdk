@@ -1,3 +1,17 @@
+use super::{
+    generated::{
+        self, account_transaction_payload, dry_run_error_response, dry_run_request,
+        DryRunInvokeInstance, DryRunMintToAccount, DryRunSignature, DryRunStateOperation,
+    },
+    AccountIdentifier, IntoBlockIdentifier,
+};
+use crate::{
+    types::{
+        smart_contracts::{ContractContext, InstanceInfo, ReturnValue},
+        AccountInfo, AccountTransactionDetails, RejectReason,
+    },
+    v2::{generated::DryRunStateQuery, Require},
+};
 use concordium_base::{
     base::{Energy, ProtocolVersion},
     common::types::{CredentialIndex, KeyIndex, Timestamp},
@@ -6,31 +20,12 @@ use concordium_base::{
     smart_contracts::ContractTraceElement,
     transactions::{EncodedPayload, PayloadLike},
 };
-
 use futures::*;
-use tonic::metadata::MetadataValue;
-
-use crate::{
-    types::{
-        smart_contracts::{ContractContext, InstanceInfo, ReturnValue},
-        AccountInfo, AccountTransactionDetails, RejectReason,
-    },
-    v2::{generated::DryRunStateQuery, Require},
-};
-
-use super::{
-    generated::{
-        self, account_transaction_payload, dry_run_error_response, dry_run_request,
-        DryRunInvokeInstance, DryRunMintToAccount, DryRunSignature, DryRunStateOperation,
-    },
-    AccountIdentifier, IntoBlockIdentifier,
-};
 
 mod shared_receiver {
 
-    use std::{collections::LinkedList, sync::Arc};
-
     use futures::{lock::Mutex, stream::FusedStream, *};
+    use std::{collections::LinkedList, sync::Arc};
 
     /// A stream together with a queue of pending requests for items from the
     /// stream that have not yet been polled. This is used to allow multiple
@@ -41,15 +36,15 @@ mod shared_receiver {
         /// The underlying stream.
         src:     S,
         /// The queue of pending receivers.
-        pending: LinkedList<oneshot::Sender<Option<S::Item>>>,
+        pending: LinkedList<tokio::sync::oneshot::Sender<Option<S::Item>>>,
     }
 
-    /// A pending item to be received from a [SharedReceiver].
+    /// A pending item to be received from a [`SharedReceiver``].
     pub struct SharedReceiverItem<S>
     where
         S: Stream, {
         /// The item, if it has already been read from the stream.
-        value:    oneshot::Receiver<Option<S::Item>>,
+        value:    tokio::sync::oneshot::Receiver<Option<S::Item>>,
         /// The shared receiver.
         receiver: Arc<Mutex<InnerSharedReceiver<S>>>,
     }
@@ -74,11 +69,11 @@ mod shared_receiver {
             }
         }
 
-        /// Get a [SharedReceiverItem] that can be used to receive the next item
-        /// from the stream. This can be thought of as reserving a place in the
-        /// queue to receive an item from the stream.
+        /// Get a [`SharedReceiverItem`] that can be used to receive the next
+        /// item from the stream. This can be thought of as reserving a
+        /// place in the queue to receive an item from the stream.
         pub async fn next(&self) -> SharedReceiverItem<S> {
-            let (item_sender, item_receiver) = oneshot::channel();
+            let (item_sender, item_receiver) = tokio::sync::oneshot::channel();
             self.inner.lock().await.pending.push_back(item_sender);
             SharedReceiverItem {
                 value:    item_receiver,
@@ -92,12 +87,12 @@ mod shared_receiver {
         /// consumed in the process, this can only occur once. Receiving
         /// is cooperative in that we receive items from the stream on behalf of
         /// other `SharedReceiveItem`s until we have received our own.
-        pub async fn receive(self) -> Option<S::Item> {
-            use oneshot::TryRecvError::*;
+        pub async fn receive(mut self) -> Option<S::Item> {
+            use tokio::sync::oneshot::error::TryRecvError::*;
             // Check if we have already received our item. If so, we are done.
             match self.value.try_recv() {
                 Ok(v) => return v,
-                Err(Disconnected) => return None,
+                Err(Closed) => return None,
                 Err(Empty) => {}
             }
             let mut receiver = self.receiver.lock().await;
@@ -106,7 +101,7 @@ mod shared_receiver {
                 // received for us since we acquired the lock.
                 match self.value.try_recv() {
                     Ok(v) => return v,
-                    Err(Disconnected) => return None,
+                    Err(Closed) => return None,
                     Err(Empty) => {}
                 }
                 // Receive the next item from the stream to send to the next waiting receiver.
@@ -174,7 +169,7 @@ pub enum ErrorResult {
         /// with out of energy or runtime error. If the V1 contract
         /// terminated with a logic error then the return value is
         /// present.
-        return_value: Option<Vec<u8>>,
+        return_value: Option<ReturnValue>,
         /// Energy used by the execution.
         used_energy:  Energy,
         /// Contract execution failed for the given reason.
@@ -203,7 +198,7 @@ impl TryFrom<dry_run_error_response::Error> for ErrorResult {
                 energy_required: e.energy_required.require()?.into(),
             },
             Error::InvokeFailed(e) => Self::InvokeFailure {
-                return_value: e.return_value,
+                return_value: e.return_value.map(ReturnValue::from),
                 used_energy:  e.used_energy.require()?.into(),
                 reason:       e.reason.require()?.try_into()?,
             },
@@ -216,7 +211,8 @@ impl TryFrom<dry_run_error_response::Error> for ErrorResult {
 #[derive(thiserror::Error, Debug)]
 pub enum DryRunError {
     /// The server responded with an error code.
-    /// In this case, no futher requests will be acceped in the dry-run session.
+    /// In this case, no futher requests will be accepted in the dry-run
+    /// session.
     #[error("{0}")]
     CallError(#[from] tonic::Status),
     /// The dry-run operation failed.
@@ -236,13 +232,13 @@ pub enum DryRunError {
 /// the operation.
 #[derive(Debug, Clone)]
 pub struct WithRemainingQuota<T> {
-    /// The result valule.
+    /// The result value.
     pub inner:           T,
     /// The remaining energy quota.
     pub quota_remaining: Energy,
 }
 
-/// The successful result of [`DryRun::load_block_state()`].
+/// The successful result of [`DryRun::load_block_state`].
 #[derive(Debug, Clone)]
 pub struct BlockStateLoaded {
     /// The timestamp of the block, taken to be the current timestamp when
@@ -280,9 +276,8 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
             }
             Response::Success(s) => {
                 let response = s.response.require()?;
-                use generated::dry_run_success_response::*;
                 match response {
-                    Response::BlockStateLoaded(loaded) => {
+                    generated::dry_run_success_response::Response::BlockStateLoaded(loaded) => {
                         let protocol_version =
                             generated::ProtocolVersion::from_i32(loaded.protocol_version)
                                 .ok_or_else(|| tonic::Status::unknown("Unknown protocol version"))?
@@ -399,7 +394,7 @@ impl From<&ContractContext> for DryRunInvokeInstance {
     }
 }
 
-/// The successful result of [`DryRun::invoke_instance()`].
+/// The successful result of [`DryRun::invoke_instance`].
 #[derive(Debug, Clone)]
 pub struct InvokeInstanceSuccess {
     /// The return value for a V1 contract call. Absent for a V0 contract call.
@@ -467,9 +462,9 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
     }
 }
 
-/// The successful result of [`DryRun::set_timestamp()`].
-#[derive(Clone, Debug)]
-pub struct TimestampSet {}
+/// The successful result of [`DryRun::set_timestamp`].
+#[derive(Clone, Debug, Copy)]
+pub struct TimestampSet;
 
 impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
     for WithRemainingQuota<TimestampSet>
@@ -496,9 +491,8 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
             }
             Response::Success(s) => {
                 let response = s.response.require()?;
-                use generated::dry_run_success_response::*;
                 match response {
-                    Response::TimestampSet(_) => {
+                    generated::dry_run_success_response::Response::TimestampSet(_) => {
                         let inner = TimestampSet {};
                         Ok(WithRemainingQuota {
                             inner,
@@ -512,9 +506,9 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
     }
 }
 
-/// The successful result of [`DryRun::mint_to_account()`].
-#[derive(Clone, Debug)]
-pub struct MintedToAccount {}
+/// The successful result of [`DryRun::mint_to_account`].
+#[derive(Clone, Debug, Copy)]
+pub struct MintedToAccount;
 
 impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
     for WithRemainingQuota<MintedToAccount>
@@ -544,9 +538,8 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
             }
             Response::Success(s) => {
                 let response = s.response.require()?;
-                use generated::dry_run_success_response::*;
                 match response {
-                    Response::MintedToAccount(_) => {
+                    generated::dry_run_success_response::Response::MintedToAccount(_) => {
                         let inner = MintedToAccount {};
                         Ok(WithRemainingQuota {
                             inner,
@@ -584,9 +577,9 @@ pub struct DryRunTransaction {
 }
 
 impl DryRunTransaction {
-    /// Create a [DryRunTransaction] given the sender address, energy limit and
-    /// payload. The empty list is used for the signatures, meaning that it
-    /// will be treated as though key 0 of credential 0 is the sole
+    /// Create a [`DryRunTransaction`] given the sender address, energy limit
+    /// and payload. The empty list is used for the signatures, meaning that
+    /// it will be treated as though key 0 of credential 0 is the sole
     /// signature on the transaction. For most purposes, this is sufficient.
     pub fn new(sender: AccountAddress, energy_amount: Energy, payload: &impl PayloadLike) -> Self {
         DryRunTransaction {
@@ -594,6 +587,29 @@ impl DryRunTransaction {
             energy_amount,
             payload: payload.encode(),
             signatures: vec![],
+        }
+    }
+}
+
+impl<P: PayloadLike> From<concordium_base::transactions::AccountTransaction<P>>
+    for DryRunTransaction
+{
+    fn from(value: concordium_base::transactions::AccountTransaction<P>) -> Self {
+        DryRunTransaction {
+            sender:        value.header.sender,
+            energy_amount: value.header.energy_amount,
+            payload:       value.payload.encode(),
+            signatures:    value
+                .signature
+                .signatures
+                .into_iter()
+                .map(|(c, v)| {
+                    v.into_iter()
+                        .map(|(k, _)| (c.clone(), k))
+                        .collect::<Vec<(CredentialIndex, KeyIndex)>>()
+                })
+                .flatten()
+                .collect(),
         }
     }
 }
@@ -611,15 +627,15 @@ impl From<DryRunTransaction> for generated::DryRunTransaction {
                 .signatures
                 .into_iter()
                 .map(|(cred, key)| DryRunSignature {
-                    credential: cred.index as u32,
-                    key:        key.0 as u32,
+                    credential: cred.index.into(),
+                    key:        key.0.into(),
                 })
                 .collect(),
         }
     }
 }
 
-/// The successful result of [`DryRun::transaction()`].
+/// The successful result of [`DryRun::run_transaction`].
 /// Note that a transaction can still be rejected (i.e. produce no effect beyond
 /// charging the sender) even if it is executed.
 #[derive(Clone, Debug)]
@@ -651,11 +667,8 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
                     result,
                     ErrorResult::NoState()
                         | ErrorResult::AccountNotFound()
-                        | ErrorResult::BalanceInsufficient {
-                            required_amount:  _,
-                            available_amount: _,
-                        }
-                        | ErrorResult::EnergyInsufficient { energy_required: _ }
+                        | ErrorResult::BalanceInsufficient { .. }
+                        | ErrorResult::EnergyInsufficient { .. }
                 ) {
                     Err(tonic::Status::unknown("unexpected error response type"))?
                 }
@@ -666,9 +679,8 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
             }
             Response::Success(s) => {
                 let response = s.response.require()?;
-                use generated::dry_run_success_response::*;
                 match response {
-                    Response::TransactionExecuted(res) => {
+                    generated::dry_run_success_response::Response::TransactionExecuted(res) => {
                         let inner = TransactionExecuted {
                             energy_cost:  res.energy_cost.require()?.into(),
                             details:      res.details.require()?.try_into()?,
@@ -689,6 +701,21 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
 type DryRunResult<T> = Result<WithRemainingQuota<T>, DryRunError>;
 
 /// A dry-run session.
+///
+/// The operations available in two variants, with and without the `begin_`
+/// prefix. The variants without a prefix will send the request and wait for the
+/// result when `await`ed. This is typically the simplest to use.
+/// The variants with the `begin_` prefix send the request when `await`ed,
+/// returning a future that can be `await`ed to retrieve the result.
+/// (This can be used to front-load operations where queries do not depend on
+/// the results of previous queries. This may be more efficient in high-latency
+/// situations.)
+///
+/// Before any other operations, [`DryRun::load_block_state`] (or
+/// [`DryRun::begin_load_block_state`]) should be called to ensure a block state
+/// is loaded. If it is not (or if loading the block state fails - for instance
+/// if an invalid block hash is supplied), other operations will result in an
+/// [`ErrorResult::NoState`] error.
 pub struct DryRun {
     /// The channel used for sending requests to the server.
     /// This is `None` if the session has been closed.
@@ -698,9 +725,9 @@ pub struct DryRun {
         futures::stream::Fuse<tonic::Streaming<generated::DryRunResponse>>,
     >,
     /// The timeout in milliseconds for the dry-run session to complete.
-    timeout:       Option<u64>,
+    timeout:       u64,
     /// The energy quota for the dry-run session as a whole.
-    energy_quota:  Option<u64>,
+    energy_quota:  u64,
 }
 
 impl DryRun {
@@ -713,11 +740,15 @@ impl DryRun {
     ) -> tonic::Result<Self> {
         let (request_send, request_recv) = channel::mpsc::channel(10);
         let response = client.dry_run(request_recv).await?;
-        fn parse_meta_u64(meta: Option<&MetadataValue<tonic::metadata::Ascii>>) -> Option<u64> {
-            meta?.to_str().ok()?.parse().ok()
-        }
-        let timeout: Option<u64> = parse_meta_u64(response.metadata().get("timeout"));
-        let energy_quota: Option<u64> = parse_meta_u64(response.metadata().get("quota"));
+        let parse_meta_u64 = |key| response.metadata().get(key)?.to_str().ok()?.parse().ok();
+        let timeout: u64 = parse_meta_u64("timeout").ok_or_else(|| {
+            tonic::Status::internal("timeout metadata could not be parsed from server response")
+        })?;
+        let energy_quota: u64 = parse_meta_u64("quota").ok_or_else(|| {
+            tonic::Status::internal(
+                "energy quota metadata could not be parsed from server response",
+            )
+        })?;
         let response_stream = response.into_inner();
         let response_recv =
             shared_receiver::SharedReceiver::new(futures::stream::StreamExt::fuse(response_stream));
@@ -732,38 +763,35 @@ impl DryRun {
     /// Get the timeout for the dry-run session set by the server.
     /// Returns `None` if the initial metadata did not include the timeout, or
     /// it could not be parsed.
-    pub fn timeout(&self) -> Option<std::time::Duration> {
-        self.timeout.map(std::time::Duration::from_millis)
-    }
+    pub fn timeout(&self) -> std::time::Duration { std::time::Duration::from_millis(self.timeout) }
 
     /// Get the total energy quota set for the dry-run session.
     /// Returns `None` if the initial metadata did not include the quota, or it
     /// could not be parsed.
-    pub fn energy_quota(&self) -> Option<Energy> { self.energy_quota.map(Energy::from) }
+    pub fn energy_quota(&self) -> Energy { self.energy_quota.into() }
 
     /// Load the state from a specified block.
     /// This can result in an error if the dry-run session has already been
-    /// closed, either by [`DryRun::close()`] or by the server closing the session.
-    /// In this case, the response code indicates the cause.
+    /// closed, either by [`DryRun::close`] or by the server closing the
+    /// session. In this case, the response code indicates the cause.
     /// If successful, this returns a future that can be used to wait for the
     /// result of the operation. The following results are possible:
     ///
-    ///  * [BlockStateLoaded] if the operation is successful.
-    ///  * [DryRunError::OperationFailed] if the operation failed, with one of
+    ///  * [`BlockStateLoaded`] if the operation is successful.
+    ///  * [`DryRunError::OperationFailed`] if the operation failed, with one of
     ///    the following results:
-    ///    - [ErrorResult::BlockNotFound] if the block could not be found.
-    ///  * [DryRunError::CallError] if the server produced an error code, or if
-    ///    the server's response was unexpected.
+    ///    - [`ErrorResult::BlockNotFound`] if the block could not be found.
+    ///  * [`DryRunError::CallError`] if the server produced an error code, or
+    ///    if the server's response was unexpected.
     ///    - If the server's response could not be interpreted, the result code
     ///      `INVALID_ARGUMENT` or `UNKNOWN` is returned.
     ///    - If the execution of the query would exceed the energy quota,
-    ///      `RESOURCE_EXHAUSETED` is returned.
+    ///      `RESOURCE_EXHAUSTED` is returned.
     ///    - If the timeout for the dry-run session has expired,
     ///      `DEADLINE_EXCEEDED` is returned.
-    ///    - `INVALID_ARGUMENT` or `INTERNAL` could occur as a result of bugs.
     ///
     /// The energy cost of this operation is 2000.
-    pub async fn load_block_state(
+    pub async fn begin_load_block_state(
         &mut self,
         bi: impl IntoBlockIdentifier,
     ) -> tonic::Result<impl Future<Output = DryRunResult<BlockStateLoaded>>> {
@@ -775,30 +803,56 @@ impl DryRun {
         Ok(self.request(request).await?.map(|z| z.try_into()))
     }
 
+    /// Load the state from a specified block.
+    /// The following results are possible:
+    ///
+    ///  * [`DryRunError::CallError`] if the dry-run session has already been
+    ///    closed, either by [`DryRun::close`] or by the server closing the
+    ///    session. In this case, the response code indicates the cause.
+    ///  * [`BlockStateLoaded`] if the operation is successful.
+    ///  * [`DryRunError::OperationFailed`] if the operation failed, with one of
+    ///    the following results:
+    ///    - [`ErrorResult::BlockNotFound`] if the block could not be found.
+    ///  * [`DryRunError::CallError`] if the server produced an error code, or
+    ///    if the server's response was unexpected.
+    ///    - If the server's response could not be interpreted, the result code
+    ///      `INVALID_ARGUMENT` or `UNKNOWN` is returned.
+    ///    - If the execution of the query would exceed the energy quota,
+    ///      `RESOURCE_EXHAUSTED` is returned.
+    ///    - If the timeout for the dry-run session has expired,
+    ///      `DEADLINE_EXCEEDED` is returned.
+    ///
+    /// The energy cost of this operation is 2000.
+    pub async fn load_block_state(
+        &mut self,
+        bi: impl IntoBlockIdentifier,
+    ) -> DryRunResult<BlockStateLoaded> {
+        self.begin_load_block_state(bi).await?.await
+    }
+
     /// Get the account information for a specified account in the current
     /// state. This can result in an error if the dry-run session has
-    /// already been closed, either by [`DryRun::close()`] or by the server
+    /// already been closed, either by [`DryRun::close`] or by the server
     /// closing the session. In this case, the response code indicates the
     /// cause. If successful, this returns a future that can be used to wait
     /// for the result of the operation. The following results are possible:
     ///
-    ///  * [AccountInfo] if the operation is successful.
-    ///  * [DryRunError::OperationFailed] if the operation failed, with one of
+    ///  * [`AccountInfo`] if the operation is successful.
+    ///  * [`DryRunError::OperationFailed`] if the operation failed, with one of
     ///    the following results:
-    ///    - [ErrorResult::NoState] if no block state has been loaded.
-    ///    - [ErrorResult::AccountNotFound] if the account could not be found.
-    ///  * [DryRunError::CallError] if the server produced an error code, or if
-    ///    the server's response was unexpected.
+    ///    - [`ErrorResult::NoState`] if no block state has been loaded.
+    ///    - [`ErrorResult::AccountNotFound`] if the account could not be found.
+    ///  * [`DryRunError::CallError`] if the server produced an error code, or
+    ///    if the server's response was unexpected.
     ///    - If the server's response could not be interpreted, the result code
     ///      `INVALID_ARGUMENT` or `UNKNOWN` is returned.
     ///    - If the execution of the query would exceed the energy quota,
-    ///      `RESOURCE_EXHAUSETED` is returned.
+    ///      `RESOURCE_EXHAUSTED` is returned.
     ///    - If the timeout for the dry-run session has expired,
     ///      `DEADLINE_EXCEEDED` is returned.
-    ///    - `INVALID_ARGUMENT` or `INTERNAL` could occur as a result of bugs.
     ///
     /// The energy cost of this operation is 200.
-    pub async fn get_account_info(
+    pub async fn begin_get_account_info(
         &mut self,
         acc: &AccountIdentifier,
     ) -> tonic::Result<impl Future<Output = DryRunResult<AccountInfo>>> {
@@ -812,30 +866,54 @@ impl DryRun {
         Ok(self.request(request).await?.map(|z| z.try_into()))
     }
 
+    /// Get the account information for a specified account in the current
+    /// state. The following results are possible:
+    ///
+    ///  * [`DryRunError::CallError`] if the dry-run session has already been
+    ///    closed, either by [`DryRun::close`] or by the server closing the
+    ///    session. In this case, the response code indicates the cause.
+    ///  * [`AccountInfo`] if the operation is successful.
+    ///  * [`DryRunError::OperationFailed`] if the operation failed, with one of
+    ///    the following results:
+    ///    - [`ErrorResult::NoState`] if no block state has been loaded.
+    ///    - [`ErrorResult::AccountNotFound`] if the account could not be found.
+    ///  * [`DryRunError::CallError`] if the server produced an error code, or
+    ///    if the server's response was unexpected.
+    ///    - If the server's response could not be interpreted, the result code
+    ///      `INVALID_ARGUMENT` or `UNKNOWN` is returned.
+    ///    - If the execution of the query would exceed the energy quota,
+    ///      `RESOURCE_EXHAUSTED` is returned.
+    ///    - If the timeout for the dry-run session has expired,
+    ///      `DEADLINE_EXCEEDED` is returned.
+    ///
+    /// The energy cost of this operation is 200.
+    pub async fn get_account_info(&mut self, acc: &AccountIdentifier) -> DryRunResult<AccountInfo> {
+        self.begin_get_account_info(acc).await?.await
+    }
+
     /// Get the details of a specified smart contract instance in the current
     /// state. This operation can result in an error if the dry-run session has
-    /// already been closed, either by [`DryRun::close()`] or by the server
+    /// already been closed, either by [`DryRun::close`] or by the server
     /// closing the session. In this case, the response code indicates the
     /// cause. If successful, this returns a future that can be used to wait
     /// for the result of the operation. The following results are possible:
     ///
-    ///  * [InstanceInfo] if the operation is successful.
-    ///  * [DryRunError::OperationFailed] if the operation failed, with one of
+    ///  * [`InstanceInfo`] if the operation is successful.
+    ///  * [`DryRunError::OperationFailed`] if the operation failed, with one of
     ///    the following results:
-    ///    - [ErrorResult::NoState] if no block state has been loaded.
-    ///    - [ErrorResult::AccountNotFound] if the account could not be found.
-    ///  * [DryRunError::CallError] if the server produced an error code, or if
-    ///    the server's response was unexpected.
+    ///    - [`ErrorResult::NoState`] if no block state has been loaded.
+    ///    - [`ErrorResult::AccountNotFound`] if the account could not be found.
+    ///  * [`DryRunError::CallError`] if the server produced an error code, or
+    ///    if the server's response was unexpected.
     ///    - If the server's response could not be interpreted, the result code
     ///      `INVALID_ARGUMENT` or `UNKNOWN` is returned.
     ///    - If the execution of the query would exceed the energy quota,
-    ///      `RESOURCE_EXHAUSETED` is returned.
+    ///      `RESOURCE_EXHAUSTED` is returned.
     ///    - If the timeout for the dry-run session has expired,
     ///      `DEADLINE_EXCEEDED` is returned.
-    ///    - `INVALID_ARGUMENT` or `INTERNAL` could occur as a result of bugs.
     ///
     /// The energy cost of this operation is 200.
-    pub async fn get_instance_info(
+    pub async fn begin_get_instance_info(
         &mut self,
         address: &ContractAddress,
     ) -> tonic::Result<impl Future<Output = DryRunResult<InstanceInfo>>> {
@@ -849,37 +927,64 @@ impl DryRun {
         Ok(self.request(request).await?.map(|z| z.try_into()))
     }
 
+    /// Get the details of a specified smart contract instance in the current
+    /// state. The following results are possible:
+    ///
+    ///  * [`DryRunError::CallError`] if the dry-run session has already been
+    ///    closed, either by [`DryRun::close`] or by the server closing the
+    ///    session. In this case, the response code indicates the cause.
+    ///  * [`InstanceInfo`] if the operation is successful.
+    ///  * [`DryRunError::OperationFailed`] if the operation failed, with one of
+    ///    the following results:
+    ///    - [`ErrorResult::NoState`] if no block state has been loaded.
+    ///    - [`ErrorResult::AccountNotFound`] if the account could not be found.
+    ///  * [`DryRunError::CallError`] if the server produced an error code, or
+    ///    if the server's response was unexpected.
+    ///    - If the server's response could not be interpreted, the result code
+    ///      `INVALID_ARGUMENT` or `UNKNOWN` is returned.
+    ///    - If the execution of the query would exceed the energy quota,
+    ///      `RESOURCE_EXHAUSTED` is returned.
+    ///    - If the timeout for the dry-run session has expired,
+    ///      `DEADLINE_EXCEEDED` is returned.
+    ///
+    /// The energy cost of this operation is 200.
+    pub async fn get_instance_info(
+        &mut self,
+        address: &ContractAddress,
+    ) -> DryRunResult<InstanceInfo> {
+        self.begin_get_instance_info(address).await?.await
+    }
+
     /// Invoke an entrypoint on a smart contract instance in the current state.
     /// Any changes this would make to the state will be rolled back so they are
     /// not observable by subsequent operations in the dry-run session. (To make
     /// updates that are observable within the dry-run session, use
-    /// [`DryRun::run_transaction()`] instead.) This operation can result in an
+    /// [`DryRun::run_transaction`] instead.) This operation can result in an
     /// error if the dry-run session has already been closed, either by
-    /// [`DryRun::close()`] or by the server closing the session. In this case,
+    /// [`DryRun::close`] or by the server closing the session. In this case,
     /// the response code indicates the cause. If successful, this returns a
     /// future that can be used to wait for the result of the operation. The
     /// following results are possible:
     ///
-    ///  * [InvokeInstanceSuccess] if the operation is successful.
-    ///  * [DryRunError::OperationFailed] if the operation failed, with one of
+    ///  * [`InvokeInstanceSuccess`] if the operation is successful.
+    ///  * [`DryRunError::OperationFailed`] if the operation failed, with one of
     ///    the following results:
-    ///    - [ErrorResult::NoState] if no block state has been loaded.
-    ///    - [ErrorResult::InvokeFailure] if the invocation failed. (This can be
-    ///      because the contract logic produced a reject, or a number of other
-    ///      reasons, such as the endpoint not existing.)
-    ///  * [DryRunError::CallError] if the server produced an error code, or if
-    ///    the server's response was unexpected.
+    ///    - [`ErrorResult::NoState`] if no block state has been loaded.
+    ///    - [`ErrorResult::InvokeFailure`] if the invocation failed. (This can
+    ///      be because the contract logic produced a reject, or a number of
+    ///      other reasons, such as the endpoint not existing.)
+    ///  * [`DryRunError::CallError`] if the server produced an error code, or
+    ///    if the server's response was unexpected.
     ///    - If the server's response could not be interpreted, the result code
     ///      `INVALID_ARGUMENT` or `UNKNOWN` is returned.
     ///    - If the execution of the query would exceed the energy quota,
-    ///      `RESOURCE_EXHAUSETED` is returned.
+    ///      `RESOURCE_EXHAUSTED` is returned.
     ///    - If the timeout for the dry-run session has expired,
     ///      `DEADLINE_EXCEEDED` is returned.
-    ///    - `INVALID_ARGUMENT` or `INTERNAL` could occur as a result of bugs.
     ///
     /// The energy cost of this operation is 200 plus the energy used by the
     /// execution of the contract endpoint.
-    pub async fn invoke_instance(
+    pub async fn begin_invoke_instance(
         &mut self,
         context: &ContractContext,
     ) -> tonic::Result<impl Future<Output = DryRunResult<InvokeInstanceSuccess>>> {
@@ -893,32 +998,66 @@ impl DryRun {
         Ok(self.request(request).await?.map(|z| z.try_into()))
     }
 
+    /// Invoke an entrypoint on a smart contract instance in the current state.
+    /// Any changes this would make to the state will be rolled back so they are
+    /// not observable by subsequent operations in the dry-run session. (To make
+    /// updates that are observable within the dry-run session, use
+    /// [`DryRun::run_transaction`] instead.) The following results are
+    /// possible:
+    ///
+    ///  * [`DryRunError::CallError`] if the dry-run session has already been
+    ///    closed, either by [`DryRun::close`] or by the server closing the
+    ///    session. In this case, the response code indicates the cause.
+    ///  * [`InvokeInstanceSuccess`] if the operation is successful.
+    ///  * [`DryRunError::OperationFailed`] if the operation failed, with one of
+    ///    the following results:
+    ///    - [`ErrorResult::NoState`] if no block state has been loaded.
+    ///    - [`ErrorResult::InvokeFailure`] if the invocation failed. (This can
+    ///      be because the contract logic produced a reject, or a number of
+    ///      other reasons, such as the endpoint not existing.)
+    ///  * [`DryRunError::CallError`] if the server produced an error code, or
+    ///    if the server's response was unexpected.
+    ///    - If the server's response could not be interpreted, the result code
+    ///      `INVALID_ARGUMENT` or `UNKNOWN` is returned.
+    ///    - If the execution of the query would exceed the energy quota,
+    ///      `RESOURCE_EXHAUSTED` is returned.
+    ///    - If the timeout for the dry-run session has expired,
+    ///      `DEADLINE_EXCEEDED` is returned.
+    ///
+    /// The energy cost of this operation is 200 plus the energy used by the
+    /// execution of the contract endpoint.
+    pub async fn invoke_instance(
+        &mut self,
+        context: &ContractContext,
+    ) -> DryRunResult<InvokeInstanceSuccess> {
+        self.begin_invoke_instance(context).await?.await
+    }
+
     /// Update the current timestamp for subsequent dry-run operations. The
     /// timestamp is automatically set to the timestamp of the block loaded
-    /// by [`DryRun::load_block_state()`]. For smart contracts that are time
+    /// by [`DryRun::load_block_state`]. For smart contracts that are time
     /// sensitive, overriding the timestamp can be useful. This operation can
     /// result in an error if the dry-run session has already been closed,
-    /// either by [`DryRun::close()`] or by the server closing the session. In
+    /// either by [`DryRun::close`] or by the server closing the session. In
     /// this case, the response code indicates the cause. If successful,
     /// this returns a future that can be used to wait for the result of the
     /// operation. The following results are possible:
     ///
-    ///  * [TimestampSet] if the operation is successful.
-    ///  * [DryRunError::OperationFailed] if the operation failed, with one of
+    ///  * [`TimestampSet`] if the operation is successful.
+    ///  * [`DryRunError::OperationFailed`] if the operation failed, with one of
     ///    the following results:
-    ///    - [ErrorResult::NoState] if no block state has been loaded.
-    ///  * [DryRunError::CallError] if the server produced an error code, or if
-    ///    the server's response was unexpected.
+    ///    - [`ErrorResult::NoState`] if no block state has been loaded.
+    ///  * [`DryRunError::CallError`] if the server produced an error code, or
+    ///    if the server's response was unexpected.
     ///    - If the server's response could not be interpreted, the result code
     ///      `INVALID_ARGUMENT` or `UNKNOWN` is returned.
     ///    - If the execution of the query would exceed the energy quota,
-    ///      `RESOURCE_EXHAUSETED` is returned.
+    ///      `RESOURCE_EXHAUSTED` is returned.
     ///    - If the timeout for the dry-run session has expired,
     ///      `DEADLINE_EXCEEDED` is returned.
-    ///    - `INVALID_ARGUMENT` or `INTERNAL` could occur as a result of bugs.
     ///
     /// The energy cost of this operation is 50.
-    pub async fn set_timestamp(
+    pub async fn begin_set_timestamp(
         &mut self,
         timestamp: Timestamp,
     ) -> tonic::Result<impl Future<Output = DryRunResult<TimestampSet>>> {
@@ -934,31 +1073,57 @@ impl DryRun {
         Ok(self.request(request).await?.map(|z| z.try_into()))
     }
 
+    /// Update the current timestamp for subsequent dry-run operations. The
+    /// timestamp is automatically set to the timestamp of the block loaded
+    /// by [`DryRun::load_block_state`]. For smart contracts that are time
+    /// sensitive, overriding the timestamp can be useful. The following results
+    /// are possible:
+    ///
+    ///  * [`DryRunError::CallError`] if the dry-run session has already been
+    ///    closed, either by [`DryRun::close`] or by the server closing the
+    ///    session. In this case, the response code indicates the cause.
+    ///  * [`TimestampSet`] if the operation is successful.
+    ///  * [`DryRunError::OperationFailed`] if the operation failed, with one of
+    ///    the following results:
+    ///    - [`ErrorResult::NoState`] if no block state has been loaded.
+    ///  * [`DryRunError::CallError`] if the server produced an error code, or
+    ///    if the server's response was unexpected.
+    ///    - If the server's response could not be interpreted, the result code
+    ///      `INVALID_ARGUMENT` or `UNKNOWN` is returned.
+    ///    - If the execution of the query would exceed the energy quota,
+    ///      `RESOURCE_EXHAUSTED` is returned.
+    ///    - If the timeout for the dry-run session has expired,
+    ///      `DEADLINE_EXCEEDED` is returned.
+    ///
+    /// The energy cost of this operation is 50.
+    pub async fn set_timestamp(&mut self, timestamp: Timestamp) -> DryRunResult<TimestampSet> {
+        self.begin_set_timestamp(timestamp).await?.await
+    }
+
     /// Mint a specified amount and award it to a specified account. This
     /// operation can result in an error if the dry-run session has already
-    /// been closed, either by [`DryRun::close()`] or by the server closing the
+    /// been closed, either by [`DryRun::close`] or by the server closing the
     /// session. In this case, the response code indicates the cause. If
     /// successful, this returns a future that can be used to wait for the
     /// result of the operation. The following results are possible:
     ///
-    ///  * [MintedToAccount] if the operation is successful.
-    ///  * [DryRunError::OperationFailed] if the operation failed, with one of
+    ///  * [`MintedToAccount`] if the operation is successful.
+    ///  * [`DryRunError::OperationFailed`] if the operation failed, with one of
     ///    the following results:
-    ///    - [ErrorResult::NoState] if no block state has been loaded.
-    ///    - [ErrorResult::AmountOverLimit] if the minted amount would overflow
-    ///      the total CCD supply.
-    ///  * [DryRunError::CallError] if the server produced an error code, or if
-    ///    the server's response was unexpected.
+    ///    - [`ErrorResult::NoState`] if no block state has been loaded.
+    ///    - [`ErrorResult::AmountOverLimit`] if the minted amount would
+    ///      overflow the total CCD supply.
+    ///  * [`DryRunError::CallError`] if the server produced an error code, or
+    ///    if the server's response was unexpected.
     ///    - If the server's response could not be interpreted, the result code
     ///      `INVALID_ARGUMENT` or `UNKNOWN` is returned.
     ///    - If the execution of the query would exceed the energy quota,
-    ///      `RESOURCE_EXHAUSETED` is returned.
+    ///      `RESOURCE_EXHAUSTED` is returned.
     ///    - If the timeout for the dry-run session has expired,
     ///      `DEADLINE_EXCEEDED` is returned.
-    ///    - `INVALID_ARGUMENT` or `INTERNAL` could occur as a result of bugs.
     ///
     /// The energy cost of this operation is 400.
-    pub async fn mint_to_account(
+    pub async fn begin_mint_to_account(
         &mut self,
         account_address: &AccountAddress,
         mint_amount: Amount,
@@ -980,38 +1145,69 @@ impl DryRun {
         Ok(self.request(request).await?.map(|z| z.try_into()))
     }
 
+    /// Mint a specified amount and award it to a specified account. The
+    /// following results are possible:
+    ///
+    ///  * [`DryRunError::CallError`] if the dry-run session has already been
+    ///    closed, either by [`DryRun::close`] or by the server closing the
+    ///    session. In this case, the response code indicates the cause.
+    ///  * [`MintedToAccount`] if the operation is successful.
+    ///  * [`DryRunError::OperationFailed`] if the operation failed, with one of
+    ///    the following results:
+    ///    - [`ErrorResult::NoState`] if no block state has been loaded.
+    ///    - [`ErrorResult::AmountOverLimit`] if the minted amount would
+    ///      overflow the total CCD supply.
+    ///  * [`DryRunError::CallError`] if the server produced an error code, or
+    ///    if the server's response was unexpected.
+    ///    - If the server's response could not be interpreted, the result code
+    ///      `INVALID_ARGUMENT` or `UNKNOWN` is returned.
+    ///    - If the execution of the query would exceed the energy quota,
+    ///      `RESOURCE_EXHAUSTED` is returned.
+    ///    - If the timeout for the dry-run session has expired,
+    ///      `DEADLINE_EXCEEDED` is returned.
+    ///
+    /// The energy cost of this operation is 400.
+    pub async fn mint_to_account(
+        &mut self,
+        account_address: &AccountAddress,
+        mint_amount: Amount,
+    ) -> DryRunResult<MintedToAccount> {
+        self.begin_mint_to_account(account_address, mint_amount)
+            .await?
+            .await
+    }
+
     /// Dry-run a transaction, updating the state of the dry-run session
     /// accordingly. This operation can result in an error if the dry-run
-    /// session has already been closed, either by [`DryRun::close()`] or by the
+    /// session has already been closed, either by [`DryRun::close`] or by the
     /// server closing the session. In this case, the response code
     /// indicates the cause. If successful, this returns a future that can
     /// be used to wait for the result of the operation. The following
     /// results are possible:
     ///
-    ///  * [TransactionExecuted] if the transaction was executed. This case
+    ///  * [`TransactionExecuted`] if the transaction was executed. This case
     ///    applies both if the transaction is rejected or successful.
-    ///  * [DryRunError::OperationFailed] if the operation failed, with one of
+    ///  * [`DryRunError::OperationFailed`] if the operation failed, with one of
     ///    the following results:
-    ///    - [ErrorResult::NoState] if no block state has been loaded.
-    ///    - [ErrorResult::AccountNotFound] if the sender account does not
+    ///    - [`ErrorResult::NoState`] if no block state has been loaded.
+    ///    - [`ErrorResult::AccountNotFound`] if the sender account does not
     ///      exist.
-    ///    - [ErrorResult::BalanceInsufficient] if the sender account does not
+    ///    - [`ErrorResult::BalanceInsufficient`] if the sender account does not
     ///      have sufficient balance to pay the deposit for the transaction.
-    ///    - [ErrorResult::EnergyInsufficient] if the specified energy is not
+    ///    - [`ErrorResult::EnergyInsufficient`] if the specified energy is not
     ///      sufficient to cover the cost of the basic checks required for a
     ///      transaction to be included in the chain.
-    ///  * [DryRunError::CallError] if the server produced an error code, or if
-    ///    the server's response was unexpected.
+    ///  * [`DryRunError::CallError`] if the server produced an error code, or
+    ///    if the server's response was unexpected.
     ///    - If the server's response could not be interpreted, the result code
     ///      `INVALID_ARGUMENT` or `UNKNOWN` is returned.
     ///    - If the execution of the query would exceed the energy quota,
-    ///      `RESOURCE_EXHAUSETED` is returned.
+    ///      `RESOURCE_EXHAUSTED` is returned.
     ///    - If the timeout for the dry-run session has expired,
     ///      `DEADLINE_EXCEEDED` is returned.
-    ///    - `INVALID_ARGUMENT` or `INTERNAL` could occur as a result of bugs.
     ///
     /// The energy cost of this operation is 400.   
-    pub async fn run_transaction(
+    pub async fn begin_run_transaction(
         &mut self,
         transaction: DryRunTransaction,
     ) -> tonic::Result<impl Future<Output = DryRunResult<TransactionExecuted>>> {
@@ -1029,10 +1225,45 @@ impl DryRun {
         Ok(self.request(request).await?.map(|z| z.try_into()))
     }
 
+    /// Dry-run a transaction, updating the state of the dry-run session
+    /// accordingly. The following results are possible:
+    ///
+    ///  * [`DryRunError::CallError`] if the dry-run session has already been
+    ///    closed, either by [`DryRun::close`] or by the server closing the
+    ///    session. In this case, the response code indicates the cause.
+    ///  * [`TransactionExecuted`] if the transaction was executed. This case
+    ///    applies both if the transaction is rejected or successful.
+    ///  * [`DryRunError::OperationFailed`] if the operation failed, with one of
+    ///    the following results:
+    ///    - [`ErrorResult::NoState`] if no block state has been loaded.
+    ///    - [`ErrorResult::AccountNotFound`] if the sender account does not
+    ///      exist.
+    ///    - [`ErrorResult::BalanceInsufficient`] if the sender account does not
+    ///      have sufficient balance to pay the deposit for the transaction.
+    ///    - [`ErrorResult::EnergyInsufficient`] if the specified energy is not
+    ///      sufficient to cover the cost of the basic checks required for a
+    ///      transaction to be included in the chain.
+    ///  * [`DryRunError::CallError`] if the server produced an error code, or
+    ///    if the server's response was unexpected.
+    ///    - If the server's response could not be interpreted, the result code
+    ///      `INVALID_ARGUMENT` or `UNKNOWN` is returned.
+    ///    - If the execution of the query would exceed the energy quota,
+    ///      `RESOURCE_EXHAUSTED` is returned.
+    ///    - If the timeout for the dry-run session has expired,
+    ///      `DEADLINE_EXCEEDED` is returned.
+    ///
+    /// The energy cost of this operation is 400.   
+    pub async fn run_transaction(
+        &mut self,
+        transaction: DryRunTransaction,
+    ) -> DryRunResult<TransactionExecuted> {
+        self.begin_run_transaction(transaction).await?.await
+    }
+
     /// Close the request stream. Any subsequent dry-run requests will result in
     /// a `CANCELLED` status code. Closing the request stream allows the
     /// server to free resources associated with the dry-run session. It is
-    /// recommended to close the request stream if the [DryRun] object will
+    /// recommended to close the request stream if the [`DryRun`] object will
     /// be retained for any significant length of time after the last request is
     /// made.
     pub fn close(&mut self) { self.request_send = None; }

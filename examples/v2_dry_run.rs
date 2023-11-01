@@ -20,7 +20,7 @@ struct App {
     #[structopt(
         long = "node",
         help = "GRPC interface of the node.",
-        default_value = "http://localhost:20000"
+        default_value = "http://localhost:25162"
     )]
     endpoint: v2::Endpoint,
 }
@@ -37,9 +37,13 @@ async fn test_all(endpoint: v2::Endpoint) -> anyhow::Result<()> {
         dry_run.energy_quota()
     );
     // Load the best block.
-    let fut1 = dry_run.load_block_state(BlockIdentifier::Best).await?;
+    let fut1 = dry_run
+        .begin_load_block_state(BlockIdentifier::Best)
+        .await?;
     // Load the last finalized block.
-    let fut2 = dry_run.load_block_state(BlockIdentifier::LastFinal).await?;
+    let fut2 = dry_run
+        .begin_load_block_state(BlockIdentifier::LastFinal)
+        .await?;
     // Await the results of the loads in the reverse order.
     let res2 = fut2.await?;
     let res1 = fut1.await?;
@@ -54,7 +58,6 @@ async fn test_all(endpoint: v2::Endpoint) -> anyhow::Result<()> {
     // Get account info for account at index 0.
     let res3 = dry_run
         .get_account_info(&v2::AccountIdentifier::Index(0.into()))
-        .await?
         .await?;
     println!("Account 0: {}", res3.inner.account_address);
     // Get contract info for contract at address <0,0>.
@@ -62,9 +65,9 @@ async fn test_all(endpoint: v2::Endpoint) -> anyhow::Result<()> {
         index:    0,
         subindex: 0,
     };
-    let res4 = dry_run.get_instance_info(&contract_addr).await?.await?;
+    let res4 = dry_run.get_instance_info(&contract_addr).await?;
     println!(
-        "Instance <0,0>: {} {:?}",
+        "Instance {contract_addr}: {} {:?}",
         res4.inner.name(),
         res4.inner.entrypoints()
     );
@@ -75,29 +78,29 @@ async fn test_all(endpoint: v2::Endpoint) -> anyhow::Result<()> {
     )?;
     let parameter = OwnedParameter::empty();
     let context = ContractContext {
-        invoker: Some(Address::Account(res3.inner.account_address)),
-        contract: contract_addr,
-        amount: Amount::zero(),
-        method: invoke_target,
-        parameter,
-        energy: 10000.into(),
+        invoker:   Some(Address::Account(res3.inner.account_address)),
+        contract:  contract_addr,
+        amount:    Amount::zero(),
+        method:    invoke_target.clone(),
+        parameter: parameter.clone(),
+        energy:    10000.into(),
     };
-    let res5 = dry_run.invoke_instance(&context).await?.await;
-    println!("Invoked view on <0,0>: {:?}", res5);
+    let res5 = dry_run.invoke_instance(&context).await;
+    println!("Invoked view on {contract_addr}: {:?}", res5);
     // Mint to account 0.
     let _res6 = dry_run
         .mint_to_account(&res3.inner.account_address, Amount::from_ccd(21))
-        .await?
         .await?;
     // Update the timestamp to now.
-    let _res7 = dry_run.set_timestamp(Timestamp::now()).await?.await?;
+    let _fut7 = dry_run.begin_set_timestamp(Timestamp::now()).await?;
     // Execute a transfer to the encrypted balance on account 0.
     let payload = Payload::TransferToEncrypted {
         amount: Amount::from_ccd(20),
     };
     let transaction =
-        DryRunTransaction::new(res3.inner.account_address, Energy::from(5000), &payload);
-    let fut8 = dry_run.run_transaction(transaction).await?;
+        DryRunTransaction::new(res3.inner.account_address, Energy::from(500), &payload);
+    let fut8 = dry_run.begin_run_transaction(transaction).await?;
+    // We are done sending requests, so close the request stream.
     dry_run.close();
     let res8 = fut8.await?;
     println!("Transferred to encrypted: {:?}", res8);
