@@ -58,14 +58,14 @@ async fn main() -> anyhow::Result<()> {
                 ..
             } => {
                 total_state_size += model.len();
-                println!(
-                    "{}, V0, {}, {}, {}, {}",
-                    ia,
-                    model.len(),
-                    owner,
-                    amount,
-                    String::from(name)
-                );
+                // println!(
+                //     "{}, V0, {}, {}, {}, {}",
+                //     ia,
+                //     model.len(),
+                //     owner,
+                //     amount,
+                //     String::from(name)
+                // );
             }
             InstanceInfo::V1 {
                 owner,

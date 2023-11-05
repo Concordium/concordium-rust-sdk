@@ -1,31 +1,27 @@
-#![allow(deprecated)]
 //! List accounts with the most liquid balance, and total stake, total amount,
 //! and total liquid amount of accounts. Additionally list contracts with at
 //! most CCD owned.
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::types::Amount,
-    endpoints::{self, Endpoint},
-    types::hashes::BlockHash,
+    v2::{self, BlockIdentifier},
 };
-use futures::Future;
+use futures::{Future, TryStreamExt};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
 struct App {
     #[structopt(
         long = "node",
-        help = "GRPC interface of the node.",
-        default_value = "http://localhost:10000"
+        help = "V2 GRPC interface of the node.",
+        default_value = "http://localhost:20000"
     )]
-    endpoint: Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(
-        long = "block",
+        long = "lastfinal",
         help = "Block to query the data in. Defaults to last finalized block."
     )]
-    block:    Option<BlockHash>,
-    #[structopt(long = "token", help = "GRPC login token", default_value = "rpcadmin")]
-    token:    String,
+    block:    BlockIdentifier,
     #[structopt(
         long = "num",
         help = "How many queries to make in parallel.",
@@ -92,14 +88,14 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
-    let mut client = endpoints::Client::connect(app.endpoint, app.token).await?;
+    let mut client = v2::Client::new(app.endpoint).await?;
 
-    let consensus_info = client.get_consensus_status().await?;
-
-    let block = app.block.unwrap_or(consensus_info.last_finalized_block);
+    let block = app.block;
     println!("Listing accounts in block {}.", block);
 
-    let accounts = client.get_account_list(&block).await?;
+    let accounts_response = client.get_account_list(&block).await?;
+    let accounts = accounts_response.response.try_collect::<Vec<_>>().await?;
+    let block: BlockIdentifier = accounts_response.block_hash.into();
 
     let total_accounts = accounts.len();
     let closure_client = client.clone();
@@ -110,7 +106,7 @@ async fn main() -> anyhow::Result<()> {
             let mut client = closure_client.clone();
             async move {
                 let block = block;
-                let info = client.get_account_info(acc, &block).await?;
+                let info = client.get_account_info(&acc.into(), &block).await?.response;
                 let additional_stake = info
                     .account_stake
                     .map_or(Amount::zero(), |baker_delegator| {
@@ -166,14 +162,19 @@ async fn main() -> anyhow::Result<()> {
 
     // Now also handle contracts.
     let mut total_contract_amount = Amount::zero();
-    let contracts = client.get_instances(&block).await?;
+    let contracts = client
+        .get_instance_list(&block)
+        .await?
+        .response
+        .try_collect::<Vec<_>>()
+        .await?;
     let mut cout = Vec::new();
     for ccs in contracts.chunks(app.num).map(Vec::from) {
         let mut handles = Vec::with_capacity(app.num);
         for contract in ccs {
             let mut client = client.clone();
             handles.push(tokio::spawn(async move {
-                let info = client.get_instance_info(contract, &block).await?;
+                let info = client.get_instance_info(contract, &block).await?.response;
                 Ok::<_, anyhow::Error>((contract, info))
             }));
         }

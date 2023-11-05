@@ -1,11 +1,11 @@
-#![allow(deprecated)]
 //! A simple script to check how many bytes in an address are needed to
 //! distinguish accounts. The script gets the account list from the node.
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    endpoints::{self, Endpoint},
     id::types::AccountAddress,
+    v2::{self, BlockIdentifier},
 };
+use futures::TryStreamExt;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -13,9 +13,9 @@ struct App {
     #[structopt(
         long = "node",
         help = "GRPC interface of the node.",
-        default_value = "http://localhost:10000"
+        default_value = "http://localhost:20000"
     )]
-    endpoint: Endpoint,
+    endpoint: v2::Endpoint,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -26,12 +26,14 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
-    let mut client = endpoints::Client::connect(app.endpoint, "rpcadmin".to_string()).await?;
+    let mut client = v2::Client::new(app.endpoint).await?;
 
-    let consensus_info = client.get_consensus_status().await?;
-
-    let cb = consensus_info.best_block;
-    let bi = client.get_account_list(&cb).await?;
+    let bi = client
+        .get_account_list(BlockIdentifier::LastFinal)
+        .await?
+        .response
+        .try_collect::<Vec<_>>()
+        .await?;
     println!("There are {} accounts.", bi.len());
     for i in 0..32 {
         let mut tmp = bi.clone();

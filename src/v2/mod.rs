@@ -42,7 +42,7 @@ pub use endpoints::{QueryError, QueryResult, RPCError, RPCResult};
 use futures::{Stream, StreamExt};
 pub use http::uri::Scheme;
 use num::{BigUint, ToPrimitive};
-use std::{collections::HashMap, num::ParseIntError};
+use std::{collections::HashMap, num::ParseIntError, ops::Deref};
 use tonic::IntoRequest;
 pub use tonic::{
     transport::{Endpoint, Error},
@@ -138,6 +138,28 @@ pub enum BlockIdentifierFromStrError {
     InvalidHash(#[from] HashFromStrError),
     #[error("The input is not a valid unsigned integer: {0}.")]
     InvalidInteger(#[from] ParseIntError),
+}
+
+/// Display implementation to match the [`FromStr`] implementation defined just
+/// below.
+impl std::fmt::Display for BlockIdentifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BlockIdentifier::Best => "best".fmt(f),
+            BlockIdentifier::LastFinal => "lastfinal".fmt(f),
+            BlockIdentifier::Given(bh) => bh.fmt(f),
+            BlockIdentifier::AbsoluteHeight(h) => write!(f, "@{h}"),
+            BlockIdentifier::RelativeHeight(rh) => {
+                write!(
+                    f,
+                    "@{}/{}{}",
+                    rh.height,
+                    rh.genesis_index,
+                    if rh.restrict { "!" } else { "" }
+                )
+            }
+        }
+    }
 }
 
 /// Parse a string as a [`BlockIdentifier`]. The format is one of the following

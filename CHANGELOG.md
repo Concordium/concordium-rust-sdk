@@ -1,6 +1,7 @@
 ## Unreleased changes
 
 - The sdk now requires a `rustc` version at least 1.67 (Before it required version 1.66).
+- Add Display implementation to BlockIdentifier.
 
 ## 3.1.0
 
