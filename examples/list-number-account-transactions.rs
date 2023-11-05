@@ -74,7 +74,7 @@ async fn main() -> anyhow::Result<()> {
     let mut account_table = BTreeMap::new();
 
     let start_block = client
-        .find_first_finalized_block_no_later_than(
+        .find_first_finalized_block_no_earlier_than(
             ..=consensus_info.last_finalized_block_height,
             start_time,
         )

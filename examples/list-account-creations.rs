@@ -1,14 +1,14 @@
-#![allow(deprecated)]
 //! List all account creations in a given time span.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    endpoints::{self, Endpoint},
     types::{
         queries::BlockInfo, AbsoluteBlockHeight, BlockItemSummary, BlockItemSummaryDetails,
         BlockSummary, CredentialType,
     },
+    v2,
 };
+use futures::TryStreamExt;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -16,9 +16,9 @@ struct App {
     #[structopt(
         long = "node",
         help = "GRPC interface of the node.",
-        default_value = "http://localhost:10000"
+        default_value = "http://localhost:20000"
     )]
-    endpoint: Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(
         long = "num",
         help = "Number of parallel queries to make.",
@@ -39,60 +39,39 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
-    let mut client = endpoints::Client::connect(app.endpoint, "rpcadmin".to_string()).await?;
-
-    let cs = client.get_consensus_status().await?;
+    let mut client = v2::Client::new(app.endpoint).await?;
 
     let mut h = if let Some(start_time) = app.from {
-        let cb = cs.last_finalized_block;
-        let mut bi = client.get_block_info(&cb).await?;
-        anyhow::ensure!(
-            bi.block_slot_time >= start_time,
-            "Last finalized block is not after the requested start time ({})",
-            bi.block_slot_time.to_rfc3339()
-        );
-        let mut end: u64 = bi.block_height.into();
-        let mut start = 0;
-        while start < end {
-            let mid = (start + end) / 2;
-            let bh = client
-                .get_blocks_at_height(AbsoluteBlockHeight::from(mid).into())
-                .await?[0];
-            bi = client.get_block_info(&bh).await?;
-            if bi.block_slot_time < start_time {
-                start = mid + 1;
-            } else {
-                end = mid;
-            }
-        }
-        start.into()
+        let start = client
+            .find_first_finalized_block_no_earlier_than(.., start_time)
+            .await?;
+        start.block_height
     } else {
         AbsoluteBlockHeight::from(0u64)
     };
 
-    loop {
-        let mut handles = Vec::with_capacity(app.num as usize);
-        for height in u64::from(h)..u64::from(h) + app.num {
+    let mut block_stream = client.get_finalized_blocks_from(h).await?;
+
+    while let Ok(chunk) = block_stream.next_chunk(app.num as usize).await {
+        let mut handles = Vec::with_capacity(chunk.len());
+
+        for (h, block) in (u64::from(h)..).zip(chunk) {
             let cc = client.clone();
             handles.push(tokio::spawn(async move {
-                let h: AbsoluteBlockHeight = height.into();
                 let mut cc = cc.clone();
-                let blocks = cc
-                    .get_blocks_at_height(h.into())
+                let bi = cc
+                    .get_block_info(block.block_hash)
                     .await
-                    .context("Blocks at height.")?;
-                if blocks.is_empty() {
-                    return Ok::<Option<(BlockInfo, Option<BlockSummary>)>, anyhow::Error>(None);
-                }
-                let bi = cc.get_block_info(&blocks[0]).await.context("Block info.")?;
-                if !bi.finalized {
-                    return Ok::<_, anyhow::Error>(None);
-                }
+                    .context("Block info.")?
+                    .response;
                 if bi.transaction_count != 0 {
                     let summary = cc
-                        .get_block_summary(&blocks[0])
+                        .get_block_transaction_events(block.block_hash)
                         .await
-                        .context("Block summary.")?;
+                        .context("Block summary.")?
+                        .response
+                        .try_collect::<Vec<_>>()
+                        .await?;
                     Ok(Some((bi, Some(summary))))
                 } else {
                     Ok::<_, anyhow::Error>(Some((bi, None)))
@@ -114,7 +93,7 @@ async fn main() -> anyhow::Result<()> {
                         energy_cost: _,
                         hash: _,
                         details,
-                    } in summary.transaction_summaries()
+                    } in summary
                     {
                         match details {
                             BlockItemSummaryDetails::AccountTransaction(_) => {}
@@ -141,4 +120,5 @@ async fn main() -> anyhow::Result<()> {
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         }
     }
+    Ok(())
 }

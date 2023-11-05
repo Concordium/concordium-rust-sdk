@@ -1,11 +1,11 @@
-#![allow(deprecated)]
 //! List initial accounts created between two given timestamps.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    endpoints::{self, Endpoint},
     types::{AbsoluteBlockHeight, AccountInfo},
+    v2,
 };
+use futures::TryStreamExt;
 use std::{collections::BTreeSet, io::Write, path::PathBuf};
 use structopt::StructOpt;
 
@@ -14,9 +14,9 @@ struct App {
     #[structopt(
         long = "node",
         help = "GRPC interface of the node.",
-        default_value = "http://localhost:10000"
+        default_value = "http://localhost:20000"
     )]
-    endpoint: Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(
         long = "start",
         help = "Timestamp to start at. This is inclusive and defaults to genesis time."
@@ -24,8 +24,6 @@ struct App {
     from:     Option<chrono::DateTime<chrono::Utc>>,
     #[structopt(long = "end", help = "Timestamp to end. This is exclusive.")]
     to:       Option<chrono::DateTime<chrono::Utc>>,
-    #[structopt(long = "token", help = "GRPC login token", default_value = "rpcadmin")]
-    token:    String,
     #[structopt(
         long = "num",
         help = "Number of parallel queries to make.",
@@ -51,33 +49,15 @@ async fn main() -> anyhow::Result<()> {
     // then find the output file cannot be created.
     let mut out = std::fs::File::create(app.initial).context("Could not create output file.")?;
 
-    let mut client = endpoints::Client::connect(app.endpoint, app.token).await?;
+    let mut client = v2::Client::new(app.endpoint).await?;
 
-    let cs = client.get_consensus_status().await?;
+    let cs = client.get_consensus_info().await?;
 
     let end_block = if let Some(end_time) = app.to {
-        let cb = cs.last_finalized_block;
-        let mut bi = client.get_block_info(&cb).await?;
-        anyhow::ensure!(
-            bi.block_slot_time >= end_time,
-            "Last finalized block is not after the requested end time ({})",
-            bi.block_slot_time.to_rfc3339()
-        );
-        let mut end: u64 = bi.block_height.into();
-        let mut start = 0;
-        while start < end {
-            let mid = (start + end) / 2;
-            let bh = client
-                .get_blocks_at_height(AbsoluteBlockHeight::from(mid).into())
-                .await?[0];
-            bi = client.get_block_info(&bh).await?;
-            if bi.block_slot_time < end_time {
-                start = mid + 1;
-            } else {
-                end = mid;
-            }
-        }
-        bi.block_parent
+        let block = client
+            .find_first_finalized_block_no_earlier_than(.., end_time)
+            .await?;
+        block.block_parent
     } else {
         cs.last_finalized_block
     };
@@ -87,26 +67,15 @@ async fn main() -> anyhow::Result<()> {
         if cs.genesis_time > start_time {
             None
         } else {
-            let mut bi = client.get_block_info(&cb).await?;
+            let mut bi = client.get_block_info(&cb).await?.response;
             anyhow::ensure!(
                 bi.block_slot_time >= start_time,
                 "Last finalized block is not after the requested start time ({})",
                 bi.block_slot_time.to_rfc3339()
             );
-            let mut end: u64 = bi.block_height.into();
-            let mut start = 0;
-            while start < end {
-                let mid = (start + end) / 2;
-                let bh = client
-                    .get_blocks_at_height(AbsoluteBlockHeight::from(mid).into())
-                    .await?[0];
-                bi = client.get_block_info(&bh).await?;
-                if bi.block_slot_time < start_time {
-                    start = mid + 1;
-                } else {
-                    end = mid;
-                }
-            }
+            let block = client
+                .find_first_finalized_block_no_earlier_than(.., start_time)
+                .await?;
             if bi.block_slot_time <= start_time {
                 Some(bi.block_hash)
             } else {
@@ -117,38 +86,45 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
-    let end_block = client.get_block_info(&end_block).await?;
+    let end_block = client.get_block_info(&end_block).await?.response;
     eprintln!(
         "Listing initial accounts in block {} with timestamp {}.",
         end_block.block_hash, end_block.block_slot_time
     );
 
     let start_block_accounts = if let Some(block) = start_block {
-        let block = client.get_block_info(&block).await?;
+        let block = client.get_block_info(&block).await?.response;
         eprintln!(
             "Without initial accounts existing in block {} with timestamp {}.",
             block.block_hash, block.block_slot_time
         );
+        let block_hash = block.block_hash;
         client
-            .get_account_list(&block.block_hash)
+            .get_account_list(block_hash)
             .await?
-            .into_iter()
-            .collect::<BTreeSet<_>>()
+            .response
+            .try_collect::<BTreeSet<_>>()
+            .await?
     } else {
         BTreeSet::new()
     };
 
-    let accounts = client.get_account_list(&end_block.block_hash).await?;
+    let accounts = client
+        .get_account_list(&end_block.block_hash)
+        .await?
+        .response
+        .try_collect::<Vec<_>>()
+        .await?;
 
     for accs in accounts.chunks(app.num) {
         let mut handles = Vec::with_capacity(app.num);
         for &acc in accs {
             let mut client = client.clone();
             let block = end_block.block_hash;
-            handles.push(async move { client.get_account_info(&acc, &block).await })
+            handles.push(async move { client.get_account_info(&acc.into(), &block).await })
         }
         for ainfo in futures::future::join_all(handles).await {
-            let ainfo: AccountInfo = ainfo?;
+            let ainfo: AccountInfo = ainfo?.response;
             let is_initial =
                 ainfo
                     .account_credentials

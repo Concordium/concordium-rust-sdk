@@ -27,8 +27,8 @@ use concordium_base::{
         types::{TransactionSignature, TransactionTime},
     },
     contracts_common::{
-        AccountAddress, Amount, ContractAddress, Duration, OwnedContractName, OwnedParameter,
-        OwnedReceiveName, ReceiveName,
+        AccountAddress, AccountAddressParseError, Amount, ContractAddress, Duration,
+        OwnedContractName, OwnedParameter, OwnedReceiveName, ReceiveName,
     },
     hashes::HashFromStrError,
     transactions::{BlockItem, EncodedPayload, PayloadLike},
@@ -42,7 +42,7 @@ pub use endpoints::{QueryError, QueryResult, RPCError, RPCResult};
 use futures::{Stream, StreamExt};
 pub use http::uri::Scheme;
 use num::{BigUint, ToPrimitive};
-use std::{collections::HashMap, num::ParseIntError, ops::Deref};
+use std::{collections::HashMap, num::ParseIntError, str::FromStr};
 use tonic::IntoRequest;
 pub use tonic::{
     transport::{Endpoint, Error},
@@ -228,14 +228,31 @@ pub struct RelativeBlockHeight {
 }
 
 /// An account identifier used in queries.
-#[derive(Copy, Clone, Debug, derive_more::From)]
+#[derive(Copy, Clone, Debug, derive_more::From, derive_more::Display)]
 pub enum AccountIdentifier {
     /// Identify an account by an address.
+    #[display(fmt = "{_0}")]
     Address(AccountAddress),
     /// Identify an account by the credential registration id.
+    #[display(fmt = "{_0}")]
     CredId(CredentialRegistrationID),
     /// Identify an account by its account index.
+    #[display(fmt = "{_0}")]
     Index(crate::types::AccountIndex),
+}
+
+impl FromStr for AccountIdentifier {
+    type Err = AccountAddressParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Ok(ai) = s.parse::<crate::types::AccountIndex>() {
+            return Ok(Self::Index(ai));
+        }
+        if let Ok(cid) = s.parse::<CredentialRegistrationID>() {
+            return Ok(Self::CredId(cid));
+        }
+        s.parse().map(Self::Address)
+    }
 }
 
 /// Identifier for an [`Epoch`] relative to the specified genesis index.
@@ -2541,13 +2558,13 @@ impl Client {
     }
 
     /// Find the first (i.e., earliest) finalized block whose slot time is no
-    /// later than the specified time. If a block is not found return
+    /// earlier than the specified time. If a block is not found return
     /// [`QueryError::NotFound`].
     ///
     /// The search is limited to the bounds specified. If the lower bound is not
     /// provided it defaults to 0, if the upper bound is not provided it
     /// defaults to the last finalized block at the time of the call.
-    pub async fn find_first_finalized_block_no_later_than(
+    pub async fn find_first_finalized_block_no_earlier_than(
         &mut self,
         range: impl std::ops::RangeBounds<AbsoluteBlockHeight>,
         time: chrono::DateTime<chrono::Utc>,
@@ -2757,7 +2774,10 @@ impl FinalizedBlocksStream {
     /// occurred (it is `true` if an error occurred) while getting blocks.
     /// If that is the case further calls will always yield an error.
     ///
-    /// If no blocks are available in time an `Err` is returned.
+    /// The first field of the response indicates if an error occurred, either
+    /// due to a timeout or the receiver channel was disconnected.
+    /// Concretely, if no blocks are available in time then `Ok((true,
+    /// Vec::new()))` is returned.
     pub async fn next_chunk_timeout(
         &mut self,
         n: usize,
