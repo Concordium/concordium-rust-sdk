@@ -1,6 +1,9 @@
 ## Unreleased changes
 
 - The sdk now requires a `rustc` version at least 1.67 (Before it required version 1.66).
+- Add a `contract_updates` helper analogous to `contract_init` to extract a list
+  of contract updates from a transaction.
+- Add a `ccd_cost` helper to `ChainParameters` to convert NRG cost to CCD.
 
 ## 3.1.0
 
