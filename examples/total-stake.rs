@@ -1,11 +1,6 @@
 //! List total equity, total delegated stake, and effective stake.
 use clap::AppSettings;
-use concordium_rust_sdk::{
-    common::types::Amount,
-    types::{hashes::BlockHash, BakerPoolStatus, PoolStatus},
-    v2,
-    v2::BlockIdentifier,
-};
+use concordium_rust_sdk::{common::types::Amount, v2, v2::BlockIdentifier};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]

@@ -50,13 +50,7 @@ async fn main() -> anyhow::Result<()> {
         let ia = ia?;
         let ii = client.get_instance_info(ia, &block).await?;
         match ii.response {
-            InstanceInfo::V0 {
-                model,
-                owner,
-                amount,
-                name,
-                ..
-            } => {
+            InstanceInfo::V0 { model, .. } => {
                 total_state_size += model.len();
                 // println!(
                 //     "{}, V0, {}, {}, {}, {}",

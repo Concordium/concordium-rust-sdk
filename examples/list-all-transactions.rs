@@ -59,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut client = v2::Client::new(app.endpoint).await?;
 
-    let cs = client.get_consensus_info().await?;
+    let _cs = client.get_consensus_info().await?;
 
     // Find the block to start at.
     let mut h = if let Some(start_time) = app.from {

@@ -2,10 +2,7 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    types::{
-        queries::BlockInfo, AbsoluteBlockHeight, BlockItemSummary, BlockItemSummaryDetails,
-        BlockSummary, CredentialType,
-    },
+    types::{AbsoluteBlockHeight, BlockItemSummary, BlockItemSummaryDetails, CredentialType},
     v2,
 };
 use futures::TryStreamExt;
@@ -55,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
     while let Ok(chunk) = block_stream.next_chunk(app.num as usize).await {
         let mut handles = Vec::with_capacity(chunk.len());
 
-        for (h, block) in (u64::from(h)..).zip(chunk) {
+        for (_h, block) in (u64::from(h)..).zip(chunk) {
             let cc = client.clone();
             handles.push(tokio::spawn(async move {
                 let mut cc = cc.clone();

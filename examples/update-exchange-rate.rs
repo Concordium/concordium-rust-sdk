@@ -6,7 +6,7 @@ use concordium_rust_sdk::{
     common::types::TransactionTime,
     types::{
         transactions::{update, BlockItem, Payload},
-        BlockSummary, ExchangeRate, TransactionStatus, UpdateKeyPair, UpdatePayload,
+        ExchangeRate, TransactionStatus, UpdateKeyPair, UpdatePayload,
     },
     v2::{self, BlockIdentifier, ChainParameters},
 };

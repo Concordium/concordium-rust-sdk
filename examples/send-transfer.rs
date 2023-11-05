@@ -6,9 +6,9 @@ use concordium_rust_sdk::{
     common::types::{Amount, TransactionTime},
     types::{
         transactions::{send, BlockItem},
-        AccountInfo, WalletAccount,
+        WalletAccount,
     },
-    v2::{self, BlockIdentifier},
+    v2::{self},
 };
 use std::path::PathBuf;
 use structopt::*;
@@ -40,7 +40,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Get the initial nonce at the last finalized block.
     let nonce = client
-        .get_next_account_sequence_number(&keys.address.into())
+        .get_next_account_sequence_number(&keys.address)
         .await?;
 
     let nonce = nonce.nonce;

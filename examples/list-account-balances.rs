@@ -6,7 +6,7 @@ use concordium_rust_sdk::{
     common::{types::Amount, SerdeSerialize},
     id,
     id::types::AccountAddress,
-    types::{hashes::BlockHash, AccountStakingInfo, CredentialType},
+    types::{AccountStakingInfo, CredentialType},
     v2::{self, BlockIdentifier},
 };
 use futures::TryStreamExt;
@@ -83,7 +83,8 @@ async fn main() -> anyhow::Result<()> {
         .get_account_list(&block)
         .await?
         .response
-        .try_collect::<Vec<_>>().await?;
+        .try_collect::<Vec<_>>()
+        .await?;
 
     let total_accounts = accounts.len();
     let mut num_bakers = 0;

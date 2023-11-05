@@ -1,10 +1,7 @@
 //! List initial accounts created between two given timestamps.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{
-    types::{AbsoluteBlockHeight, AccountInfo},
-    v2,
-};
+use concordium_rust_sdk::{types::AccountInfo, v2};
 use futures::TryStreamExt;
 use std::{collections::BTreeSet, io::Write, path::PathBuf};
 use structopt::StructOpt;
@@ -67,13 +64,13 @@ async fn main() -> anyhow::Result<()> {
         if cs.genesis_time > start_time {
             None
         } else {
-            let mut bi = client.get_block_info(&cb).await?.response;
+            let bi = client.get_block_info(&cb).await?.response;
             anyhow::ensure!(
                 bi.block_slot_time >= start_time,
                 "Last finalized block is not after the requested start time ({})",
                 bi.block_slot_time.to_rfc3339()
             );
-            let block = client
+            let _block = client
                 .find_first_finalized_block_no_earlier_than(.., start_time)
                 .await?;
             if bi.block_slot_time <= start_time {
