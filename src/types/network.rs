@@ -1,17 +1,8 @@
 //! Network related types.
 
-use crate::generated_types::peer_element::CatchupStatus;
 use concordium_base::common::{SerdeDeserialize, SerdeSerialize};
 use derive_more::{Display, From, FromStr, Into};
 use std::{fmt, net::IpAddr, num::ParseIntError};
-
-#[derive(Debug)]
-pub struct PeerElement {
-    pub node_id:        String,
-    pub port:           u16,
-    pub ip:             IpAddr,
-    pub catchup_status: CatchupStatus,
-}
 
 #[repr(transparent)]
 #[derive(Debug)]

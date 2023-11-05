@@ -5,10 +5,6 @@
 //!   contains the [`Client`](v2::Client) struct
 //! which maintains a connection to the node, and supports queries and node
 //! manipulation. This client uses gRPC API version 2 of the Concordium node.
-//! - [`endpoints`] contains a [`Client`](endpoints::Client) struct
-//! which maintains a connection to the node, and supports queries and node
-//! manipulation. This client uses gRPC API version 1 of the Concordium node and
-//! should not be used in new code. It exists to retain backwards compatibility.
 //! - [`constants`] contains a number of constants and type definitions that are
 //!   relevant when using the chain.
 //! - [`types`] contains most type definitions to model responses as well as
@@ -36,9 +32,6 @@ pub mod constants;
 /// Wrapper for the node's GRPC API. The return values are parsed and wrapped in
 /// structured values.
 pub mod endpoints;
-#[path = "v1/generated/concordium.rs"]
-#[allow(clippy::derive_partial_eq_without_eq)]
-mod generated_types;
 mod internal;
 /// Interface to the (optional) postgres database that the node logs finalized
 /// transactions in.

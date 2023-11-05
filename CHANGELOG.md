@@ -3,7 +3,9 @@
 - The sdk now requires a `rustc` version at least 1.67 (Before it required version 1.66).
 - Add `Display` implementation to `BlockIdentifier`.
 - Add `Display` and `FromStr` implementations for `AccountIdentifier`.
-
+- Rename `find_first_finalized_block_no_later_than` into
+  `find_first_finalized_block_no_earlier_than` since that correctly reflects its
+  semantics.
 
 ## 3.1.0
 

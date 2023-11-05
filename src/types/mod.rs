@@ -10,7 +10,6 @@ mod summary_helper;
 pub mod transactions;
 
 use crate::constants::*;
-pub use crate::generated_types::PeerStatsResponse;
 pub use concordium_base::{
     base::*,
     smart_contracts::{ContractTraceElement, InstanceUpdatedEvent},
