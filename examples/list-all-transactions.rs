@@ -72,10 +72,15 @@ async fn main() -> anyhow::Result<()> {
     };
     // Query blocks by increasing height.
     let mut block_stream = client.get_finalized_blocks_from(h).await?;
-    while let Ok((timeout, chunk)) = block_stream
-        .next_chunk_timeout(app.num as usize, std::time::Duration::from_millis(500))
-        .await
-    {
+    loop {
+        let Ok((error, chunk)) = block_stream
+            .next_chunk_timeout(app.num as usize, std::time::Duration::from_millis(500))
+            .await
+        else {
+            // if we failed and end time is not yet here, then wait a bit
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            continue;
+        };
         let mut handles = Vec::with_capacity(app.num as usize);
         for block in chunk {
             let mut cc = client.clone();
@@ -133,10 +138,8 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
-        if timeout {
-            // if we failed and end time is not yet here, then wait a bit
-            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        if error {
+            anyhow::bail!("Finalized blocks vanished.")
         }
     }
-    Ok(())
 }

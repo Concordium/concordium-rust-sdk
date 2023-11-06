@@ -2774,10 +2774,9 @@ impl FinalizedBlocksStream {
     /// occurred (it is `true` if an error occurred) while getting blocks.
     /// If that is the case further calls will always yield an error.
     ///
-    /// The first field of the response indicates if an error occurred, either
-    /// due to a timeout or the receiver channel was disconnected.
-    /// Concretely, if no blocks are available in time then `Ok((true,
-    /// Vec::new()))` is returned.
+    /// The first field of the response indicates if an error occurred. This
+    /// will only happen if the stream of finalized blocks has unexpectedly
+    /// dropped.
     pub async fn next_chunk_timeout(
         &mut self,
         n: usize,
