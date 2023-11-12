@@ -12,7 +12,8 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(
-        long = "lastfinal",
+        long = "block",
+        default_value = "lastfinal",
         help = "Block to query the data in. Defaults to last finalized block."
     )]
     block:    BlockIdentifier,
