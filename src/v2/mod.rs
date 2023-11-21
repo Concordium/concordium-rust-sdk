@@ -41,6 +41,7 @@ use concordium_base::{
 pub use endpoints::{QueryError, QueryResult, RPCError, RPCResult};
 use futures::{Stream, StreamExt};
 pub use http::uri::Scheme;
+use num::{BigUint, ToPrimitive};
 use std::{collections::HashMap, num::ParseIntError};
 use tonic::IntoRequest;
 pub use tonic::{
@@ -466,6 +467,23 @@ impl ChainParameters {
             }
         };
         num::rational::Ratio::new(num, denom)
+    }
+
+    /// Get the CCD cost of the given amount of energy for the current chain
+    /// parameters.
+    pub fn ccd_cost(&self, nrg: Energy) -> Amount {
+        let ratio = self.micro_ccd_per_energy();
+        let numer = BigUint::from(*ratio.numer()) * nrg.energy;
+        let denomer = BigUint::from(*ratio.denom());
+        let cost = num::rational::Ratio::new(numer, denomer);
+        let i = cost.ceil().to_integer();
+        // The next line should be a no-op when the values are coming from the chain
+        // since the amount should always fit a u64. With a 3_000_000 maximum
+        // NRG limit the exchange rate would have to be more than 6148914691236
+        // microCCD per NRG (6148914 CCD per NRG) for this to occur. But even in that
+        // case this behaviour here matches the node behaviour.
+        let micro = i % u64::MAX;
+        Amount::from_micro_ccd(micro.to_u64().expect("Value is known to be under u64::MAX"))
     }
 
     /// The foundation account that gets the foundation tax.
@@ -2634,7 +2652,7 @@ impl Client {
     }
 
     /// Get all bakers in the reward period of a block.
-    /// This endpoint is only supported for protocol version 6 and onwards.
+    /// This endpoint is only supported for protocol version 4 and onwards.
     /// If the protocol does not support the endpoint then an
     /// [`IllegalArgument`](tonic::Code::InvalidArgument) is returned.
     pub async fn get_bakers_reward_period(

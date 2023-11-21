@@ -16,7 +16,7 @@ on:
 
 env:
   RUST_FMT: nightly-2023-04-01-x86_64-unknown-linux-gnu
-  RUST_VERSION: "1.66"
+  RUST_VERSION: "1.67"
 
 jobs:
   "lint_fmt":
@@ -26,16 +26,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ env.RUST_FMT }}
-          override: true
-          components: rustfmt
+        uses: actions/checkout@v4
       - name: Format
         run: |
+          rustup default $RUST_FMT
+          rustup component add rustfmt
           cargo fmt -- --color=always --check
 
   "lint_doc":
@@ -44,59 +39,31 @@ jobs:
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     steps:
-      - name: Install protobuf
-        run: sudo apt-get install -y protobuf-compiler
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ env.RUST_VERSION }}
-          override: true
       - name: Docs
         run: |
-          RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features --color=always
+          rustup default $RUST_VERSION
+          rustup component add rust-docs
+          RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --features postgres --color=always
 
-  "lint_clippy":
+  "lint_clippy_test":
     name: lint:clippy
     # Don't run on draft pull requests
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ env.RUST_VERSION }}
-          override: true
-          components: rustfmt, clippy
       - name: Clippy
         run: |
+          rustup default $RUST_VERSION
+          rustup component add clippy
           cargo clippy --features=postgres --color=always --tests --benches --examples -- -D warnings
-
-  "cargo_test":
-    name: cargo:test
-    runs-on: ubuntu-latest
-    needs:
-      - lint_clippy
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          submodules: recursive
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ env.RUST_VERSION }}
-          override: true
-          components: rustfmt
-      - name: Test
-        run: cargo test
+          # Examples can be large with a lot of debug info due to tokio. So we
+          # disable debug info generation.
+          RUSTFLAGS="-C debuginfo=0" cargo test

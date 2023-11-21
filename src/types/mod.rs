@@ -34,6 +34,9 @@ use concordium_base::{
             AccountAddress, AccountCredentialWithoutProofs, AccountKeys, CredentialPublicKeys,
         },
     },
+    smart_contracts::{
+        ContractEvent, ModuleReference, OwnedParameter, OwnedReceiveName, WasmVersion,
+    },
     transactions::{AccountAccessStructure, ExactSizeTransactionSigner, TransactionSigner},
 };
 use std::{
@@ -1099,6 +1102,22 @@ impl BlockItemSummary {
         }
     }
 
+    /// If the block item is a smart contract update transaction then return the
+    /// execution tree.
+    pub fn contract_update(self) -> Option<ExecutionTree> {
+        if let BlockItemSummaryDetails::AccountTransaction(at) = self.details {
+            match at.effects {
+                AccountTransactionEffects::ContractInitialized { .. } => None,
+                AccountTransactionEffects::ContractUpdateIssued { effects } => {
+                    execution_tree(effects)
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
     /// If the block item is a smart contract init transaction then
     /// return the initialization data.
     pub fn contract_init(&self) -> Option<&ContractInitializedEvent> {
@@ -1217,6 +1236,298 @@ impl BlockItemSummary {
             Vec::new()
         }
     }
+}
+
+#[derive(Debug, PartialEq)]
+/// A result of updating a smart contract instance.
+pub enum ExecutionTree {
+    /// The top-level call was a V0 contract instance update.
+    V0(ExecutionTreeV0),
+    /// The top-level call was a V1 contract instance update.
+    V1(ExecutionTreeV1),
+}
+
+/// Convert the trace elements into an [`ExecutionTree`].
+/// This will fail if the list was not generated correctly, but if the list of
+/// trace elements is coming from the node it will always be in the correct
+/// format.
+pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTree> {
+    #[derive(Debug)]
+    struct PartialTree {
+        address: ContractAddress,
+        /// Whether the matching resume was seen for the interrupt.
+        resumed: bool,
+        events:  Vec<TraceV1>,
+    }
+
+    #[derive(Debug)]
+    enum Worker {
+        V0(ExecutionTreeV0),
+        Partial(PartialTree),
+    }
+
+    // The current stack of calls. Stack is pushed on new interrupts (interrupts
+    // that introduce new nested calls) and on calls to V0 contracts.
+    let mut stack: Vec<Worker> = Vec::new();
+    let mut elements = elements.into_iter();
+    while let Some(element) = elements.next() {
+        match element {
+            ContractTraceElement::Updated {
+                data:
+                    InstanceUpdatedEvent {
+                        contract_version,
+                        address,
+                        instigator,
+                        amount,
+                        message,
+                        receive_name,
+                        events,
+                    },
+            } => {
+                if let Some(end) = stack.pop() {
+                    let tree = match contract_version {
+                        WasmVersion::V0 => ExecutionTree::V0(ExecutionTreeV0 {
+                            top_level: UpdateV0 {
+                                address,
+                                instigator,
+                                amount,
+                                message,
+                                receive_name,
+                                events,
+                            },
+                            rest:      Vec::new(),
+                        }),
+                        WasmVersion::V1 => ExecutionTree::V1(ExecutionTreeV1 {
+                            address,
+                            instigator,
+                            amount,
+                            message,
+                            receive_name,
+                            events: vec![TraceV1::Events { events }],
+                        }),
+                    };
+                    match end {
+                        Worker::V0(mut v0) => {
+                            v0.rest.push(TraceV0::Call(tree));
+                            stack.push(Worker::V0(v0));
+                        }
+                        Worker::Partial(mut partial) => {
+                            if partial.resumed {
+                                // terminate it.
+                                let  ExecutionTree::V1(mut tree) = tree else {
+                                    return None;
+                                };
+                                std::mem::swap(&mut tree.events, &mut partial.events);
+                                tree.events.append(&mut partial.events);
+                                if let Some(last) = stack.last_mut() {
+                                    match last {
+                                        Worker::V0(v0) => {
+                                            v0.rest.push(TraceV0::Call(ExecutionTree::V1(tree)));
+                                        }
+                                        Worker::Partial(v0) => {
+                                            v0.events.push(TraceV1::Call {
+                                                call: ExecutionTree::V1(tree),
+                                            });
+                                        }
+                                    }
+                                } else {
+                                    // and return it.
+                                    if elements.next().is_none() {
+                                        return Some(ExecutionTree::V1(tree));
+                                    } else {
+                                        return None;
+                                    }
+                                }
+                            } else {
+                                partial.events.push(TraceV1::Call { call: tree });
+                                stack.push(Worker::Partial(partial));
+                            }
+                        }
+                    }
+                } else {
+                    // no stack yet
+                    match contract_version {
+                        WasmVersion::V0 => stack.push(Worker::V0(ExecutionTreeV0 {
+                            top_level: UpdateV0 {
+                                address,
+                                instigator,
+                                amount,
+                                message,
+                                receive_name,
+                                events,
+                            },
+                            rest:      Vec::new(),
+                        })),
+                        WasmVersion::V1 => {
+                            let tree = ExecutionTreeV1 {
+                                address,
+                                instigator,
+                                amount,
+                                message,
+                                receive_name,
+                                events: vec![TraceV1::Events { events }],
+                            };
+                            // and return it.
+                            if elements.next().is_none() {
+                                return Some(ExecutionTree::V1(tree));
+                            } else {
+                                return None;
+                            }
+                        }
+                    }
+                }
+            }
+            ContractTraceElement::Transferred { from, amount, to } => {
+                let last = stack.last_mut()?;
+                match last {
+                    Worker::V0(v0) => v0.rest.push(TraceV0::Transfer { from, amount, to }),
+                    Worker::Partial(partial) => {
+                        partial.events.push(TraceV1::Transfer { from, amount, to });
+                    }
+                }
+            }
+            ContractTraceElement::Interrupted { address, events } => match stack.last_mut() {
+                Some(Worker::Partial(partial)) if partial.resumed => {
+                    partial.resumed = false;
+                    partial.events.push(TraceV1::Events { events })
+                }
+                _ => {
+                    stack.push(Worker::Partial(PartialTree {
+                        address,
+                        resumed: false,
+                        events: vec![TraceV1::Events { events }],
+                    }));
+                }
+            },
+            ContractTraceElement::Resumed {
+                address,
+                success: _,
+            } => {
+                match stack.pop()? {
+                    Worker::V0(v0) => {
+                        let Worker::Partial(partial) = stack.last_mut()? else {
+                            return None;
+                        };
+                        partial.events.push(TraceV1::Call {
+                            call: ExecutionTree::V0(v0),
+                        });
+                        partial.resumed = true;
+                    }
+                    Worker::Partial(mut partial) => {
+                        if address != partial.address {
+                            return None;
+                        }
+                        partial.resumed = true;
+                        stack.push(Worker::Partial(partial));
+                    }
+                };
+            }
+            ContractTraceElement::Upgraded { address, from, to } => {
+                let Worker::Partial(partial) = stack.last_mut()? else {
+                    return None;
+                };
+                if address != partial.address {
+                    return None;
+                }
+                // Put an upgrade event to the list, and continue.
+                partial.events.push(TraceV1::Upgrade { from, to });
+            }
+        }
+    }
+    let Worker::V0(v0) = stack.pop()? else {
+        return None;
+    };
+    if stack.is_empty() {
+        Some(ExecutionTree::V0(v0))
+    } else {
+        None
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct UpdateV0 {
+    /// Address of the affected instance.
+    pub address:      ContractAddress,
+    /// The origin of the message to the smart contract. This can be either
+    /// an account or a smart contract.
+    pub instigator:   Address,
+    /// The amount the method was invoked with.
+    pub amount:       Amount,
+    /// The message passed to method.
+    pub message:      OwnedParameter,
+    /// The name of the method that was executed.
+    pub receive_name: OwnedReceiveName,
+    /// Events emitted by the contract call.
+    pub events:       Vec<ContractEvent>,
+}
+
+#[derive(Debug, PartialEq)]
+/// An update of a V0 contract with all of its subsequent trace elements in the
+/// order they were executed. Note that some of those events might have been
+/// generated by subsequent calls, not directly by the top-level call.
+pub struct ExecutionTreeV0 {
+    top_level: UpdateV0,
+    rest:      Vec<TraceV0>,
+}
+
+#[derive(Debug, PartialEq)]
+/// An action generated by a V0 contract.
+enum TraceV0 {
+    /// A contract call, either V0 or V1 contract with all its nested calls.
+    Call(ExecutionTree),
+    /// A transfer of CCD from the V0 contract to an account.
+    Transfer {
+        /// Sender contract.
+        from:   ContractAddress,
+        /// Amount transferred.
+        amount: Amount,
+        /// Receiver account.
+        to:     AccountAddress,
+    },
+}
+
+#[derive(Debug, PartialEq)]
+/// An update of a V1 contract with all of its nested calls.
+pub struct ExecutionTreeV1 {
+    /// Address of the affected instance.
+    pub address:      ContractAddress,
+    /// The origin of the message to the smart contract. This can be either
+    /// an account or a smart contract.
+    pub instigator:   Address,
+    /// The amount the method was invoked with.
+    pub amount:       Amount,
+    /// The message passed to method.
+    pub message:      OwnedParameter,
+    /// The name of the method that was executed.
+    pub receive_name: OwnedReceiveName,
+    /// A sequence of calls, transfers, etc. performed by the contract, in the
+    /// order that they took effect.
+    pub events:       Vec<TraceV1>,
+}
+
+#[derive(Debug, PartialEq)]
+/// An operation performed directly by a V1 contract.
+pub enum TraceV1 {
+    /// New events emitted.
+    Events { events: Vec<ContractEvent> },
+    /// A successful call to another contract, either V0 or V1.
+    Call { call: ExecutionTree },
+    /// A transfer of CCD from the contract to the account.
+    Transfer {
+        /// Sender contract.
+        from:   ContractAddress,
+        /// Amount transferred.
+        amount: Amount,
+        /// Receiver account.
+        to:     AccountAddress,
+    },
+    /// An upgrade of the contract instance.
+    Upgrade {
+        /// The existing module reference that is in effect before the upgrade.
+        from: ModuleReference,
+        /// The new module reference that is in effect after the upgrade.
+        to:   ModuleReference,
+    },
 }
 
 #[derive(Debug, Clone)]
