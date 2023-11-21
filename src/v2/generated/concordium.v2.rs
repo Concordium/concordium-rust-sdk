@@ -2723,7 +2723,7 @@ pub mod block_item_summary {
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Details {
-        /// Detailsa about an account transaction.
+        /// Details about an account transaction.
         #[prost(message, tag = "4")]
         AccountTransaction(super::AccountTransactionDetails),
         /// Details about an account creation.
@@ -4237,7 +4237,7 @@ pub struct AccountTransactionHeader {
     /// Sequence number of the transaction.
     #[prost(message, optional, tag = "2")]
     pub sequence_number: ::core::option::Option<SequenceNumber>,
-    /// Maximum amount of nergy the transaction can take to execute.
+    /// Maximum amount of energy the transaction can take to execute.
     #[prost(message, optional, tag = "3")]
     pub energy_amount:   ::core::option::Option<Energy>,
     /// Latest time the transaction can included in a block.
@@ -4866,6 +4866,426 @@ pub struct WinningBaker {
     /// and False otherwise.
     #[prost(bool, tag = "3")]
     pub present: bool,
+}
+/// An operation to dry run.  The first operation in a dry-run sequence should
+/// be `load_block_state`: any other operation will be met with `NoState` until
+/// a state is successfully loaded.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DryRunRequest {
+    #[prost(oneof = "dry_run_request::Request", tags = "1, 2, 3")]
+    pub request: ::core::option::Option<dry_run_request::Request>,
+}
+/// Nested message and enum types in `DryRunRequest`.
+pub mod dry_run_request {
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Request {
+        /// Load the state of the specified block to use for subsequent
+        /// requests. The state is taken at the end of execution of the
+        /// block, and the block’s timestamp is used as the current
+        /// timestamp.
+        ///
+        /// The energy cost for this operation is 2000.
+        #[prost(message, tag = "1")]
+        LoadBlockState(super::BlockHashInput),
+        /// Run a query on the state.
+        #[prost(message, tag = "2")]
+        StateQuery(super::DryRunStateQuery),
+        /// Run a (non-transaction) operation to modify the state.
+        #[prost(message, tag = "3")]
+        StateOperation(super::DryRunStateOperation),
+    }
+}
+/// Run a query as part of a dry run. Queries do not update the block state.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DryRunStateQuery {
+    #[prost(oneof = "dry_run_state_query::Query", tags = "1, 2, 3")]
+    pub query: ::core::option::Option<dry_run_state_query::Query>,
+}
+/// Nested message and enum types in `DryRunStateQuery`.
+pub mod dry_run_state_query {
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Query {
+        /// Look up information on a particular account.
+        ///
+        /// The energy cost for this query is 200.
+        #[prost(message, tag = "1")]
+        GetAccountInfo(super::AccountIdentifierInput),
+        /// Look up information about a particular smart contract.
+        ///
+        /// The energy cost for this query is 200.
+        #[prost(message, tag = "2")]
+        GetInstanceInfo(super::ContractAddress),
+        /// Invoke an entrypoint on a smart contract instance.
+        /// No changes made to the state are retained at the completion of the
+        /// operation.
+        ///
+        /// The energy cost for this query is 200 plus the energy used by the
+        /// smart contract execution.
+        #[prost(message, tag = "3")]
+        InvokeInstance(super::DryRunInvokeInstance),
+    }
+}
+/// Invoke an entrypoint on a smart contract instance.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DryRunInvokeInstance {
+    /// Invoker of the contract. If this is not supplied then the contract will
+    /// be invoked by an account with address 0, no credentials and
+    /// sufficient amount of CCD to cover the transfer amount. If given, the
+    /// relevant address (either account or contract) must exist in the
+    /// blockstate.
+    #[prost(message, optional, tag = "1")]
+    pub invoker:    ::core::option::Option<Address>,
+    /// Address of the contract instance to invoke.
+    #[prost(message, optional, tag = "2")]
+    pub instance:   ::core::option::Option<ContractAddress>,
+    /// Amount to invoke the smart contract instance with.
+    #[prost(message, optional, tag = "3")]
+    pub amount:     ::core::option::Option<Amount>,
+    /// The entrypoint of the smart contract instance to invoke.
+    #[prost(message, optional, tag = "4")]
+    pub entrypoint: ::core::option::Option<ReceiveName>,
+    /// The parameter bytes to include in the invocation of the entrypoint.
+    #[prost(message, optional, tag = "5")]
+    pub parameter:  ::core::option::Option<Parameter>,
+    /// The maximum energy to allow for the invocation. Note that the node
+    /// imposes an energy quota that is enforced in addition to this limit.
+    #[prost(message, optional, tag = "6")]
+    pub energy:     ::core::option::Option<Energy>,
+}
+/// An operation that can update the state as part of a dry run.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DryRunStateOperation {
+    #[prost(oneof = "dry_run_state_operation::Operation", tags = "1, 2, 3")]
+    pub operation: ::core::option::Option<dry_run_state_operation::Operation>,
+}
+/// Nested message and enum types in `DryRunStateOperation`.
+pub mod dry_run_state_operation {
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Operation {
+        /// Sets the current block time to the given timestamp for the purposes
+        /// of future transactions.
+        ///
+        /// The energy cost of this operation is 50.
+        #[prost(message, tag = "1")]
+        SetTimestamp(super::Timestamp),
+        /// Add a specified amount of newly-minted CCDs to a specified account.
+        /// The amount cannot cause the total circulating supply to overflow.
+        ///
+        /// The energy cost of this operation is 400.
+        #[prost(message, tag = "2")]
+        MintToAccount(super::DryRunMintToAccount),
+        /// Dry run a transaction, updating the state if it succeeds.
+        ///
+        /// The energy cost of this operation is 400 plus the energy used by
+        /// executing the transaction.
+        #[prost(message, tag = "3")]
+        RunTransaction(super::DryRunTransaction),
+    }
+}
+/// Mint a specified amount and credit it to the specified account as part of a
+/// dry run.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DryRunMintToAccount {
+    /// The account to mint to.
+    #[prost(message, optional, tag = "1")]
+    pub account: ::core::option::Option<AccountAddress>,
+    /// The amount to mint and credit to the account.
+    #[prost(message, optional, tag = "2")]
+    pub amount:  ::core::option::Option<Amount>,
+}
+/// Dry run an account transaction
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DryRunTransaction {
+    /// The account to use as the sender of the transaction.
+    #[prost(message, optional, tag = "1")]
+    pub sender:        ::core::option::Option<AccountAddress>,
+    /// The energy limit set for executing the transaction.
+    #[prost(message, optional, tag = "2")]
+    pub energy_amount: ::core::option::Option<Energy>,
+    /// The payload of the transaction.
+    #[prost(message, optional, tag = "3")]
+    pub payload:       ::core::option::Option<AccountTransactionPayload>,
+    /// Which credentials and keys should be treated as having signed the
+    /// transaction. If none is given, then the transaction is treated as
+    /// having one signature for credential 0, key 0. Therefore, this is
+    /// only required when the transaction is from a multi-signature
+    /// account. There are two reasons why you might want to specify signatures:
+    ///    * The cost of the transaction depends on the number of signatures, so
+    ///      if you want to get the correct cost for a multi-signature
+    ///      transaction, then specifying the signatures supports this.
+    ///    * When changing account keys on a multi-credential account, the
+    ///      transaction must be signed by the credential whose keys are being
+    ///      changed.
+    ///
+    /// Note that the signature thresholds are not checked as part of the dry
+    /// run. Duplicated signatures are only counted once.
+    #[prost(message, repeated, tag = "4")]
+    pub signatures:    ::prost::alloc::vec::Vec<DryRunSignature>,
+}
+/// A dry run signature is a pair of a credential index and key index,
+/// identifying the credential and key that is presumed to have signed the
+/// transaction. No actual cryptographic signature is included.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DryRunSignature {
+    /// Credential index. Must not exceed 255.
+    #[prost(uint32, tag = "1")]
+    pub credential: u32,
+    /// Key index. Must not exceed 255.
+    #[prost(uint32, tag = "2")]
+    pub key:        u32,
+}
+/// A response to a `DryRunRequest`.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DryRunResponse {
+    /// The remaining available energy quota after the dry run operation.
+    #[prost(message, optional, tag = "3")]
+    pub quota_remaining: ::core::option::Option<Energy>,
+    #[prost(oneof = "dry_run_response::Response", tags = "1, 2")]
+    pub response:        ::core::option::Option<dry_run_response::Response>,
+}
+/// Nested message and enum types in `DryRunResponse`.
+pub mod dry_run_response {
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Response {
+        /// The request produced an error. The request otherwise has no effect
+        /// on the state.
+        #[prost(message, tag = "1")]
+        Error(super::DryRunErrorResponse),
+        /// The request was successful.
+        #[prost(message, tag = "2")]
+        Success(super::DryRunSuccessResponse),
+    }
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DryRunErrorResponse {
+    #[prost(
+        oneof = "dry_run_error_response::Error",
+        tags = "1, 2, 3, 4, 5, 6, 8, 9"
+    )]
+    pub error: ::core::option::Option<dry_run_error_response::Error>,
+}
+/// Nested message and enum types in `DryRunErrorResponse`.
+pub mod dry_run_error_response {
+    /// The current block state is undefined. It should be initialized with
+    /// a 'load_block_state' request before any other operations.
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct NoState {}
+    /// The requested block was not found, so its state could not be loaded.
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct BlockNotFound {}
+    /// The specified account was not found.
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct AccountNotFound {}
+    /// The specified instance was not found.
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct InstanceNotFound {}
+    /// The amount that was requested to be minted would overflow the total
+    /// supply.
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct AmountOverLimit {
+        /// The maximum amount that can be minted without overflowing the
+        /// supply.
+        #[prost(message, optional, tag = "1")]
+        pub amount_limit: ::core::option::Option<super::Amount>,
+    }
+    /// The sender account for the transaction has insufficient balance to pay
+    /// the preliminary fees for the transaction to be included in a block.
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct BalanceInsufficient {
+        /// The minimum balance required to perform the operation.
+        #[prost(message, optional, tag = "1")]
+        pub required_amount:  ::core::option::Option<super::Amount>,
+        /// The currently-available balance on the account to pay for the
+        /// operation.
+        #[prost(message, optional, tag = "2")]
+        pub available_amount: ::core::option::Option<super::Amount>,
+    }
+    /// The energy made available for the transaction is insufficient to cover
+    /// the basic processing required to include a transaction in a block.
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct EnergyInsufficient {
+        /// The minimum energy required for the transaction to be included in
+        /// the chain. Note that, even if the energy supplied for the
+        /// transaction is enough to prevent a `EnergyInsufficient`, the
+        /// transaction can still be rejected for having insufficient
+        /// energy. In that case, a `TransactionExecuted` response will be
+        /// produced, but indicate the transaction was rejected.
+        #[prost(message, optional, tag = "1")]
+        pub energy_required: ::core::option::Option<super::Energy>,
+    }
+    /// Invoking the smart contract instance failed.
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct InvokeFailure {
+        /// If invoking a V0 contract this is not provided, otherwise it is
+        /// potentially return value produced by the call unless the call failed
+        /// with out of energy or runtime error. If the V1 contract
+        /// terminated with a logic error then the return value is
+        /// present.
+        #[prost(bytes = "vec", optional, tag = "1")]
+        pub return_value: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
+        /// Energy used by the execution.
+        #[prost(message, optional, tag = "2")]
+        pub used_energy:  ::core::option::Option<super::Energy>,
+        /// Contract execution failed for the given reason.
+        #[prost(message, optional, tag = "3")]
+        pub reason:       ::core::option::Option<super::RejectReason>,
+    }
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Error {
+        /// The current block state is undefined. It should be initialized with
+        /// a 'load_block_state' request before any other operations.
+        #[prost(message, tag = "1")]
+        NoState(NoState),
+        /// The requested block was not found, so its state could not be loaded.
+        /// Response to 'load_block_state'.
+        #[prost(message, tag = "2")]
+        BlockNotFound(BlockNotFound),
+        /// The specified account was not found.
+        /// Response to 'get_account_info', 'mint_to_account' and
+        /// 'run_transaction'.
+        #[prost(message, tag = "3")]
+        AccountNotFound(AccountNotFound),
+        /// The specified instance was not found.
+        /// Response to 'get_instance_info'.
+        #[prost(message, tag = "4")]
+        InstanceNotFound(InstanceNotFound),
+        /// The amount to mint would overflow the total CCD supply.
+        /// Response to 'mint_to_account'.
+        #[prost(message, tag = "5")]
+        AmountOverLimit(AmountOverLimit),
+        /// The balance of the sender account is not sufficient to pay for the
+        /// operation. Response to 'run_transaction'.
+        #[prost(message, tag = "6")]
+        BalanceInsufficient(BalanceInsufficient),
+        /// The energy supplied for the transaction was not sufficient to
+        /// perform the basic checks. Response to 'run_transaction'.
+        #[prost(message, tag = "8")]
+        EnergyInsufficient(EnergyInsufficient),
+        /// The contract invocation failed.
+        /// Response to 'invoke_instance'.
+        #[prost(message, tag = "9")]
+        InvokeFailed(InvokeFailure),
+    }
+}
+/// The dry run operation completed successfully.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DryRunSuccessResponse {
+    #[prost(
+        oneof = "dry_run_success_response::Response",
+        tags = "1, 2, 3, 4, 5, 6, 7"
+    )]
+    pub response: ::core::option::Option<dry_run_success_response::Response>,
+}
+/// Nested message and enum types in `DryRunSuccessResponse`.
+pub mod dry_run_success_response {
+    /// The block state at the specified block was successfully loaded.
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct BlockStateLoaded {
+        /// The timestamp of the block, taken to be the current timestamp.
+        #[prost(message, optional, tag = "1")]
+        pub current_timestamp: ::core::option::Option<super::Timestamp>,
+        /// The hash of the block that was loaded.
+        #[prost(message, optional, tag = "2")]
+        pub block_hash:        ::core::option::Option<super::BlockHash>,
+        /// The protocol version at the specified block. The behavior of
+        /// operations can vary across protocol versions.
+        #[prost(enumeration = "super::ProtocolVersion", tag = "3")]
+        pub protocol_version:  i32,
+    }
+    /// The current apparent timestamp was updated to the specified value.
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct TimestampSet {}
+    /// The specified amount was minted to the specified account.
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct MintedToAccount {}
+    /// The transaction was executed.
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct TransactionExecuted {
+        /// The amount of energy actually expended in executing the transaction.
+        #[prost(message, optional, tag = "1")]
+        pub energy_cost:  ::core::option::Option<super::Energy>,
+        /// The details of the outcome of the transaction.
+        #[prost(message, optional, tag = "2")]
+        pub details:      ::core::option::Option<super::AccountTransactionDetails>,
+        /// If this is an invocation of a V1 contract that produced a return
+        /// value, this is that value. Otherwise it is absent.
+        #[prost(bytes = "vec", optional, tag = "3")]
+        pub return_value: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
+    }
+    /// The smart contract instance was invoked successfully.
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct InvokeSuccess {
+        /// If invoking a V0 contract this is absent. Otherwise it is the return
+        /// value produced by the contract.
+        #[prost(bytes = "vec", optional, tag = "1")]
+        pub return_value: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
+        /// Energy used by the execution.
+        #[prost(message, optional, tag = "2")]
+        pub used_energy:  ::core::option::Option<super::Energy>,
+        /// Effects produced by contract execution.
+        #[prost(message, repeated, tag = "3")]
+        pub effects:      ::prost::alloc::vec::Vec<super::ContractTraceElement>,
+    }
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Response {
+        /// The state from the specified block was successfully loaded.
+        /// Response to 'load_block_state'.
+        #[prost(message, tag = "1")]
+        BlockStateLoaded(BlockStateLoaded),
+        /// Details of the requested account.
+        /// Response to 'get_account_info'.
+        #[prost(message, tag = "2")]
+        AccountInfo(super::AccountInfo),
+        /// Details of the requested smart contract instance.
+        /// Response to 'get_instance_info'.
+        #[prost(message, tag = "3")]
+        InstanceInfo(super::InstanceInfo),
+        /// The smart contract instance was invoked successfully.
+        #[prost(message, tag = "4")]
+        InvokeSucceeded(InvokeSuccess),
+        /// The current timestamp was set successfully.
+        /// Response to 'set_timestamp'.
+        #[prost(message, tag = "5")]
+        TimestampSet(TimestampSet),
+        /// The specified amount was minted and credited to the account.
+        /// Response to 'mint_to_account'.
+        #[prost(message, tag = "6")]
+        MintedToAccount(MintedToAccount),
+        /// The specified transaction was executed. Note that the transaction
+        /// could still have been rejected.
+        /// Response to 'run_transaction'.
+        #[prost(message, tag = "7")]
+        TransactionExecuted(TransactionExecuted),
+    }
 }
 /// Information about how open the pool is to new delegators.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
@@ -6367,7 +6787,7 @@ pub mod queries_client {
         ///  * `INVALID_ARGUMENT` if the query is for a genesis index at
         ///    consensus version 0.
         ///  * `INVALID_ARGUMENT` if the input `EpochRequest` is malformed.
-        ///  * `UNAVAILABLE` if the endpoint is disabled on the node.
+        ///  * `UNIMPLEMENTED` if the endpoint is disabled on the node.
         pub async fn get_winning_bakers_epoch(
             &mut self,
             request: impl tonic::IntoRequest<super::EpochRequest>,
@@ -6398,7 +6818,7 @@ pub mod queries_client {
         ///  * `INVALID_ARGUMENT` if the query is for an epoch with no finalized
         ///    blocks for a past genesis index.
         ///  * `INVALID_ARGUMENT` if the input `EpochRequest` is malformed.
-        ///  * `UNAVAILABLE` if the endpoint is disabled on the node.
+        ///  * `UNIMPLEMENTED` if the endpoint is disabled on the node.
         pub async fn get_first_block_epoch(
             &mut self,
             request: impl tonic::IntoRequest<super::EpochRequest>,
@@ -6413,6 +6833,59 @@ pub mod queries_client {
             let path =
                 http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetFirstBlockEpoch");
             self.inner.unary(request.into_request(), path, codec).await
+        }
+
+        /// Dry run a series of transactions and operations on a state derived
+        /// from a specified block. The server should send a single
+        /// `DryRunResponse` for each `DryRunRequest` received, unless
+        /// the call fails with an error status code. If a request produces a
+        /// `DryRunErrorResponse`, then the server will still process
+        /// subsequent requests, just as if the request causing the error
+        /// did not happen.
+        ///
+        /// The first request should be `load_block_at_state` to determine the
+        /// block state that will be used for the dry run.
+        ///
+        /// The server associates each request with an energy cost, and limits
+        /// the total energy that may be expended in a single invocation
+        /// of `DryRun`. This limit is reported as `quota` in the
+        /// initial metadata returned by the server. If executing an operation
+        /// exceeds the limit, the server terminates the session with
+        /// `RESOURCE_EXHAUSTED`.
+        ///
+        /// The server also imposes a timeout for a dry-run session to complete.
+        /// The server reports the timeout duration in milliseconds in
+        /// the initial metadata field `timeout`. If the session
+        /// is not completed before the timeout elapses, the server terminates
+        /// the session with `DEADLINE_EXCEEDED`.
+        ///
+        /// The following error cases are possible:
+        ///  * `INVALID_ARGUMENT` if any `DryRunRequest` is malformed.
+        ///  * `RESOURCE_EXHAUSTED` if the energy quota is exceeded.
+        ///  * `DEADLINE_EXCEEDED` if the session does not complete before the
+        ///    server-imposed timeout.
+        ///  * `RESOURCE_EXHAUSTED` if the server is not currently accepting new
+        ///    `DryRun` sessions. (The server may impose a limit on the number
+        ///    of concurrent sessions.)
+        ///  * `INTERNAL` if an interal server error occurs. This should not
+        ///    happen, and likely indicates a bug.
+        ///  * `UNIMPLEMENTED` if the endpoint is disabled on the node.
+        pub async fn dry_run(
+            &mut self,
+            request: impl tonic::IntoStreamingRequest<Message = super::DryRunRequest>,
+        ) -> Result<tonic::Response<tonic::codec::Streaming<super::DryRunResponse>>, tonic::Status>
+        {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/DryRun");
+            self.inner
+                .streaming(request.into_streaming_request(), path, codec)
+                .await
         }
     }
 }
