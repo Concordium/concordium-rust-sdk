@@ -49,6 +49,8 @@ pub use tonic::{
     Code, Status,
 };
 
+use self::dry_run::WithRemainingQuota;
+
 mod conversions;
 pub mod dry_run;
 #[path = "generated/concordium.v2.rs"]
@@ -1618,8 +1620,23 @@ impl Client {
     /// Before invoking any other operations on the [`dry_run::DryRun`] object,
     /// the state must be loaded by calling
     /// [`dry_run::DryRun::load_block_state`].
-    pub async fn dry_run(&mut self) -> endpoints::QueryResult<dry_run::DryRun> {
+    pub async fn begin_dry_run(&mut self) -> endpoints::QueryResult<dry_run::DryRun> {
         Ok(dry_run::DryRun::new(&mut self.client).await?)
+    }
+
+    /// Start a dry-run sequence that can be used to simulate a series of
+    /// transactions and other operations on the node, starting from the
+    /// specified block.
+    pub async fn dry_run(
+        &mut self,
+        bi: impl IntoBlockIdentifier,
+    ) -> dry_run::DryRunResult<(dry_run::DryRun, dry_run::BlockStateLoaded)> {
+        let mut runner = dry_run::DryRun::new(&mut self.client).await?;
+        let load_result = runner.load_block_state(bi).await?;
+        Ok(WithRemainingQuota {
+            inner:           (runner, load_result.inner),
+            quota_remaining: load_result.quota_remaining,
+        })
     }
 
     /// Get information, such as height, timings, and transaction counts for the

@@ -31,25 +31,23 @@ mod shared_receiver {
 
     /// A `SharedReceiver` wraps an underlying stream so that multiple clients
     /// can queue to receive items from the stream.
-    pub struct SharedReceiver<S>
-    where
-        S: Stream, {
-        senders: mpsc::UnboundedSender<oneshot::Sender<S::Item>>,
+    pub struct SharedReceiver<I> {
+        senders: mpsc::UnboundedSender<oneshot::Sender<I>>,
         task:    JoinHandle<()>,
     }
 
-    impl<S: Stream> Drop for SharedReceiver<S> {
+    impl<I> Drop for SharedReceiver<I> {
         fn drop(&mut self) { self.task.abort(); }
     }
 
-    impl<S: Stream + Unpin + Send + 'static> SharedReceiver<S>
+    impl<I> SharedReceiver<I>
     where
-        S::Item: Send,
+        I: Send + 'static,
     {
         /// Construct a new shared receiver. This spawns a background task that
         /// pairs waiters with incoming stream items.
-        pub fn new(stream: S) -> Self {
-            let (senders, rec_senders) = mpsc::unbounded_channel::<oneshot::Sender<S::Item>>();
+        pub fn new(stream: impl Stream<Item = I> + Unpin + Send + 'static) -> Self {
+            let (senders, rec_senders) = mpsc::unbounded_channel::<oneshot::Sender<I>>();
             let task = tokio::task::spawn(async {
                 let mut zipped = stream.zip(tokio_stream::wrappers::UnboundedReceiverStream::from(
                     rec_senders,
@@ -64,7 +62,7 @@ mod shared_receiver {
         /// Claim the next item from the stream when it becomes available.
         /// Returns `None` if the stream is already closed. Otherwise returns a
         /// [`oneshot::Receiver`] that can be `await`ed to retrieve the item.
-        pub fn next(&self) -> Option<oneshot::Receiver<S::Item>> {
+        pub fn next(&self) -> Option<oneshot::Receiver<I>> {
             let (send, recv) = oneshot::channel();
             self.senders.send(send).ok()?;
             Some(recv)
@@ -78,19 +76,19 @@ pub enum ErrorResult {
     /// The current block state is undefined. It should be initialized with a
     /// `load_block_state` request before any other operations.
     #[error("block state not loaded")]
-    NoState(),
+    NoState,
     /// The requested block was not found, so its state could not be loaded.
     /// Response to `load_block_state`.
     #[error("block not found")]
-    BlockNotFound(),
+    BlockNotFound,
     /// The specified account was not found.
     /// Response to `get_account_info`, `mint_to_account` and `run_transaction`.
     #[error("account not found")]
-    AccountNotFound(),
+    AccountNotFound,
     /// The specified instance was not found.
     /// Response to `get_instance_info`.
     #[error("contract instance not found")]
-    InstanceNotFound(),
+    InstanceNotFound,
     /// The amount to mint would overflow the total CCD supply.
     /// Response to `mint_to_account`.
     #[error("mint amount exceeds limit")]
@@ -139,10 +137,10 @@ impl TryFrom<dry_run_error_response::Error> for ErrorResult {
     fn try_from(value: dry_run_error_response::Error) -> Result<Self, Self::Error> {
         use dry_run_error_response::Error;
         let res = match value {
-            Error::NoState(_) => Self::NoState(),
-            Error::BlockNotFound(_) => Self::BlockNotFound(),
-            Error::AccountNotFound(_) => Self::AccountNotFound(),
-            Error::InstanceNotFound(_) => Self::InstanceNotFound(),
+            Error::NoState(_) => Self::NoState,
+            Error::BlockNotFound(_) => Self::BlockNotFound,
+            Error::AccountNotFound(_) => Self::AccountNotFound,
+            Error::InstanceNotFound(_) => Self::InstanceNotFound,
             Error::AmountOverLimit(e) => Self::AmountOverLimit {
                 amount_limit: e.amount_limit.require()?.into(),
             },
@@ -169,7 +167,7 @@ pub enum DryRunError {
     /// The server responded with an error code.
     /// In this case, no futher requests will be accepted in the dry-run
     /// session.
-    #[error("{0}")]
+    #[error("gRPC error: {0}")]
     CallError(#[from] tonic::Status),
     /// The dry-run operation failed.
     /// In this case, further dry-run requests are possible in the same session.
@@ -222,7 +220,7 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
         match response.response.require()? {
             Response::Error(e) => {
                 let result = e.error.require()?.try_into()?;
-                if !matches!(result, ErrorResult::BlockNotFound()) {
+                if !matches!(result, ErrorResult::BlockNotFound) {
                     Err(tonic::Status::unknown("unexpected error response type"))?
                 }
                 Err(DryRunError::OperationFailed {
@@ -270,10 +268,7 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
         match response.response.require()? {
             Response::Error(e) => {
                 let result = e.error.require()?.try_into()?;
-                if !matches!(
-                    result,
-                    ErrorResult::NoState() | ErrorResult::AccountNotFound()
-                ) {
+                if !matches!(result, ErrorResult::NoState | ErrorResult::AccountNotFound) {
                     Err(tonic::Status::unknown("unexpected error response type"))?
                 }
                 Err(DryRunError::OperationFailed {
@@ -311,10 +306,7 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
         match response.response.require()? {
             Response::Error(e) => {
                 let result = e.error.require()?.try_into()?;
-                if !matches!(
-                    result,
-                    ErrorResult::NoState() | ErrorResult::InstanceNotFound()
-                ) {
+                if !matches!(result, ErrorResult::NoState | ErrorResult::InstanceNotFound) {
                     Err(tonic::Status::unknown("unexpected error response type"))?
                 }
                 Err(DryRunError::OperationFailed {
@@ -378,7 +370,7 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
                 let result = e.error.require()?.try_into()?;
                 if !matches!(
                     result,
-                    ErrorResult::NoState()
+                    ErrorResult::NoState
                         | ErrorResult::InvokeFailure {
                             return_value: _,
                             used_energy:  _,
@@ -437,7 +429,7 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
         match response.response.require()? {
             Response::Error(e) => {
                 let result = e.error.require()?.try_into()?;
-                if !matches!(result, ErrorResult::NoState()) {
+                if !matches!(result, ErrorResult::NoState) {
                     Err(tonic::Status::unknown("unexpected error response type"))?
                 }
                 Err(DryRunError::OperationFailed {
@@ -483,7 +475,7 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
                 let result = e.error.require()?.try_into()?;
                 if !matches!(
                     result,
-                    ErrorResult::NoState() | ErrorResult::AmountOverLimit { amount_limit: _ }
+                    ErrorResult::NoState | ErrorResult::AmountOverLimit { amount_limit: _ }
                 ) {
                     Err(tonic::Status::unknown("unexpected error response type"))?
                 }
@@ -616,8 +608,8 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
                 let result = e.error.require()?.try_into()?;
                 if !matches!(
                     result,
-                    ErrorResult::NoState()
-                        | ErrorResult::AccountNotFound()
+                    ErrorResult::NoState
+                        | ErrorResult::AccountNotFound
                         | ErrorResult::BalanceInsufficient { .. }
                         | ErrorResult::EnergyInsufficient { .. }
                 ) {
@@ -649,7 +641,7 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
     }
 }
 
-type DryRunResult<T> = Result<WithRemainingQuota<T>, DryRunError>;
+pub type DryRunResult<T> = Result<WithRemainingQuota<T>, DryRunError>;
 
 /// A dry-run session.
 ///
@@ -672,9 +664,7 @@ pub struct DryRun {
     /// This is `None` if the session has been closed.
     request_send:  Option<channel::mpsc::Sender<generated::DryRunRequest>>,
     /// The channel used for receiving responses from the server.
-    response_recv: shared_receiver::SharedReceiver<
-        futures::stream::Fuse<tonic::Streaming<generated::DryRunResponse>>,
-    >,
+    response_recv: shared_receiver::SharedReceiver<tonic::Result<generated::DryRunResponse>>,
     /// The timeout in milliseconds for the dry-run session to complete.
     timeout:       u64,
     /// The energy quota for the dry-run session as a whole.

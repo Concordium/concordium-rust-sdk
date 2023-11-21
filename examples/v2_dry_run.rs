@@ -30,7 +30,7 @@ async fn test_all(endpoint: v2::Endpoint) -> anyhow::Result<()> {
     // Connect to endpoint.
     let mut client = v2::Client::new(endpoint).await.context("Cannot connect.")?;
     // Start the dry run session.
-    let mut dry_run = client.dry_run().await?;
+    let mut dry_run = client.begin_dry_run().await?;
     println!(
         "Timeout: {:?}\nEnergy quota: {:?}",
         dry_run.timeout(),
@@ -74,7 +74,7 @@ async fn test_all(endpoint: v2::Endpoint) -> anyhow::Result<()> {
     // Try to invoke the entrypoint "view" on the <0,0> contract.
     let invoke_target = OwnedReceiveName::construct(
         res4.inner.name().as_contract_name(),
-        EntrypointName::new(&"view")?,
+        EntrypointName::new("view")?,
     )?;
     let parameter = OwnedParameter::empty();
     let context = ContractContext {
