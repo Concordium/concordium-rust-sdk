@@ -1,9 +1,11 @@
 ## Unreleased changes
 
+
 - The sdk now requires a `rustc` version at least 1.67 (Before it required version 1.66).
 - Add a `contract_update` helper analogous to `contract_init` to extract an
   execution tree from a smart contract update transaction.
 - Add a `ccd_cost` helper to `ChainParameters` to convert NRG cost to CCD.
+- Add support for `DryRun`. Requires a node version at least 6.2.
 
 ## 3.1.0
 

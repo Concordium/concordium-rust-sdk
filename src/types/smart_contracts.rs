@@ -233,7 +233,7 @@ impl ContractContext {
 fn return_zero_amount() -> Amount { Amount::from_micro_ccd(0) }
 fn return_default_invoke_energy() -> Energy { DEFAULT_INVOKE_ENERGY }
 
-#[derive(SerdeDeserialize, SerdeSerialize, Debug, Clone, Into)]
+#[derive(SerdeDeserialize, SerdeSerialize, Debug, Clone, Into, From)]
 #[serde(transparent)]
 pub struct ReturnValue {
     #[serde(with = "crate::internal::byte_array_hex")]

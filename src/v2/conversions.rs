@@ -842,6 +842,14 @@ impl From<Timestamp> for concordium_base::common::types::Timestamp {
     fn from(value: Timestamp) -> Self { value.value.into() }
 }
 
+impl From<concordium_base::common::types::Timestamp> for Timestamp {
+    fn from(value: concordium_base::common::types::Timestamp) -> Self {
+        Timestamp {
+            value: value.millis,
+        }
+    }
+}
+
 impl TryFrom<Timestamp> for chrono::DateTime<chrono::Utc> {
     type Error = tonic::Status;
 
@@ -1193,6 +1201,18 @@ impl TryFrom<BlockItem>
     }
 }
 
+impl TryFrom<AccountTransactionDetails> for super::types::AccountTransactionDetails {
+    type Error = tonic::Status;
+
+    fn try_from(v: AccountTransactionDetails) -> Result<Self, Self::Error> {
+        Ok(Self {
+            cost:    v.cost.require()?.into(),
+            sender:  v.sender.require()?.try_into()?,
+            effects: v.effects.require()?.try_into()?,
+        })
+    }
+}
+
 impl TryFrom<BlockItemSummary> for super::types::BlockItemSummary {
     type Error = tonic::Status;
 
@@ -1203,13 +1223,7 @@ impl TryFrom<BlockItemSummary> for super::types::BlockItemSummary {
             hash:        value.hash.require()?.try_into()?,
             details:     match value.details.require()? {
                 block_item_summary::Details::AccountTransaction(v) => {
-                    super::types::BlockItemSummaryDetails::AccountTransaction(
-                        super::types::AccountTransactionDetails {
-                            cost:    v.cost.require()?.into(),
-                            sender:  v.sender.require()?.try_into()?,
-                            effects: v.effects.require()?.try_into()?,
-                        },
-                    )
+                    super::types::BlockItemSummaryDetails::AccountTransaction(v.try_into()?)
                 }
                 block_item_summary::Details::AccountCreation(v) => {
                     super::types::BlockItemSummaryDetails::AccountCreation(
