@@ -1,5 +1,6 @@
 ## Unreleased changes
 
+## 3.2.0
 
 - The sdk now requires a `rustc` version at least 1.67 (Before it required version 1.66).
 - Add a `contract_update` helper analogous to `contract_init` to extract an
