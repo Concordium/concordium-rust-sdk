@@ -56,6 +56,8 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
+    std::fs::create_dir_all("created-accounts").context("Unable to create output directory.")?;
+
     let ip_data: IpData<IpPairing> = serde_json::from_str(
         &std::fs::read_to_string(app.idp).context("Could not read the keys file.")?,
     )

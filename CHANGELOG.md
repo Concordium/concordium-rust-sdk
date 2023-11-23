@@ -1,5 +1,9 @@
 ## Unreleased changes
 
+- Remove the V1 API.
+
+## 3.2.0
+
 - The sdk now requires a `rustc` version at least 1.67 (Before it required version 1.66).
 - Add `Display` implementation to `BlockIdentifier`.
 - Add `Display` and `FromStr` implementations for `AccountIdentifier`.
@@ -9,7 +13,7 @@
 - Add a `contract_update` helper analogous to `contract_init` to extract an
   execution tree from a smart contract update transaction.
 - Add a `ccd_cost` helper to `ChainParameters` to convert NRG cost to CCD.
-- Remove the V1 API.
+- Add support for `DryRun`. Requires a node version at least 6.2.
 
 ## 3.1.0
 
