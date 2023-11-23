@@ -1,15 +1,15 @@
 ## Unreleased changes
 
 - Remove the V1 API.
-
-## 3.2.0
-
-- The sdk now requires a `rustc` version at least 1.67 (Before it required version 1.66).
 - Add `Display` implementation to `BlockIdentifier`.
 - Add `Display` and `FromStr` implementations for `AccountIdentifier`.
 - Rename `find_first_finalized_block_no_later_than` into
   `find_first_finalized_block_no_earlier_than` since that correctly reflects its
-  semantics with respect to time and is much clearer.
+  semantics with respect to time and is much clearer.a
+
+## 3.2.0
+
+- The sdk now requires a `rustc` version at least 1.67 (Before it required version 1.66).
 - Add a `contract_update` helper analogous to `contract_init` to extract an
   execution tree from a smart contract update transaction.
 - Add a `ccd_cost` helper to `ChainParameters` to convert NRG cost to CCD.
