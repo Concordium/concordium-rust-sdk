@@ -1,15 +1,15 @@
-#![allow(deprecated)]
 //! List accounts and their balances ordered by decreasing CCD amount in a CSV
 //! file.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::{types::Amount, SerdeSerialize},
-    endpoints::{self, Endpoint},
     id,
     id::types::AccountAddress,
-    types::{hashes::BlockHash, AccountStakingInfo, CredentialType},
+    types::{AccountStakingInfo, CredentialType},
+    v2::{self, BlockIdentifier},
 };
+use futures::TryStreamExt;
 use serde::Serializer;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -19,16 +19,14 @@ struct App {
     #[structopt(
         long = "node",
         help = "GRPC interface of the node.",
-        default_value = "http://localhost:10000"
+        default_value = "http://localhost:20000"
     )]
-    endpoint: Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(
-        long = "block",
+        long = "lastfinal",
         help = "Block to query the data in. Defaults to last finalized block."
     )]
-    block:    Option<BlockHash>,
-    #[structopt(long = "token", help = "GRPC login token", default_value = "rpcadmin")]
-    token:    String,
+    block:    BlockIdentifier,
     #[structopt(
         long = "out",
         help = "File to output the list of accounts with their balances to."
@@ -72,14 +70,21 @@ async fn main() -> anyhow::Result<()> {
     // then find the output file cannot be created.
     let mut out = csv::Writer::from_path(app.out).context("Could not create output file.")?;
 
-    let mut client = endpoints::Client::connect(app.endpoint, app.token).await?;
+    let mut client = v2::Client::new(app.endpoint).await?;
 
-    let consensus_info = client.get_consensus_status().await?;
+    let block = client.get_block_info(app.block).await?;
+    println!(
+        "Listing accounts in block {} with timestamp {}.",
+        block.block_hash, block.response.block_slot_time
+    );
+    let block = block.block_hash;
 
-    let block = app.block.unwrap_or(consensus_info.last_finalized_block);
-    println!("Listing accounts in block {}.", block);
-
-    let accounts = client.get_account_list(&block).await?;
+    let accounts = client
+        .get_account_list(&block)
+        .await?
+        .response
+        .try_collect::<Vec<_>>()
+        .await?;
 
     let total_accounts = accounts.len();
     let mut num_bakers = 0;
@@ -95,9 +100,10 @@ async fn main() -> anyhow::Result<()> {
             let mut client = client.clone();
             handles.push(tokio::spawn(async move {
                 let info = client
-                    .get_account_info(&acc, &block)
+                    .get_account_info(&acc.into(), &block)
                     .await
-                    .context(format!("Getting account {} failed.", acc))?;
+                    .context(format!("Getting account {} failed.", acc))?
+                    .response;
                 Ok::<_, anyhow::Error>((acc, info))
             }));
         }

@@ -1,4 +1,3 @@
-#![allow(deprecated)]
 //! Generate initial account transactions and send them to the chain.
 //! Generated account keys are stored in the `created-accounts` directory.
 use anyhow::Context;
@@ -39,7 +38,7 @@ struct App {
     #[structopt(
         long = "node",
         help = "GRPC interface of the node.",
-        default_value = "http://localhost:10000"
+        default_value = "http://localhost:20000"
     )]
     endpoint: Endpoint,
     #[structopt(long = "identity-provider")]

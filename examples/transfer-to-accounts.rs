@@ -1,17 +1,16 @@
-#![allow(deprecated)]
 //! Send a given amount of CCD to the account listed in a provided file.
 //! The file format should be one account address per line.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::types::{Amount, TransactionTime},
-    endpoints::{self, Endpoint},
     id::types::AccountAddress,
     types::{
         self,
         transactions::{send, BlockItem},
         WalletAccount,
     },
+    v2::{self, BlockIdentifier},
 };
 use std::{io::BufRead, path::PathBuf};
 use structopt::StructOpt;
@@ -20,10 +19,10 @@ use structopt::StructOpt;
 struct App {
     #[structopt(
         long = "node",
-        help = "GRPC interface of the node.",
-        default_value = "http://localhost:10000"
+        help = "V2 GRPC interface of the node.",
+        default_value = "http://localhost:20000"
     )]
-    endpoint:  Endpoint,
+    endpoint:  v2::Endpoint,
     #[structopt(long = "sender", help = "Account keys of the sender.")]
     account:   PathBuf,
     #[structopt(
@@ -43,9 +42,7 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
-    let mut client = endpoints::Client::connect(app.endpoint, "rpcadmin".to_string()).await?;
-
-    let consensus_info = client.get_consensus_status().await?;
+    let mut client = v2::Client::new(app.endpoint).await?;
 
     let keys: WalletAccount =
         WalletAccount::from_json_file(app.account).context("Could not read the keys file.")?;
@@ -64,8 +61,9 @@ async fn main() -> anyhow::Result<()> {
 
     // Get the initial nonce.
     let acc_info: types::AccountInfo = client
-        .get_account_info(&keys.address, &consensus_info.last_finalized_block)
-        .await?;
+        .get_account_info(&keys.address.into(), BlockIdentifier::LastFinal)
+        .await?
+        .response;
 
     println!(
         "Using account {} for sending, starting at nonce {}.",
