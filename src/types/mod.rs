@@ -21,7 +21,7 @@ use concordium_base::{
         Buffer, Deserial, Get, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
         Versioned,
     },
-    contracts_common::Duration,
+    contracts_common::{Duration, EntrypointName, Parameter},
     encrypted_transfers,
     encrypted_transfers::types::{
         AggregatedDecryptedAmount, EncryptedAmountTransferData, SecToPubAmountTransferData,
@@ -1268,6 +1268,36 @@ pub enum ExecutionTree {
     V0(ExecutionTreeV0),
     /// The top-level call was a V1 contract instance update.
     V1(ExecutionTreeV1),
+}
+
+impl ExecutionTree {
+    /// Return the name of the top-level entrypoint that was invoked.
+    pub fn entrypoint(&self) -> EntrypointName {
+        match self {
+            ExecutionTree::V0(v0) => v0
+                .top_level
+                .receive_name
+                .as_receive_name()
+                .entrypoint_name(),
+            ExecutionTree::V1(v1) => v1.receive_name.as_receive_name().entrypoint_name(),
+        }
+    }
+
+    /// Return the name of the top-level contract that was invoked.
+    pub fn address(&self) -> ContractAddress {
+        match self {
+            ExecutionTree::V0(v0) => v0.top_level.address,
+            ExecutionTree::V1(v1) => v1.address,
+        }
+    }
+
+    /// Return parameter to the top-level contract call.
+    pub fn parameter(&self) -> Parameter {
+        match self {
+            ExecutionTree::V0(v0) => v0.top_level.message.as_parameter(),
+            ExecutionTree::V1(v1) => v1.message.as_parameter(),
+        }
+    }
 }
 
 /// Convert the trace elements into an [`ExecutionTree`].
