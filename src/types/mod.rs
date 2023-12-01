@@ -329,6 +329,30 @@ pub struct AccountInfo {
     pub account_address:          AccountAddress,
 }
 
+impl From<&AccountInfo> for AccountAccessStructure {
+    fn from(value: &AccountInfo) -> Self {
+        Self {
+            keys:      value
+                .account_credentials
+                .iter()
+                .map(|(idx, v)| {
+                    let key = match v.value {
+                        crate::id::types::AccountCredentialWithoutProofs::Initial { ref icdv } => {
+                            icdv.cred_account.clone()
+                        }
+                        crate::id::types::AccountCredentialWithoutProofs::Normal {
+                            ref cdv,
+                            ..
+                        } => cdv.cred_key_info.clone(),
+                    };
+                    (*idx, key)
+                })
+                .collect(),
+            threshold: value.account_threshold,
+        }
+    }
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// The state of consensus parameters, and allowed participants (i.e., bakers).
