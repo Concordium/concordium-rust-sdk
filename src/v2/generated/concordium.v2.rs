@@ -4199,8 +4199,9 @@ pub struct Signature {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
-/// Wrapper for a map from indexes to signatures.
-/// Needed because protobuf doesn't allow nested maps directly.
+/// A signature on an update instruction.
+/// The type `UpdateKeysIndex` is not used directly, as messages cannot be keys
+/// in maps.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SignatureMap {
@@ -4360,15 +4361,6 @@ pub struct AccountTransaction {
     pub header:    ::core::option::Option<AccountTransactionHeader>,
     #[prost(message, optional, tag = "3")]
     pub payload:   ::core::option::Option<AccountTransactionPayload>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct UpdateInstructionSignature {
-    /// A map from `UpdateKeysIndex` to `Signature`.
-    /// The type `UpdateKeysIndex`is not used directly, as messages cannot be
-    /// keys in maps.
-    #[prost(map = "uint32, message", tag = "1")]
-    pub signatures: ::std::collections::HashMap<u32, Signature>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -5564,6 +5556,7 @@ pub enum ProtocolVersion {
     ProtocolVersion4 = 3,
     ProtocolVersion5 = 4,
     ProtocolVersion6 = 5,
+    ProtocolVersion7 = 6,
 }
 impl ProtocolVersion {
     /// String value of the enum field names used in the ProtoBuf definition.
@@ -5579,6 +5572,7 @@ impl ProtocolVersion {
             ProtocolVersion::ProtocolVersion4 => "PROTOCOL_VERSION_4",
             ProtocolVersion::ProtocolVersion5 => "PROTOCOL_VERSION_5",
             ProtocolVersion::ProtocolVersion6 => "PROTOCOL_VERSION_6",
+            ProtocolVersion::ProtocolVersion7 => "PROTOCOL_VERSION_7",
         }
     }
 
@@ -5591,6 +5585,7 @@ impl ProtocolVersion {
             "PROTOCOL_VERSION_4" => Some(Self::ProtocolVersion4),
             "PROTOCOL_VERSION_5" => Some(Self::ProtocolVersion5),
             "PROTOCOL_VERSION_6" => Some(Self::ProtocolVersion6),
+            "PROTOCOL_VERSION_7" => Some(Self::ProtocolVersion7),
             _ => None,
         }
     }
