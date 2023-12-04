@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+- Add a `From<&AccountInfo>` instance for `AccountAccessStructure` to ease verification of signatures using `GetAccountInfo` response.
+- Add a `get_finalized_block_item` method to the `Client` to retrieve a finalized block item from the node.
 - Remove the V1 API.
 - Add `Display` implementation to `BlockIdentifier`.
 - Add `Display` and `FromStr` implementations for `AccountIdentifier`.
