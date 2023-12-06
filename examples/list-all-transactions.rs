@@ -4,10 +4,12 @@ use anyhow::Context;
 use chrono::Utc;
 use clap::AppSettings;
 use concordium_rust_sdk::{
+    indexer::{AccountTransactionIndexer, Indexer, TraverseConfig},
     types::{
-        AbsoluteBlockHeight, AccountTransactionEffects, BlockItemSummaryDetails, TransactionType,
+        queries::BlockInfo, AbsoluteBlockHeight, AccountTransactionEffects, BlockItemSummary,
+        BlockItemSummaryDetails, BlockSummary, TransactionType,
     },
-    v2,
+    v2::{self, FinalizedBlockInfo, QueryResult},
 };
 use futures::TryStreamExt;
 use std::collections::HashSet;
@@ -26,7 +28,7 @@ struct App {
         help = "How many queries to make in parallel.",
         default_value = "1"
     )]
-    num:      u64,
+    num:      usize,
     #[structopt(long = "from", help = "Starting time. Defaults to genesis time.")]
     from:     Option<chrono::DateTime<chrono::Utc>>,
     #[structopt(long = "to", help = "End time. Defaults to infinity.")]
@@ -57,12 +59,10 @@ async fn main() -> anyhow::Result<()> {
         .collect::<anyhow::Result<HashSet<TransactionType>>>()
         .context("Could not read transaction types.")?;
 
-    let mut client = v2::Client::new(app.endpoint).await?;
-
-    let _cs = client.get_consensus_info().await?;
+    let mut client = v2::Client::new(app.endpoint.clone()).await?;
 
     // Find the block to start at.
-    let mut h = if let Some(start_time) = app.from {
+    let h = if let Some(start_time) = app.from {
         let start = client
             .find_first_finalized_block_no_earlier_than(.., start_time)
             .await?;
@@ -71,75 +71,36 @@ async fn main() -> anyhow::Result<()> {
         AbsoluteBlockHeight::from(0u64)
     };
     // Query blocks by increasing height.
-    let mut block_stream = client.get_finalized_blocks_from(h).await?;
-    loop {
-        let Ok((error, chunk)) = block_stream
-            .next_chunk_timeout(app.num as usize, std::time::Duration::from_millis(500))
-            .await
-        else {
-            // if we failed and end time is not yet here, then wait a bit
-            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-            continue;
-        };
-        let mut handles = Vec::with_capacity(app.num as usize);
-        for block in chunk {
-            let mut cc = client.clone();
-            handles.push(tokio::spawn(async move {
-                let bi = cc
-                    .get_block_info(block.block_hash)
-                    .await
-                    .context("Block info.")?
-                    .response;
-                if bi.transaction_count != 0 {
-                    let summary = cc
-                        .get_block_transaction_events(block.block_hash)
-                        .await
-                        .context("Block summary.")?
-                        .response
-                        .try_collect::<Vec<_>>()
-                        .await?;
-                    Ok((bi, Some(summary)))
-                } else {
-                    Ok::<_, anyhow::Error>((bi, None))
-                }
-            }))
-        }
-        for res in futures::future::join_all(handles).await {
-            let (bi, summary) = res??;
-            if let Some(end) = app.to.as_ref() {
-                if end <= &bi.block_slot_time {
-                    return Ok(());
-                }
-            }
-            h = h.next();
-            if let Some(summary) = summary {
-                for bisummary in summary {
-                    if let BlockItemSummaryDetails::AccountTransaction(at) = &bisummary.details {
-                        if types.is_empty()
-                            || at
-                                .transaction_type()
-                                .map_or(false, |tt| types.contains(&tt))
-                        {
-                            let is_success =
-                                !matches!(&at.effects, AccountTransactionEffects::None { .. });
-                            let type_string = at
-                                .transaction_type()
-                                .map_or_else(|| "N/A".into(), |tt| tt.to_string());
-                            println!(
-                                "{}, {}, {}, {}, {}",
-                                bi.block_slot_time,
-                                bi.block_hash,
-                                bisummary.hash,
-                                is_success,
-                                type_string
-                            )
-                        }
-                    }
-                }
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(10);
+    tokio::spawn(
+        TraverseConfig::new_single(app.endpoint, h)
+            .set_max_parallel(app.num)
+            .traverse(AccountTransactionIndexer, sender),
+    );
+    while let Some((bi, summary)) = receiver.recv().await {
+        if let Some(end) = app.to.as_ref() {
+            if end <= &bi.block_slot_time {
+                return Ok(());
             }
         }
-        if error {
-            anyhow::bail!("Finalized blocks vanished.")
+        for bisummary in summary {
+            if let BlockItemSummaryDetails::AccountTransaction(at) = &bisummary.details {
+                if types.is_empty()
+                    || at
+                        .transaction_type()
+                        .map_or(false, |tt| types.contains(&tt))
+                {
+                    let is_success = !matches!(&at.effects, AccountTransactionEffects::None { .. });
+                    let type_string = at
+                        .transaction_type()
+                        .map_or_else(|| "N/A".into(), |tt| tt.to_string());
+                    println!(
+                        "{}, {}, {}, {}, {}",
+                        bi.block_slot_time, bi.block_hash, bisummary.hash, is_success, type_string
+                    )
+                }
+            }
         }
     }
+    Ok(())
 }
