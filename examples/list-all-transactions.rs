@@ -4,14 +4,12 @@ use anyhow::Context;
 use chrono::Utc;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    indexer::{AccountTransactionIndexer, Indexer, TraverseConfig},
+    indexer::{AccountTransactionIndexer, TraverseConfig},
     types::{
-        queries::BlockInfo, AbsoluteBlockHeight, AccountTransactionEffects, BlockItemSummary,
-        BlockItemSummaryDetails, BlockSummary, TransactionType,
+        AbsoluteBlockHeight, AccountTransactionEffects, BlockItemSummaryDetails, TransactionType,
     },
-    v2::{self, FinalizedBlockInfo, QueryResult},
+    v2,
 };
-use futures::TryStreamExt;
 use std::collections::HashSet;
 use structopt::StructOpt;
 
