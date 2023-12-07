@@ -4,7 +4,7 @@ use anyhow::Context;
 use chrono::Utc;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    indexer::{AccountTransactionIndexer, TraverseConfig},
+    indexer::{TransactionIndexer, TraverseConfig},
     types::{
         AbsoluteBlockHeight, AccountTransactionEffects, BlockItemSummaryDetails, TransactionType,
     },
@@ -73,7 +73,7 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(
         TraverseConfig::new_single(app.endpoint, h)
             .set_max_parallel(app.num)
-            .traverse(AccountTransactionIndexer, sender),
+            .traverse(TransactionIndexer, sender),
     );
     while let Some((bi, summary)) = receiver.recv().await {
         if let Some(end) = app.to.as_ref() {

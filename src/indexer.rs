@@ -355,17 +355,17 @@ impl TraverseConfig {
     }
 }
 
-/// An indexer that retrieves account transaction outcomes.
+/// An indexer that retrieves all transaction outcomes.
 ///
 /// The [`on_connect`](Indexer::on_connect) and
 /// [`on_failure`](Indexer::on_failure) methods of the [`Indexer`] trait only
 /// log the events on `info` and `warn` levels, respectively, using the
 /// [`tracing`](https://docs.rs/tracing/latest/tracing/) crate. The [target](https://docs.rs/tracing/latest/tracing/struct.Metadata.html#method.target)
 /// of the log is `ccd_indexer` which may be used to filter the logs.
-pub struct AccountTransactionIndexer;
+pub struct TransactionIndexer;
 
 #[async_trait]
-impl Indexer for AccountTransactionIndexer {
+impl Indexer for TransactionIndexer {
     type Context = ();
     type Data = (BlockInfo, Vec<BlockItemSummary>);
 
