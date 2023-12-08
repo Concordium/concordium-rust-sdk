@@ -10,6 +10,8 @@
   semantics with respect to time and is much clearer.a
 - Make the `Client::new` method slightly more general by accepting a
   `TryInto<Endpoint>`. This allows passing URLs as strings directly.
+- Add a new `indexer` module that provides boilerplate for robustly traversing
+  the chain.
 
 ## 3.2.0
 
