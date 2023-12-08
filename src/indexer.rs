@@ -8,8 +8,7 @@ use crate::{
         execution_tree, queries::BlockInfo, AccountTransactionEffects, BlockItemSummary,
         BlockItemSummaryDetails, ExecutionTree,
     },
-    v2,
-    v2::{FinalizedBlockInfo, QueryResult},
+    v2::{self, FinalizedBlockInfo, QueryError, QueryResult},
 };
 use concordium_base::{
     base::{AbsoluteBlockHeight, Energy},
@@ -22,6 +21,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     time::Duration,
 };
+use tokio::time::error::Elapsed;
 pub use tonic::async_trait;
 
 /// Configuration for an indexer.
@@ -31,6 +31,18 @@ pub struct TraverseConfig {
     max_behind:      std::time::Duration,
     wait_after_fail: std::time::Duration,
     start_height:    AbsoluteBlockHeight,
+}
+
+#[derive(Debug, thiserror::Error)]
+/// An error encountered during chain traversal and passed to the
+/// [`Indexer`].
+pub enum TraverseError {
+    #[error("Failed to connect: {0}")]
+    Connect(#[from] tonic::transport::Error),
+    #[error("Failed to query: {0}")]
+    Query(#[from] QueryError),
+    #[error("Timed out waiting for finalized blocks.")]
+    Elapsed(#[from] Elapsed),
 }
 
 #[async_trait]
@@ -76,13 +88,12 @@ pub struct TraverseConfig {
 ///         &mut self,
 ///         ep: v2::Endpoint,
 ///         successive_failures: u64,
-///         err: String,
+///         err: TraverseError,
 ///     ) -> bool {
 ///         unimplemented!("Implement me.")
 ///     }
 /// }
 /// ```
-
 pub trait Indexer {
     /// The data that is retrieved upon connecting to the endpoint and supplied
     /// to each call of [`on_finalized`](Self::on_finalized).
@@ -117,13 +128,11 @@ pub trait Indexer {
     /// The number of successive failures without progress is passed to the
     /// method which should return whether to stop indexing ([`true`]) or not
     /// ([`false`]).
-    ///
-    /// The `err` passed to this method will contain a description of the error.
     async fn on_failure(
         &mut self,
         endpoint: v2::Endpoint,
         successive_failures: u64,
-        err: String,
+        err: TraverseError,
     ) -> bool;
 }
 
@@ -233,11 +242,7 @@ impl TraverseConfig {
                 Err(e) => {
                     successive_failures += 1;
                     let should_stop = indexer
-                        .on_failure(
-                            node_ep,
-                            successive_failures + 1,
-                            format!("Failed to connect to node due to: {e}"),
-                        )
+                        .on_failure(node_ep, successive_failures, e.into())
                         .await;
                     if should_stop {
                         return Ok(());
@@ -247,16 +252,12 @@ impl TraverseConfig {
                 }
             };
 
-            let a = match indexer.on_connect(node_ep.clone(), &mut node).await {
+            let context = match indexer.on_connect(node_ep.clone(), &mut node).await {
                 Ok(a) => a,
                 Err(e) => {
                     successive_failures += 1;
                     let should_stop = indexer
-                        .on_failure(
-                            node_ep,
-                            successive_failures + 1,
-                            format!("Failed to run on_connect handler due to: {e}"),
-                        )
+                        .on_failure(node_ep, successive_failures, e.into())
                         .await;
                     if should_stop {
                         return Ok(());
@@ -270,11 +271,7 @@ impl TraverseConfig {
                 Err(e) => {
                     successive_failures += 1;
                     let should_stop = indexer
-                        .on_failure(
-                            node_ep,
-                            successive_failures + 1,
-                            format!("Failed to get finalized blocks due to: {e}"),
-                        )
+                        .on_failure(node_ep, successive_failures, e.into())
                         .await;
                     if should_stop {
                         return Ok(());
@@ -294,11 +291,7 @@ impl TraverseConfig {
                     Err(e) => {
                         successive_failures += 1;
                         let should_stop = indexer
-                            .on_failure(
-                                node_ep,
-                                successive_failures + 1,
-                                format!("Failed to query next finalized blocks with due to: {e}",),
-                            )
+                            .on_failure(node_ep, successive_failures, e.into())
                             .await;
                         if should_stop {
                             return Ok(());
@@ -310,7 +303,7 @@ impl TraverseConfig {
 
                 let mut futs = FuturesOrdered::new();
                 for fb in chunks {
-                    futs.push_back(indexer.on_finalized(node.clone(), &a, fb));
+                    futs.push_back(indexer.on_finalized(node.clone(), &context, fb));
                 }
                 while let Some(data) = futs.next().await {
                     let data = match data {
@@ -319,11 +312,7 @@ impl TraverseConfig {
                             drop(futs);
                             successive_failures += 1;
                             let should_stop = indexer
-                                .on_failure(
-                                    node_ep,
-                                    successive_failures + 1,
-                                    format!("Failed to query due to: {e}"),
-                                )
+                                .on_failure(node_ep, successive_failures, e.into())
                                 .await;
                             if should_stop {
                                 return Ok(());
@@ -406,7 +395,7 @@ impl Indexer for TransactionIndexer {
         &mut self,
         endpoint: v2::Endpoint,
         successive_failures: u64,
-        err: String,
+        err: TraverseError,
     ) -> bool {
         tracing::warn!(
             target = "ccd_indexer",
@@ -516,7 +505,7 @@ impl Indexer for ContractUpdateIndexer {
         &mut self,
         endpoint: v2::Endpoint,
         successive_failures: u64,
-        err: String,
+        err: TraverseError,
     ) -> bool {
         tracing::warn!(
             target = "ccd_indexer",
@@ -611,7 +600,7 @@ impl Indexer for AffectedContractIndexer {
         &mut self,
         endpoint: v2::Endpoint,
         successive_failures: u64,
-        err: String,
+        err: TraverseError,
     ) -> bool {
         tracing::warn!(
             target = "ccd_indexer",
