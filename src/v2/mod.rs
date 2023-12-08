@@ -1234,15 +1234,15 @@ impl Client {
     /// use concordium_rust_sdk::{endpoints::Endpoint, v2::Client};
     /// use std::str::FromStr;
     ///
-    /// let node_endpoint = Endpoint::from_str("http://localhost:20001")?;
-    /// let mut client = Client::new(node_endpoint).await?;
+    /// let mut client = Client::new("http://localhost:20001").await?;
     ///
     /// # Ok::<(), anyhow::Error>(())
     /// # });
     /// ```
-    pub async fn new<E: Into<tonic::transport::Endpoint>>(
-        endpoint: E,
-    ) -> Result<Self, tonic::transport::Error> {
+    pub async fn new<E>(endpoint: E) -> Result<Self, tonic::transport::Error>
+    where
+        E: TryInto<tonic::transport::Endpoint>,
+        E::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>>, {
         let client = generated::queries_client::QueriesClient::connect(endpoint).await?;
         Ok(Self { client })
     }

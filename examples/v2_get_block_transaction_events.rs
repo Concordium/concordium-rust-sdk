@@ -56,8 +56,7 @@ async fn main() -> anyhow::Result<()> {
                     )
                 }
             }
-        } else {
-        };
+        }
     }
     Ok(())
 }
