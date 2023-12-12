@@ -105,7 +105,6 @@ async fn main() -> anyhow::Result<()> {
         move |acc| {
             let mut client = closure_client.clone();
             async move {
-                let block = block;
                 let info = client.get_account_info(&acc.into(), &block).await?.response;
                 let additional_stake = info
                     .account_stake
