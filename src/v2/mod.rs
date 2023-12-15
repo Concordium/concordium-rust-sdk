@@ -12,8 +12,8 @@ use crate::{
             ContractContext, InstanceInfo, InvokeContractResult, ModuleReference, WasmModule,
         },
         transactions::{self, InitContractPayload, UpdateContractPayload, UpdateInstruction},
-        AbsoluteBlockHeight, AccountInfo, CredentialRegistrationID, Energy, Memo, Nonce,
-        RegisteredData, SpecialTransactionOutcome, TransactionStatus, UpdateSequenceNumber,
+        AbsoluteBlockHeight, AccountInfo, BlockItemSummary, CredentialRegistrationID, Energy, Memo,
+        Nonce, RegisteredData, SpecialTransactionOutcome, TransactionStatus, UpdateSequenceNumber,
     },
 };
 use concordium_base::{
@@ -39,7 +39,7 @@ use concordium_base::{
     },
 };
 pub use endpoints::{QueryError, QueryResult, RPCError, RPCResult};
-use futures::{Stream, StreamExt};
+use futures::{Stream, StreamExt, TryStreamExt};
 pub use http::uri::Scheme;
 use num::{BigUint, ToPrimitive};
 use std::{collections::HashMap, num::ParseIntError, str::FromStr};
@@ -1234,15 +1234,15 @@ impl Client {
     /// use concordium_rust_sdk::{endpoints::Endpoint, v2::Client};
     /// use std::str::FromStr;
     ///
-    /// let node_endpoint = Endpoint::from_str("http://localhost:20001")?;
-    /// let mut client = Client::new(node_endpoint).await?;
+    /// let mut client = Client::new("http://localhost:20001").await?;
     ///
     /// # Ok::<(), anyhow::Error>(())
     /// # });
     /// ```
-    pub async fn new<E: Into<tonic::transport::Endpoint>>(
-        endpoint: E,
-    ) -> Result<Self, tonic::transport::Error> {
+    pub async fn new<E>(endpoint: E) -> Result<Self, tonic::transport::Error>
+    where
+        E: TryInto<tonic::transport::Endpoint>,
+        E::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>>, {
         let client = generated::queries_client::QueriesClient::connect(endpoint).await?;
         Ok(Self { client })
     }
@@ -2102,6 +2102,35 @@ impl Client {
             block_hash,
             response: stream,
         })
+    }
+
+    /// Get the specific **block item** if it is finalized.
+    /// If the transaction does not exist in a finalized block
+    /// [`QueryError::NotFound`] is returned.
+    ///
+    /// **Note that this is not an efficient method** since the node API does
+    /// not allow for retrieving just the specific block item, but rather
+    /// requires retrieving the full block. Use it for testing and debugging
+    /// only.
+    ///
+    /// The return value is a triple of the [`BlockItem`], the hash of the block
+    /// in which it is finalized, and the outcome in the form of
+    /// [`BlockItemSummary`].
+    pub async fn get_finalized_block_item(
+        &mut self,
+        th: TransactionHash,
+    ) -> endpoints::QueryResult<(BlockItem<EncodedPayload>, BlockHash, BlockItemSummary)> {
+        let status = self.get_block_item_status(&th).await?;
+        let Some((bh, status)) = status.is_finalized() else {
+            return Err(QueryError::NotFound);
+        };
+        let mut response = self.get_block_items(bh).await?.response;
+        while let Some(tx) = response.try_next().await? {
+            if tx.hash() == th {
+                return Ok((tx, *bh, status.clone()));
+            }
+        }
+        Err(endpoints::QueryError::NotFound)
     }
 
     /// Shut down the node.

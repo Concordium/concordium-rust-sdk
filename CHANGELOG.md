@@ -1,11 +1,17 @@
 ## Unreleased changes
 
+- Add a `From<&AccountInfo>` instance for `AccountAccessStructure` to ease verification of signatures using `GetAccountInfo` response.
+- Add a `get_finalized_block_item` method to the `Client` to retrieve a finalized block item from the node.
 - Remove the V1 API.
 - Add `Display` implementation to `BlockIdentifier`.
 - Add `Display` and `FromStr` implementations for `AccountIdentifier`.
 - Rename `find_first_finalized_block_no_later_than` into
   `find_first_finalized_block_no_earlier_than` since that correctly reflects its
   semantics with respect to time and is much clearer.
+- Make the `Client::new` method slightly more general by accepting a
+  `TryInto<Endpoint>`. This allows passing URLs as strings directly.
+- Add a new `indexer` module that provides boilerplate for robustly traversing
+  the chain.
 - Support protocol version 7.
 
 ## 3.2.0

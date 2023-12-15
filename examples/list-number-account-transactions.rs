@@ -6,12 +6,13 @@
 //! per day.
 //!
 //! The script also outputs progress on stderr before printing the final result.
-use std::collections::BTreeMap;
-
 use clap::AppSettings;
 use concordium_base::contracts_common::AccountAddress;
-use concordium_rust_sdk::{types::AbsoluteBlockHeight, v2};
-use futures::{stream::FuturesOrdered, StreamExt, TryStreamExt};
+use concordium_rust_sdk::{
+    indexer::{TransactionIndexer, TraverseConfig},
+    v2,
+};
+use std::collections::BTreeMap;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -53,9 +54,7 @@ impl PartialEq for Aliased {
 }
 
 impl PartialOrd for Aliased {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.0 .0[..29].partial_cmp(&other.0 .0[..29])
-    }
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { Some(self.cmp(other)) }
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -66,7 +65,7 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
-    let mut client = v2::Client::new(app.endpoint).await?;
+    let mut client = v2::Client::new(app.endpoint.clone()).await?;
 
     let consensus_info = client.get_consensus_info().await?;
 
@@ -80,59 +79,39 @@ async fn main() -> anyhow::Result<()> {
         )
         .await?;
 
-    let heights =
-        u64::from(start_block.block_height)..=u64::from(consensus_info.last_finalized_block_height);
-
-    let mut blocks = heights.map(|n| {
-        let mut client = client.clone();
-        async move {
-            let bi = client.get_block_info(&AbsoluteBlockHeight::from(n)).await?;
-            let v = client
-                .get_block_transaction_events(bi.block_hash)
-                .await?
-                .response
-                .map_ok(|e| e.sender_account())
-                .try_collect::<Vec<_>>()
-                .await;
-            Ok::<_, anyhow::Error>(v.map(|r| (bi.response, r)))
-        }
-    });
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(10);
+    let cancel_handle = tokio::spawn(
+        TraverseConfig::new_single(app.endpoint, start_block.block_height)
+            .set_max_parallel(app.num)
+            .traverse(TransactionIndexer, sender),
+    );
 
     let mut max_days = 0;
-    while let Some(n) = blocks.next() {
-        let mut chunk = Vec::with_capacity(app.num);
-        chunk.push(n);
-        for _ in 1..app.num {
-            if let Some(n) = blocks.next() {
-                chunk.push(n);
-            } else {
-                break;
-            }
+    while let Some((bi, r)) = receiver.recv().await {
+        if bi.block_height > consensus_info.last_finalized_block_height {
+            break;
         }
-        let mut stream = chunk.into_iter().collect::<FuturesOrdered<_>>();
-        while let Some((bi, r)) = stream.next().await.transpose()?.transpose()? {
-            eprintln!(
-                "Processing block {} at height {}.",
-                bi.block_hash, bi.block_height
-            );
-            let day = bi
-                .block_slot_time
-                .signed_duration_since(start_time)
-                .num_seconds()
-                / app.interval as i64;
-            max_days = std::cmp::max(day as usize, max_days);
-            for acc in r.into_iter().flatten() {
-                if let Some(n) = account_table
-                    .entry(Aliased(acc))
-                    .or_insert_with(|| vec![0u64; day as usize + 1])
-                    .last_mut()
-                {
-                    *n += 1;
-                }
+        eprintln!(
+            "Processing block {} at height {}.",
+            bi.block_hash, bi.block_height
+        );
+        let day = bi
+            .block_slot_time
+            .signed_duration_since(start_time)
+            .num_seconds()
+            / app.interval as i64;
+        max_days = std::cmp::max(day as usize, max_days);
+        for acc in r.into_iter().filter_map(|x| x.sender_account()) {
+            if let Some(n) = account_table
+                .entry(Aliased(acc))
+                .or_insert_with(|| vec![0u64; day as usize + 1])
+                .last_mut()
+            {
+                *n += 1;
             }
-            eprintln!("Processed block.");
         }
     }
+    cancel_handle.abort();
     for (acc, mut values) in account_table {
         values.resize(max_days, 0);
         println!(

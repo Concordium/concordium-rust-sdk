@@ -21,7 +21,7 @@ use concordium_base::{
         Buffer, Deserial, Get, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
         Versioned,
     },
-    contracts_common::Duration,
+    contracts_common::{Duration, EntrypointName, Parameter},
     encrypted_transfers,
     encrypted_transfers::types::{
         AggregatedDecryptedAmount, EncryptedAmountTransferData, SecToPubAmountTransferData,
@@ -327,6 +327,30 @@ pub struct AccountInfo {
     pub account_stake:            Option<AccountStakingInfo>,
     /// Canonical address of the account.
     pub account_address:          AccountAddress,
+}
+
+impl From<&AccountInfo> for AccountAccessStructure {
+    fn from(value: &AccountInfo) -> Self {
+        Self {
+            keys:      value
+                .account_credentials
+                .iter()
+                .map(|(idx, v)| {
+                    let key = match v.value {
+                        crate::id::types::AccountCredentialWithoutProofs::Initial { ref icdv } => {
+                            icdv.cred_account.clone()
+                        }
+                        crate::id::types::AccountCredentialWithoutProofs::Normal {
+                            ref cdv,
+                            ..
+                        } => cdv.cred_key_info.clone(),
+                    };
+                    (*idx, key)
+                })
+                .collect(),
+            threshold: value.account_threshold,
+        }
+    }
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
@@ -1244,6 +1268,161 @@ pub enum ExecutionTree {
     V0(ExecutionTreeV0),
     /// The top-level call was a V1 contract instance update.
     V1(ExecutionTreeV1),
+}
+
+impl ExecutionTree {
+    /// Return the name of the top-level entrypoint that was invoked.
+    pub fn entrypoint(&self) -> EntrypointName {
+        match self {
+            ExecutionTree::V0(v0) => v0
+                .top_level
+                .receive_name
+                .as_receive_name()
+                .entrypoint_name(),
+            ExecutionTree::V1(v1) => v1.receive_name.as_receive_name().entrypoint_name(),
+        }
+    }
+
+    /// Return the name of the top-level contract that was invoked.
+    pub fn address(&self) -> ContractAddress {
+        match self {
+            ExecutionTree::V0(v0) => v0.top_level.address,
+            ExecutionTree::V1(v1) => v1.address,
+        }
+    }
+
+    /// Return parameter to the top-level contract call.
+    pub fn parameter(&self) -> Parameter {
+        match self {
+            ExecutionTree::V0(v0) => v0.top_level.message.as_parameter(),
+            ExecutionTree::V1(v1) => v1.message.as_parameter(),
+        }
+    }
+
+    /// Return a set of contract addresses that appear in this execution
+    /// tree, together with a set of [receive names](OwnedReceiveName) that
+    /// were called for that contract address.
+    pub fn affected_addresses(&self) -> BTreeMap<ContractAddress, BTreeSet<OwnedReceiveName>> {
+        let mut addresses = BTreeMap::<ContractAddress, BTreeSet<_>>::new();
+        let mut todo = vec![self];
+        while let Some(head) = todo.pop() {
+            match head {
+                ExecutionTree::V0(v0) => {
+                    addresses
+                        .entry(v0.top_level.address)
+                        .or_default()
+                        .insert(v0.top_level.receive_name.clone());
+                    for rest in &v0.rest {
+                        if let TraceV0::Call(call) = rest {
+                            todo.push(call);
+                        }
+                    }
+                }
+                ExecutionTree::V1(v1) => {
+                    addresses
+                        .entry(v1.address)
+                        .or_default()
+                        .insert(v1.receive_name.clone());
+                    for event in &v1.events {
+                        if let TraceV1::Call { call } = event {
+                            todo.push(call);
+                        }
+                    }
+                }
+            }
+        }
+        addresses
+    }
+
+    /// Get an iterator over the events logged by the contracts that were called
+    /// as part of the execution tree. The iterator retuns triples of the
+    /// `(address, entrypoint, logs)` where the meaning is that the contract
+    /// at the given address, while executing the entrypoint `entrypoint`
+    /// produced the `logs`. Note that the `logs` might be an empty slice.
+    pub fn events(
+        &self,
+    ) -> impl Iterator<
+        Item = (
+            ContractAddress,
+            EntrypointName<'_>,
+            &[smart_contracts::ContractEvent],
+        ),
+    > + '_ {
+        // An auxiliary type used to store the list of next items produced by
+        // the [`EventsIterator`]
+        enum LogsIteratorNext<'a> {
+            Tree(&'a ExecutionTree),
+            Events(
+                (
+                    ContractAddress,
+                    EntrypointName<'a>,
+                    &'a [smart_contracts::ContractEvent],
+                ),
+            ),
+        }
+
+        struct LogsIterator<'a> {
+            // A stack of next items to process.
+            next: Vec<LogsIteratorNext<'a>>,
+        }
+
+        impl<'a> Iterator for LogsIterator<'a> {
+            type Item = (
+                ContractAddress,
+                EntrypointName<'a>,
+                &'a [smart_contracts::ContractEvent],
+            );
+
+            fn next(&mut self) -> Option<Self::Item> {
+                while let Some(next) = self.next.pop() {
+                    match next {
+                        LogsIteratorNext::Events(r) => return Some(r),
+                        LogsIteratorNext::Tree(next) => match next {
+                            ExecutionTree::V0(v0) => {
+                                let rv = (
+                                    v0.top_level.address,
+                                    v0.top_level
+                                        .receive_name
+                                        .as_receive_name()
+                                        .entrypoint_name(),
+                                    &v0.top_level.events[..],
+                                );
+                                for rest in v0.rest.iter().rev() {
+                                    if let TraceV0::Call(call) = rest {
+                                        self.next.push(LogsIteratorNext::Tree(call));
+                                    }
+                                }
+                                return Some(rv);
+                            }
+                            ExecutionTree::V1(v1) => {
+                                for event in v1.events.iter().rev() {
+                                    match event {
+                                        TraceV1::Events { events } => {
+                                            self.next.push(LogsIteratorNext::Events((
+                                                v1.address,
+                                                v1.receive_name.as_receive_name().entrypoint_name(),
+                                                events,
+                                            )))
+                                        }
+                                        TraceV1::Call { call } => {
+                                            self.next.push(LogsIteratorNext::Tree(call));
+                                        }
+                                        TraceV1::Transfer { .. } => (),
+                                        TraceV1::Upgrade { .. } => (),
+                                    }
+                                }
+                            }
+                        },
+                    }
+                }
+                None
+            }
+        }
+
+        LogsIterator {
+            next: vec![LogsIteratorNext::Tree(self)],
+        }
+    }
 }
 
 /// Convert the trace elements into an [`ExecutionTree`].

@@ -43,13 +43,13 @@ async fn main() -> anyhow::Result<()> {
     );
     ensure!(
         banned_peers
-            .get(0)
+            .first()
             .context("Expected a banned peer here")?
             .0
             == ip_to_ban,
         "Unexpected peer in the ban list"
     );
-    let banned_peer_0 = banned_peers.get(0).context("Expected a peer")?;
+    let banned_peer_0 = banned_peers.first().context("Expected a peer")?;
     client.unban_peer(banned_peer_0).await?;
     ensure!(
         client.get_banned_peers().await?.is_empty(),

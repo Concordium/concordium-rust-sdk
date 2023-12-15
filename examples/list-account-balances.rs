@@ -148,7 +148,6 @@ async fn main() -> anyhow::Result<()> {
                 is_baker,
                 acc_type,
             };
-            if row.is_baker {}
             acc_balances.push(row);
         }
     }
