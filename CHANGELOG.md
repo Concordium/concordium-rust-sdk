@@ -13,6 +13,7 @@
 - Add a new `indexer` module that provides boilerplate for robustly traversing
   the chain.
 - Support protocol version 7.
+- Support for smart contract debugging when running locally.
 
 ## 3.2.0
 
