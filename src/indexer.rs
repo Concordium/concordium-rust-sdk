@@ -6,7 +6,7 @@
 use crate::{
     types::{
         execution_tree, queries::BlockInfo, AccountTransactionEffects, BlockItemSummary,
-        BlockItemSummaryDetails, ExecutionTree,
+        BlockItemSummaryDetails, ExecutionTree, SpecialTransactionOutcome,
     },
     v2::{self, FinalizedBlockInfo, QueryError, QueryResult},
 };
@@ -593,6 +593,80 @@ impl Indexer for AffectedContractIndexer {
             Ok((bi, summary))
         } else {
             Ok((bi, Vec::new()))
+        }
+    }
+
+    async fn on_failure(
+        &mut self,
+        endpoint: v2::Endpoint,
+        successive_failures: u64,
+        err: TraverseError,
+    ) -> bool {
+        tracing::warn!(
+            target = "ccd_indexer",
+            successive_failures,
+            "Failed when querying endpoint {}: {err}",
+            endpoint.uri()
+        );
+        false
+    }
+}
+
+/// An indexer that retrieves all events in a block, transaction outcomes
+/// and special transaction outcomes.
+///
+/// The [`on_connect`](Indexer::on_connect) and
+/// [`on_failure`](Indexer::on_failure) methods of the [`Indexer`] trait only
+/// log the events on `info` and `warn` levels, respectively, using the
+/// [`tracing`](https://docs.rs/tracing/latest/tracing/) crate. The [target](https://docs.rs/tracing/latest/tracing/struct.Metadata.html#method.target)
+/// of the log is `ccd_indexer` which may be used to filter the logs.
+pub struct BlockEventsIndexer;
+
+#[async_trait]
+impl Indexer for BlockEventsIndexer {
+    type Context = ();
+    type Data = (
+        BlockInfo,
+        Vec<BlockItemSummary>,
+        Vec<SpecialTransactionOutcome>,
+    );
+
+    async fn on_connect<'a>(
+        &mut self,
+        endpoint: v2::Endpoint,
+        _client: &'a mut v2::Client,
+    ) -> QueryResult<()> {
+        tracing::info!(
+            target = "ccd_indexer",
+            "Connected to endpoint {}.",
+            endpoint.uri()
+        );
+        Ok(())
+    }
+
+    async fn on_finalized<'a>(
+        &self,
+        mut client: v2::Client,
+        _ctx: &'a (),
+        fbi: FinalizedBlockInfo,
+    ) -> QueryResult<Self::Data> {
+        let bi = client.get_block_info(fbi.height).await?.response;
+        let special = client
+            .get_block_special_events(fbi.height)
+            .await?
+            .response
+            .try_collect()
+            .await?;
+        if bi.transaction_count != 0 {
+            let summary = client
+                .get_block_transaction_events(fbi.height)
+                .await?
+                .response
+                .try_collect::<Vec<_>>()
+                .await?;
+            Ok((bi, summary, special))
+        } else {
+            Ok((bi, Vec::new(), special))
         }
     }
 
