@@ -15,6 +15,7 @@
 - Support protocol version 7.
 - Support for smart contract debugging when running locally.
 - Remove JSON serialization support of BlockSummary.
+- Add an additional `indexer` to index all transaction outcomes and special events.
 
 ## 3.2.0
 
