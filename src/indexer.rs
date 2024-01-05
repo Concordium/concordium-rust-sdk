@@ -641,17 +641,22 @@ impl Indexer for BlockEventsIndexer {
 
     async fn on_finalized<'a>(
         &self,
-        mut client: v2::Client,
+        client: v2::Client,
         ctx: &'a (),
         fbi: FinalizedBlockInfo,
     ) -> QueryResult<Self::Data> {
-        let (bi, summary) = TransactionIndexer.on_finalized(client, ctx, fbi).await?;
-        let special = client
-            .get_block_special_events(fbi.height)
-            .await?
-            .response
-            .try_collect()
-            .await?;
+        let mut special_client = client.clone();
+        let special = async move {
+            let events = special_client
+                .get_block_special_events(fbi.height)
+                .await?
+                .response
+                .try_collect()
+                .await?;
+            Ok(events)
+        };
+        let ((bi, summary), special) =
+            futures::try_join!(TransactionIndexer.on_finalized(client, ctx, fbi), special)?;
         Ok((bi, summary, special))
     }
 
