@@ -634,40 +634,25 @@ impl Indexer for BlockEventsIndexer {
     async fn on_connect<'a>(
         &mut self,
         endpoint: v2::Endpoint,
-        _client: &'a mut v2::Client,
+        client: &'a mut v2::Client,
     ) -> QueryResult<()> {
-        tracing::info!(
-            target = "ccd_indexer",
-            "Connected to endpoint {}.",
-            endpoint.uri()
-        );
-        Ok(())
+        TransactionIndexer.on_connect(endpoint, client).await
     }
 
     async fn on_finalized<'a>(
         &self,
         mut client: v2::Client,
-        _ctx: &'a (),
+        ctx: &'a (),
         fbi: FinalizedBlockInfo,
     ) -> QueryResult<Self::Data> {
-        let bi = client.get_block_info(fbi.height).await?.response;
+        let (bi, summary) = TransactionIndexer.on_finalized(client, ctx, fbi).await?;
         let special = client
             .get_block_special_events(fbi.height)
             .await?
             .response
             .try_collect()
             .await?;
-        if bi.transaction_count != 0 {
-            let summary = client
-                .get_block_transaction_events(fbi.height)
-                .await?
-                .response
-                .try_collect::<Vec<_>>()
-                .await?;
-            Ok((bi, summary, special))
-        } else {
-            Ok((bi, Vec::new(), special))
-        }
+        Ok((bi, summary, special))
     }
 
     async fn on_failure(
@@ -676,12 +661,8 @@ impl Indexer for BlockEventsIndexer {
         successive_failures: u64,
         err: TraverseError,
     ) -> bool {
-        tracing::warn!(
-            target = "ccd_indexer",
-            successive_failures,
-            "Failed when querying endpoint {}: {err}",
-            endpoint.uri()
-        );
-        false
+        TransactionIndexer
+            .on_failure(endpoint, successive_failures, err)
+            .await
     }
 }
