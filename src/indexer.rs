@@ -6,7 +6,7 @@
 use crate::{
     types::{
         execution_tree, queries::BlockInfo, AccountTransactionEffects, BlockItemSummary,
-        BlockItemSummaryDetails, ExecutionTree,
+        BlockItemSummaryDetails, ExecutionTree, SpecialTransactionOutcome,
     },
     v2::{self, FinalizedBlockInfo, QueryError, QueryResult},
 };
@@ -609,5 +609,65 @@ impl Indexer for AffectedContractIndexer {
             endpoint.uri()
         );
         false
+    }
+}
+
+/// An indexer that retrieves all events in a block, transaction outcomes
+/// and special transaction outcomes.
+///
+/// The [`on_connect`](Indexer::on_connect) and
+/// [`on_failure`](Indexer::on_failure) methods of the [`Indexer`] trait only
+/// log the events on `info` and `warn` levels, respectively, using the
+/// [`tracing`](https://docs.rs/tracing/latest/tracing/) crate. The [target](https://docs.rs/tracing/latest/tracing/struct.Metadata.html#method.target)
+/// of the log is `ccd_indexer` which may be used to filter the logs.
+pub struct BlockEventsIndexer;
+
+#[async_trait]
+impl Indexer for BlockEventsIndexer {
+    type Context = ();
+    type Data = (
+        BlockInfo,
+        Vec<BlockItemSummary>,
+        Vec<SpecialTransactionOutcome>,
+    );
+
+    async fn on_connect<'a>(
+        &mut self,
+        endpoint: v2::Endpoint,
+        client: &'a mut v2::Client,
+    ) -> QueryResult<()> {
+        TransactionIndexer.on_connect(endpoint, client).await
+    }
+
+    async fn on_finalized<'a>(
+        &self,
+        client: v2::Client,
+        ctx: &'a (),
+        fbi: FinalizedBlockInfo,
+    ) -> QueryResult<Self::Data> {
+        let mut special_client = client.clone();
+        let special = async move {
+            let events = special_client
+                .get_block_special_events(fbi.height)
+                .await?
+                .response
+                .try_collect()
+                .await?;
+            Ok(events)
+        };
+        let ((bi, summary), special) =
+            futures::try_join!(TransactionIndexer.on_finalized(client, ctx, fbi), special)?;
+        Ok((bi, summary, special))
+    }
+
+    async fn on_failure(
+        &mut self,
+        endpoint: v2::Endpoint,
+        successive_failures: u64,
+        err: TraverseError,
+    ) -> bool {
+        TransactionIndexer
+            .on_failure(endpoint, successive_failures, err)
+            .await
     }
 }

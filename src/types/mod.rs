@@ -875,80 +875,22 @@ pub struct BlockSummaryData<Upd> {
     pub finalization_data:     Option<FinalizationSummary>,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
-// serialize as untagged, deserialization is custom, looking at the protocol version.
-#[serde(untagged, try_from = "block_summary_parser::BlockSummaryRaw")]
+#[derive(Debug)]
 /// Summary of transactions, protocol generated transfers, and chain parameters
 /// in a given block.
 pub enum BlockSummary {
-    #[serde(rename_all = "camelCase")]
     V0 {
         /// Protocol version at which this block was baked. This is no more than
-        /// [ProtocolVersion::P3]
+        /// [`ProtocolVersion::P3`]
         protocol_version: ProtocolVersion,
-        #[serde(flatten)]
         data:             BlockSummaryData<Updates<ChainParameterVersion0>>,
     },
-    #[serde(rename_all = "camelCase")]
     V1 {
         /// Protocol version at which this block was baked. This is at least
-        /// [ProtocolVersion::P4]
+        /// [`ProtocolVersion::P4`]
         protocol_version: ProtocolVersion,
-        #[serde(flatten)]
         data:             BlockSummaryData<Updates<ChainParameterVersion1>>,
     },
-}
-
-mod block_summary_parser {
-    #[derive(super::SerdeDeserialize)]
-    #[serde(rename_all = "camelCase")]
-    pub struct BlockSummaryRaw {
-        protocol_version: super::ProtocolVersion,
-        #[serde(flatten)]
-        // parse first into a value
-        data: super::BlockSummaryData<serde_json::Value>,
-    }
-
-    impl std::convert::TryFrom<BlockSummaryRaw> for super::BlockSummary {
-        type Error = anyhow::Error;
-
-        fn try_from(value: BlockSummaryRaw) -> Result<Self, Self::Error> {
-            use super::ProtocolVersion::*;
-            match value.protocol_version {
-                P1 | P2 | P3 => {
-                    let updates: super::Updates<super::ChainParameterVersion0> =
-                        serde_json::from_value(value.data.updates)?;
-                    let data = super::BlockSummaryData {
-                        updates,
-                        transaction_summaries: value.data.transaction_summaries,
-                        special_events: value.data.special_events,
-                        finalization_data: value.data.finalization_data,
-                    };
-                    Ok(Self::V0 {
-                        protocol_version: value.protocol_version,
-                        data,
-                    })
-                }
-                P4 | P5 => {
-                    let updates: super::Updates<super::ChainParameterVersion1> =
-                        serde_json::from_value(value.data.updates)?;
-                    let data = super::BlockSummaryData {
-                        updates,
-                        transaction_summaries: value.data.transaction_summaries,
-                        special_events: value.data.special_events,
-                        finalization_data: value.data.finalization_data,
-                    };
-                    Ok(Self::V1 {
-                        protocol_version: value.protocol_version,
-                        data,
-                    })
-                }
-                P6 | P7 => {
-                    anyhow::bail!("Not yet supported.")
-                }
-            }
-        }
-    }
 }
 
 impl BlockSummary {
