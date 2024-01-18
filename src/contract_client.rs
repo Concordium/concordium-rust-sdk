@@ -394,6 +394,10 @@ impl ContractUpdateBuilder {
         self
     }
 
+    /// Return the amount of [`Energy`] allowed for execution if
+    /// the transaction was sent with the current parameters.
+    pub fn current_energy(&self) -> Energy { self.energy + self.add_energy.unwrap_or(100.into()) }
+
     /// Send the transaction and return its hash.
     pub async fn send(
         mut self,
@@ -424,11 +428,18 @@ impl ContractUpdateBuilder {
     }
 }
 
+/// A handle returned when sending a smart contract update transaction.
+/// This can be used to get the response of the update.
+///
+/// Note that this handle retains a connection to the node. So if it is not
+/// going to be used it should be dropped.
 pub struct ContractUpdateHandle {
     tx_hash: TransactionHash,
     client:  v2::Client,
 }
 
+/// The [`Display`](std::fmt::Display) implementation displays the hash of the
+/// transaction.
 impl std::fmt::Display for ContractUpdateHandle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.tx_hash.fmt(f) }
 }
@@ -444,6 +455,9 @@ pub enum ContractUpdateError {
 }
 
 impl ContractUpdateHandle {
+    /// Extract the hash of the transaction underlying this handle.
+    pub fn hash(&self) -> TransactionHash { self.tx_hash }
+
     /// Wait until the transaction is finalized and return the result.
     /// Note that this can potentially wait indefinitely.
     pub async fn wait_for_finalization(
