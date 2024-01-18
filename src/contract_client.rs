@@ -495,7 +495,7 @@ impl ContractUpdateHandle {
                 mk_error("Expected smart contract update status, but received account creation.")
             }
             crate::types::BlockItemSummaryDetails::Update(_) => mk_error(
-                "Expected smart contract update status, but received chain update creation.",
+                "Expected smart contract update status, but received chain update instruction.",
             ),
         }
     }
