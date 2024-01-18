@@ -16,6 +16,11 @@
 - Support for smart contract debugging when running locally.
 - Remove JSON serialization support of BlockSummary.
 - Add an additional `indexer` to index all transaction outcomes and special events.
+- Make the `energy` field of `ContractContext` optional since it is no longer
+  required by the node.
+- Add `dry_run_update` and `dry_run_update_raw` methods to the `ContractClient`
+  to simulate smart contract updates. The return values of these can be used to
+  immediately sign and send a transaction.
 
 ## 3.2.0
 

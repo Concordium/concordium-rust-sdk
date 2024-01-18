@@ -994,7 +994,7 @@ impl IntoRequest<generated::InvokeInstanceRequest> for (&BlockIdentifier, &Contr
             amount:     Some(context.amount.into()),
             entrypoint: Some(context.method.as_receive_name().into()),
             parameter:  Some(context.parameter.as_ref().into()),
-            energy:     Some(context.energy.into()),
+            energy:     context.energy.map(From::from),
         })
     }
 }

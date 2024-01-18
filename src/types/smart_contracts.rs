@@ -180,10 +180,9 @@ pub struct ContractContext {
     /// And with what parameter.
     #[serde(default)]
     pub parameter: OwnedParameter,
-    /// And what amount of energy to allow for execution. This should be small
-    /// enough so that it can be converted to interpreter energy.
-    #[serde(default = "return_default_invoke_energy")]
-    pub energy:    Energy,
+    /// The energy to allow for execution. If not set the node decides on the
+    /// maximum amount.
+    pub energy:    Option<Energy>,
 }
 
 pub const DEFAULT_INVOKE_ENERGY: Energy = Energy { energy: 10_000_000 };
@@ -195,8 +194,6 @@ impl ContractContext {
     /// - the [`amount`](ContractContext::amount) is set to `0CCD`
     /// - the [`parameter`](ContractContext::parameter) is set to the empty
     ///   parameter
-    /// - the [`energy`](ContractContext::energy) is set to
-    ///   [`DEFAULT_INVOKE_ENERGY`]
     pub fn new(contract: ContractAddress, method: OwnedReceiveName) -> Self {
         Self {
             invoker: None,
@@ -204,7 +201,7 @@ impl ContractContext {
             amount: Amount::zero(),
             method,
             parameter: OwnedParameter::default(),
-            energy: DEFAULT_INVOKE_ENERGY,
+            energy: None,
         }
     }
 
@@ -216,22 +213,21 @@ impl ContractContext {
     /// - `payload` - the update contract payload to derive arguments from.
     pub fn new_from_payload(
         sender: AccountAddress,
-        energy: Energy,
+        energy: impl Into<Option<Energy>>,
         payload: UpdateContractPayload,
     ) -> Self {
         Self {
-            invoker: Some(sender.into()),
-            contract: payload.address,
-            amount: payload.amount,
-            method: payload.receive_name,
+            invoker:   Some(sender.into()),
+            contract:  payload.address,
+            amount:    payload.amount,
+            method:    payload.receive_name,
             parameter: payload.message,
-            energy,
+            energy:    energy.into(),
         }
     }
 }
 
 fn return_zero_amount() -> Amount { Amount::from_micro_ccd(0) }
-fn return_default_invoke_energy() -> Energy { DEFAULT_INVOKE_ENERGY }
 
 #[derive(SerdeDeserialize, SerdeSerialize, Debug, Clone, Into, From)]
 #[serde(transparent)]

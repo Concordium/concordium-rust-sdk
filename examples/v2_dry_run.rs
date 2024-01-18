@@ -83,7 +83,7 @@ async fn test_all(endpoint: v2::Endpoint) -> anyhow::Result<()> {
         amount:    Amount::zero(),
         method:    invoke_target.clone(),
         parameter: parameter.clone(),
-        energy:    10000.into(),
+        energy:    None,
     };
     let res5 = dry_run.invoke_instance(&context).await;
     println!("Invoked view on {contract_addr}: {:?}", res5);
