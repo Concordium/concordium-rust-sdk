@@ -398,11 +398,12 @@ impl ContractUpdateBuilder {
     /// the transaction was sent with the current parameters.
     pub fn current_energy(&self) -> Energy { self.energy + self.add_energy.unwrap_or(100.into()) }
 
-    /// Send the transaction and return its hash.
+    /// Send the transaction and return a handle that can be queried
+    /// for the status.
     pub async fn send(
         mut self,
         signer: &impl transactions::ExactSizeTransactionSigner,
-    ) -> v2::QueryResult<TransactionHash> {
+    ) -> v2::QueryResult<ContractUpdateHandle> {
         let nonce = if let Some(nonce) = self.nonce {
             nonce
         } else {
@@ -423,8 +424,11 @@ impl ContractUpdateBuilder {
             self.payload,
             energy,
         );
-        let hash = self.client.send_account_transaction(tx).await?;
-        Ok(hash)
+        let tx_hash = self.client.send_account_transaction(tx).await?;
+        Ok(ContractUpdateHandle {
+            tx_hash,
+            client: self.client,
+        })
     }
 }
 
