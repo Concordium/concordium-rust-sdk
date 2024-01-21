@@ -618,7 +618,7 @@ impl TryFrom<AccountVerifyKey> for crate::id::types::VerifyKey {
     }
 }
 
-impl TryFrom<ip_info::IpCdiVerifyKey> for ed25519_dalek::PublicKey {
+impl TryFrom<ip_info::IpCdiVerifyKey> for ed25519_dalek::VerifyingKey {
     type Error = tonic::Status;
 
     fn try_from(value: ip_info::IpCdiVerifyKey) -> Result<Self, Self::Error> {

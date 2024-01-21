@@ -21,6 +21,7 @@
 - Add `dry_run_update` and `dry_run_update_raw` methods to the `ContractClient`
   to simulate smart contract updates. The return values of these can be used to
   immediately sign and send a transaction.
+- Update `rand` dependency to `0.8`.
 
 ## 3.2.0
 

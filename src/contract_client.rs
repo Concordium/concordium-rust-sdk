@@ -204,6 +204,13 @@ impl<Type> ContractClient<Type> {
     /// Dry run an update. If the dry run succeeds the return value is an object
     /// that has a send method to send the transaction that was simulated during
     /// the dry run.
+    ///
+    /// The arguments are
+    /// - `entrypoint` the name of the entrypoint to be invoked. Note that this
+    ///   is just the entrypoint name without the contract name.
+    /// - `amount` the amount of CCD to send to the contract instance
+    /// - `sender` the account that will be sending the transaction
+    /// - `message` the parameter to the smart contract entrypoint.
     pub async fn dry_run_update<P: contracts_common::Serial, E>(
         &mut self,
         entrypoint: &str,
@@ -242,7 +249,7 @@ impl<Type> ContractClient<Type> {
             message,
         };
 
-        let context = ContractContext::new_from_payload(sender, Energy::from(10_000_000), payload);
+        let context = ContractContext::new_from_payload(sender, None, payload);
 
         let invoke_result = self
             .client
@@ -374,6 +381,10 @@ impl ContractUpdateBuilder {
     }
 
     /// Add extra energy to the call.
+    /// The default amount is 10%, or at least 50.
+    /// This should be sufficient in most cases, but for specific
+    /// contracts no extra energy might be needed, or a greater safety margin
+    /// could be desired.
     pub fn extra_energy(mut self, energy: Energy) -> Self {
         self.add_energy = Some(energy);
         self
@@ -396,7 +407,13 @@ impl ContractUpdateBuilder {
 
     /// Return the amount of [`Energy`] allowed for execution if
     /// the transaction was sent with the current parameters.
-    pub fn current_energy(&self) -> Energy { self.energy + self.add_energy.unwrap_or(100.into()) }
+    pub fn current_energy(&self) -> Energy {
+        // Add 10% to the call, or at least 50.
+        self.energy
+            + self
+                .add_energy
+                .unwrap_or_else(|| std::cmp::max(50, self.energy.energy / 10).into())
+    }
 
     /// Send the transaction and return a handle that can be queried
     /// for the status.
@@ -415,7 +432,7 @@ impl ContractUpdateBuilder {
         let expiry = self
             .expiry
             .unwrap_or_else(|| TransactionTime::hours_after(1));
-        let energy = self.energy + self.add_energy.unwrap_or(100.into());
+        let energy = self.current_energy();
         let tx = transactions::send::update_contract(
             signer,
             self.sender,
