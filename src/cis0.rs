@@ -5,13 +5,11 @@ use crate::{
     types::{self as sdk_types, smart_contracts::ContractContext},
     v2::{BlockIdentifier, QueryResponse},
 };
-use concordium_base::{
-    base::Energy,
-    contracts_common::{Amount, ContractName, EntrypointName, OwnedReceiveName, ParseError},
+use concordium_base::contracts_common::{
+    Amount, ContractName, EntrypointName, OwnedReceiveName, ParseError,
 };
 use sdk_types::{smart_contracts, ContractAddress};
 use smart_contracts::concordium_contracts_common as contracts_common;
-use std::convert::From;
 use thiserror::*;
 
 /// The query result type for whether a smart contract supports a standard.
@@ -222,7 +220,7 @@ pub async fn supports_multi(
         amount: Amount::from_micro_ccd(0),
         method,
         parameter,
-        energy: Energy::from(500_000u64),
+        energy: None,
     };
     let res = client.invoke_instance(bi, &ctx).await?;
     match res.response {

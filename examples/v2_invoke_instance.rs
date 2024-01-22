@@ -40,7 +40,7 @@ async fn main() -> anyhow::Result<()> {
         amount:    Amount::zero(),
         method:    app.receive_name,
         parameter: Default::default(),
-        energy:    1000000.into(),
+        energy:    None,
     };
 
     let info = client

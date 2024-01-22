@@ -28,9 +28,9 @@ semver = "1"
 anyhow = "1.0"
 # See https://github.com/serde-rs/json/issues/505 for how to be careful.
 rust_decimal = { version = "1.26", features = ["serde-float", "serde-arbitrary-precision"]}
-ed25519-dalek = "1"
+ed25519-dalek = "2"
 sha2 = "0.10"
-rand = {version = "0.7", features = ["small_rng"]}
+rand = {version = "0.8", features = ["small_rng"]}
 num = "0.4"
 num-bigint = "0.4"
 num-traits = "0.2"
