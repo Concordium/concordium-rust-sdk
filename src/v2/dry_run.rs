@@ -233,8 +233,8 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
                 match response {
                     generated::dry_run_success_response::Response::BlockStateLoaded(loaded) => {
                         let protocol_version =
-                            generated::ProtocolVersion::from_i32(loaded.protocol_version)
-                                .ok_or_else(|| tonic::Status::unknown("Unknown protocol version"))?
+                            generated::ProtocolVersion::try_from(loaded.protocol_version)
+                                .map_err(|_| tonic::Status::unknown("Unknown protocol version"))?
                                 .into();
                         let loaded = BlockStateLoaded {
                             current_timestamp: loaded.current_timestamp.require()?.into(),

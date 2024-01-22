@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+## 4.0.0
+
 - Add a `From<&AccountInfo>` instance for `AccountAccessStructure` to ease verification of signatures using `GetAccountInfo` response.
 - Add a `get_finalized_block_item` method to the `Client` to retrieve a finalized block item from the node.
 - Remove the V1 API.
@@ -22,6 +24,7 @@
   to simulate smart contract updates. The return values of these can be used to
   immediately sign and send a transaction.
 - Update `rand` dependency to `0.8`.
+- Update `tonic` to 0.10.
 
 ## 3.2.0
 

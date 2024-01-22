@@ -1,6 +1,6 @@
 [package]
 name = "concordium-rust-sdk"
-version = "3.2.0"
+version = "4.0.0"
 authors = ["Concordium <developers@concordium.com>"]
 edition = "2021"
 rust-version = "1.67"
@@ -14,8 +14,8 @@ homepage = "https://github.com/Concordium/concordium-rust-sdk"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tonic = {version = "0.8"}
-prost = "0.11"
+tonic = {version = "0.10"}
+prost = "0.12"
 tokio = { version = "1.27", features = ["net"] }
 futures = "0.3"
 serde_json = "1.0"
@@ -38,8 +38,8 @@ tokio-postgres = { version = "^0.7.8", features = ["with-serde_json-1"], optiona
 http = "0.2"
 tokio-stream = "0.1"
 
-concordium_base = { version = "3.2.0", path = "./concordium-base/rust-src/concordium_base/", features = ["encryption"] }
-concordium-smart-contract-engine = { version = "3.0", path = "./concordium-base/smart-contracts/wasm-chain-integration/", default-features = false, features = ["async"]}
+concordium_base = { version = "4.0", path = "./concordium-base/rust-src/concordium_base/", features = ["encryption"] }
+concordium-smart-contract-engine = { version = "4.0", path = "./concordium-base/smart-contracts/wasm-chain-integration/", default-features = false, features = ["async"]}
 aes-gcm = { version = "0.10", features = ["std"] }
 tracing = "0.1"
 
@@ -53,7 +53,7 @@ clap = "2.34"
 csv = "1.1"
 tokio = { version = "1.27", features = ["full"] }
 tokio-test = { version = "0.4" }
-tonic = {version = "0.8", features = ["tls", "tls-roots"]} # Use system trust roots.
+tonic = {version = "0.10", features = ["tls", "tls-roots"]} # Use system trust roots.
 
 [[example]]
 name = "postgres"
@@ -64,5 +64,5 @@ name = "monitor-postgres"
 required-features = ["postgres"]
 
 [build-dependencies]
-tonic-build = {version = "0.8", optional = true}
-git2 = {version = "0.14", optional = true}
+tonic-build = {version = "0.10", optional = true}
+git2 = {version = "0.18", optional = true}

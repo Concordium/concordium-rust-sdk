@@ -2153,8 +2153,8 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
     type Error = tonic::Status;
 
     fn try_from(value: ConsensusInfo) -> Result<Self, Self::Error> {
-        let protocol_version = ProtocolVersion::from_i32(value.protocol_version)
-            .ok_or_else(|| tonic::Status::internal("Unknown protocol version"))?
+        let protocol_version = ProtocolVersion::try_from(value.protocol_version)
+            .map_err(|_| tonic::Status::internal("Unknown protocol version"))?
             .into();
         Ok(Self {
             last_finalized_block_height: value.last_finalized_block_height.require()?.into(),
@@ -2414,8 +2414,8 @@ impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
     type Error = tonic::Status;
 
     fn try_from(value: BlockInfo) -> Result<Self, Self::Error> {
-        let protocol_version = ProtocolVersion::from_i32(value.protocol_version)
-            .ok_or_else(|| {
+        let protocol_version = ProtocolVersion::try_from(value.protocol_version)
+            .map_err(|_| {
                 tonic::Status::internal(format!(
                     "Unknown protocol version: {}",
                     value.protocol_version
@@ -2573,8 +2573,13 @@ impl TryFrom<TokenomicsInfo> for super::types::RewardsOverview {
         match value.tokenomics.require()? {
             tokenomics_info::Tokenomics::V0(value) => Ok(Self::V0 {
                 data: super::types::CommonRewardData {
-                    protocol_version:            ProtocolVersion::from_i32(value.protocol_version)
-                        .require()?
+                    protocol_version:            ProtocolVersion::try_from(value.protocol_version)
+                        .map_err(|_| {
+                            tonic::Status::internal(format!(
+                                "Unknown protocol version: {}",
+                                value.protocol_version
+                            ))
+                        })?
                         .into(),
                     total_amount:                value.total_amount.require()?.into(),
                     total_encrypted_amount:      value.total_encrypted_amount.require()?.into(),
@@ -2588,8 +2593,13 @@ impl TryFrom<TokenomicsInfo> for super::types::RewardsOverview {
             }),
             tokenomics_info::Tokenomics::V1(value) => Ok(Self::V1 {
                 common: super::types::CommonRewardData {
-                    protocol_version:            ProtocolVersion::from_i32(value.protocol_version)
-                        .require()?
+                    protocol_version:            ProtocolVersion::try_from(value.protocol_version)
+                        .map_err(|_| {
+                            tonic::Status::internal(format!(
+                                "Unknown protocol version: {}",
+                                value.protocol_version
+                            ))
+                        })?
                         .into(),
                     total_amount:                value.total_amount.require()?.into(),
                     total_encrypted_amount:      value.total_encrypted_amount.require()?.into(),
