@@ -16,7 +16,8 @@ use concordium_base::{
     base::{Energy, Nonce},
     common::types::{self, TransactionTime},
     contracts_common::{
-        self, AccountAddress, Address, Amount, ContractAddress, NewReceiveNameError,
+        self, AccountAddress, Address, Amount, ContractAddress, NewContractNameError,
+        NewReceiveNameError,
     },
     hashes::TransactionHash,
     smart_contracts::{
@@ -308,15 +309,53 @@ pub enum DryRunNewInstanceError {
 
 impl<Type> ContractClient<Type> {
     /// Initialize a new smart contract instance and create a client as a
+    /// result. In contrast to
+    /// [`dry_run_new_instance_raw`](Self::dry_run_new_instance_raw) this
+    /// automatically serializes the provided parameter.
+    pub async fn dry_run_new_instance<P: contracts_common::Serial, E>(
+        client: Client,
+        sender: AccountAddress,
+        mod_ref: ModuleReference,
+        name: &str,
+        amount: Amount,
+        parameter: &P,
+    ) -> Result<ContractInitBuilder<Type>, E>
+    where
+        E: From<NewContractNameError>
+            + From<RejectReason>
+            + From<dry_run::DryRunError>
+            + From<v2::QueryError>
+            + From<ExceedsParameterSize>, {
+        let parameter = OwnedParameter::from_serial(parameter)?;
+        Self::dry_run_new_instance_raw(client, sender, mod_ref, name, amount, parameter).await
+    }
+
+    /// Initialize a new smart contract instance and create a client as a
     /// result.
-    pub async fn dry_run_new_instance_raw(
+    ///
+    /// The arguments are
+    /// - `client` - the client to connect to the node
+    /// - `sender` - the account that will be sending the transaction
+    /// - `mod_ref` - the reference to the module on chain from which the
+    ///   instance is to be created
+    /// - `name` - the name of the contract (NB: without the `init_` prefix)
+    /// - `amount` - the amount of CCD to initialize the instance with
+    /// - `parameter` - the parameter to send to the initialization method of
+    ///   the contract.
+    pub async fn dry_run_new_instance_raw<E>(
         mut client: Client,
         sender: AccountAddress,
         mod_ref: ModuleReference,
-        name: OwnedContractName,
+        name: &str,
         amount: Amount,
         parameter: OwnedParameter,
-    ) -> Result<ContractInitBuilder<Type>, DryRunNewInstanceError> {
+    ) -> Result<ContractInitBuilder<Type>, E>
+    where
+        E: From<NewContractNameError>
+            + From<RejectReason>
+            + From<dry_run::DryRunError>
+            + From<v2::QueryError>, {
+        let name = OwnedContractName::new(format!("init_{name}"))?;
         let mut dr = client.dry_run(BlockIdentifier::LastFinal).await?;
         let payload = InitContractPayload {
             amount,
@@ -344,7 +383,7 @@ impl<Type> ContractClient<Type> {
             AccountTransactionEffects::None {
                 transaction_type: _,
                 reject_reason,
-            } => return Err(DryRunNewInstanceError::Failed(reject_reason)),
+            } => return Err(reject_reason.into()),
             AccountTransactionEffects::ContractInitialized { data } => data,
             _ => {
                 return Err(
