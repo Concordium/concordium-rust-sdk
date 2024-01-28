@@ -587,7 +587,7 @@ pub struct TransactionExecuted {
     pub energy_cost:  Energy,
     /// Detailed result of the transaction execution.
     pub details:      AccountTransactionDetails,
-    /// For V1 contract update transactions, the return value.
+    /// For V1 contract update and init transactions, the return value.
     pub return_value: Option<Vec<u8>>,
 }
 
@@ -707,8 +707,6 @@ impl DryRun {
     pub fn timeout(&self) -> std::time::Duration { std::time::Duration::from_millis(self.timeout) }
 
     /// Get the total energy quota set for the dry-run session.
-    /// Returns `None` if the initial metadata did not include the quota, or it
-    /// could not be parsed.
     pub fn energy_quota(&self) -> Energy { self.energy_quota.into() }
 
     /// Load the state from a specified block.

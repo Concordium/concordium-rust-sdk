@@ -4,9 +4,13 @@ use crate::{
     indexer::ContractUpdateInfo,
     types::{
         smart_contracts::{self, ContractContext, InvokeContractResult},
-        transactions, AccountTransactionEffects, RejectReason,
+        transactions, AccountTransactionEffects, ContractInitializedEvent, RejectReason,
     },
-    v2::{self, BlockIdentifier, Client},
+    v2::{
+        self,
+        dry_run::{self, DryRunTransaction},
+        BlockIdentifier, Client,
+    },
 };
 use concordium_base::{
     base::{Energy, Nonce},
@@ -15,8 +19,13 @@ use concordium_base::{
         self, AccountAddress, Address, Amount, ContractAddress, NewReceiveNameError,
     },
     hashes::TransactionHash,
-    smart_contracts::{ExceedsParameterSize, OwnedContractName, OwnedParameter, OwnedReceiveName},
-    transactions::{AccountTransaction, EncodedPayload, UpdateContractPayload},
+    smart_contracts::{
+        ContractEvent, ExceedsParameterSize, ModuleReference, OwnedContractName, OwnedParameter,
+        OwnedReceiveName,
+    },
+    transactions::{
+        AccountTransaction, EncodedPayload, InitContractPayload, PayloadLike, UpdateContractPayload,
+    },
 };
 pub use concordium_base::{cis2_types::MetadataUrl, cis4_types::*};
 use std::{marker::PhantomData, sync::Arc};
@@ -85,7 +94,274 @@ impl From<RejectReason> for ViewError {
     fn from(value: RejectReason) -> Self { Self::QueryFailed(value) }
 }
 
+/// Builder for initializing a new smart contract instance.
+/// This is returned from the `dry_run_new_instance` family of methods of the
+/// [`ContractClient`].
+pub struct ContractInitBuilder<Type> {
+    add_energy: Option<Energy>,
+    expiry:     Option<TransactionTime>,
+    nonce:      Option<Nonce>,
+    client:     v2::Client,
+    payload:    transactions::Payload,
+    sender:     AccountAddress,
+    energy:     Energy,
+    event:      ContractInitializedEvent,
+    phantom:    PhantomData<Type>,
+}
+
+impl<Type> ContractInitBuilder<Type> {
+    /// Access to the generated events.
+    ///
+    /// Note that these are events generated as part of a dry run.
+    /// Since time passes between the dry run and the actual transaction
+    /// the transaction might behave differently.
+    pub fn event(&self) -> &ContractInitializedEvent { &self.event }
+
+    fn new(
+        client: v2::Client,
+        sender: AccountAddress,
+        energy: Energy,
+        payload: transactions::Payload,
+        event: ContractInitializedEvent,
+    ) -> Self {
+        Self {
+            client,
+            payload,
+            sender,
+            energy,
+            event,
+            add_energy: None,
+            expiry: None,
+            nonce: None,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Add extra energy to the call.
+    /// The default amount is 10%, or at least 50.
+    /// This should be sufficient in most cases, but for specific
+    /// contracts no extra energy might be needed, or a greater safety margin
+    /// could be desired.
+    pub fn extra_energy(mut self, energy: Energy) -> Self {
+        self.add_energy = Some(energy);
+        self
+    }
+
+    /// Set the expiry time for the transaction. If not set the default is one
+    /// hour from the time the transaction is signed.
+    pub fn expiry(mut self, expiry: TransactionTime) -> Self {
+        self.expiry = Some(expiry);
+        self
+    }
+
+    /// Set the nonce for the transaction. If not set the default behaviour is
+    /// to get the nonce from the connected [`Client`](v2::Client) at the
+    /// time the transaction is sent.
+    pub fn nonce(mut self, nonce: Nonce) -> Self {
+        self.nonce = Some(nonce);
+        self
+    }
+
+    /// Return the amount of [`Energy`] that will be allowed for the transaction
+    /// if the transaction was sent with the current parameters.
+    pub fn current_energy(&self) -> Energy {
+        // Add 10% to the call, or at least 50.
+        self.energy
+            + self
+                .add_energy
+                .unwrap_or_else(|| std::cmp::max(50, self.energy.energy / 10).into())
+    }
+
+    /// Send the transaction and return a handle that can be queried
+    /// for the status.
+    pub async fn send(
+        mut self,
+        signer: &impl transactions::ExactSizeTransactionSigner,
+    ) -> v2::QueryResult<ContractInitHandle<Type>> {
+        let nonce = if let Some(nonce) = self.nonce {
+            nonce
+        } else {
+            self.client
+                .get_next_account_sequence_number(&self.sender)
+                .await?
+                .nonce
+        };
+        let expiry = self
+            .expiry
+            .unwrap_or_else(|| TransactionTime::hours_after(1));
+        let energy = self.current_energy();
+        let tx = transactions::send::make_and_sign_transaction(
+            signer,
+            self.sender,
+            nonce,
+            expiry,
+            transactions::send::GivenEnergy::Absolute(energy),
+            self.payload,
+        );
+        let tx_hash = self.client.send_account_transaction(tx).await?;
+        Ok(ContractInitHandle {
+            tx_hash,
+            client: self.client,
+            phantom: self.phantom,
+        })
+    }
+}
+
+/// A handle returned when sending a smart contract update transaction.
+/// This can be used to get the response of the update.
+///
+/// Note that this handle retains a connection to the node. So if it is not
+/// going to be used it should be dropped.
+pub struct ContractInitHandle<Type> {
+    tx_hash: TransactionHash,
+    client:  v2::Client,
+    phantom: PhantomData<Type>,
+}
+
+/// The [`Display`](std::fmt::Display) implementation displays the hash of the
+/// transaction.
+impl<Type> std::fmt::Display for ContractInitHandle<Type> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.tx_hash.fmt(f) }
+}
+
+#[derive(Debug, thiserror::Error)]
+/// An error that may occur when querying the result of a smart contract update
+/// transaction.
+pub enum ContractInitError {
+    #[error("The status of the transaction could not be ascertained: {0}")]
+    Query(#[from] QueryError),
+    #[error("Contract update failed with reason: {0:?}")]
+    Failed(RejectReason),
+}
+
+impl<Type> ContractInitHandle<Type> {
+    /// Extract the hash of the transaction underlying this handle.
+    pub fn hash(&self) -> TransactionHash { self.tx_hash }
+
+    /// Wait until the transaction is finalized and return the client for the
+    /// contract together with a list of events generated by the contract
+    /// during initialization.
+    ///
+    /// Note that this can potentially wait indefinitely.
+    pub async fn wait_for_finalization(
+        mut self,
+    ) -> Result<(ContractClient<Type>, Vec<ContractEvent>), ContractInitError> {
+        let (_, result) = self.client.wait_until_finalized(&self.tx_hash).await?;
+
+        let mk_error = |msg| {
+            Err(ContractInitError::from(QueryError::RPCError(
+                RPCError::CallError(tonic::Status::invalid_argument(msg)),
+            )))
+        };
+
+        match result.details {
+            crate::types::BlockItemSummaryDetails::AccountTransaction(at) => match at.effects {
+                AccountTransactionEffects::ContractInitialized { data } => {
+                    let contract_client =
+                        ContractClient::new(self.client, data.address, data.init_name);
+                    Ok((contract_client, data.events))
+                }
+                AccountTransactionEffects::None {
+                    transaction_type: _,
+                    reject_reason,
+                } => Err(ContractInitError::Failed(reject_reason)),
+                _ => mk_error(
+                    "Expected smart contract initialization status, but did not receive it.",
+                ),
+            },
+            crate::types::BlockItemSummaryDetails::AccountCreation(_) => mk_error(
+                "Expected smart contract initialization status, but received account creation.",
+            ),
+            crate::types::BlockItemSummaryDetails::Update(_) => mk_error(
+                "Expected smart contract initialization status, but received chain update \
+                 instruction.",
+            ),
+        }
+    }
+
+    /// Wait until the transaction is finalized or until the timeout has elapsed
+    /// and return the result.
+    pub async fn wait_for_finalization_timeout(
+        self,
+        timeout: std::time::Duration,
+    ) -> Result<(ContractClient<Type>, Vec<ContractEvent>), ContractInitError> {
+        let result = tokio::time::timeout(timeout, self.wait_for_finalization()).await;
+        match result {
+            Ok(r) => r,
+            Err(_elapsed) => Err(ContractInitError::Query(QueryError::RPCError(
+                RPCError::CallError(tonic::Status::deadline_exceeded(
+                    "Deadline waiting for result of transaction is exceeded.",
+                )),
+            ))),
+        }
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+/// An error that may occur when attempting to dry run a new instance creation.
+pub enum DryRunNewInstanceError {
+    #[error("Dry run succeeded, but contract initialization failed due to {0:#?}.")]
+    Failed(RejectReason),
+    #[error("Dry run failed: {0}")]
+    DryRun(#[from] dry_run::DryRunError),
+}
+
 impl<Type> ContractClient<Type> {
+    /// Initialize a new smart contract instance and create a client as a
+    /// result.
+    pub async fn dry_run_new_instance_raw(
+        mut client: Client,
+        sender: AccountAddress,
+        mod_ref: ModuleReference,
+        name: OwnedContractName,
+        amount: Amount,
+        parameter: OwnedParameter,
+    ) -> Result<ContractInitBuilder<Type>, DryRunNewInstanceError> {
+        let mut dr = client.dry_run(BlockIdentifier::LastFinal).await?;
+        let payload = InitContractPayload {
+            amount,
+            mod_ref,
+            init_name: name,
+            param: parameter,
+        };
+        let payload = transactions::Payload::InitContract { payload };
+        let tx = DryRunTransaction {
+            sender,
+            energy_amount: dr.inner.0.energy_quota(),
+            payload: payload.encode(),
+            signatures: Vec::new(),
+        };
+        let result = dr
+            .inner
+            .0
+            .begin_run_transaction(tx)
+            .await
+            .map_err(dry_run::DryRunError::from)?
+            .await?
+            .inner;
+
+        let data = match result.details.effects {
+            AccountTransactionEffects::None {
+                transaction_type: _,
+                reject_reason,
+            } => return Err(DryRunNewInstanceError::Failed(reject_reason)),
+            AccountTransactionEffects::ContractInitialized { data } => data,
+            _ => {
+                return Err(
+                    dry_run::DryRunError::CallError(tonic::Status::invalid_argument(
+                        "Unexpected response from dry-running a contract initialization.",
+                    ))
+                    .into(),
+                )
+            }
+        };
+        let energy = result.energy_cost;
+
+        Ok(ContractInitBuilder::new(
+            client, sender, energy, payload, data,
+        ))
+    }
+
     /// Construct a [`ContractClient`] by looking up metadata from the chain.
     ///
     /// # Arguments
@@ -363,7 +639,7 @@ pub struct ContractUpdateBuilder {
 
 impl ContractUpdateBuilder {
     /// Construct a new builder.
-    pub fn new(
+    fn new(
         client: v2::Client,
         sender: AccountAddress,
         payload: UpdateContractPayload,
@@ -510,7 +786,7 @@ impl ContractUpdateHandle {
                     transaction_type: _,
                     reject_reason,
                 } => Err(ContractUpdateError::Failed(reject_reason)),
-                _ => mk_error("Expected smart contract update status, but received ."),
+                _ => mk_error("Expected smart contract update status, but did not receive it."),
             },
             crate::types::BlockItemSummaryDetails::AccountCreation(_) => {
                 mk_error("Expected smart contract update status, but received account creation.")
