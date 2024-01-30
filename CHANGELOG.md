@@ -1,5 +1,10 @@
 ## Unreleased changes
 
+## 4.1.0
+
+- Add `ContractInitBuilder` for more ergonomic initialization of new smart
+  contract instances.
+
 ## 4.0.0
 
 - Add a `From<&AccountInfo>` instance for `AccountAccessStructure` to ease verification of signatures using `GetAccountInfo` response.
