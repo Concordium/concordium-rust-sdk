@@ -25,7 +25,8 @@ use concordium_base::{
         OwnedReceiveName,
     },
     transactions::{
-        AccountTransaction, EncodedPayload, InitContractPayload, PayloadLike, UpdateContractPayload,
+        construct::TRANSACTION_HEADER_SIZE, AccountTransaction, EncodedPayload,
+        InitContractPayload, PayloadLike, UpdateContractPayload,
     },
 };
 pub use concordium_base::{cis2_types::MetadataUrl, cis4_types::*};
@@ -96,8 +97,12 @@ impl From<RejectReason> for ViewError {
 }
 
 /// Builder for initializing a new smart contract instance.
-/// This is returned from the `dry_run_new_instance` family of methods of the
-/// [`ContractClient`].
+///
+/// The builder is intended to be constructed using
+/// [`dry_run_new_instance`](ContractInitBuilder::dry_run_new_instance)
+/// or [`dry_run_new_instance_raw`](ContractInitBuilder::dry_run_new_instance_raw) methods.
+/// and the transaction is intended to be sent using the
+/// [`send`](ContractInitBuilder::send) method.
 pub struct ContractInitBuilder<Type> {
     add_energy: Option<Energy>,
     expiry:     Option<TransactionTime>,
@@ -110,106 +115,8 @@ pub struct ContractInitBuilder<Type> {
     phantom:    PhantomData<Type>,
 }
 
-impl<Type> ContractInitBuilder<Type> {
-    /// Access to the generated events.
-    ///
-    /// Note that these are events generated as part of a dry run.
-    /// Since time passes between the dry run and the actual transaction
-    /// the transaction might behave differently.
-    pub fn event(&self) -> &ContractInitializedEvent { &self.event }
-
-    fn new(
-        client: v2::Client,
-        sender: AccountAddress,
-        energy: Energy,
-        payload: transactions::Payload,
-        event: ContractInitializedEvent,
-    ) -> Self {
-        Self {
-            client,
-            payload,
-            sender,
-            energy,
-            event,
-            add_energy: None,
-            expiry: None,
-            nonce: None,
-            phantom: PhantomData,
-        }
-    }
-
-    /// Add extra energy to the call.
-    /// The default amount is 10%, or at least 50.
-    /// This should be sufficient in most cases, but for specific
-    /// contracts no extra energy might be needed, or a greater safety margin
-    /// could be desired.
-    pub fn extra_energy(mut self, energy: Energy) -> Self {
-        self.add_energy = Some(energy);
-        self
-    }
-
-    /// Set the expiry time for the transaction. If not set the default is one
-    /// hour from the time the transaction is signed.
-    pub fn expiry(mut self, expiry: TransactionTime) -> Self {
-        self.expiry = Some(expiry);
-        self
-    }
-
-    /// Set the nonce for the transaction. If not set the default behaviour is
-    /// to get the nonce from the connected [`Client`](v2::Client) at the
-    /// time the transaction is sent.
-    pub fn nonce(mut self, nonce: Nonce) -> Self {
-        self.nonce = Some(nonce);
-        self
-    }
-
-    /// Return the amount of [`Energy`] that will be allowed for the transaction
-    /// if the transaction was sent with the current parameters.
-    pub fn current_energy(&self) -> Energy {
-        // Add 10% to the call, or at least 50.
-        self.energy
-            + self
-                .add_energy
-                .unwrap_or_else(|| std::cmp::max(50, self.energy.energy / 10).into())
-    }
-
-    /// Send the transaction and return a handle that can be queried
-    /// for the status.
-    pub async fn send(
-        mut self,
-        signer: &impl transactions::ExactSizeTransactionSigner,
-    ) -> v2::QueryResult<ContractInitHandle<Type>> {
-        let nonce = if let Some(nonce) = self.nonce {
-            nonce
-        } else {
-            self.client
-                .get_next_account_sequence_number(&self.sender)
-                .await?
-                .nonce
-        };
-        let expiry = self
-            .expiry
-            .unwrap_or_else(|| TransactionTime::hours_after(1));
-        let energy = self.current_energy();
-        let tx = transactions::send::make_and_sign_transaction(
-            signer,
-            self.sender,
-            nonce,
-            expiry,
-            transactions::send::GivenEnergy::Absolute(energy),
-            self.payload,
-        );
-        let tx_hash = self.client.send_account_transaction(tx).await?;
-        Ok(ContractInitHandle {
-            tx_hash,
-            client: self.client,
-            phantom: self.phantom,
-        })
-    }
-}
-
-/// A handle returned when sending a smart contract update transaction.
-/// This can be used to get the response of the update.
+/// A handle returned when sending a smart contract init transaction.
+/// This can be used to get the response of the initialization.
 ///
 /// Note that this handle retains a connection to the node. So if it is not
 /// going to be used it should be dropped.
@@ -305,33 +212,43 @@ pub enum DryRunNewInstanceError {
     Failed(RejectReason),
     #[error("Dry run failed: {0}")]
     DryRun(#[from] dry_run::DryRunError),
+    #[error("Parameter too large: {0}")]
+    ExceedsParameterSize(#[from] ExceedsParameterSize),
+    #[error("Node query error: {0}")]
+    Query(#[from] v2::QueryError),
+    #[error("Contract name not valid: {0}")]
+    InvalidContractName(#[from] NewContractNameError),
+    #[error("The reported energy consumed for the dry run is less than expected ({min}).")]
+    InvalidEnergy {
+        /// Minimum amount of energy expected
+        min: Energy,
+    },
 }
 
-impl<Type> ContractClient<Type> {
-    /// Initialize a new smart contract instance and create a client as a
-    /// result. In contrast to
+impl From<RejectReason> for DryRunNewInstanceError {
+    fn from(value: RejectReason) -> Self { Self::Failed(value) }
+}
+
+impl<Type> ContractInitBuilder<Type> {
+    /// Attempt to dry run a smart contract initialization transaction.
+    /// In case of success the resulting value
+    ///
+    /// In contrast to
     /// [`dry_run_new_instance_raw`](Self::dry_run_new_instance_raw) this
     /// automatically serializes the provided parameter.
-    pub async fn dry_run_new_instance<P: contracts_common::Serial, E>(
+    pub async fn dry_run_new_instance<P: contracts_common::Serial>(
         client: Client,
         sender: AccountAddress,
         mod_ref: ModuleReference,
         name: &str,
         amount: Amount,
         parameter: &P,
-    ) -> Result<ContractInitBuilder<Type>, E>
-    where
-        E: From<NewContractNameError>
-            + From<RejectReason>
-            + From<dry_run::DryRunError>
-            + From<v2::QueryError>
-            + From<ExceedsParameterSize>, {
+    ) -> Result<Self, DryRunNewInstanceError> {
         let parameter = OwnedParameter::from_serial(parameter)?;
         Self::dry_run_new_instance_raw(client, sender, mod_ref, name, amount, parameter).await
     }
 
-    /// Initialize a new smart contract instance and create a client as a
-    /// result.
+    /// Attempt to dry run a smart contract initialization transaction.
     ///
     /// The arguments are
     /// - `client` - the client to connect to the node
@@ -342,19 +259,14 @@ impl<Type> ContractClient<Type> {
     /// - `amount` - the amount of CCD to initialize the instance with
     /// - `parameter` - the parameter to send to the initialization method of
     ///   the contract.
-    pub async fn dry_run_new_instance_raw<E>(
+    pub async fn dry_run_new_instance_raw(
         mut client: Client,
         sender: AccountAddress,
         mod_ref: ModuleReference,
         name: &str,
         amount: Amount,
         parameter: OwnedParameter,
-    ) -> Result<ContractInitBuilder<Type>, E>
-    where
-        E: From<NewContractNameError>
-            + From<RejectReason>
-            + From<dry_run::DryRunError>
-            + From<v2::QueryError>, {
+    ) -> Result<Self, DryRunNewInstanceError> {
         let name = OwnedContractName::new(format!("init_{name}"))?;
         let mut dr = client.dry_run(BlockIdentifier::LastFinal).await?;
         let payload = InitContractPayload {
@@ -364,10 +276,12 @@ impl<Type> ContractClient<Type> {
             param: parameter,
         };
         let payload = transactions::Payload::InitContract { payload };
+        let encoded_payload = payload.encode();
+        let payload_size = encoded_payload.size();
         let tx = DryRunTransaction {
             sender,
             energy_amount: dr.inner.0.energy_quota(),
-            payload: payload.encode(),
+            payload: encoded_payload,
             signatures: Vec::new(),
         };
         let result = dr
@@ -394,13 +308,118 @@ impl<Type> ContractClient<Type> {
                 )
             }
         };
-        let energy = result.energy_cost;
+        let base_cost = transactions::cost::base_cost(
+            TRANSACTION_HEADER_SIZE + u64::from(u32::from(payload_size)),
+            1,
+        );
+        let energy = result
+            .energy_cost
+            .checked_sub(base_cost)
+            .ok_or(DryRunNewInstanceError::InvalidEnergy { min: base_cost })?;
 
         Ok(ContractInitBuilder::new(
             client, sender, energy, payload, data,
         ))
     }
 
+    /// Access to the generated events.
+    ///
+    /// Note that these are events generated as part of a dry run.
+    /// Since time passes between the dry run and the actual transaction
+    /// the transaction might behave differently.
+    pub fn event(&self) -> &ContractInitializedEvent { &self.event }
+
+    fn new(
+        client: v2::Client,
+        sender: AccountAddress,
+        energy: Energy,
+        payload: transactions::Payload,
+        event: ContractInitializedEvent,
+    ) -> Self {
+        Self {
+            client,
+            payload,
+            sender,
+            energy,
+            event,
+            add_energy: None,
+            expiry: None,
+            nonce: None,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Add extra energy to the call.
+    /// The default amount is 10%, or at least 50.
+    /// This should be sufficient in most cases, but for specific
+    /// contracts no extra energy might be needed, or a greater safety margin
+    /// could be desired.
+    pub fn extra_energy(mut self, energy: Energy) -> Self {
+        self.add_energy = Some(energy);
+        self
+    }
+
+    /// Set the expiry time for the transaction. If not set the default is one
+    /// hour from the time the transaction is signed.
+    pub fn expiry(mut self, expiry: TransactionTime) -> Self {
+        self.expiry = Some(expiry);
+        self
+    }
+
+    /// Set the nonce for the transaction. If not set the default behaviour is
+    /// to get the nonce from the connected [`Client`](v2::Client) at the
+    /// time the transaction is sent.
+    pub fn nonce(mut self, nonce: Nonce) -> Self {
+        self.nonce = Some(nonce);
+        self
+    }
+
+    /// Return the amount of [`Energy`] that will be allowed for the transaction
+    /// if the transaction was sent with the current parameters.
+    pub fn current_energy(&self) -> Energy {
+        // Add 10% to the call, or at least 50.
+        self.energy
+            + self
+                .add_energy
+                .unwrap_or_else(|| std::cmp::max(50, self.energy.energy / 10).into())
+    }
+
+    /// Send the transaction and return a handle that can be queried
+    /// for the status.
+    pub async fn send(
+        mut self,
+        signer: &impl transactions::ExactSizeTransactionSigner,
+    ) -> v2::QueryResult<ContractInitHandle<Type>> {
+        let nonce = if let Some(nonce) = self.nonce {
+            nonce
+        } else {
+            self.client
+                .get_next_account_sequence_number(&self.sender)
+                .await?
+                .nonce
+        };
+        let expiry = self
+            .expiry
+            .unwrap_or_else(|| TransactionTime::hours_after(1));
+        let energy = self.current_energy();
+        let tx = transactions::send::make_and_sign_transaction(
+            signer,
+            self.sender,
+            nonce,
+            expiry,
+            transactions::send::GivenEnergy::Add(energy),
+            self.payload,
+        );
+        let tx_hash = self.client.send_account_transaction(tx).await?;
+        Ok(ContractInitHandle {
+            tx_hash,
+            client: self.client,
+            phantom: self.phantom,
+        })
+    }
+}
+
+impl<Type> ContractClient<Type> {
     /// Construct a [`ContractClient`] by looking up metadata from the chain.
     ///
     /// # Arguments

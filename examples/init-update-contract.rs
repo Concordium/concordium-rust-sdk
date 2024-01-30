@@ -5,18 +5,15 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize},
+    common::{SerdeDeserialize, SerdeSerialize},
+    contract_client::{ContractClient, ContractInitBuilder, ViewError},
     endpoints,
     smart_contracts::{
         common as concordium_std,
-        common::{Amount, ContractAddress, OwnedContractName, OwnedReceiveName, Serial},
+        common::{Amount, ContractAddress, Serial},
     },
-    types::{
-        smart_contracts::{ModuleReference, OwnedParameter},
-        transactions::{send, InitContractPayload, UpdateContractPayload},
-        AccountInfo, WalletAccount,
-    },
-    v2::{self, BlockIdentifier},
+    types::{smart_contracts::ModuleReference, WalletAccount},
+    v2,
 };
 use std::path::PathBuf;
 use structopt::*;
@@ -81,6 +78,8 @@ impl std::str::FromStr for Weather {
     }
 }
 
+enum WeatherContractMarker {}
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
     let app = {
@@ -89,62 +88,60 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
 
-    let mut client = v2::Client::new(app.endpoint).await?;
+    let client = v2::Client::new(app.endpoint).await?;
 
     // load account keys and sender address from a file
-    let keys: WalletAccount =
+    let account: WalletAccount =
         WalletAccount::from_json_file(app.keys_path).context("Could not parse the keys file.")?;
 
-    // Get the initial nonce at the last finalized block.
-    let acc_info: AccountInfo = client
-        .get_account_info(&keys.address.into(), BlockIdentifier::LastFinal)
-        .await?
-        .response;
-
-    let nonce = acc_info.account_nonce;
-    // set expiry to now + 5min
-    let expiry: TransactionTime =
-        TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
-
-    let tx = match app.action {
+    match app.action {
         Action::Init {
             weather,
             module_ref: mod_ref,
         } => {
-            let param = OwnedParameter::from_serial(&weather)
-                .expect("Known to not exceed parameter size limit.");
-            let payload = InitContractPayload {
-                amount: Amount::zero(),
+            let builder = ContractInitBuilder::<WeatherContractMarker>::dry_run_new_instance(
+                client,
+                account.address,
                 mod_ref,
-                init_name: OwnedContractName::new_unchecked("init_weather".to_string()),
-                param,
-            };
-
-            send::init_contract(&keys, keys.address, nonce, expiry, payload, 10000u64.into())
+                "weather",
+                Amount::zero(),
+                &weather,
+            )
+            .await?;
+            println!(
+                "The maximum amount of NRG allowed for the transaction is {}.",
+                builder.current_energy()
+            );
+            let handle = builder.send(&account).await?;
+            println!("Transaction {handle} submitted. Waiting for finalization.");
+            let (contract_client, events) = handle.wait_for_finalization().await?;
+            println!(
+                "Initialized a new smart contract instance at address {}.",
+                contract_client.address
+            );
+            println!("The following events were generated.");
+            for event in events {
+                println!("{event}");
+            }
         }
         Action::Update { weather, address } => {
-            let message = OwnedParameter::from_serial(&weather)
-                .expect("Known to not exceed parameter size limit.");
-            let payload = UpdateContractPayload {
-                amount: Amount::zero(),
-                address,
-                receive_name: OwnedReceiveName::new_unchecked("weather.set".to_string()),
-                message,
-            };
-
-            send::update_contract(&keys, keys.address, nonce, expiry, payload, 10000u64.into())
+            let mut contract_client =
+                ContractClient::<WeatherContractMarker>::create(client, address).await?;
+            let builder = contract_client
+                .dry_run_update::<_, ViewError>("set", Amount::zero(), account.address, &weather)
+                .await?;
+            println!(
+                "The maximum amount of execution NRG allowed for the transaction is {}.",
+                builder.current_energy()
+            );
+            let handle = builder.send(&account).await?;
+            println!("Transaction {handle} submitted. Waiting for finalization.");
+            let result = handle.wait_for_finalization().await?;
+            println!(
+                "Update smart contract instance. It cost {}CCD.",
+                result.cost
+            );
         }
     };
-
-    // submit the transaction to the chain
-    let transaction_hash = client.send_account_transaction(tx).await?;
-    println!(
-        "Transaction {} submitted (nonce = {}).",
-        transaction_hash, nonce,
-    );
-    let (bh, bs) = client.wait_until_finalized(&transaction_hash).await?;
-    println!("Transaction finalized in block {}.", bh);
-    println!("The outcome is {:#?}", bs);
-
     Ok(())
 }
