@@ -6,7 +6,8 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    common::{self, types::TransactionTime, SerdeDeserialize, SerdeSerialize},
+    common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize},
+    contract_client::ModuleDeployBuilder,
     smart_contracts::{
         common as concordium_std,
         common::Amount,
@@ -180,10 +181,15 @@ async fn main() -> anyhow::Result<()> {
             send::update_contract(&keys, keys.address, nonce, expiry, payload, 10000u64.into())
         }
         Action::Deploy { module_path } => {
-            let contents = std::fs::read(module_path).context("Could not read contract module.")?;
-            let payload: WasmModule =
-                common::Deserial::deserial(&mut std::io::Cursor::new(contents))?;
-            send::deploy_module(&keys, keys.address, nonce, expiry, payload)
+            let module =
+                WasmModule::from_file(&module_path).context("Could not read contract module.")?;
+            let builder =
+                ModuleDeployBuilder::dry_run_module_deploy(client, keys.address, module).await?;
+            let handle = builder.send(&keys).await?;
+            println!("Module deployment transaction {handle} submitted.");
+            let result = handle.wait_for_finalization().await?;
+            println!("Module {result} deployed.");
+            return Ok(());
         }
     };
 
