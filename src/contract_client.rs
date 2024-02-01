@@ -496,6 +496,16 @@ pub enum DryRunModuleDeployError {
     },
 }
 
+impl DryRunModuleDeployError {
+    /// Check whether dry-run failed because the module already exists.
+    pub fn already_exists(&self) -> bool {
+        let Self::Failed(reason) = self else {
+            return false;
+        };
+        matches!(reason, RejectReason::ModuleHashAlreadyExists { .. })
+    }
+}
+
 impl From<RejectReason> for DryRunModuleDeployError {
     fn from(value: RejectReason) -> Self { Self::Failed(value) }
 }
