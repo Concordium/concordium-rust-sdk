@@ -2,8 +2,10 @@
 //! interacting with any smart contract instance, as well as for creating new
 //! ones.
 //!
-//! The key types in this module are [`ContractClient`], [`ContractInitBuilder`]
-//! and [`ModuleDeployBuilder`].
+//! The key types in this module are
+//! [`ContractClient`](contract_client::ContractClient),
+//! [`ContractInitBuilder`](contract_client::ContractInitBuilder)
+//! and [`ModuleDeployBuilder`](contract_client::ModuleDeployBuilder).
 use crate::{
     indexer::ContractUpdateInfo,
     types::{
