@@ -188,7 +188,7 @@ async fn main() -> anyhow::Result<()> {
             let handle = builder.send(&keys).await?;
             println!("Module deployment transaction {handle} submitted.");
             let result = handle.wait_for_finalization().await?;
-            println!("Module {result} deployed.");
+            println!("Module {} deployed.", result.module_reference);
             return Ok(());
         }
     };
