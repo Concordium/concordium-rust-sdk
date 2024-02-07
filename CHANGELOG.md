@@ -3,7 +3,9 @@
 ## 4.1.0
 
 - Add `ContractInitBuilder` for more ergonomic initialization of new smart
-  contract instances.
+  contract instances with automatic NRG cost estimation.
+- Add `ModuleDeployBuilder` for more ergonomic deployment of contract modules
+  with automatic dry run and validation.
 
 ## 4.0.0
 
