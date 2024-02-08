@@ -1,5 +1,9 @@
 ## Unreleased changes
 
+## 4.1.1
+
+- Fix incorrect calculation of the micro_ccd_per_eur helper.
+
 ## 4.1.0
 
 - Add `ContractInitBuilder` for more ergonomic initialization of new smart
