@@ -1,5 +1,10 @@
 ## Unreleased changes
 
+## 4.2.0
+
+- Add a `ProcessorConfig` struct dual to the `TraverseConfig` to help in writing
+  indexers.
+
 ## 4.1.1
 
 - Fix incorrect calculation of the micro_ccd_per_eur helper.
