@@ -364,7 +364,7 @@ impl Indexer for TransactionIndexer {
         _client: &'a mut v2::Client,
     ) -> QueryResult<()> {
         tracing::info!(
-            target = "ccd_indexer",
+            target: "ccd_indexer",
             "Connected to endpoint {}.",
             endpoint.uri()
         );
@@ -398,7 +398,7 @@ impl Indexer for TransactionIndexer {
         err: TraverseError,
     ) -> bool {
         tracing::warn!(
-            target = "ccd_indexer",
+            target: "ccd_indexer",
             successive_failures,
             "Failed when querying endpoint {}: {err}",
             endpoint.uri()
@@ -462,7 +462,7 @@ impl Indexer for ContractUpdateIndexer {
         _client: &'a mut v2::Client,
     ) -> QueryResult<()> {
         tracing::info!(
-            target = "ccd_indexer",
+            target: "ccd_indexer",
             "Connected to endpoint {}.",
             endpoint.uri()
         );
@@ -508,7 +508,7 @@ impl Indexer for ContractUpdateIndexer {
         err: TraverseError,
     ) -> bool {
         tracing::warn!(
-            target = "ccd_indexer",
+            target: "ccd_indexer",
             successive_failures,
             "Failed when querying endpoint {}: {err}",
             endpoint.uri()
@@ -549,7 +549,7 @@ impl Indexer for AffectedContractIndexer {
         _client: &'a mut v2::Client,
     ) -> QueryResult<()> {
         tracing::info!(
-            target = "ccd_indexer",
+            target: "ccd_indexer",
             "Connected to endpoint {}.",
             endpoint.uri()
         );
@@ -603,7 +603,7 @@ impl Indexer for AffectedContractIndexer {
         err: TraverseError,
     ) -> bool {
         tracing::warn!(
-            target = "ccd_indexer",
+            target: "ccd_indexer",
             successive_failures,
             "Failed when querying endpoint {}: {err}",
             endpoint.uri()
@@ -670,4 +670,169 @@ impl Indexer for BlockEventsIndexer {
             .on_failure(endpoint, successive_failures, err)
             .await
     }
+}
+
+#[async_trait]
+/// Handle an individual event. This trait is designed to be used together with
+/// the [`Processor`]. These two together are designed to ease the work of
+/// writing the part of indexers where data is to be stored in a database.
+pub trait ProcessEvent {
+    /// The type of events that are to be processed. Typically this will be all
+    /// of the transactions of interest for a single block.
+    type Data;
+    /// An error that can be signalled.
+    type Error: std::fmt::Display + std::fmt::Debug;
+    /// A description returned by the [`process`](ProcessEvent::process) method.
+    /// This message is logged by the [`Processor`] and is intended to describe
+    /// the data that was just processed.
+    type Description: std::fmt::Display;
+
+    /// Process a single item. This should work atomically in the sense that
+    /// either the entire `data` is processed or none of it is in case of an
+    /// error. This property is relied upon by the [`Processor`] to retry failed
+    /// attempts.
+    async fn process(&mut self, data: &Self::Data) -> Result<Self::Description, Self::Error>;
+
+    /// The `on_failure` method is invoked by the [`Processor`] when it fails to
+    /// process an event. It is meant to retry to recreate the resources,
+    /// such as a database connection, that might have been dropped. The
+    /// return value should signal if the handler process should continue
+    /// (`true`) or not.
+    ///
+    /// The function takes the `error` that occurred at the latest
+    /// [`process`](Self::process) call that just failed, and the number of
+    /// attempts of calling `process` that failed.
+    async fn on_failure(
+        &mut self,
+        error: Self::Error,
+        failed_attempts: u32,
+    ) -> Result<bool, Self::Error>;
+}
+
+pub struct ProcessorConfig {
+    /// The amount of time to wait after a failure to process an event.
+    wait_after_fail: std::time::Duration,
+    /// A future to be signalled to stop processing.
+    stop:            std::pin::Pin<Box<dyn std::future::Future<Output = ()>>>,
+}
+
+impl ProcessorConfig {
+    /// After each failure the [`Processor`] will pause a bit before trying
+    /// again. Defaults to 5 seconds.
+    pub fn set_wait_after_failure(self, wait_after_fail: Duration) -> Self {
+        Self {
+            wait_after_fail,
+            ..self
+        }
+    }
+
+    /// Set the stop signal for the processor. This accepts a future which will
+    /// be polled and if the future yields ready the `process_events` method
+    /// will terminate.
+    ///
+    /// An example of such a future would be the `Receiver` end of a oneshot
+    /// channel.
+    pub fn set_stop_signal(self, stop: impl std::future::Future<Output = ()> + 'static) -> Self {
+        Self {
+            stop: Box::pin(stop),
+            ..self
+        }
+    }
+
+    /// Construct a new [`Processor`] that will retry the given number of times.
+    /// The default wait after a failure is 5 seconds.
+    pub fn new() -> Self {
+        Self {
+            wait_after_fail: std::time::Duration::from_secs(5),
+            stop:            Box::pin(std::future::pending()),
+        }
+    }
+
+    /// Process events that are coming in on the provided channel.
+    ///
+    /// This handler will only terminate in the case of
+    ///
+    /// - the [`on_failure`](ProcessEvent::on_failure) method indicates so.
+    /// - the sender part of the `events` channel has been dropped
+    /// - the [`ProcessorConfig`] was configured with a termination signal that
+    ///   was triggered.
+    ///
+    /// The function will log progress using the `tracing` library with the
+    /// target set to `ccd_event_processor`.
+    pub async fn process_events<P: ProcessEvent>(
+        mut self,
+        mut process: P,
+        mut events: tokio::sync::mpsc::Receiver<P::Data>,
+    ) {
+        while let Some(event) = tokio::select! {
+            biased;
+            _ = &mut self.stop => None,
+            r = events.recv() => r,
+        } {
+            let mut try_number: u32 = 0;
+            'outer: loop {
+                let start = tokio::time::Instant::now();
+                let response = process.process(&event).await;
+                let end = tokio::time::Instant::now();
+                let duration = end.duration_since(start).as_millis();
+                match response {
+                    Ok(descr) => {
+                        tracing::info!(
+                            target: "ccd_event_processor",
+                            "{descr} in {duration}ms."
+                        );
+                        break 'outer;
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            target: "ccd_event_processor",
+                            "Failed to process event: {e}. Took {duration}ms to fail."
+                        );
+                        tracing::info!(
+                            target: "ccd_event_processor",
+                            "Retrying in {}ms.",
+                            self.wait_after_fail.as_millis()
+                        );
+                        // Wait before calling on_failure with the idea that whatever caused the
+                        // failure is more likely to be fixed if we try
+                        // after a bit of time rather than immediately.
+                        tokio::time::sleep(self.wait_after_fail).await;
+                        match process.on_failure(e, try_number + 1).await {
+                            Ok(true) => {
+                                // do nothing, continue.
+                            }
+                            Ok(false) => return,
+                            Err(e) => {
+                                tracing::warn!("Failed to restart: {e}.");
+                            }
+                        }
+                        try_number += 1;
+                    }
+                }
+            }
+        }
+        tracing::info!(
+            target: "ccd_event_processor",
+            "Terminating process_events due to channel closing."
+        );
+    }
+}
+
+/// Given a configuration for traversing the chain and processing generated
+/// events start a process to traverse the chain and index events.
+///
+/// This process will only stop when the `stop_signal` future completes, when
+/// [`traverse`](TraverseConfig::traverse) completes, or when
+/// [`process_events`](ProcessorConfig::process_events) completes.
+pub async fn traverse_and_process<I: Indexer, P: ProcessEvent<Data = I::Data>>(
+    config: TraverseConfig,
+    i: I,
+    processor: ProcessorConfig,
+    p: P,
+) -> Result<(), QueryError> {
+    let (sender, receiver) = tokio::sync::mpsc::channel(10);
+    let fut1 = config.traverse(i, sender);
+    let fut2 = processor.process_events(p, receiver);
+    let (r1, ()) = futures::join!(fut1, fut2);
+    r1
 }

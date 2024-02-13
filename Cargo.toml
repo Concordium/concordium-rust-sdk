@@ -54,6 +54,8 @@ csv = "1.1"
 tokio = { version = "1.27", features = ["full"] }
 tokio-test = { version = "0.4" }
 tonic = {version = "0.10", features = ["tls", "tls-roots"]} # Use system trust roots.
+tracing-subscriber = "0.3"
+sqlite = "0.33"
 
 [[example]]
 name = "postgres"
