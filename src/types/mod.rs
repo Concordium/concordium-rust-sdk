@@ -1786,8 +1786,6 @@ pub enum AccountTransactionEffects {
     /// [`TransferWithMemo`](transactions::Payload::TransferWithMemo)
     /// transaction.
     AccountTransferWithMemo {
-        // TODO: Consider combining this with the non-memo version when we move to gRPC v2 and have
-        // Option<Memo>.
         /// Amount that was transferred.
         amount: Amount,
         /// Receiver account.
