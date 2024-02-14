@@ -16,7 +16,7 @@ on:
 
 env:
   RUST_FMT: nightly-2023-04-01-x86_64-unknown-linux-gnu
-  RUST_VERSION: "1.67"
+  RUST_VERSION: "1.72"
 
 jobs:
   "lint_fmt":
@@ -48,6 +48,23 @@ jobs:
           rustup default $RUST_VERSION
           rustup component add rust-docs
           RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --features postgres --color=always
+
+  # Check compilation of just the crate without tests and examples. This is to
+  # make sure that the features are correctly set for the normal dependencies.
+  "check_pure_compilation":
+    name: lint:clippy
+    # Don't run on draft pull requests
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Clippy
+        run: |
+          rustup default $RUST_VERSION
+          cargo check
 
   "lint_clippy_test":
     name: lint:clippy

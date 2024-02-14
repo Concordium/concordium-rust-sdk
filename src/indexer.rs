@@ -674,7 +674,7 @@ impl Indexer for BlockEventsIndexer {
 
 #[async_trait]
 /// Handle an individual event. This trait is designed to be used together with
-/// the [`Processor`]. These two together are designed to ease the work of
+/// the [`ProcessorConfig`]. These two together are designed to ease the work of
 /// writing the part of indexers where data is to be stored in a database.
 pub trait ProcessEvent {
     /// The type of events that are to be processed. Typically this will be all
@@ -683,21 +683,21 @@ pub trait ProcessEvent {
     /// An error that can be signalled.
     type Error: std::fmt::Display + std::fmt::Debug;
     /// A description returned by the [`process`](ProcessEvent::process) method.
-    /// This message is logged by the [`Processor`] and is intended to describe
-    /// the data that was just processed.
+    /// This message is logged by the [`ProcessorConfig`] and is intended to
+    /// describe the data that was just processed.
     type Description: std::fmt::Display;
 
     /// Process a single item. This should work atomically in the sense that
     /// either the entire `data` is processed or none of it is in case of an
-    /// error. This property is relied upon by the [`Processor`] to retry failed
-    /// attempts.
+    /// error. This property is relied upon by the [`ProcessorConfig`] to retry
+    /// failed attempts.
     async fn process(&mut self, data: &Self::Data) -> Result<Self::Description, Self::Error>;
 
-    /// The `on_failure` method is invoked by the [`Processor`] when it fails to
-    /// process an event. It is meant to retry to recreate the resources,
-    /// such as a database connection, that might have been dropped. The
-    /// return value should signal if the handler process should continue
-    /// (`true`) or not.
+    /// The `on_failure` method is invoked by the [`ProcessorConfig`] when it
+    /// fails to process an event. It is meant to retry to recreate the
+    /// resources, such as a database connection, that might have been
+    /// dropped. The return value should signal if the handler process
+    /// should continue (`true`) or not.
     ///
     /// The function takes the `error` that occurred at the latest
     /// [`process`](Self::process) call that just failed, and the number of
@@ -716,9 +716,15 @@ pub struct ProcessorConfig {
     stop:            std::pin::Pin<Box<dyn std::future::Future<Output = ()>>>,
 }
 
+/// The default implementation behaves the same as
+/// [`ProcessorConfig::new`](ProcessorConfig::new).
+impl Default for ProcessorConfig {
+    fn default() -> Self { Self::new() }
+}
+
 impl ProcessorConfig {
-    /// After each failure the [`Processor`] will pause a bit before trying
-    /// again. Defaults to 5 seconds.
+    /// After each failure the [`ProcessorConfig`] will pause a bit before
+    /// trying again. Defaults to 5 seconds.
     pub fn set_wait_after_failure(self, wait_after_fail: Duration) -> Self {
         Self {
             wait_after_fail,
@@ -739,8 +745,8 @@ impl ProcessorConfig {
         }
     }
 
-    /// Construct a new [`Processor`] that will retry the given number of times.
-    /// The default wait after a failure is 5 seconds.
+    /// Construct a new [`ProcessorConfig`] that will retry the given number of
+    /// times. The default wait after a failure is 5 seconds.
     pub fn new() -> Self {
         Self {
             wait_after_fail: std::time::Duration::from_secs(5),

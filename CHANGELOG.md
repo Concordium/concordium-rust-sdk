@@ -4,6 +4,7 @@
 
 - Add a `ProcessorConfig` struct dual to the `TraverseConfig` to help in writing
   indexers.
+- Bump MSRV to 1.72
 
 ## 4.1.1
 
