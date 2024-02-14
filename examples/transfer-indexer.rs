@@ -57,27 +57,23 @@ impl indexer::ProcessEvent for StoreTransfers {
             let BlockItemSummaryDetails::AccountTransaction(at) = &tx.details else {
                 continue
             };
+            // we only look at transfers or transfers with memo.
+            let (amount, to) = match at.effects {
+                AccountTransactionEffects::AccountTransfer { amount, to } => (amount, to),
+                AccountTransactionEffects::AccountTransferWithMemo {
+                    amount,
+                    to,
+                    memo: _,
+                } => (amount, to),
+                _ => continue,
+            };
             let mut statement = self.db_conn.prepare(
                 "INSERT INTO transfers (sender, amount, receiver) VALUES (:sender, :amount, \
                  :receiver)",
             )?;
             statement.bind((":sender", at.sender.to_string().as_str()))?;
-            // we only look at transfers or transfers with memo.
-            match at.effects {
-                AccountTransactionEffects::AccountTransfer { amount, to } => {
-                    statement.bind((":receiver", to.to_string().as_str()))?;
-                    statement.bind((":amount", amount.to_string().as_str()))?;
-                }
-                AccountTransactionEffects::AccountTransferWithMemo {
-                    amount,
-                    to,
-                    memo: _,
-                } => {
-                    statement.bind((":receiver", to.to_string().as_str()))?;
-                    statement.bind((":amount", amount.to_string().as_str()))?;
-                }
-                _ => continue,
-            }
+            statement.bind((":receiver", to.to_string().as_str()))?;
+            statement.bind((":amount", amount.to_string().as_str()))?;
             while statement.next()? != sqlite::State::Done {}
         }
         self.db_conn.execute("COMMIT")?;
