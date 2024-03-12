@@ -398,7 +398,9 @@ impl TryFrom<EncryptedBalance> for super::types::AccountEncryptedAmount {
 }
 
 impl From<Duration> for chrono::Duration {
-    fn from(value: Duration) -> Self { chrono::Duration::milliseconds(value.value as i64) }
+    fn from(value: Duration) -> Self {
+        chrono::TimeDelta::try_milliseconds(value.value as i64).expect("Duration out of bounds")
+    }
 }
 
 impl From<Duration> for super::types::SlotDuration {
