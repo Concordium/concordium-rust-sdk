@@ -14,7 +14,8 @@ pub(crate) mod timestamp_millis {
     ) -> Result<chrono::DateTime<chrono::Utc>, D::Error> {
         let millis = i64::deserialize(des)?;
         Ok(chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
-            + chrono::TimeDelta::try_milliseconds(millis).ok_or(serde::de::Error::custom("Timestamp out of bounds!"))?)
+            + chrono::TimeDelta::try_milliseconds(millis)
+                .ok_or(serde::de::Error::custom("Timestamp out of bounds!"))?)
     }
 }
 
@@ -121,6 +122,7 @@ pub(crate) mod duration_millis {
         des: D,
     ) -> Result<chrono::Duration, D::Error> {
         let millis = i64::deserialize(des)?;
-        Ok(chrono::Duration::try_milliseconds(millis).ok_or(serde::de::Error::custom("Duration out of bounds!"))?)
+        Ok(chrono::Duration::try_milliseconds(millis)
+            .ok_or(serde::de::Error::custom("Duration out of bounds!"))?)
     }
 }

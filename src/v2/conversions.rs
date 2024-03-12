@@ -401,9 +401,9 @@ impl TryFrom<Duration> for chrono::Duration {
     type Error = tonic::Status;
 
     fn try_from(value: Duration) -> Result<Self, Self::Error> {
-        chrono::TimeDelta::try_milliseconds(value.value as i64).ok_or(
-            tonic::Status::internal("Unexpected response for 'Duration': Duration out of bounds.")
-        )
+        chrono::TimeDelta::try_milliseconds(value.value as i64).ok_or(tonic::Status::internal(
+            "Unexpected response for 'Duration': Duration out of bounds.",
+        ))
     }
 }
 
@@ -2206,7 +2206,10 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
                 None
             } else {
                 Some(ConcordiumBFTDetails {
-                    current_timeout_duration: value.current_timeout_duration.require()?.try_into()?,
+                    current_timeout_duration: value
+                        .current_timeout_duration
+                        .require()?
+                        .try_into()?,
                     current_round:            value.current_round.require()?.into(),
                     current_epoch:            value.current_epoch.require()?.into(),
                     trigger_block_time:       value.trigger_block_time.require()?.try_into()?,
