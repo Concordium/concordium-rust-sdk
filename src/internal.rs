@@ -122,7 +122,7 @@ pub(crate) mod duration_millis {
         des: D,
     ) -> Result<chrono::Duration, D::Error> {
         let millis = i64::deserialize(des)?;
-        Ok(chrono::Duration::try_milliseconds(millis)
-            .ok_or(serde::de::Error::custom("Duration out of bounds!"))?)
+        chrono::Duration::try_milliseconds(millis)
+            .ok_or(serde::de::Error::custom("Duration out of bounds!"))
     }
 }

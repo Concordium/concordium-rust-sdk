@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+- Bump MSRV to 1.73
+
 ## 4.2.0
 
 - Add a `ProcessorConfig` struct dual to the `TraverseConfig` to help in writing
