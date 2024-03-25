@@ -397,8 +397,14 @@ impl TryFrom<EncryptedBalance> for super::types::AccountEncryptedAmount {
     }
 }
 
-impl From<Duration> for chrono::Duration {
-    fn from(value: Duration) -> Self { chrono::Duration::milliseconds(value.value as i64) }
+impl TryFrom<Duration> for chrono::Duration {
+    type Error = tonic::Status;
+
+    fn try_from(value: Duration) -> Result<Self, Self::Error> {
+        chrono::TimeDelta::try_milliseconds(value.value as i64).ok_or_else(|| {
+            tonic::Status::internal("Unexpected response for 'Duration': Duration out of bounds.")
+        })
+    }
 }
 
 impl From<Duration> for super::types::SlotDuration {
@@ -2172,7 +2178,7 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
                 .map(|v| v.try_into())
                 .transpose()?,
             finalization_count: value.finalization_count.into(),
-            epoch_duration: value.epoch_duration.require()?.into(),
+            epoch_duration: value.epoch_duration.require()?.try_into()?,
             blocks_verified_count: value.blocks_verified_count.into(),
             slot_duration: value.slot_duration.map(Into::into),
             genesis_time: value.genesis_time.require()?.try_into()?,
@@ -2200,7 +2206,10 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
                 None
             } else {
                 Some(ConcordiumBFTDetails {
-                    current_timeout_duration: value.current_timeout_duration.require()?.into(),
+                    current_timeout_duration: value
+                        .current_timeout_duration
+                        .require()?
+                        .try_into()?,
                     current_round:            value.current_round.require()?.into(),
                     current_epoch:            value.current_epoch.require()?.into(),
                     trigger_block_time:       value.trigger_block_time.require()?.try_into()?,

@@ -150,7 +150,7 @@ impl<const ADD: bool, Inner> TransactionBuilder<ADD, Inner> {
     }
 
     /// Set the nonce for the transaction. If not set the default behaviour is
-    /// to get the nonce from the connected [`Client`](v2::Client) at the
+    /// to get the nonce from the connected [`Client`] at the
     /// time the transaction is sent.
     pub fn nonce(mut self, nonce: Nonce) -> Self {
         self.nonce = Some(nonce);
