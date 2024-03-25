@@ -401,9 +401,9 @@ impl TryFrom<Duration> for chrono::Duration {
     type Error = tonic::Status;
 
     fn try_from(value: Duration) -> Result<Self, Self::Error> {
-        chrono::TimeDelta::try_milliseconds(value.value as i64).ok_or(tonic::Status::internal(
-            "Unexpected response for 'Duration': Duration out of bounds.",
-        ))
+        chrono::TimeDelta::try_milliseconds(value.value as i64).ok_or_else(|| {
+            tonic::Status::internal("Unexpected response for 'Duration': Duration out of bounds.")
+        })
     }
 }
 

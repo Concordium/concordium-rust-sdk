@@ -1157,7 +1157,9 @@ impl TryFrom<generated::NodeInfo> for types::NodeInfo {
         let local_time = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
             + chrono::TimeDelta::try_milliseconds(node_info.local_time.require()?.value as i64)
                 .context("Node local time out of bounds!")?;
-        let uptime = types::DurationSeconds::from(node_info.peer_uptime.require()?.value).into();
+        let uptime = chrono::Duration::try_from(types::DurationSeconds::from(
+            node_info.peer_uptime.require()?.value,
+        ))?;
         let network_info = node_info.network_info.require()?.try_into()?;
         let details = match node_info.details.require()? {
             generated::node_info::Details::Bootstrapper(_) => types::NodeDetails::Bootstrapper,
