@@ -16,6 +16,7 @@ use crate::{
         Nonce, RegisteredData, SpecialTransactionOutcome, TransactionStatus, UpdateSequenceNumber,
     },
 };
+use anyhow::Context;
 use concordium_base::{
     base::{
         BlockHeight, ChainParameterVersion0, ChainParameterVersion1, CredentialsPerBlockLimit,
@@ -1154,8 +1155,11 @@ impl TryFrom<generated::NodeInfo> for types::NodeInfo {
     fn try_from(node_info: generated::NodeInfo) -> Result<Self, Self::Error> {
         let version = semver::Version::parse(&node_info.peer_version)?;
         let local_time = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH)
-            + chrono::Duration::milliseconds(node_info.local_time.require()?.value as i64);
-        let uptime = types::DurationSeconds::from(node_info.peer_uptime.require()?.value).into();
+            + chrono::TimeDelta::try_milliseconds(node_info.local_time.require()?.value as i64)
+                .context("Node local time out of bounds!")?;
+        let uptime = chrono::Duration::try_from(types::DurationSeconds::from(
+            node_info.peer_uptime.require()?.value,
+        ))?;
         let network_info = node_info.network_info.require()?.try_into()?;
         let details = match node_info.details.require()? {
             generated::node_info::Details::Bootstrapper(_) => types::NodeDetails::Bootstrapper,

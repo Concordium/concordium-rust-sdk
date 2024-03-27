@@ -1679,7 +1679,7 @@ pub struct AccountTransactionDetails {
 impl AccountTransactionDetails {
     /// Get the transaction type corresponding to the details.
     /// Returns `None` for the
-    /// [AccountTransactionEffects::None](AccountTransactionEffects::None)
+    /// [AccountTransactionEffects::None]
     /// variant in case the transaction failed with serialization failure
     /// reason.
     pub fn transaction_type(&self) -> Option<TransactionType> { self.effects.transaction_type() }
@@ -1691,7 +1691,7 @@ impl AccountTransactionDetails {
 impl AccountTransactionEffects {
     /// Get the transaction type corresponding to the effects.
     /// Returns `None` for the
-    /// [AccountTransactionEffects::None](AccountTransactionEffects::None)
+    /// [AccountTransactionEffects::None]
     /// variant in case the transaction failed with serialization failure
     /// reason.
     pub fn transaction_type(&self) -> Option<TransactionType> {

@@ -1,5 +1,10 @@
 ## Unreleased changes
 
+## 4.3.0
+
+- Bump MSRV to 1.73
+- Update dependencies. In particular `concordium-base` and `concordium-smart-contract-engine` are bumped to version 5.
+
 ## 4.2.0
 
 - Add a `ProcessorConfig` struct dual to the `TraverseConfig` to help in writing
