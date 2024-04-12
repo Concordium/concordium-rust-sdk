@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+- Add `cis3` module and `Cis3Contract` for interacting with CIS3 contracts.
+
 ## 4.3.0
 
 - Bump MSRV to 1.73
