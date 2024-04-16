@@ -47,6 +47,8 @@ pub mod contract_client;
 pub mod cis0;
 /// Types and functions for working with CIS-2 smart contracts.
 pub mod cis2;
+/// Types and functions for working with CIS-3 smart contracts.
+pub mod cis3;
 /// Types and functions for working with CIS-4 credential registry standard
 /// contracts.
 pub mod cis4;
