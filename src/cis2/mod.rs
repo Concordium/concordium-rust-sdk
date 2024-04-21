@@ -361,8 +361,8 @@ impl Cis2Contract {
     ///
     /// # Arguments
     ///
-    /// * `block_hash` - Hash of a block. The query will be executed in the
-    ///   state of the chain at the end of the block.
+    /// * `bi` - The block to query. The query will be executed in the state of
+    ///   the chain at the end of the block.
     /// * `queries` - A list queries to execute.
     pub async fn balance_of(
         &mut self,
@@ -397,8 +397,8 @@ impl Cis2Contract {
     ///
     /// # Arguments
     ///
-    /// * `block_hash` - Hash of a block. The query will be executed in the
-    ///   state of the chain at the end of the block.
+    /// * `bi` - The block to query. The query will be executed in the state of
+    ///   the chain at the end of the block.
     /// * `queries` - A list queries to execute.
     pub async fn operator_of(
         &mut self,
@@ -436,8 +436,8 @@ impl Cis2Contract {
     ///
     /// # Arguments
     ///
-    /// * `block_hash` - Hash of a block. The query will be executed in the
-    ///   state of the chain at the end of the block.
+    /// * `bi` - The block to query. The query will be executed in the state of
+    ///   the chain at the end of the block.
     /// * `queries` - A list queries to execute.
     pub async fn token_metadata(
         &mut self,
