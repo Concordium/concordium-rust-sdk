@@ -285,6 +285,46 @@ impl AccountStakingInfo {
     }
 }
 
+/// The status of a cooldown. When stake is removed from a baker or delegator
+/// (from protocol version 7) it first enters the pre-pre-cooldown state.
+/// The next time the stake snaphot is taken (at the epoch transition before
+/// a payday) it enters the pre-cooldown state. At the subsequent payday, it
+/// enters the cooldown state. At the payday after the end of the cooldown
+/// period, the stake is finally released.
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
+pub enum CooldownStatus {
+    /// The amount is in cooldown and will expire at the specified time,
+    /// becoming available at the subsequent pay day.
+    Cooldown,
+
+    /// The amount will enter cooldown at the next pay day. The specified
+    /// end time is projected to be the end of the cooldown period,
+    /// but the actual end time will be determined at the payday,
+    /// and may be different if the global cooldown period changes.
+    PreCooldown,
+
+    /// The amount will enter pre-cooldown at the next snapshot epoch (i.e.
+    /// the epoch transition before a pay day transition). As with
+    /// pre-cooldown, the specified end time is projected, but the
+    /// actual end time will be determined later.
+    PrePreCooldown,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Cooldown {
+    /// The time in milliseconds since the Unix epoch when the cooldown period
+    /// ends.
+    pub end_time: Timestamp,
+
+    /// The amount that is in cooldown and set to be released at the end of the
+    /// cooldown period.
+    pub amount: Amount,
+
+    /// The status of the cooldown.
+    pub status: CooldownStatus,
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// Account information exposed via the node's API. This is always the state of
@@ -327,6 +367,18 @@ pub struct AccountInfo {
     pub account_stake:            Option<AccountStakingInfo>,
     /// Canonical address of the account.
     pub account_address:          AccountAddress,
+
+    /// The stake on the account that is in cooldown.
+    /// There can be multiple amounts in cooldown that expire at different
+    /// times.
+    pub cooldowns: Vec<Cooldown>,
+
+    /// The available (unencrypted) balance of the account (i.e. that can be
+    /// transferred or used to pay for transactions). This is the balance
+    /// minus the locked amount. The locked amount is the maximum of the
+    /// amount in the release schedule and the total amount that is actively
+    /// staked or in cooldown (inactive stake).
+    pub available_balance: Amount,
 }
 
 impl From<&AccountInfo> for AccountAccessStructure {

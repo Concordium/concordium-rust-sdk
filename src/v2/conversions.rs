@@ -21,6 +21,7 @@ use concordium_base::{
     },
     updates,
 };
+use cooldown::CooldownStatus;
 use std::collections::{BTreeMap, BTreeSet};
 
 fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
@@ -899,6 +900,28 @@ impl TryFrom<DelegatorRewardPeriodInfo> for super::types::DelegatorRewardPeriodI
     }
 }
 
+impl From<CooldownStatus> for super::types::CooldownStatus {
+    fn from(cds: CooldownStatus) -> Self {
+        match cds {
+            CooldownStatus::Cooldown => Self::Cooldown,
+            CooldownStatus::PreCooldown => Self::PreCooldown,
+            CooldownStatus::PrePreCooldown => Self::PrePreCooldown,
+        }
+    }
+}
+
+impl TryFrom<Cooldown> for super::types::Cooldown {
+    type Error = tonic::Status;
+
+    fn try_from(cd: Cooldown) -> Result<Self, Self::Error> {
+        Ok(Self {
+            status:   cd.status().into(),
+            end_time: cd.end_time.require()?.into(),
+            amount:   cd.amount.require()?.into(),
+        })
+    }
+}
+
 impl TryFrom<AccountInfo> for super::types::AccountInfo {
     type Error = tonic::Status;
 
@@ -914,6 +937,8 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             index,
             stake,
             address,
+            cooldowns,
+            available_balance,
         } = value;
         let account_nonce = sequence_number.require()?.into();
         let account_amount = amount.require()?.into();
@@ -927,6 +952,12 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             None => None,
         };
         let account_address = address.require()?.try_into()?;
+        let mut cds = Vec::with_capacity(cooldowns.len());
+        for cooldown in cooldowns.into_iter() {
+            cds.push(cooldown.try_into()?)
+        }
+        let cooldowns = cds;
+        let available_balance = available_balance.require()?.into();
         Ok(Self {
             account_nonce,
             account_amount,
@@ -947,6 +978,8 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             account_index,
             account_stake,
             account_address,
+            cooldowns,
+            available_balance,
         })
     }
 }
