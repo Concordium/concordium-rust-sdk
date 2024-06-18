@@ -915,7 +915,14 @@ impl TryFrom<Cooldown> for super::types::Cooldown {
 
     fn try_from(cd: Cooldown) -> Result<Self, Self::Error> {
         Ok(Self {
-            status:   cd.status().into(),
+            status:   CooldownStatus::try_from(cd.status)
+                .map_err(|_| {
+                    tonic::Status::invalid_argument(format!(
+                        "unknown cooldown status value {}",
+                        cd.status
+                    ))
+                })?
+                .into(),
             end_time: cd.end_time.require()?.into(),
             amount:   cd.amount.require()?.into(),
         })
