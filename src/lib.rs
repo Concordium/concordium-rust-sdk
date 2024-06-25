@@ -19,7 +19,8 @@
 //! - [`common`] has some common type definitions, as well as traits and helpers
 //!   for binary serialization
 //! - [`encrypted_transfers`] implements structures and zero knowledge proofs
-//!   related to encrypted transfers
+//!   related to encrypted transfers. Note that this functionality has been
+//!   deprecated in protocol version 7.
 //! - [`eddsa_ed25519`] is a re-export of the signature scheme used for blocks
 //!   and accounts on the Concordium blockchain.
 //! - [`aggregate_sig`] is a re-export of the BLS signature scheme, used by the

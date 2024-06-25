@@ -5,12 +5,12 @@ use super::generated::*;
 
 use super::Require;
 use crate::{
-    types::{queries::ConcordiumBFTDetails, UpdateKeysCollectionSkeleton},
+    types::{queries::ConcordiumBFTDetails, AccountReleaseSchedule, UpdateKeysCollectionSkeleton},
     v2::generated::BlockCertificates,
 };
 use chrono::TimeZone;
 use concordium_base::{
-    base,
+    base, common,
     common::{Deserial, Versioned, VERSION_0},
     id::{
         constants::{ArCurve, AttributeKind, IpPairing},
@@ -949,12 +949,12 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
         } = value;
         let account_nonce = sequence_number.require()?.into();
         let account_amount = amount.require()?.into();
-        let account_release_schedule = schedule.require()?.try_into()?;
+        let account_release_schedule: AccountReleaseSchedule = schedule.require()?.try_into()?;
         let account_threshold = threshold.require()?.try_into()?;
         let account_encrypted_amount = encrypted_balance.require()?.try_into()?;
         let account_encryption_key = encryption_key.require()?.try_into()?;
         let account_index = index.require()?.into();
-        let account_stake = match stake {
+        let account_stake: Option<super::types::AccountStakingInfo> = match stake {
             Some(stake) => Some(stake.try_into()?),
             None => None,
         };
@@ -964,7 +964,32 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             cds.push(cooldown.try_into()?)
         }
         let cooldowns = cds;
-        let available_balance = available_balance.require()?.into();
+
+        // The available balance is only provided as convenience and in case the
+        // calculation of it changes in the future. If the available balance is
+        // not present, we calculate it manually instead. Note that changes in the
+        // calculation method may make this calculation invalid.
+        let available_balance = available_balance.map(|ab| ab.into()).unwrap_or_else(|| {
+            // According to the protobuf documentation:
+            // The available (unencrypted) balance of the account is the balance...
+            let balance = account_amount;
+
+            // ... minus the locked amount. The locked amount is the maximum of the
+            // amount in the release schedule...
+            let release_schedule_amount = account_release_schedule.total;
+
+            // ... and the total amount that is actively staked or in cooldown (inactive
+            // stake).
+            let staked_amount = account_stake.as_ref()
+                .map(|s| s.staked_amount())
+                // FIXME: Give common::types::Amount a `Default` impl and use .unwrap_or_default();
+                .unwrap_or(common::types::Amount::zero());
+
+            let locked_amount = Ord::max(release_schedule_amount, staked_amount);
+
+            balance - locked_amount
+        });
+
         Ok(Self {
             account_nonce,
             account_amount,
