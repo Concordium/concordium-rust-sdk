@@ -959,7 +959,7 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             None => None,
         };
         let account_address = address.require()?.try_into()?;
-        let mut cds = Vec::with_capacity(cooldowns.len());
+        let mut cds: Vec<super::types::Cooldown> = Vec::with_capacity(cooldowns.len());
         for cooldown in cooldowns.into_iter() {
             cds.push(cooldown.try_into()?)
         }
@@ -970,24 +970,23 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
         // not present, we calculate it manually instead. Note that changes in the
         // calculation method may make this calculation invalid.
         let available_balance = available_balance.map(|ab| ab.into()).unwrap_or_else(|| {
-            // According to the protobuf documentation:
-            // The available (unencrypted) balance of the account is the balance...
-            let balance = account_amount;
-
-            // ... minus the locked amount. The locked amount is the maximum of the
-            // amount in the release schedule...
-            let release_schedule_amount = account_release_schedule.total;
-
-            // ... and the total amount that is actively staked or in cooldown (inactive
-            // stake).
-            let staked_amount = account_stake.as_ref()
+            let active_stake = account_stake.as_ref()
                 .map(|s| s.staked_amount())
                 // FIXME: Give common::types::Amount a `Default` impl and use .unwrap_or_default();
                 .unwrap_or(common::types::Amount::zero());
 
-            let locked_amount = Ord::max(release_schedule_amount, staked_amount);
+            let inactive_stake = cooldowns.iter().map(|cd| cd.amount).sum();
 
-            balance - locked_amount
+            let staked_amount = active_stake + inactive_stake;
+
+            // The locked amount is the maximum of the amount in the release schedule and
+            // the total amount that is actively staked or in cooldown (inactive stake).
+            let locked_amount = Ord::max(account_release_schedule.total, staked_amount);
+
+            // According to the protobuf documentation:
+            // The available (unencrypted) balance of the account is the balance minus the
+            // locked amount.
+            account_amount - locked_amount
         });
 
         Ok(Self {
