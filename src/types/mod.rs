@@ -647,9 +647,26 @@ mod lottery_power_parser {
 /// the state of the baker that is currently eligible for baking.
 pub struct BakerPoolStatus {
     /// The 'BakerId' of the pool owner.
-    pub baker_id:                   BakerId,
+    pub baker_id:                 BakerId,
     /// The account address of the pool owner.
-    pub baker_address:              AccountAddress,
+    pub baker_address:            AccountAddress,
+    /// The active status of the pool. This reflects any changes to the pool
+    /// since the last snapshot.
+    pub active_baker_pool_status: Option<ActiveBakerPoolStatus>,
+    /// Status of the pool in the current reward period. This will be [`None`]
+    /// if the pool is not a baker in the payday (e.g., because they just
+    /// registered and a new payday has not started yet).
+    pub current_payday_status:    Option<CurrentPaydayBakerPoolStatus>,
+    /// Total capital staked across all pools.
+    pub all_pool_total_capital:   Amount,
+}
+
+// Information about a baker pool's active stake and status. This does not
+// reflect the stake used for the current reward period, but rather the stake
+// that is currently active.
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ActiveBakerPoolStatus {
     /// The equity capital provided by the pool owner.
     pub baker_equity_capital:       Amount,
     /// The capital delegated to the pool by other accounts.
@@ -662,12 +679,6 @@ pub struct BakerPoolStatus {
     pub pool_info:                  BakerPoolInfo,
     /// Any pending change to the baker's stake.
     pub baker_stake_pending_change: PoolPendingChange,
-    /// Status of the pool in the current reward period. This will be [`None`]
-    /// if the pool is not a baker in the payday (e.g., because they just
-    /// registered and a new payday has not started yet).
-    pub current_payday_status:      Option<CurrentPaydayBakerPoolStatus>,
-    /// Total capital staked across all pools.
-    pub all_pool_total_capital:     Amount,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]

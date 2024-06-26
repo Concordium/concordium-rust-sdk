@@ -5,7 +5,10 @@ use super::generated::*;
 
 use super::Require;
 use crate::{
-    types::{queries::ConcordiumBFTDetails, AccountReleaseSchedule, UpdateKeysCollectionSkeleton},
+    types::{
+        queries::ConcordiumBFTDetails, AccountReleaseSchedule, ActiveBakerPoolStatus,
+        UpdateKeysCollectionSkeleton,
+    },
     v2::generated::BlockCertificates,
 };
 use chrono::TimeZone;
@@ -2535,20 +2538,29 @@ impl TryFrom<PoolInfoResponse> for super::types::BakerPoolStatus {
     type Error = tonic::Status;
 
     fn try_from(value: PoolInfoResponse) -> Result<Self, Self::Error> {
+        // The active baker pool status is present iff the pool info is present in the
+        // response.
+        let active_baker_pool_status = match value.pool_info {
+            None => None,
+            Some(pi) => Some(ActiveBakerPoolStatus {
+                baker_equity_capital:       value.equity_capital.require()?.into(),
+                delegated_capital:          value.delegated_capital.require()?.into(),
+                delegated_capital_cap:      value.delegated_capital_cap.require()?.into(),
+                pool_info:                  pi.try_into()?,
+                baker_stake_pending_change: value.equity_pending_change.try_into()?,
+            }),
+        };
+
         Ok(Self {
-            baker_id:                   value.baker.require()?.into(),
-            baker_address:              value.address.require()?.try_into()?,
-            baker_equity_capital:       value.equity_capital.require()?.into(),
-            delegated_capital:          value.delegated_capital.require()?.into(),
-            delegated_capital_cap:      value.delegated_capital_cap.require()?.into(),
-            pool_info:                  value.pool_info.require()?.try_into()?,
-            baker_stake_pending_change: value.equity_pending_change.try_into()?,
-            current_payday_status:      if let Some(v) = value.current_payday_info {
+            baker_id: value.baker.require()?.into(),
+            baker_address: value.address.require()?.try_into()?,
+            active_baker_pool_status,
+            current_payday_status: if let Some(v) = value.current_payday_info {
                 Some(v.try_into()?)
             } else {
                 None
             },
-            all_pool_total_capital:     value.all_pool_total_capital.require()?.into(),
+            all_pool_total_capital: value.all_pool_total_capital.require()?.into(),
         })
     }
 }
