@@ -1,6 +1,8 @@
 ## Unreleased changes
 
 - Add `cis3` module and `Cis3Contract` for interacting with CIS3 contracts.
+- Updated the concordium-base submodule to incorporate protocol 7 changes.
+  This updates some protobuf messages relating to cooldown and baker pool status.
 
 ## 4.3.0
 
@@ -126,7 +128,7 @@
   serialization macros.
 - Bump minimum supported rust version to 1.64.
 - When using derive(Serial,Deserial) macros from the smart_contracts modules
-  `concordium_std` must be made available, for example as 
+  `concordium_std` must be made available, for example as
   `use concordium_rust_sdk::smart_contracts::common as concordium_std`
 
 ## 2.3.0
