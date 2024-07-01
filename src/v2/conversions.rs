@@ -970,7 +970,7 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
 
         // The available balance is only provided as convenience and in case the
         // calculation of it changes in the future. It should be present if the node
-        // uses protocol version 7 (or later). If the available balance is not present,
+        // is version 7 (or later). If the available balance is not present,
         // we calculate it manually instead.
         // If we up the minimum supported node version to version 7, we can remove this
         // fallback calculation and instead require the available balance field to
