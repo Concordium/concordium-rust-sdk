@@ -374,6 +374,7 @@ pub struct AccountInfo {
     /// The stake on the account that is in cooldown.
     /// There can be multiple amounts in cooldown that expire at different
     /// times.
+    /// Empty for nodes using protocol version 6 or lower.
     pub cooldowns: Vec<Cooldown>,
 
     /// The available (unencrypted) balance of the account (i.e. that can be
