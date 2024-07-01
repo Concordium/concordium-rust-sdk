@@ -5,7 +5,10 @@ use super::generated::*;
 
 use super::Require;
 use crate::{
-    types::{queries::ConcordiumBFTDetails, UpdateKeysCollectionSkeleton},
+    types::{
+        queries::ConcordiumBFTDetails, AccountReleaseSchedule, ActiveBakerPoolStatus,
+        UpdateKeysCollectionSkeleton,
+    },
     v2::generated::BlockCertificates,
 };
 use chrono::TimeZone;
@@ -21,6 +24,7 @@ use concordium_base::{
     },
     updates,
 };
+use cooldown::CooldownStatus;
 use std::collections::{BTreeMap, BTreeSet};
 
 fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
@@ -899,6 +903,35 @@ impl TryFrom<DelegatorRewardPeriodInfo> for super::types::DelegatorRewardPeriodI
     }
 }
 
+impl From<CooldownStatus> for super::types::CooldownStatus {
+    fn from(cds: CooldownStatus) -> Self {
+        match cds {
+            CooldownStatus::Cooldown => Self::Cooldown,
+            CooldownStatus::PreCooldown => Self::PreCooldown,
+            CooldownStatus::PrePreCooldown => Self::PrePreCooldown,
+        }
+    }
+}
+
+impl TryFrom<Cooldown> for super::types::Cooldown {
+    type Error = tonic::Status;
+
+    fn try_from(cd: Cooldown) -> Result<Self, Self::Error> {
+        Ok(Self {
+            status:   CooldownStatus::try_from(cd.status)
+                .map_err(|_| {
+                    tonic::Status::invalid_argument(format!(
+                        "unknown cooldown status value {}",
+                        cd.status
+                    ))
+                })?
+                .into(),
+            end_time: cd.end_time.require()?.into(),
+            amount:   cd.amount.require()?.into(),
+        })
+    }
+}
+
 impl TryFrom<AccountInfo> for super::types::AccountInfo {
     type Error = tonic::Status;
 
@@ -914,19 +947,54 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             index,
             stake,
             address,
+            cooldowns,
+            available_balance,
         } = value;
         let account_nonce = sequence_number.require()?.into();
         let account_amount = amount.require()?.into();
-        let account_release_schedule = schedule.require()?.try_into()?;
+        let account_release_schedule: AccountReleaseSchedule = schedule.require()?.try_into()?;
         let account_threshold = threshold.require()?.try_into()?;
         let account_encrypted_amount = encrypted_balance.require()?.try_into()?;
         let account_encryption_key = encryption_key.require()?.try_into()?;
         let account_index = index.require()?.into();
-        let account_stake = match stake {
+        let account_stake: Option<super::types::AccountStakingInfo> = match stake {
             Some(stake) => Some(stake.try_into()?),
             None => None,
         };
         let account_address = address.require()?.try_into()?;
+        let mut cds: Vec<super::types::Cooldown> = Vec::with_capacity(cooldowns.len());
+        for cooldown in cooldowns.into_iter() {
+            cds.push(cooldown.try_into()?)
+        }
+        let cooldowns = cds;
+
+        // The available balance is only provided as convenience and in case the
+        // calculation of it changes in the future. It should be present if the node
+        // is version 7 (or later). If the available balance is not present,
+        // we calculate it manually instead.
+        // If we up the minimum supported node version to version 7, we can remove this
+        // fallback calculation and instead require the available balance field to
+        // always be present.
+        let available_balance = available_balance.map(|ab| ab.into()).unwrap_or_else(|| {
+            let active_stake = account_stake
+                .as_ref()
+                .map(|s| s.staked_amount())
+                .unwrap_or_default();
+
+            let inactive_stake = cooldowns.iter().map(|cd| cd.amount).sum();
+
+            let staked_amount = active_stake + inactive_stake;
+
+            // The locked amount is the maximum of the amount in the release schedule and
+            // the total amount that is actively staked or in cooldown (inactive stake).
+            let locked_amount = Ord::max(account_release_schedule.total, staked_amount);
+
+            // According to the protobuf documentation:
+            // The available (unencrypted) balance of the account is the balance minus the
+            // locked amount.
+            account_amount - locked_amount
+        });
+
         Ok(Self {
             account_nonce,
             account_amount,
@@ -947,6 +1015,8 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             account_index,
             account_stake,
             account_address,
+            cooldowns,
+            available_balance,
         })
     }
 }
@@ -2471,20 +2541,29 @@ impl TryFrom<PoolInfoResponse> for super::types::BakerPoolStatus {
     type Error = tonic::Status;
 
     fn try_from(value: PoolInfoResponse) -> Result<Self, Self::Error> {
+        // The active baker pool status is present iff the pool info is present in the
+        // response.
+        let active_baker_pool_status = match value.pool_info {
+            None => None,
+            Some(pi) => Some(ActiveBakerPoolStatus {
+                baker_equity_capital:       value.equity_capital.require()?.into(),
+                delegated_capital:          value.delegated_capital.require()?.into(),
+                delegated_capital_cap:      value.delegated_capital_cap.require()?.into(),
+                pool_info:                  pi.try_into()?,
+                baker_stake_pending_change: value.equity_pending_change.try_into()?,
+            }),
+        };
+
         Ok(Self {
-            baker_id:                   value.baker.require()?.into(),
-            baker_address:              value.address.require()?.try_into()?,
-            baker_equity_capital:       value.equity_capital.require()?.into(),
-            delegated_capital:          value.delegated_capital.require()?.into(),
-            delegated_capital_cap:      value.delegated_capital_cap.require()?.into(),
-            pool_info:                  value.pool_info.require()?.try_into()?,
-            baker_stake_pending_change: value.equity_pending_change.try_into()?,
-            current_payday_status:      if let Some(v) = value.current_payday_info {
+            baker_id: value.baker.require()?.into(),
+            baker_address: value.address.require()?.try_into()?,
+            active_baker_pool_status,
+            current_payday_status: if let Some(v) = value.current_payday_info {
                 Some(v.try_into()?)
             } else {
                 None
             },
-            all_pool_total_capital:     value.all_pool_total_capital.require()?.into(),
+            all_pool_total_capital: value.all_pool_total_capital.require()?.into(),
         })
     }
 }

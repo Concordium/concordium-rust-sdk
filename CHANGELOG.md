@@ -1,6 +1,15 @@
 ## Unreleased changes
 
 - Add `cis3` module and `Cis3Contract` for interacting with CIS3 contracts.
+- Updated the concordium-base submodule to incorporate protocol 7 changes (cooldown and baker pool status changes).
+  Specifically, this changes the following public types:
+    - `AccountInfo`: Now has two new fields, `cooldown: Vec<Cooldown>` and `available_balance: Amount`.
+      The `cooldown` field specifies the stake currently in cooldown for the account.
+      The `available_balance` field denotes the total amount available to the account for transfers.
+    - `BakerPoolStatus`: The `baker_equity_capital`, `delegated_capital`, `delegated_capital_cap`, `pool_info`
+      and `baker_stake_pending_change` fields are moved into a new type, `ActiveBakerPoolStatus`. A new field is added
+      to `BakerPoolStatus` which includes these fields, namely `active_baker_pool_status: Option<ActiveBakerPoolStatus>`.
+      This field is `Some(..)` iff `pool_info` is included in the node's `PoolInfoResponse`.
 
 ## 4.3.0
 
@@ -126,7 +135,7 @@
   serialization macros.
 - Bump minimum supported rust version to 1.64.
 - When using derive(Serial,Deserial) macros from the smart_contracts modules
-  `concordium_std` must be made available, for example as 
+  `concordium_std` must be made available, for example as
   `use concordium_rust_sdk::smart_contracts::common as concordium_std`
 
 ## 2.3.0

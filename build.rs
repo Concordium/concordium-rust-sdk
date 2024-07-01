@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let spec = repo.revparse_single("HEAD")?.id();
         std::fs::write(
             "./src/v2/proto_schema_version.rs",
-            format!("pub const PROTO_SCHEMA_VERSION: &str = \"{}\";", spec),
+            format!("pub const PROTO_SCHEMA_VERSION: &str = \"{}\";\n", spec),
         )?;
     }
     Ok(())

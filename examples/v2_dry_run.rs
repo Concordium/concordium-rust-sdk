@@ -94,6 +94,7 @@ async fn test_all(endpoint: v2::Endpoint) -> anyhow::Result<()> {
     // Update the timestamp to now.
     let _fut7 = dry_run.begin_set_timestamp(Timestamp::now()).await?;
     // Execute a transfer to the encrypted balance on account 0.
+    #[allow(deprecated)]
     let payload = Payload::TransferToEncrypted {
         amount: Amount::from_ccd(20),
     };

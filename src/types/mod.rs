@@ -134,11 +134,13 @@ impl AccountEncryptedAmount {
         let mut combined = self.self_amount.clone();
         let mut agg_amount = encrypted_transfers::decrypt_amount(table, sk, &self.self_amount);
         let mut index = self.start_index;
+        #[allow(deprecated)]
         if let Some((agg, num_agg)) = self.aggregated_amount.as_ref() {
             agg_amount += encrypted_transfers::decrypt_amount(table, sk, agg);
             combined = encrypted_transfers::aggregate(&combined, agg);
             index += u64::from(*num_agg);
         }
+        #[allow(deprecated)]
         for amount in &self.incoming_amounts {
             agg_amount += encrypted_transfers::decrypt_amount(table, sk, amount);
             combined = encrypted_transfers::aggregate(&combined, amount);
@@ -192,6 +194,7 @@ impl AccountEncryptedAmount {
     {
         let agg_amount = self.decrypt_and_combine(ctx, sk);
         if amount <= agg_amount.agg_amount {
+            #[allow(deprecated)]
             let data = encrypted_transfers::make_transfer_data(
                 ctx.params,
                 receiver_pk,
@@ -285,6 +288,46 @@ impl AccountStakingInfo {
     }
 }
 
+/// The status of a cooldown. When stake is removed from a baker or delegator
+/// (from protocol version 7) it first enters the pre-pre-cooldown state.
+/// The next time the stake snaphot is taken (at the epoch transition before
+/// a payday) it enters the pre-cooldown state. At the subsequent payday, it
+/// enters the cooldown state. At the payday after the end of the cooldown
+/// period, the stake is finally released.
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
+pub enum CooldownStatus {
+    /// The amount is in cooldown and will expire at the specified time,
+    /// becoming available at the subsequent pay day.
+    Cooldown,
+
+    /// The amount will enter cooldown at the next pay day. The specified
+    /// end time is projected to be the end of the cooldown period,
+    /// but the actual end time will be determined at the payday,
+    /// and may be different if the global cooldown period changes.
+    PreCooldown,
+
+    /// The amount will enter pre-cooldown at the next snapshot epoch (i.e.
+    /// the epoch transition before a pay day transition). As with
+    /// pre-cooldown, the specified end time is projected, but the
+    /// actual end time will be determined later.
+    PrePreCooldown,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Cooldown {
+    /// The time in milliseconds since the Unix epoch when the cooldown period
+    /// ends.
+    pub end_time: Timestamp,
+
+    /// The amount that is in cooldown and set to be released at the end of the
+    /// cooldown period.
+    pub amount: Amount,
+
+    /// The status of the cooldown.
+    pub status: CooldownStatus,
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// Account information exposed via the node's API. This is always the state of
@@ -327,6 +370,19 @@ pub struct AccountInfo {
     pub account_stake:            Option<AccountStakingInfo>,
     /// Canonical address of the account.
     pub account_address:          AccountAddress,
+
+    /// The stake on the account that is in cooldown.
+    /// There can be multiple amounts in cooldown that expire at different
+    /// times.
+    /// Empty for nodes using protocol version 6 or lower.
+    pub cooldowns: Vec<Cooldown>,
+
+    /// The available (unencrypted) balance of the account (i.e. that can be
+    /// transferred or used to pay for transactions). This is the balance
+    /// minus the locked amount. The locked amount is the maximum of the
+    /// amount in the release schedule and the total amount that is actively
+    /// staked or in cooldown (inactive stake).
+    pub available_balance: Amount,
 }
 
 impl From<&AccountInfo> for AccountAccessStructure {
@@ -595,9 +651,26 @@ mod lottery_power_parser {
 /// the state of the baker that is currently eligible for baking.
 pub struct BakerPoolStatus {
     /// The 'BakerId' of the pool owner.
-    pub baker_id:                   BakerId,
+    pub baker_id:                 BakerId,
     /// The account address of the pool owner.
-    pub baker_address:              AccountAddress,
+    pub baker_address:            AccountAddress,
+    /// The active status of the pool. This reflects any changes to the pool
+    /// since the last snapshot.
+    pub active_baker_pool_status: Option<ActiveBakerPoolStatus>,
+    /// Status of the pool in the current reward period. This will be [`None`]
+    /// if the pool is not a baker in the payday (e.g., because they just
+    /// registered and a new payday has not started yet).
+    pub current_payday_status:    Option<CurrentPaydayBakerPoolStatus>,
+    /// Total capital staked across all pools.
+    pub all_pool_total_capital:   Amount,
+}
+
+// Information about a baker pool's active stake and status. This does not
+// reflect the stake used for the current reward period, but rather the stake
+// that is currently active.
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ActiveBakerPoolStatus {
     /// The equity capital provided by the pool owner.
     pub baker_equity_capital:       Amount,
     /// The capital delegated to the pool by other accounts.
@@ -610,12 +683,6 @@ pub struct BakerPoolStatus {
     pub pool_info:                  BakerPoolInfo,
     /// Any pending change to the baker's stake.
     pub baker_stake_pending_change: PoolPendingChange,
-    /// Status of the pool in the current reward period. This will be [`None`]
-    /// if the pool is not a baker in the payday (e.g., because they just
-    /// registered and a new payday has not started yet).
-    pub current_payday_status:      Option<CurrentPaydayBakerPoolStatus>,
-    /// Total capital staked across all pools.
-    pub all_pool_total_capital:     Amount,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -1705,19 +1772,27 @@ impl AccountTransactionEffects {
             AccountTransactionEffects::ContractUpdateIssued { .. } => Some(Update),
             AccountTransactionEffects::AccountTransfer { .. } => Some(Transfer),
             AccountTransactionEffects::AccountTransferWithMemo { .. } => Some(TransferWithMemo),
+            #[allow(deprecated)]
             AccountTransactionEffects::BakerAdded { .. } => Some(AddBaker),
+            #[allow(deprecated)]
             AccountTransactionEffects::BakerRemoved { .. } => Some(RemoveBaker),
+            #[allow(deprecated)]
             AccountTransactionEffects::BakerStakeUpdated { .. } => Some(UpdateBakerStake),
+            #[allow(deprecated)]
             AccountTransactionEffects::BakerRestakeEarningsUpdated { .. } => {
                 Some(UpdateBakerRestakeEarnings)
             }
+            #[allow(deprecated)]
             AccountTransactionEffects::BakerKeysUpdated { .. } => Some(UpdateBakerKeys),
+            #[allow(deprecated)]
             AccountTransactionEffects::EncryptedAmountTransferred { .. } => {
                 Some(EncryptedAmountTransfer)
             }
+            #[allow(deprecated)]
             AccountTransactionEffects::EncryptedAmountTransferredWithMemo { .. } => {
                 Some(EncryptedAmountTransferWithMemo)
             }
+            #[allow(deprecated)]
             AccountTransactionEffects::TransferredToEncrypted { .. } => Some(TransferToEncrypted),
             AccountTransactionEffects::TransferredToPublic { .. } => Some(TransferToPublic),
             AccountTransactionEffects::TransferredWithSchedule { .. } => Some(TransferWithSchedule),

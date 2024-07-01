@@ -462,10 +462,14 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                         },
                         Event::TransferMemo { memo },
                     ),
-                    super::AccountTransactionEffects::BakerAdded { data } => {
+                    super::AccountTransactionEffects::BakerAdded { data } =>
+                    {
+                        #[allow(deprecated)]
                         mk_success_1(TransactionType::AddBaker, Event::BakerAdded { data })
                     }
-                    super::AccountTransactionEffects::BakerRemoved { baker_id } => {
+                    super::AccountTransactionEffects::BakerRemoved { baker_id } =>
+                    {
+                        #[allow(deprecated)]
                         mk_success_1(TransactionType::RemoveBaker, Event::BakerRemoved {
                             baker_id,
                             account: sender,
@@ -474,6 +478,7 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                     super::AccountTransactionEffects::BakerStakeUpdated { data } => {
                         if let Some(data) = data {
                             mk_success_1(
+                                #[allow(deprecated)]
                                 TransactionType::UpdateBakerStake,
                                 if data.increased {
                                     Event::BakerStakeIncreased {
@@ -491,6 +496,7 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                             )
                         } else {
                             (
+                                #[allow(deprecated)]
                                 Some(TransactionType::UpdateBakerStake),
                                 BlockItemResult::Success { events: Vec::new() },
                             )
@@ -500,6 +506,7 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                         baker_id,
                         restake_earnings,
                     } => mk_success_1(
+                        #[allow(deprecated)]
                         TransactionType::UpdateBakerRestakeEarnings,
                         Event::BakerSetRestakeEarnings {
                             baker_id,
@@ -507,7 +514,9 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                             restake_earnings,
                         },
                     ),
-                    super::AccountTransactionEffects::BakerKeysUpdated { data } => {
+                    super::AccountTransactionEffects::BakerKeysUpdated { data } =>
+                    {
+                        #[allow(deprecated)]
                         mk_success_1(TransactionType::UpdateBakerKeys, Event::BakerKeysUpdated {
                             data,
                         })
@@ -516,6 +525,7 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                         removed,
                         added,
                     } => mk_success_2(
+                        #[allow(deprecated)]
                         TransactionType::EncryptedAmountTransfer,
                         Event::EncryptedAmountsRemoved { data: removed },
                         Event::NewEncryptedAmount { data: added },
@@ -525,12 +535,15 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                         added,
                         memo,
                     } => mk_success_3(
+                        #[allow(deprecated)]
                         TransactionType::EncryptedAmountTransferWithMemo,
                         Event::EncryptedAmountsRemoved { data: removed },
                         Event::NewEncryptedAmount { data: added },
                         Event::TransferMemo { memo },
                     ),
-                    super::AccountTransactionEffects::TransferredToEncrypted { data } => {
+                    super::AccountTransactionEffects::TransferredToEncrypted { data } =>
+                    {
+                        #[allow(deprecated)]
                         mk_success_1(
                             TransactionType::TransferToEncrypted,
                             Event::EncryptedSelfAmountAdded { data },
@@ -899,6 +912,7 @@ fn convert_account_transaction(
                 _ => Err(ConversionError::InvalidTransactionResult),
             }
         }
+        #[allow(deprecated)]
         TransactionType::AddBaker => {
             let effects = with_singleton(events, |e| match e {
                 Event::BakerAdded { data } => {
@@ -908,6 +922,7 @@ fn convert_account_transaction(
             })?;
             mk_success(effects)
         }
+        #[allow(deprecated)]
         TransactionType::RemoveBaker => {
             let effects = with_singleton(events, |e| match e {
                 Event::BakerRemoved {
@@ -918,6 +933,7 @@ fn convert_account_transaction(
             })?;
             mk_success(effects)
         }
+        #[allow(deprecated)]
         TransactionType::UpdateBakerStake => {
             let effects = if events.is_empty() {
                 super::AccountTransactionEffects::BakerStakeUpdated { data: None }
@@ -950,6 +966,7 @@ fn convert_account_transaction(
             };
             mk_success(effects)
         }
+        #[allow(deprecated)]
         TransactionType::UpdateBakerRestakeEarnings => {
             let effects = with_singleton(events, |e| match e {
                 Event::BakerSetRestakeEarnings {
@@ -966,6 +983,7 @@ fn convert_account_transaction(
             })?;
             mk_success(effects)
         }
+        #[allow(deprecated)]
         TransactionType::UpdateBakerKeys => {
             let effects = with_singleton(events, |e| match e {
                 Event::BakerKeysUpdated { data } => {
@@ -984,6 +1002,7 @@ fn convert_account_transaction(
             })?;
             mk_success(effects)
         }
+        #[allow(deprecated)]
         TransactionType::EncryptedAmountTransfer => {
             let events_arr: [_; 2] = events
                 .try_into()
@@ -1000,6 +1019,7 @@ fn convert_account_transaction(
                 _ => Err(ConversionError::InvalidTransactionResult),
             }
         }
+        #[allow(deprecated)]
         TransactionType::EncryptedAmountTransferWithMemo => {
             let events_arr: [_; 3] = events
                 .try_into()
@@ -1017,6 +1037,7 @@ fn convert_account_transaction(
                 _ => Err(ConversionError::InvalidTransactionResult),
             }
         }
+        #[allow(deprecated)]
         TransactionType::TransferToEncrypted => {
             let effects = with_singleton(events, |e| match e {
                 Event::EncryptedSelfAmountAdded { data } => {
