@@ -134,11 +134,13 @@ impl AccountEncryptedAmount {
         let mut combined = self.self_amount.clone();
         let mut agg_amount = encrypted_transfers::decrypt_amount(table, sk, &self.self_amount);
         let mut index = self.start_index;
+        #[allow(deprecated)]
         if let Some((agg, num_agg)) = self.aggregated_amount.as_ref() {
             agg_amount += encrypted_transfers::decrypt_amount(table, sk, agg);
             combined = encrypted_transfers::aggregate(&combined, agg);
             index += u64::from(*num_agg);
         }
+        #[allow(deprecated)]
         for amount in &self.incoming_amounts {
             agg_amount += encrypted_transfers::decrypt_amount(table, sk, amount);
             combined = encrypted_transfers::aggregate(&combined, amount);
@@ -192,6 +194,7 @@ impl AccountEncryptedAmount {
     {
         let agg_amount = self.decrypt_and_combine(ctx, sk);
         if amount <= agg_amount.agg_amount {
+            #[allow(deprecated)]
             let data = encrypted_transfers::make_transfer_data(
                 ctx.params,
                 receiver_pk,
@@ -1768,19 +1771,27 @@ impl AccountTransactionEffects {
             AccountTransactionEffects::ContractUpdateIssued { .. } => Some(Update),
             AccountTransactionEffects::AccountTransfer { .. } => Some(Transfer),
             AccountTransactionEffects::AccountTransferWithMemo { .. } => Some(TransferWithMemo),
+            #[allow(deprecated)]
             AccountTransactionEffects::BakerAdded { .. } => Some(AddBaker),
+            #[allow(deprecated)]
             AccountTransactionEffects::BakerRemoved { .. } => Some(RemoveBaker),
+            #[allow(deprecated)]
             AccountTransactionEffects::BakerStakeUpdated { .. } => Some(UpdateBakerStake),
+            #[allow(deprecated)]
             AccountTransactionEffects::BakerRestakeEarningsUpdated { .. } => {
                 Some(UpdateBakerRestakeEarnings)
             }
+            #[allow(deprecated)]
             AccountTransactionEffects::BakerKeysUpdated { .. } => Some(UpdateBakerKeys),
+            #[allow(deprecated)]
             AccountTransactionEffects::EncryptedAmountTransferred { .. } => {
                 Some(EncryptedAmountTransfer)
             }
+            #[allow(deprecated)]
             AccountTransactionEffects::EncryptedAmountTransferredWithMemo { .. } => {
                 Some(EncryptedAmountTransferWithMemo)
             }
+            #[allow(deprecated)]
             AccountTransactionEffects::TransferredToEncrypted { .. } => Some(TransferToEncrypted),
             AccountTransactionEffects::TransferredToPublic { .. } => Some(TransferToPublic),
             AccountTransactionEffects::TransferredWithSchedule { .. } => Some(TransferWithSchedule),

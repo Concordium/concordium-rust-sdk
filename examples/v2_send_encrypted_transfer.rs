@@ -113,6 +113,7 @@ async fn main() -> anyhow::Result<()> {
             send::transfer_to_public(&keys.account_keys, keys.address, nonce, expiry, data)
         }
         Receiver::Encrypt => {
+            #[allow(deprecated)]
             send::transfer_to_encrypted(&keys.account_keys, keys.address, nonce, expiry, app.amount)
         }
         Receiver::Transfer(addr) => {
@@ -127,6 +128,7 @@ async fn main() -> anyhow::Result<()> {
                 &receiver.response.account_encryption_key,
                 &mut rng,
             )?;
+            #[allow(deprecated)]
             send::encrypted_transfer(&keys.account_keys, keys.address, nonce, expiry, addr, data)
         }
     };

@@ -969,9 +969,9 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
         let cooldowns = cds;
 
         // The available balance is only provided as convenience and in case the
-        // calculation of it changes in the future. If the available balance is
-        // not present, we calculate it manually instead. Note that changes in the
-        // calculation method may make this calculation invalid.
+        // calculation of it changes in the future. It should be present if the node
+        // uses protocol version 7 (or later). If the available balance is not present,
+        // we calculate it manually instead.
         let available_balance = available_balance.map(|ab| ab.into()).unwrap_or_else(|| {
             let active_stake = account_stake.as_ref()
                 .map(|s| s.staked_amount())

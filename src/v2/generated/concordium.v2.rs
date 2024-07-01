@@ -41,8 +41,7 @@ pub struct AbsoluteBlockHeight {
     pub value: u64,
 }
 /// The height of a block relative to the last genesis. This differs from the
-/// absolute block height in that it counts height from the last protocol
-/// update.
+/// absolute block height in that it counts height from the last protocol update.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockHeight {
@@ -116,16 +115,15 @@ pub struct Timestamp {
 pub struct Release {
     /// Effective time of the release in milliseconds since unix epoch.
     #[prost(message, optional, tag = "1")]
-    pub timestamp:    ::core::option::Option<Timestamp>,
+    pub timestamp: ::core::option::Option<Timestamp>,
     /// Amount to be released.
     #[prost(message, optional, tag = "2")]
-    pub amount:       ::core::option::Option<Amount>,
+    pub amount: ::core::option::Option<Amount>,
     /// List of transaction hashes that contribute a balance to this release.
     #[prost(message, repeated, tag = "3")]
     pub transactions: ::prost::alloc::vec::Vec<TransactionHash>,
 }
-/// A new individual release. Part of a single transfer with schedule
-/// transaction.
+/// A new individual release. Part of a single transfer with schedule transaction.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewRelease {
@@ -134,7 +132,7 @@ pub struct NewRelease {
     pub timestamp: ::core::option::Option<Timestamp>,
     /// Amount to be released.
     #[prost(message, optional, tag = "2")]
-    pub amount:    ::core::option::Option<Amount>,
+    pub amount: ::core::option::Option<Amount>,
 }
 /// State of the account's release schedule. This is the balance of the account
 /// that is owned by the account, but cannot be used until the release point.
@@ -143,7 +141,7 @@ pub struct NewRelease {
 pub struct ReleaseSchedule {
     /// Total amount locked in the release schedule.
     #[prost(message, optional, tag = "1")]
-    pub total:     ::core::option::Option<Amount>,
+    pub total: ::core::option::Option<Amount>,
     /// A list of releases, ordered by increasing timestamp.
     #[prost(message, repeated, tag = "2")]
     pub schedules: ::prost::alloc::vec::Vec<Release>,
@@ -171,13 +169,13 @@ pub struct EncryptedBalance {
     ///
     /// When a transfer is made all of these must always be used.
     #[prost(message, optional, tag = "1")]
-    pub self_amount:       ::core::option::Option<EncryptedAmount>,
+    pub self_amount: ::core::option::Option<EncryptedAmount>,
     /// Starting index for incoming encrypted amounts. If an aggregated amount
     /// is present then this index is associated with such an amount and the
     /// list of incoming encrypted amounts starts at the index `start_index
     /// + 1`.
     #[prost(uint64, tag = "2")]
-    pub start_index:       u64,
+    pub start_index: u64,
     /// If present, the amount that has resulted from aggregating other amounts
     /// If this field is present so is `num_aggregated`.
     #[prost(message, optional, tag = "3")]
@@ -185,14 +183,14 @@ pub struct EncryptedBalance {
     /// The number of aggregated amounts (must be at least 2 if present). This
     /// field is present if and only if `aggregated_amount` is present.
     #[prost(uint32, optional, tag = "4")]
-    pub num_aggregated:    ::core::option::Option<u32>,
+    pub num_aggregated: ::core::option::Option<u32>,
     /// Amounts starting at `start_index` (or at `start_index + 1` if there is
     /// an aggregated amount present). They are assumed to be numbered
     /// sequentially. The length of this list is bounded by the maximum number
     /// of incoming amounts on the accounts, which is currently 32. After
     /// that aggregation kicks in.
     #[prost(message, repeated, tag = "5")]
-    pub incoming_amounts:  ::prost::alloc::vec::Vec<EncryptedAmount>,
+    pub incoming_amounts: ::prost::alloc::vec::Vec<EncryptedAmount>,
 }
 /// Entity to which the account delegates a portion of its stake.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -245,14 +243,14 @@ pub struct BakerInfo {
     /// Identity of the baker. This is actually the account index of
     /// the account controlling the baker.
     #[prost(message, optional, tag = "1")]
-    pub baker_id:        ::core::option::Option<BakerId>,
+    pub baker_id: ::core::option::Option<BakerId>,
     /// Baker's public key used to check whether they won the lottery or not.
     #[prost(message, optional, tag = "2")]
-    pub election_key:    ::core::option::Option<BakerElectionVerifyKey>,
+    pub election_key: ::core::option::Option<BakerElectionVerifyKey>,
     /// Baker's public key used to check that they are indeed the ones who
     /// produced the block.
     #[prost(message, optional, tag = "3")]
-    pub signature_key:   ::core::option::Option<BakerSignatureVerifyKey>,
+    pub signature_key: ::core::option::Option<BakerSignatureVerifyKey>,
     /// Baker's public key used to check signatures on finalization records.
     /// This is only used if the baker has sufficient stake to participate in
     /// finalization.
@@ -272,7 +270,7 @@ pub mod stake_pending_change {
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Reduce {
         #[prost(message, optional, tag = "1")]
-        pub new_stake:      ::core::option::Option<super::Amount>,
+        pub new_stake: ::core::option::Option<super::Amount>,
         /// Unix timestamp in milliseconds when the change takes effect.
         #[prost(message, optional, tag = "2")]
         pub effective_time: ::core::option::Option<super::Timestamp>,
@@ -282,8 +280,8 @@ pub mod stake_pending_change {
     pub enum Change {
         #[prost(message, tag = "1")]
         Reduce(Reduce),
-        /// Remove the stake. The value is a Unix timestamp of the effective
-        /// time in milliseconds.
+        /// Remove the stake. The value is a Unix timestamp of the effective time in
+        /// milliseconds.
         #[prost(message, tag = "2")]
         Remove(super::Timestamp),
     }
@@ -305,10 +303,10 @@ pub struct CommissionRates {
     pub finalization: ::core::option::Option<AmountFraction>,
     /// Fraction of baking rewards charged by the pool owner.
     #[prost(message, optional, tag = "2")]
-    pub baking:       ::core::option::Option<AmountFraction>,
+    pub baking: ::core::option::Option<AmountFraction>,
     /// Fraction of transaction rewards charged by the pool owner.
     #[prost(message, optional, tag = "3")]
-    pub transaction:  ::core::option::Option<AmountFraction>,
+    pub transaction: ::core::option::Option<AmountFraction>,
 }
 /// Additional information about a baking pool.
 /// This information is added with the introduction of delegation.
@@ -317,10 +315,10 @@ pub struct CommissionRates {
 pub struct BakerPoolInfo {
     /// Whether the pool allows delegators.
     #[prost(enumeration = "OpenStatus", tag = "1")]
-    pub open_status:      i32,
+    pub open_status: i32,
     /// The URL that links to the metadata about the pool.
     #[prost(string, tag = "2")]
-    pub url:              ::prost::alloc::string::String,
+    pub url: ::prost::alloc::string::String,
     /// The commission rates charged by the pool owner.
     #[prost(message, optional, tag = "3")]
     pub commission_rates: ::core::option::Option<CommissionRates>,
@@ -340,37 +338,37 @@ pub mod account_staking_info {
     pub struct Baker {
         /// Amount staked at present.
         #[prost(message, optional, tag = "1")]
-        pub staked_amount:    ::core::option::Option<super::Amount>,
-        /// A flag indicating whether rewards paid to the baker are
-        /// automatically restaked or not.
+        pub staked_amount: ::core::option::Option<super::Amount>,
+        /// A flag indicating whether rewards paid to the baker are automatically
+        /// restaked or not.
         #[prost(bool, tag = "2")]
         pub restake_earnings: bool,
         /// Information about the baker that is staking.
         #[prost(message, optional, tag = "3")]
-        pub baker_info:       ::core::option::Option<super::BakerInfo>,
+        pub baker_info: ::core::option::Option<super::BakerInfo>,
         /// If present, any pending change to the delegated stake.
         #[prost(message, optional, tag = "4")]
-        pub pending_change:   ::core::option::Option<super::StakePendingChange>,
-        /// Present if the account is currently a baker, i.e., it is in the
-        /// baking committee of the current epoch.
+        pub pending_change: ::core::option::Option<super::StakePendingChange>,
+        /// Present if the account is currently a baker, i.e., it is in the baking
+        /// committee of the current epoch.
         #[prost(message, optional, tag = "5")]
-        pub pool_info:        ::core::option::Option<super::BakerPoolInfo>,
+        pub pool_info: ::core::option::Option<super::BakerPoolInfo>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Delegator {
         /// The amount that the account delegates.
         #[prost(message, optional, tag = "1")]
-        pub staked_amount:    ::core::option::Option<super::Amount>,
+        pub staked_amount: ::core::option::Option<super::Amount>,
         /// Whether the earnings are automatically added to the staked amount.
         #[prost(bool, tag = "2")]
         pub restake_earnings: bool,
         /// The entity to which the account delegates.
         #[prost(message, optional, tag = "3")]
-        pub target:           ::core::option::Option<super::DelegationTarget>,
+        pub target: ::core::option::Option<super::DelegationTarget>,
         /// If present, any pending change to the delegated stake.
         #[prost(message, optional, tag = "4")]
-        pub pending_change:   ::core::option::Option<super::StakePendingChange>,
+        pub pending_change: ::core::option::Option<super::StakePendingChange>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
@@ -483,7 +481,7 @@ pub mod account_verify_key {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CredentialPublicKeys {
     #[prost(map = "uint32, message", tag = "1")]
-    pub keys:      ::std::collections::HashMap<u32, AccountVerifyKey>,
+    pub keys: ::std::collections::HashMap<u32, AccountVerifyKey>,
     #[prost(message, optional, tag = "2")]
     pub threshold: ::core::option::Option<SignatureThreshold>,
 }
@@ -508,7 +506,7 @@ pub struct IdentityProviderIdentity {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct YearMonth {
     #[prost(uint32, tag = "1")]
-    pub year:  u32,
+    pub year: u32,
     #[prost(uint32, tag = "2")]
     pub month: u32,
 }
@@ -523,10 +521,10 @@ pub struct Policy {
     /// The last year and month when the credential is still valid. After this
     /// expires an account can no longer be created from the credential.
     #[prost(message, optional, tag = "2")]
-    pub valid_to:   ::core::option::Option<YearMonth>,
-    /// Mapping from attribute tags to attribute values. Attribute tags are
-    /// always representable in a single `u8`, attribute values are never
-    /// more than 31 bytes in length.
+    pub valid_to: ::core::option::Option<YearMonth>,
+    /// Mapping from attribute tags to attribute values. Attribute tags are always
+    /// representable in a single `u8`, attribute values are never more than 31
+    /// bytes in length.
     #[prost(map = "uint32, bytes", tag = "3")]
     pub attributes: ::std::collections::HashMap<u32, ::prost::alloc::vec::Vec<u8>>,
 }
@@ -536,17 +534,17 @@ pub struct Policy {
 pub struct InitialCredentialValues {
     /// Public keys of the credential.
     #[prost(message, optional, tag = "1")]
-    pub keys:    ::core::option::Option<CredentialPublicKeys>,
+    pub keys: ::core::option::Option<CredentialPublicKeys>,
     /// Its registration ID.
     #[prost(message, optional, tag = "2")]
     pub cred_id: ::core::option::Option<CredentialRegistrationId>,
     /// The identity provider who signed the identity object from which this
     /// credential is derived.
     #[prost(message, optional, tag = "3")]
-    pub ip_id:   ::core::option::Option<IdentityProviderIdentity>,
+    pub ip_id: ::core::option::Option<IdentityProviderIdentity>,
     /// Policy of this credential.
     #[prost(message, optional, tag = "4")]
-    pub policy:  ::core::option::Option<Policy>,
+    pub policy: ::core::option::Option<Policy>,
 }
 /// Data relating to a single anonymity revoker sent by the account holder to
 /// the chain.
@@ -565,8 +563,8 @@ pub struct ArThreshold {
     #[prost(uint32, tag = "1")]
     pub value: u32,
 }
-/// A single commitment in the G1 group of the BLS curve. This is always 48
-/// bytes in length.
+/// A single commitment in the G1 group of the BLS curve. This is always 48 bytes
+/// in length.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Commitment {
@@ -580,16 +578,14 @@ pub struct CredentialCommitments {
     /// Commitment to the PRF key.
     #[prost(message, optional, tag = "1")]
     pub prf: ::core::option::Option<Commitment>,
-    /// Commitment to the counter used to generate the credential registration
-    /// id.
+    /// Commitment to the counter used to generate the credential registration id.
     #[prost(message, optional, tag = "2")]
     pub cred_counter: ::core::option::Option<Commitment>,
-    /// Commitment to the `max_accounts` value, which determines the maximum
-    /// number of credentials that may be created from the identity object.
+    /// Commitment to the `max_accounts` value, which determines the maximum number
+    /// of credentials that may be created from the identity object.
     #[prost(message, optional, tag = "3")]
     pub max_accounts: ::core::option::Option<Commitment>,
-    /// Commitments to the attributes which have not been revealed in the
-    /// policy.
+    /// Commitments to the attributes which have not been revealed in the policy.
     #[prost(map = "uint32, message", tag = "4")]
     pub attributes: ::std::collections::HashMap<u32, Commitment>,
     /// List of commitments to the coefficients of the sharing polynomial. This
@@ -604,28 +600,27 @@ pub struct CredentialCommitments {
 pub struct NormalCredentialValues {
     /// Public keys of the credential.
     #[prost(message, optional, tag = "1")]
-    pub keys:         ::core::option::Option<CredentialPublicKeys>,
+    pub keys: ::core::option::Option<CredentialPublicKeys>,
     /// Its registration ID.
     #[prost(message, optional, tag = "2")]
-    pub cred_id:      ::core::option::Option<CredentialRegistrationId>,
+    pub cred_id: ::core::option::Option<CredentialRegistrationId>,
     /// The identity provider who signed the identity object from which this
     /// credential is derived.
     #[prost(message, optional, tag = "3")]
-    pub ip_id:        ::core::option::Option<IdentityProviderIdentity>,
+    pub ip_id: ::core::option::Option<IdentityProviderIdentity>,
     /// Policy of this credential.
     #[prost(message, optional, tag = "4")]
-    pub policy:       ::core::option::Option<Policy>,
+    pub policy: ::core::option::Option<Policy>,
     /// The number of anonymity revokers that must work together to revoke the
     /// anonymity of the credential holder.
     #[prost(message, optional, tag = "5")]
     pub ar_threshold: ::core::option::Option<ArThreshold>,
-    /// Mapping from anonymity revoker identities to revocation data for the
-    /// given anonymity revoker.
+    /// Mapping from anonymity revoker identities to revocation data for the given anonymity revoker.
     #[prost(map = "uint32, message", tag = "6")]
-    pub ar_data:      ::std::collections::HashMap<u32, ChainArData>,
+    pub ar_data: ::std::collections::HashMap<u32, ChainArData>,
     /// Commitments to attributes which have not been revealed.
     #[prost(message, optional, tag = "7")]
-    pub commitments:  ::core::option::Option<CredentialCommitments>,
+    pub commitments: ::core::option::Option<CredentialCommitments>,
 }
 /// Credential that is part of an account.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -655,44 +650,50 @@ pub struct Cooldown {
     /// The amount that is in cooldown and set to be released at the end of the
     /// cooldown period.
     #[prost(message, optional, tag = "2")]
-    pub amount:   ::core::option::Option<Amount>,
+    pub amount: ::core::option::Option<Amount>,
     /// The status of the cooldown.
     #[prost(enumeration = "cooldown::CooldownStatus", tag = "3")]
-    pub status:   i32,
+    pub status: i32,
 }
 /// Nested message and enum types in `Cooldown`.
 pub mod cooldown {
-    /// The status of a cooldown. When stake is removed from a baker or
-    /// delegator (from protocol version 7) it first enters the
-    /// pre-pre-cooldown state. The next time the stake snaphot is taken (at
-    /// the epoch transition before a payday) it enters the pre-cooldown
-    /// state. At the subsequent payday, it enters the cooldown state. At
-    /// the payday after the end of the cooldown period, the stake is
-    /// finally released.
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    /// The status of a cooldown. When stake is removed from a baker or delegator
+    /// (from protocol version 7) it first enters the pre-pre-cooldown state.
+    /// The next time the stake snaphot is taken (at the epoch transition before
+    /// a payday) it enters the pre-cooldown state. At the subsequent payday, it
+    /// enters the cooldown state. At the payday after the end of the cooldown
+    /// period, the stake is finally released.
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        PartialOrd,
+        Ord,
+        ::prost::Enumeration
+    )]
     #[repr(i32)]
     pub enum CooldownStatus {
-        /// The amount is in cooldown and will expire at the specified time,
-        /// becoming available at the subsequent pay day.
-        Cooldown       = 0,
-        /// The amount will enter cooldown at the next pay day. The specified
-        /// end time is projected to be the end of the cooldown period,
-        /// but the actual end time will be determined at the payday,
-        /// and may be different if the global cooldown period changes.
-        PreCooldown    = 1,
-        /// The amount will enter pre-cooldown at the next snapshot epoch (i.e.
-        /// the epoch transition before a pay day transition). As with
-        /// pre-cooldown, the specified end time is projected, but the
-        /// actual end time will be determined later.
+        /// The amount is in cooldown and will expire at the specified time, becoming available
+        /// at the subsequent pay day.
+        Cooldown = 0,
+        /// The amount will enter cooldown at the next pay day. The specified end time is
+        /// projected to be the end of the cooldown period, but the actual end time will be
+        /// determined at the payday, and may be different if the global cooldown period
+        /// changes.
+        PreCooldown = 1,
+        /// The amount will enter pre-cooldown at the next snapshot epoch (i.e. the epoch
+        /// transition before a pay day transition). As with pre-cooldown, the specified
+        /// end time is projected, but the actual end time will be determined later.
         PrePreCooldown = 2,
     }
     impl CooldownStatus {
-        /// String value of the enum field names used in the ProtoBuf
-        /// definition.
+        /// String value of the enum field names used in the ProtoBuf definition.
         ///
-        /// The values are not transformed in any way and thus are considered
-        /// stable (if the ProtoBuf definition does not change) and safe
-        /// for programmatic use.
+        /// The values are not transformed in any way and thus are considered stable
+        /// (if the ProtoBuf definition does not change) and safe for programmatic use.
         pub fn as_str_name(&self) -> &'static str {
             match self {
                 CooldownStatus::Cooldown => "COOLDOWN",
@@ -700,7 +701,6 @@ pub mod cooldown {
                 CooldownStatus::PrePreCooldown => "PRE_PRE_COOLDOWN",
             }
         }
-
         /// Creates an enum from field names used in the ProtoBuf definition.
         pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
             match value {
@@ -716,58 +716,58 @@ pub mod cooldown {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountInfo {
-    /// Next sequence number to be used for transactions signed from this
-    /// account.
+    /// Next sequence number to be used for transactions signed from this account.
     #[prost(message, optional, tag = "1")]
-    pub sequence_number:   ::core::option::Option<SequenceNumber>,
+    pub sequence_number: ::core::option::Option<SequenceNumber>,
     /// Current (unencrypted) balance of the account.
     #[prost(message, optional, tag = "2")]
-    pub amount:            ::core::option::Option<Amount>,
+    pub amount: ::core::option::Option<Amount>,
     /// Release schedule for any locked up amount. This could be an empty
     /// release schedule.
     #[prost(message, optional, tag = "3")]
-    pub schedule:          ::core::option::Option<ReleaseSchedule>,
+    pub schedule: ::core::option::Option<ReleaseSchedule>,
     /// Map of all currently active credentials on the account.
     /// This includes public keys that can sign for the given credentials, as
     /// well as any revealed attributes. This map always contains a credential
     /// with index 0.
     #[prost(map = "uint32, message", tag = "4")]
-    pub creds:             ::std::collections::HashMap<u32, AccountCredential>,
+    pub creds: ::std::collections::HashMap<u32, AccountCredential>,
     /// Lower bound on how many credentials must sign any given transaction from
     /// this account.
     #[prost(message, optional, tag = "5")]
-    pub threshold:         ::core::option::Option<AccountThreshold>,
+    pub threshold: ::core::option::Option<AccountThreshold>,
     /// The encrypted balance of the account.
     #[prost(message, optional, tag = "6")]
     pub encrypted_balance: ::core::option::Option<EncryptedBalance>,
     /// The public key for sending encrypted balances to the account.
     #[prost(message, optional, tag = "7")]
-    pub encryption_key:    ::core::option::Option<EncryptionKey>,
+    pub encryption_key: ::core::option::Option<EncryptionKey>,
     /// Internal index of the account. Accounts on the chain get sequential
     /// indices. These should generally not be used outside of the chain,
     /// the account address is meant to be used to refer to accounts,
     /// however the account index serves the role of the baker id, if the
     /// account is a baker. Hence it is exposed here as well.
     #[prost(message, optional, tag = "8")]
-    pub index:             ::core::option::Option<AccountIndex>,
+    pub index: ::core::option::Option<AccountIndex>,
     /// Present if the account is a baker or delegator. In that case
     /// it is the information about the baker or delegator.
     #[prost(message, optional, tag = "9")]
-    pub stake:             ::core::option::Option<AccountStakingInfo>,
-    /// Canonical address of the account. This is derived from the first
-    /// credential that created the account.
+    pub stake: ::core::option::Option<AccountStakingInfo>,
+    /// Canonical address of the account. This is derived from the first credential
+    /// that created the account.
     #[prost(message, optional, tag = "10")]
-    pub address:           ::core::option::Option<AccountAddress>,
+    pub address: ::core::option::Option<AccountAddress>,
     /// The stake on the account that is in cooldown.
-    /// There can be multiple amounts in cooldown that expire at different
-    /// times.
+    /// There can be multiple amounts in cooldown that expire at different times.
+    /// This was introduced in protocol version 7, and so is not present in
+    /// earlier protocol versions.
     #[prost(message, repeated, tag = "11")]
-    pub cooldowns:         ::prost::alloc::vec::Vec<Cooldown>,
-    /// The available (unencrypted) balance of the account (i.e. that can be
-    /// transferred or used to pay for transactions). This is the balance
-    /// minus the locked amount. The locked amount is the maximum of the
-    /// amount in the release schedule and the total amount that is actively
-    /// staked or in cooldown (inactive stake).
+    pub cooldowns: ::prost::alloc::vec::Vec<Cooldown>,
+    /// The available (unencrypted) balance of the account (i.e. that can be transferred
+    /// or used to pay for transactions). This is the balance minus the locked amount.
+    /// The locked amount is the maximum of the amount in the release schedule and
+    /// the total amount that is actively staked or in cooldown (inactive stake).
+    /// This was introduced in node version 7.0.
     #[prost(message, optional, tag = "12")]
     pub available_balance: ::core::option::Option<Amount>,
 }
@@ -789,12 +789,11 @@ pub mod block_hash_input {
         pub genesis_index: ::core::option::Option<super::GenesisIndex>,
         /// Height starting from the genesis block at the genesis index.
         #[prost(message, optional, tag = "2")]
-        pub height:        ::core::option::Option<super::BlockHeight>,
-        /// Whether to return results only from the specified genesis index
-        /// (`true`), or allow results from more recent genesis indices
-        /// as well (`false`).
+        pub height: ::core::option::Option<super::BlockHeight>,
+        /// Whether to return results only from the specified genesis index (`true`),
+        /// or allow results from more recent genesis indices as well (`false`).
         #[prost(bool, tag = "3")]
-        pub restrict:      bool,
+        pub restrict: bool,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
@@ -805,12 +804,10 @@ pub mod block_hash_input {
         /// Query for the last finalized block.
         #[prost(message, tag = "2")]
         LastFinal(super::Empty),
-        /// Query for the block specified by the hash. This hash should always
-        /// be 32 bytes.
+        /// Query for the block specified by the hash. This hash should always be 32 bytes.
         #[prost(message, tag = "3")]
         Given(super::BlockHash),
-        /// Query for a block at absolute height, if a unique block can be
-        /// identified at that height.
+        /// Query for a block at absolute height, if a unique block can be identified at that height.
         #[prost(message, tag = "4")]
         AbsoluteHeight(super::AbsoluteBlockHeight),
         /// Query for a block at height relative to a genesis index.
@@ -831,14 +828,13 @@ pub mod epoch_request {
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct RelativeEpoch {
-        /// The genesis index to query at. The query is restricted to this
-        /// genesis index, and will not return results for other indices
-        /// even if the epoch number is out of bounds.
+        /// The genesis index to query at. The query is restricted to this genesis index, and
+        /// will not return results for other indices even if the epoch number is out of bounds.
         #[prost(message, optional, tag = "1")]
         pub genesis_index: ::core::option::Option<super::GenesisIndex>,
         /// The epoch number to query at.
         #[prost(message, optional, tag = "2")]
-        pub epoch:         ::core::option::Option<super::Epoch>,
+        pub epoch: ::core::option::Option<super::Epoch>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
@@ -859,8 +855,9 @@ pub struct AccountIdentifierInput {
         oneof = "account_identifier_input::AccountIdentifierInput",
         tags = "1, 2, 3"
     )]
-    pub account_identifier_input:
-        ::core::option::Option<account_identifier_input::AccountIdentifierInput>,
+    pub account_identifier_input: ::core::option::Option<
+        account_identifier_input::AccountIdentifierInput,
+    >,
 }
 /// Nested message and enum types in `AccountIdentifierInput`.
 pub mod account_identifier_input {
@@ -870,8 +867,7 @@ pub mod account_identifier_input {
         /// Identify the account by the address of the account.
         #[prost(message, tag = "1")]
         Address(super::AccountAddress),
-        /// Identify the account by the credential that belongs or has belonged
-        /// to it.
+        /// Identify the account by the credential that belongs or has belonged to it.
         #[prost(message, tag = "2")]
         CredId(super::CredentialRegistrationId),
         /// Identify the account via its index.
@@ -885,7 +881,7 @@ pub mod account_identifier_input {
 pub struct AccountInfoRequest {
     /// Block in which to query the account information.
     #[prost(message, optional, tag = "1")]
-    pub block_hash:         ::core::option::Option<BlockHashInput>,
+    pub block_hash: ::core::option::Option<BlockHashInput>,
     /// Specification of the account.
     #[prost(message, optional, tag = "2")]
     pub account_identifier: ::core::option::Option<AccountIdentifierInput>,
@@ -896,7 +892,7 @@ pub struct AccountInfoRequest {
 pub struct FinalizedBlockInfo {
     /// Hash of the block.
     #[prost(message, optional, tag = "1")]
-    pub hash:   ::core::option::Option<BlockHash>,
+    pub hash: ::core::option::Option<BlockHash>,
     /// Absolute height of the block, height 0 is the genesis block.
     #[prost(message, optional, tag = "2")]
     pub height: ::core::option::Option<AbsoluteBlockHeight>,
@@ -910,7 +906,7 @@ pub struct AncestorsRequest {
     pub block_hash: ::core::option::Option<BlockHashInput>,
     /// The maximum number of ancestors returned.
     #[prost(uint64, tag = "2")]
-    pub amount:     u64,
+    pub amount: u64,
 }
 /// Request for getting the source of a smart contract module.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -929,7 +925,7 @@ pub struct ModuleSourceRequest {
 pub struct ContractAddress {
     /// The index of the smart contract.
     #[prost(uint64, tag = "1")]
-    pub index:    u64,
+    pub index: u64,
     /// The subindex of the smart contract instance.
     /// Currently not used, so it is always 0.
     #[prost(uint64, tag = "2")]
@@ -944,14 +940,13 @@ pub struct InstanceInfoRequest {
     pub block_hash: ::core::option::Option<BlockHashInput>,
     /// The address of the smart contract instance.
     #[prost(message, optional, tag = "2")]
-    pub address:    ::core::option::Option<ContractAddress>,
+    pub address: ::core::option::Option<ContractAddress>,
 }
 /// Information about a smart contract instance.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InstanceInfo {
-    /// The information depends on the smart contract version used by the
-    /// instance.
+    /// The information depends on the smart contract version used by the instance.
     #[prost(oneof = "instance_info::Version", tags = "1, 2")]
     pub version: ::core::option::Option<instance_info::Version>,
 }
@@ -963,19 +958,19 @@ pub mod instance_info {
     pub struct V0 {
         /// The state of the instance.
         #[prost(message, optional, tag = "1")]
-        pub model:         ::core::option::Option<super::ContractStateV0>,
+        pub model: ::core::option::Option<super::ContractStateV0>,
         /// The account address which deployed the instance.
         #[prost(message, optional, tag = "2")]
-        pub owner:         ::core::option::Option<super::AccountAddress>,
+        pub owner: ::core::option::Option<super::AccountAddress>,
         /// The amount of CCD tokens in the balance of the instance.
         #[prost(message, optional, tag = "3")]
-        pub amount:        ::core::option::Option<super::Amount>,
+        pub amount: ::core::option::Option<super::Amount>,
         /// A list of endpoints exposed by the instance.
         #[prost(message, repeated, tag = "4")]
-        pub methods:       ::prost::alloc::vec::Vec<super::ReceiveName>,
+        pub methods: ::prost::alloc::vec::Vec<super::ReceiveName>,
         /// The name of the smart contract of the instance.
         #[prost(message, optional, tag = "5")]
-        pub name:          ::core::option::Option<super::InitName>,
+        pub name: ::core::option::Option<super::InitName>,
         /// The module reference for the smart contract module of the instance.
         #[prost(message, optional, tag = "6")]
         pub source_module: ::core::option::Option<super::ModuleRef>,
@@ -986,22 +981,21 @@ pub mod instance_info {
     pub struct V1 {
         /// The account address which deployed the instance.
         #[prost(message, optional, tag = "2")]
-        pub owner:         ::core::option::Option<super::AccountAddress>,
+        pub owner: ::core::option::Option<super::AccountAddress>,
         /// The amount of CCD tokens in the balance of the instance.
         #[prost(message, optional, tag = "3")]
-        pub amount:        ::core::option::Option<super::Amount>,
+        pub amount: ::core::option::Option<super::Amount>,
         /// A list of endpoints exposed by the instance.
         #[prost(message, repeated, tag = "4")]
-        pub methods:       ::prost::alloc::vec::Vec<super::ReceiveName>,
+        pub methods: ::prost::alloc::vec::Vec<super::ReceiveName>,
         /// The name of the smart contract of the instance.
         #[prost(message, optional, tag = "5")]
-        pub name:          ::core::option::Option<super::InitName>,
+        pub name: ::core::option::Option<super::InitName>,
         /// The module reference for the smart contract module of the instance.
         #[prost(message, optional, tag = "6")]
         pub source_module: ::core::option::Option<super::ModuleRef>,
     }
-    /// The information depends on the smart contract version used by the
-    /// instance.
+    /// The information depends on the smart contract version used by the instance.
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Version {
@@ -1016,7 +1010,7 @@ pub mod instance_info {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InstanceStateKvPair {
     #[prost(bytes = "vec", tag = "1")]
-    pub key:   ::prost::alloc::vec::Vec<u8>,
+    pub key: ::prost::alloc::vec::Vec<u8>,
     #[prost(bytes = "vec", tag = "2")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
@@ -1029,11 +1023,10 @@ pub struct InstanceStateLookupRequest {
     pub block_hash: ::core::option::Option<BlockHashInput>,
     /// The address of the smart contract instance.
     #[prost(message, optional, tag = "2")]
-    pub address:    ::core::option::Option<ContractAddress>,
-    /// Key to look up. If the instance is a V0 instance then this will not be
-    /// used.
+    pub address: ::core::option::Option<ContractAddress>,
+    /// Key to look up. If the instance is a V0 instance then this will not be used.
     #[prost(bytes = "vec", tag = "3")]
-    pub key:        ::prost::alloc::vec::Vec<u8>,
+    pub key: ::prost::alloc::vec::Vec<u8>,
 }
 /// Value at the requested key of a smart contract instance state. For V0
 /// contracts this will always be the entire state of the contract.
@@ -1053,9 +1046,9 @@ pub struct ReceiveName {
     pub value: ::prost::alloc::string::String,
 }
 /// The init name of a smart contract function. Expected format:
-/// `init_<contract_name>`. It must only consist of atmost 100 ASCII
-/// alphanumeric or punctuation characters, must not contain a '.' and must
-/// start with 'init_'.
+/// `init_<contract_name>`. It must only consist of atmost 100 ASCII alphanumeric
+/// or punctuation characters, must not contain a '.' and must start with
+/// 'init_'.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InitName {
@@ -1103,10 +1096,10 @@ pub mod block_item_status {
         /// Block item is received, but not yet in any blocks.
         #[prost(message, tag = "1")]
         Received(super::Empty),
-        /// Block item is committed to one or more blocks. The outcomes are
-        /// listed for each block. Note that in the vast majority of
-        /// cases the outcome of a transaction should not be dependent
-        /// on the block it is in, but this can in principle happen.
+        /// Block item is committed to one or more blocks. The outcomes are listed
+        /// for each block. Note that in the vast majority of cases the outcome of a
+        /// transaction should not be dependent on the block it is in, but this
+        /// can in principle happen.
         #[prost(message, tag = "2")]
         Committed(Committed),
         /// Block item is finalized in the given block, with the given summary.
@@ -1123,7 +1116,7 @@ pub struct BlockItemSummaryInBlock {
     pub block_hash: ::core::option::Option<BlockHash>,
     /// The block item summary.
     #[prost(message, optional, tag = "2")]
-    pub outcome:    ::core::option::Option<BlockItemSummary>,
+    pub outcome: ::core::option::Option<BlockItemSummary>,
 }
 /// Energy is used to count exact execution cost.
 /// This cost is then converted to CCD amounts.
@@ -1147,10 +1140,9 @@ pub struct NextAccountSequenceNumber {
     /// The best guess for the available account sequence number.
     #[prost(message, optional, tag = "1")]
     pub sequence_number: ::core::option::Option<SequenceNumber>,
-    /// Whether the guess relies on any non-finalized transactions. If true all
-    /// of the relevant transactions are finalized.
+    /// Whether the guess relies on any non-finalized transactions. If true all of the relevant transactions are finalized.
     #[prost(bool, tag = "2")]
-    pub all_final:       bool,
+    pub all_final: bool,
 }
 /// A duration of milliseconds.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -1167,9 +1159,7 @@ pub struct Duration {
 pub struct RejectReason {
     #[prost(
         oneof = "reject_reason::Reason",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, \
-                23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, \
-                43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54"
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54"
     )]
     pub reason: ::core::option::Option<reject_reason::Reason>,
 }
@@ -1181,13 +1171,13 @@ pub mod reject_reason {
         #[prost(message, optional, tag = "1")]
         pub module_ref: ::core::option::Option<super::ModuleRef>,
         #[prost(message, optional, tag = "2")]
-        pub init_name:  ::core::option::Option<super::InitName>,
+        pub init_name: ::core::option::Option<super::InitName>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct InvalidReceiveMethod {
         #[prost(message, optional, tag = "1")]
-        pub module_ref:   ::core::option::Option<super::ModuleRef>,
+        pub module_ref: ::core::option::Option<super::ModuleRef>,
         #[prost(message, optional, tag = "2")]
         pub receive_name: ::core::option::Option<super::ReceiveName>,
     }
@@ -1197,7 +1187,7 @@ pub mod reject_reason {
         #[prost(message, optional, tag = "1")]
         pub address: ::core::option::Option<super::Address>,
         #[prost(message, optional, tag = "2")]
-        pub amount:  ::core::option::Option<super::Amount>,
+        pub amount: ::core::option::Option<super::Amount>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1209,13 +1199,13 @@ pub mod reject_reason {
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct RejectedReceive {
         #[prost(int32, tag = "1")]
-        pub reject_reason:    i32,
+        pub reject_reason: i32,
         #[prost(message, optional, tag = "2")]
         pub contract_address: ::core::option::Option<super::ContractAddress>,
         #[prost(message, optional, tag = "3")]
-        pub receive_name:     ::core::option::Option<super::ReceiveName>,
+        pub receive_name: ::core::option::Option<super::ReceiveName>,
         #[prost(message, optional, tag = "4")]
-        pub parameter:        ::core::option::Option<super::Parameter>,
+        pub parameter: ::core::option::Option<super::Parameter>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1283,12 +1273,10 @@ pub mod reject_reason {
         /// Tried to remove a baker for an account that has no baker.
         #[prost(message, tag = "16")]
         NotABaker(super::AccountAddress),
-        /// The amount on the account was insufficient to cover the proposed
-        /// stake.
+        /// The amount on the account was insufficient to cover the proposed stake.
         #[prost(message, tag = "17")]
         InsufficientBalanceForBakerStake(super::Empty),
-        /// The amount provided is under the threshold required for becoming a
-        /// baker.
+        /// The amount provided is under the threshold required for becoming a baker.
         #[prost(message, tag = "18")]
         StakeUnderMinimumThresholdForBaking(super::Empty),
         /// The change could not be made because the baker is in cooldown for
@@ -1304,8 +1292,8 @@ pub mod reject_reason {
         /// Attempted to add an account key to a key index already in use.
         #[prost(message, tag = "22")]
         KeyIndexAlreadyInUse(super::Empty),
-        /// When the account threshold is updated, it must not exceed the amount
-        /// of existing keys.
+        /// When the account threshold is updated, it must not exceed the amount of
+        /// existing keys.
         #[prost(message, tag = "23")]
         InvalidAccountThreshold(super::Empty),
         /// When the credential key threshold is updated, it must not exceed the
@@ -1336,12 +1324,11 @@ pub mod reject_reason {
         /// expired.
         #[prost(message, tag = "31")]
         FirstScheduledReleaseExpired(super::Empty),
-        /// Account tried to transfer with schedule to itself, that's not
-        /// allowed.
+        /// Account tried to transfer with schedule to itself, that's not allowed.
         #[prost(message, tag = "32")]
         ScheduledSelfTransfer(super::AccountAddress),
-        /// At least one of the credentials was either malformed or its proof
-        /// was incorrect.
+        /// At least one of the credentials was either malformed or its proof was
+        /// incorrect.
         #[prost(message, tag = "33")]
         InvalidCredentials(super::Empty),
         /// Some of the credential IDs already exist or are duplicated in the
@@ -1358,24 +1345,23 @@ pub mod reject_reason {
         /// transaction.
         #[prost(message, tag = "37")]
         CredentialHolderDidNotSign(super::Empty),
-        /// Account is not allowed to have multiple credentials because it
-        /// contains a non-zero encrypted transfer.
+        /// Account is not allowed to have multiple credentials because it contains
+        /// a non-zero encrypted transfer.
         #[prost(message, tag = "38")]
         NotAllowedMultipleCredentials(super::Empty),
-        /// The account is not allowed to receive encrypted transfers because it
-        /// has multiple credentials.
+        /// The account is not allowed to receive encrypted transfers because it has
+        /// multiple credentials.
         #[prost(message, tag = "39")]
         NotAllowedToReceiveEncrypted(super::Empty),
         /// The account is not allowed to send encrypted transfers (or transfer
         /// from/to public to/from encrypted).
         #[prost(message, tag = "40")]
         NotAllowedToHandleEncrypted(super::Empty),
-        /// A configure baker transaction is missing one or more arguments in
-        /// order to add a baker.
+        /// A configure baker transaction is missing one or more arguments in order
+        /// to add a baker.
         #[prost(message, tag = "41")]
         MissingBakerAddParameters(super::Empty),
-        /// Finalization reward commission is not in the valid range for a
-        /// baker.
+        /// Finalization reward commission is not in the valid range for a baker.
         #[prost(message, tag = "42")]
         FinalizationRewardCommissionNotInRange(super::Empty),
         /// Baking reward commission is not in the valid range for a baker.
@@ -1387,12 +1373,11 @@ pub mod reject_reason {
         /// Tried to add baker for an account that already has a delegator.
         #[prost(message, tag = "45")]
         AlreadyADelegator(super::Empty),
-        /// The amount on the account was insufficient to cover the proposed
-        /// stake.
+        /// The amount on the account was insufficient to cover the proposed stake.
         #[prost(message, tag = "46")]
         InsufficientBalanceForDelegationStake(super::Empty),
-        /// A configure delegation transaction is missing one or more arguments
-        /// in order to add a delegator.
+        /// A configure delegation transaction is missing one or more arguments in
+        /// order to add a delegator.
         #[prost(message, tag = "47")]
         MissingDelegationAddParameters(super::Empty),
         /// Delegation stake when adding a delegator was 0.
@@ -1411,8 +1396,8 @@ pub mod reject_reason {
         /// threshold.
         #[prost(message, tag = "52")]
         StakeOverMaximumThresholdForPool(super::Empty),
-        /// The amount would result in pool with a too high fraction of
-        /// delegated capital.
+        /// The amount would result in pool with a too high fraction of delegated
+        /// capital.
         #[prost(message, tag = "53")]
         PoolWouldBecomeOverDelegated(super::Empty),
         /// The pool is not open to delegators.
@@ -1429,20 +1414,19 @@ pub struct ContractInitializedEvent {
     pub contract_version: i32,
     /// Module with the source code of the contract.
     #[prost(message, optional, tag = "2")]
-    pub origin_ref:       ::core::option::Option<ModuleRef>,
+    pub origin_ref: ::core::option::Option<ModuleRef>,
     /// The newly assigned address of the contract.
     #[prost(message, optional, tag = "3")]
-    pub address:          ::core::option::Option<ContractAddress>,
+    pub address: ::core::option::Option<ContractAddress>,
     /// The amount the instance was initialized with.
     #[prost(message, optional, tag = "4")]
-    pub amount:           ::core::option::Option<Amount>,
+    pub amount: ::core::option::Option<Amount>,
     /// The name of the contract.
     #[prost(message, optional, tag = "5")]
-    pub init_name:        ::core::option::Option<InitName>,
-    /// Any contract events that might have been genereated by the contract
-    /// initialization.
+    pub init_name: ::core::option::Option<InitName>,
+    /// Any contract events that might have been genereated by the contract initialization.
     #[prost(message, repeated, tag = "6")]
-    pub events:           ::prost::alloc::vec::Vec<ContractEvent>,
+    pub events: ::prost::alloc::vec::Vec<ContractEvent>,
 }
 /// An event generated by a smart contract.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -1462,24 +1446,23 @@ pub struct InstanceUpdatedEvent {
     pub contract_version: i32,
     /// Address of the affected instance.
     #[prost(message, optional, tag = "2")]
-    pub address:          ::core::option::Option<ContractAddress>,
+    pub address: ::core::option::Option<ContractAddress>,
     /// The origin of the message to the smart contract. This can be
     /// either an account or a smart contract.
     #[prost(message, optional, tag = "3")]
-    pub instigator:       ::core::option::Option<Address>,
+    pub instigator: ::core::option::Option<Address>,
     /// The amount the method was invoked with.
     #[prost(message, optional, tag = "4")]
-    pub amount:           ::core::option::Option<Amount>,
+    pub amount: ::core::option::Option<Amount>,
     /// The parameter passed to the method.
     #[prost(message, optional, tag = "5")]
-    pub parameter:        ::core::option::Option<Parameter>,
+    pub parameter: ::core::option::Option<Parameter>,
     /// The name of the method that was executed.
     #[prost(message, optional, tag = "6")]
-    pub receive_name:     ::core::option::Option<ReceiveName>,
-    /// Any contract events that might have been generated by the contract
-    /// execution.
+    pub receive_name: ::core::option::Option<ReceiveName>,
+    /// Any contract events that might have been generated by the contract execution.
     #[prost(message, repeated, tag = "7")]
-    pub events:           ::prost::alloc::vec::Vec<ContractEvent>,
+    pub events: ::prost::alloc::vec::Vec<ContractEvent>,
 }
 /// Effects produced by successful smart contract invocations.
 /// A single invocation will produce a sequence of these effects.
@@ -1497,17 +1480,16 @@ pub mod contract_trace_element {
     pub struct Transferred {
         /// Sender contract.
         #[prost(message, optional, tag = "1")]
-        pub sender:   ::core::option::Option<super::ContractAddress>,
+        pub sender: ::core::option::Option<super::ContractAddress>,
         /// Amount transferred.
         #[prost(message, optional, tag = "2")]
-        pub amount:   ::core::option::Option<super::Amount>,
+        pub amount: ::core::option::Option<super::Amount>,
         /// Receiver account.
         #[prost(message, optional, tag = "3")]
         pub receiver: ::core::option::Option<super::AccountAddress>,
     }
     /// A contract was interrupted.
-    /// This occurs when a contract invokes another contract or makes a transfer
-    /// to an account.
+    /// This occurs when a contract invokes another contract or makes a transfer to an account.
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Interrupted {
@@ -1516,7 +1498,7 @@ pub mod contract_trace_element {
         pub address: ::core::option::Option<super::ContractAddress>,
         /// The events generated up until the interruption.
         #[prost(message, repeated, tag = "2")]
-        pub events:  ::prost::alloc::vec::Vec<super::ContractEvent>,
+        pub events: ::prost::alloc::vec::Vec<super::ContractEvent>,
     }
     /// A previously interrupted contract was resumed.
     #[allow(clippy::derive_partial_eq_without_eq)]
@@ -1525,8 +1507,7 @@ pub mod contract_trace_element {
         /// The contract resumed.
         #[prost(message, optional, tag = "1")]
         pub address: ::core::option::Option<super::ContractAddress>,
-        /// Whether the action that caused the interruption (invoke contract or
-        /// make transfer) was successful or not.
+        /// Whether the action that caused the interruption (invoke contract or make transfer) was successful or not.
         #[prost(bool, tag = "2")]
         pub success: bool,
     }
@@ -1539,10 +1520,10 @@ pub mod contract_trace_element {
         pub address: ::core::option::Option<super::ContractAddress>,
         /// The module from which the contract was upgraded.
         #[prost(message, optional, tag = "2")]
-        pub from:    ::core::option::Option<super::ModuleRef>,
+        pub from: ::core::option::Option<super::ModuleRef>,
         /// The module to which it was upgraded.
         #[prost(message, optional, tag = "3")]
-        pub to:      ::core::option::Option<super::ModuleRef>,
+        pub to: ::core::option::Option<super::ModuleRef>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
@@ -1554,8 +1535,7 @@ pub mod contract_trace_element {
         #[prost(message, tag = "2")]
         Transferred(Transferred),
         /// A contract was interrupted.
-        /// This occurs when a contract invokes another contract or makes a
-        /// transfer to an account.
+        /// This occurs when a contract invokes another contract or makes a transfer to an account.
         #[prost(message, tag = "3")]
         Interrupted(Interrupted),
         /// A previously interrupted contract was resumed.
@@ -1572,17 +1552,17 @@ pub mod contract_trace_element {
 pub struct BakerKeysEvent {
     /// ID of the baker whose keys were changed.
     #[prost(message, optional, tag = "1")]
-    pub baker_id:        ::core::option::Option<BakerId>,
+    pub baker_id: ::core::option::Option<BakerId>,
     /// Account address of the baker.
     #[prost(message, optional, tag = "2")]
-    pub account:         ::core::option::Option<AccountAddress>,
+    pub account: ::core::option::Option<AccountAddress>,
     /// The new public key for verifying block signatures.
     #[prost(message, optional, tag = "3")]
-    pub sign_key:        ::core::option::Option<BakerSignatureVerifyKey>,
+    pub sign_key: ::core::option::Option<BakerSignatureVerifyKey>,
     /// The new public key for verifying whether the baker won the block
     /// lottery.
     #[prost(message, optional, tag = "4")]
-    pub election_key:    ::core::option::Option<BakerElectionVerifyKey>,
+    pub election_key: ::core::option::Option<BakerElectionVerifyKey>,
     /// The new public key for verifying finalization records.
     #[prost(message, optional, tag = "5")]
     pub aggregation_key: ::core::option::Option<BakerAggregationVerifyKey>,
@@ -1599,7 +1579,7 @@ pub struct Memo {
 pub struct BakerStakeUpdatedData {
     /// Affected baker.
     #[prost(message, optional, tag = "1")]
-    pub baker_id:  ::core::option::Option<BakerId>,
+    pub baker_id: ::core::option::Option<BakerId>,
     /// New stake.
     #[prost(message, optional, tag = "2")]
     pub new_stake: ::core::option::Option<Amount>,
@@ -1608,23 +1588,22 @@ pub struct BakerStakeUpdatedData {
     #[prost(bool, tag = "3")]
     pub increased: bool,
 }
-/// Event generated when one or more encrypted amounts are consumed from the
-/// account.
+/// Event generated when one or more encrypted amounts are consumed from the account.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EncryptedAmountRemovedEvent {
     /// The affected account.
     #[prost(message, optional, tag = "1")]
-    pub account:      ::core::option::Option<AccountAddress>,
+    pub account: ::core::option::Option<AccountAddress>,
     /// The new self encrypted amount on the affected account.
     #[prost(message, optional, tag = "2")]
-    pub new_amount:   ::core::option::Option<EncryptedAmount>,
+    pub new_amount: ::core::option::Option<EncryptedAmount>,
     /// The input encrypted amount that was removed.
     #[prost(message, optional, tag = "3")]
     pub input_amount: ::core::option::Option<EncryptedAmount>,
     /// The index indicating which amounts were used.
     #[prost(uint64, tag = "4")]
-    pub up_to_index:  u64,
+    pub up_to_index: u64,
 }
 /// Event generated when an account receives a new encrypted amount.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -1632,10 +1611,10 @@ pub struct EncryptedAmountRemovedEvent {
 pub struct NewEncryptedAmountEvent {
     /// The account onto which the amount was added.
     #[prost(message, optional, tag = "1")]
-    pub receiver:         ::core::option::Option<AccountAddress>,
+    pub receiver: ::core::option::Option<AccountAddress>,
     /// The index the amount was assigned.
     #[prost(uint64, tag = "2")]
-    pub new_index:        u64,
+    pub new_index: u64,
     /// The encrypted amount that was added.
     #[prost(message, optional, tag = "3")]
     pub encrypted_amount: ::core::option::Option<EncryptedAmount>,
@@ -1645,13 +1624,13 @@ pub struct NewEncryptedAmountEvent {
 pub struct EncryptedSelfAmountAddedEvent {
     /// The affected account.
     #[prost(message, optional, tag = "1")]
-    pub account:    ::core::option::Option<AccountAddress>,
+    pub account: ::core::option::Option<AccountAddress>,
     /// The new self encrypted amount of the account.
     #[prost(message, optional, tag = "2")]
     pub new_amount: ::core::option::Option<EncryptedAmount>,
     /// The amount that was transferred from public to encrypted balance.
     #[prost(message, optional, tag = "3")]
-    pub amount:     ::core::option::Option<Amount>,
+    pub amount: ::core::option::Option<Amount>,
 }
 /// Data registered on the chain with a register data transaction.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -1664,10 +1643,7 @@ pub struct RegisteredData {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerEvent {
-    #[prost(
-        oneof = "baker_event::Event",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11"
-    )]
+    #[prost(oneof = "baker_event::Event", tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11")]
     pub event: ::core::option::Option<baker_event::Event>,
 }
 /// Nested message and enum types in `BakerEvent`.
@@ -1678,11 +1654,11 @@ pub mod baker_event {
     pub struct BakerAdded {
         /// The keys with which the baker registered.
         #[prost(message, optional, tag = "1")]
-        pub keys_event:       ::core::option::Option<super::BakerKeysEvent>,
+        pub keys_event: ::core::option::Option<super::BakerKeysEvent>,
         /// The amount the account staked to become a baker. This amount is
         /// locked.
         #[prost(message, optional, tag = "2")]
-        pub stake:            ::core::option::Option<super::Amount>,
+        pub stake: ::core::option::Option<super::Amount>,
         /// Whether the baker will automatically add earnings to their stake or
         /// not.
         #[prost(bool, tag = "3")]
@@ -1694,7 +1670,7 @@ pub mod baker_event {
     pub struct BakerStakeIncreased {
         /// Baker's id.
         #[prost(message, optional, tag = "1")]
-        pub baker_id:  ::core::option::Option<super::BakerId>,
+        pub baker_id: ::core::option::Option<super::BakerId>,
         /// The new stake.
         #[prost(message, optional, tag = "2")]
         pub new_stake: ::core::option::Option<super::Amount>,
@@ -1704,7 +1680,7 @@ pub mod baker_event {
     pub struct BakerStakeDecreased {
         /// Baker's id.
         #[prost(message, optional, tag = "1")]
-        pub baker_id:  ::core::option::Option<super::BakerId>,
+        pub baker_id: ::core::option::Option<super::BakerId>,
         /// The new stake.
         #[prost(message, optional, tag = "2")]
         pub new_stake: ::core::option::Option<super::Amount>,
@@ -1714,7 +1690,7 @@ pub mod baker_event {
     pub struct BakerRestakeEarningsUpdated {
         /// Baker's id.
         #[prost(message, optional, tag = "1")]
-        pub baker_id:         ::core::option::Option<super::BakerId>,
+        pub baker_id: ::core::option::Option<super::BakerId>,
         /// The new value of the flag.
         #[prost(bool, tag = "2")]
         pub restake_earnings: bool,
@@ -1725,7 +1701,7 @@ pub mod baker_event {
     pub struct BakerSetOpenStatus {
         /// Baker's id.
         #[prost(message, optional, tag = "1")]
-        pub baker_id:    ::core::option::Option<super::BakerId>,
+        pub baker_id: ::core::option::Option<super::BakerId>,
         /// The new open status.
         #[prost(enumeration = "super::OpenStatus", tag = "2")]
         pub open_status: i32,
@@ -1739,7 +1715,7 @@ pub mod baker_event {
         pub baker_id: ::core::option::Option<super::BakerId>,
         /// The URL.
         #[prost(string, tag = "2")]
-        pub url:      ::prost::alloc::string::String,
+        pub url: ::prost::alloc::string::String,
     }
     /// Updated transaction fee commission for a baker pool.
     #[allow(clippy::derive_partial_eq_without_eq)]
@@ -1747,7 +1723,7 @@ pub mod baker_event {
     pub struct BakerSetTransactionFeeCommission {
         /// Baker's id.
         #[prost(message, optional, tag = "1")]
-        pub baker_id:                   ::core::option::Option<super::BakerId>,
+        pub baker_id: ::core::option::Option<super::BakerId>,
         /// The transaction fee commission.
         #[prost(message, optional, tag = "2")]
         pub transaction_fee_commission: ::core::option::Option<super::AmountFraction>,
@@ -1758,7 +1734,7 @@ pub mod baker_event {
     pub struct BakerSetBakingRewardCommission {
         /// Baker's id
         #[prost(message, optional, tag = "1")]
-        pub baker_id:                 ::core::option::Option<super::BakerId>,
+        pub baker_id: ::core::option::Option<super::BakerId>,
         /// The baking reward commission
         #[prost(message, optional, tag = "2")]
         pub baking_reward_commission: ::core::option::Option<super::AmountFraction>,
@@ -1772,7 +1748,9 @@ pub mod baker_event {
         pub baker_id: ::core::option::Option<super::BakerId>,
         /// The finalization reward commission
         #[prost(message, optional, tag = "2")]
-        pub finalization_reward_commission: ::core::option::Option<super::AmountFraction>,
+        pub finalization_reward_commission: ::core::option::Option<
+            super::AmountFraction,
+        >,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
@@ -1835,7 +1813,7 @@ pub mod delegation_event {
         pub delegator_id: ::core::option::Option<super::DelegatorId>,
         /// New stake
         #[prost(message, optional, tag = "2")]
-        pub new_stake:    ::core::option::Option<super::Amount>,
+        pub new_stake: ::core::option::Option<super::Amount>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1845,14 +1823,14 @@ pub mod delegation_event {
         pub delegator_id: ::core::option::Option<super::DelegatorId>,
         /// New stake
         #[prost(message, optional, tag = "2")]
-        pub new_stake:    ::core::option::Option<super::Amount>,
+        pub new_stake: ::core::option::Option<super::Amount>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct DelegationSetRestakeEarnings {
         /// Delegator's id
         #[prost(message, optional, tag = "1")]
-        pub delegator_id:     ::core::option::Option<super::DelegatorId>,
+        pub delegator_id: ::core::option::Option<super::DelegatorId>,
         /// Whether earnings will be restaked
         #[prost(bool, tag = "2")]
         pub restake_earnings: bool,
@@ -1862,7 +1840,7 @@ pub mod delegation_event {
     pub struct DelegationSetDelegationTarget {
         /// Delegator's id
         #[prost(message, optional, tag = "1")]
-        pub delegator_id:      ::core::option::Option<super::DelegatorId>,
+        pub delegator_id: ::core::option::Option<super::DelegatorId>,
         /// New delegation target
         #[prost(message, optional, tag = "2")]
         pub delegation_target: ::core::option::Option<super::DelegationTarget>,
@@ -1914,7 +1892,7 @@ pub mod account_transaction_effects {
         pub transaction_type: ::core::option::Option<i32>,
         /// Reason for rejection of the transaction.
         #[prost(message, optional, tag = "2")]
-        pub reject_reason:    ::core::option::Option<super::RejectReason>,
+        pub reject_reason: ::core::option::Option<super::RejectReason>,
     }
     /// A contract update transaction was issued and produced the given trace.
     /// This is the result of Update transaction.
@@ -1931,13 +1909,13 @@ pub mod account_transaction_effects {
     pub struct AccountTransfer {
         /// Amount that was transferred.
         #[prost(message, optional, tag = "1")]
-        pub amount:   ::core::option::Option<super::Amount>,
+        pub amount: ::core::option::Option<super::Amount>,
         /// Receiver account.
         #[prost(message, optional, tag = "2")]
         pub receiver: ::core::option::Option<super::AccountAddress>,
         /// Memo.
         #[prost(message, optional, tag = "3")]
-        pub memo:     ::core::option::Option<super::Memo>,
+        pub memo: ::core::option::Option<super::Memo>,
     }
     /// An account was deregistered as a baker. This is the result of a
     /// successful UpdateBakerStake transaction.
@@ -1957,20 +1935,19 @@ pub mod account_transaction_effects {
         #[prost(message, optional, tag = "1")]
         pub removed: ::core::option::Option<super::EncryptedAmountRemovedEvent>,
         #[prost(message, optional, tag = "2")]
-        pub added:   ::core::option::Option<super::NewEncryptedAmountEvent>,
+        pub added: ::core::option::Option<super::NewEncryptedAmountEvent>,
         #[prost(message, optional, tag = "3")]
-        pub memo:    ::core::option::Option<super::Memo>,
+        pub memo: ::core::option::Option<super::Memo>,
     }
     /// An account transferred part of its encrypted balance to its public
-    /// balance. This is the result of a successful TransferToPublic
-    /// transaction.
+    /// balance. This is the result of a successful TransferToPublic transaction.
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct TransferredToPublic {
         #[prost(message, optional, tag = "1")]
         pub removed: ::core::option::Option<super::EncryptedAmountRemovedEvent>,
         #[prost(message, optional, tag = "2")]
-        pub amount:  ::core::option::Option<super::Amount>,
+        pub amount: ::core::option::Option<super::Amount>,
     }
     /// A transfer with schedule was performed. This is the result of a
     /// successful TransferWithSchedule transaction.
@@ -1982,10 +1959,10 @@ pub mod account_transaction_effects {
         pub receiver: ::core::option::Option<super::AccountAddress>,
         /// The list of releases. Ordered by increasing timestamp.
         #[prost(message, repeated, tag = "2")]
-        pub amount:   ::prost::alloc::vec::Vec<super::NewRelease>,
+        pub amount: ::prost::alloc::vec::Vec<super::NewRelease>,
         /// Optional memo.
         #[prost(message, optional, tag = "3")]
-        pub memo:     ::core::option::Option<super::Memo>,
+        pub memo: ::core::option::Option<super::Memo>,
     }
     /// Account's credentials were updated. This is the result of a
     /// successful UpdateCredentials transaction.
@@ -1994,13 +1971,13 @@ pub mod account_transaction_effects {
     pub struct CredentialsUpdated {
         /// The credential ids that were added.
         #[prost(message, repeated, tag = "1")]
-        pub new_cred_ids:     ::prost::alloc::vec::Vec<super::CredentialRegistrationId>,
+        pub new_cred_ids: ::prost::alloc::vec::Vec<super::CredentialRegistrationId>,
         /// The credentials that were removed.
         #[prost(message, repeated, tag = "2")]
         pub removed_cred_ids: ::prost::alloc::vec::Vec<super::CredentialRegistrationId>,
         /// The (possibly) updated account threshold.
         #[prost(message, optional, tag = "3")]
-        pub new_threshold:    ::core::option::Option<super::AccountThreshold>,
+        pub new_threshold: ::core::option::Option<super::AccountThreshold>,
     }
     /// A baker was configured. The details of what happened are contained in
     /// the list of BakerEvents.
@@ -2059,8 +2036,7 @@ pub mod account_transaction_effects {
         /// balance.
         #[prost(message, tag = "12")]
         TransferredToEncrypted(super::EncryptedSelfAmountAddedEvent),
-        /// An account transferred part of its encrypted balance to its public
-        /// balance.
+        /// An account transferred part of its encrypted balance to its public balance.
         #[prost(message, tag = "13")]
         TransferredToPublic(TransferredToPublic),
         /// A transfer with a release schedule was made.
@@ -2075,12 +2051,10 @@ pub mod account_transaction_effects {
         /// Some data was registered on the chain.
         #[prost(message, tag = "17")]
         DataRegistered(super::RegisteredData),
-        /// A baker was configured. The details of what happened are contained
-        /// in a list of BakerEvents.
+        /// A baker was configured. The details of what happened are contained in a list of BakerEvents.
         #[prost(message, tag = "18")]
         BakerConfigured(BakerConfigured),
-        /// A delegator was configured. The details of what happened are
-        /// contained in a list of DelegatorEvents.
+        /// A delegator was configured. The details of what happened are contained in a list of DelegatorEvents.
         #[prost(message, tag = "19")]
         DelegationConfigured(DelegationConfigured),
     }
@@ -2092,14 +2066,13 @@ pub struct ElectionDifficulty {
     #[prost(message, optional, tag = "1")]
     pub value: ::core::option::Option<AmountFraction>,
 }
-/// Parameters that determine timeouts in the consensus protocol used from
-/// protocol version 6.
+/// Parameters that determine timeouts in the consensus protocol used from protocol version 6.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TimeoutParameters {
     /// The base value for triggering a timeout
     #[prost(message, optional, tag = "1")]
-    pub timeout_base:     ::core::option::Option<Duration>,
+    pub timeout_base: ::core::option::Option<Duration>,
     /// Factor for increasing the timeout. Must be greater than 1.
     #[prost(message, optional, tag = "2")]
     pub timeout_increase: ::core::option::Option<Ratio>,
@@ -2111,16 +2084,14 @@ pub struct TimeoutParameters {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FinalizationCommitteeParameters {
-    /// The minimum size of a finalization committee before
-    /// `finalizer_relative_stake_threshold` takes effect.
+    /// The minimum size of a finalization committee before `finalizer_relative_stake_threshold` takes effect.
     #[prost(uint32, tag = "1")]
-    pub minimum_finalizers:                 u32,
+    pub minimum_finalizers: u32,
     /// The maximum size of a finalization committee.
     #[prost(uint32, tag = "2")]
-    pub maximum_finalizers:                 u32,
-    /// The threshold for determining the stake required for being eligible the
-    /// finalization committee. The amount is given by `total stake in pools
-    /// * finalizer_relative_stake_threshold`
+    pub maximum_finalizers: u32,
+    /// The threshold for determining the stake required for being eligible the finalization committee.
+    /// The amount is given by `total stake in pools * finalizer_relative_stake_threshold`
     #[prost(message, optional, tag = "3")]
     pub finalizer_relative_stake_threshold: ::core::option::Option<AmountFraction>,
 }
@@ -2133,7 +2104,7 @@ pub struct ConsensusParametersV1 {
     pub timeout_parameters: ::core::option::Option<TimeoutParameters>,
     /// Minimum time interval between blocks.
     #[prost(message, optional, tag = "2")]
-    pub min_block_time:     ::core::option::Option<Duration>,
+    pub min_block_time: ::core::option::Option<Duration>,
     /// Maximum energy allowed per block.
     #[prost(message, optional, tag = "3")]
     pub block_energy_limit: ::core::option::Option<Energy>,
@@ -2151,7 +2122,7 @@ pub struct ExchangeRate {
 pub struct Ratio {
     /// The numerator.
     #[prost(uint64, tag = "1")]
-    pub numerator:   u64,
+    pub numerator: u64,
     /// The denominator.
     #[prost(uint64, tag = "2")]
     pub denominator: u64,
@@ -2163,8 +2134,7 @@ pub struct UpdatePublicKey {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
-/// The threshold for how many UpdatePublicKeys are need to make a certain chain
-/// update.
+/// The threshold for how many UpdatePublicKeys are need to make a certain chain update.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateKeysThreshold {
@@ -2185,15 +2155,14 @@ pub struct UpdateKeysIndex {
 pub struct HigherLevelKeys {
     /// The keys.
     #[prost(message, repeated, tag = "1")]
-    pub keys:      ::prost::alloc::vec::Vec<UpdatePublicKey>,
+    pub keys: ::prost::alloc::vec::Vec<UpdatePublicKey>,
     /// The number of keys needed to make a chain update.
     #[prost(message, optional, tag = "2")]
     pub threshold: ::core::option::Option<UpdateKeysThreshold>,
 }
-/// An access structure which specifies which UpdatePublicKeys in a
-/// HigherLevelKeys that are allowed to make chain update of a specific type.
-/// The threshold defines the minimum number of allowed keys needed to make the
-/// actual update.
+/// An access structure which specifies which UpdatePublicKeys in a HigherLevelKeys that are allowed
+/// to make chain update of a specific type. The threshold defines the minimum number of allowed keys needed
+/// to make the actual update.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccessStructure {
@@ -2202,10 +2171,10 @@ pub struct AccessStructure {
     pub access_public_keys: ::prost::alloc::vec::Vec<UpdateKeysIndex>,
     /// Number of keys requred to authorize an update.
     #[prost(message, optional, tag = "2")]
-    pub access_threshold:   ::core::option::Option<UpdateKeysThreshold>,
+    pub access_threshold: ::core::option::Option<UpdateKeysThreshold>,
 }
-/// The set of keys authorized for chain updates, together with access
-/// structures determining which keys are authorized for which update types.
+/// The set of keys authorized for chain updates, together with access structures
+/// determining which keys are authorized for which update types.
 /// This is the payload of an update to authorization.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2252,21 +2221,20 @@ pub struct AuthorizationsV0 {
     #[prost(message, optional, tag = "13")]
     pub add_identity_provider: ::core::option::Option<AccessStructure>,
 }
-/// The set of keys authorized for chain updates, together with access
-/// structures determining which keys are authorized for which update types.
+/// The set of keys authorized for chain updates, together with access structures
+/// determining which keys are authorized for which update types.
 /// This is the payload of an update to authorization.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AuthorizationsV1 {
     #[prost(message, optional, tag = "1")]
-    pub v0:                 ::core::option::Option<AuthorizationsV0>,
-    /// Access structure for updating the cooldown periods related to baking and
-    /// delegation.
+    pub v0: ::core::option::Option<AuthorizationsV0>,
+    /// Access structure for updating the cooldown periods related to baking and delegation.
     #[prost(message, optional, tag = "2")]
     pub parameter_cooldown: ::core::option::Option<AccessStructure>,
     /// Access structure for updating the length of the reward period.
     #[prost(message, optional, tag = "3")]
-    pub parameter_time:     ::core::option::Option<AccessStructure>,
+    pub parameter_time: ::core::option::Option<AccessStructure>,
 }
 /// Description either of an anonymity revoker or identity provider.
 /// Metadata that should be visible on the chain.
@@ -2275,11 +2243,10 @@ pub struct AuthorizationsV1 {
 pub struct Description {
     /// The name.
     #[prost(string, tag = "1")]
-    pub name:        ::prost::alloc::string::String,
-    /// A link to more information about the anonymity revoker or identity
-    /// provider.
+    pub name: ::prost::alloc::string::String,
+    /// A link to more information about the anonymity revoker or identity provider.
     #[prost(string, tag = "2")]
-    pub url:         ::prost::alloc::string::String,
+    pub url: ::prost::alloc::string::String,
     /// A free form description of the revoker or provider.
     #[prost(string, tag = "3")]
     pub description: ::prost::alloc::string::String,
@@ -2291,13 +2258,13 @@ pub struct Description {
 pub struct ArInfo {
     /// Unique identifier of the anonymity revoker.
     #[prost(message, optional, tag = "1")]
-    pub identity:    ::core::option::Option<ar_info::ArIdentity>,
+    pub identity: ::core::option::Option<ar_info::ArIdentity>,
     /// Description of the anonymity revoker.
     #[prost(message, optional, tag = "2")]
     pub description: ::core::option::Option<Description>,
     /// Elgamal encryption key of the anonymity revoker.
     #[prost(message, optional, tag = "3")]
-    pub public_key:  ::core::option::Option<ar_info::ArPublicKey>,
+    pub public_key: ::core::option::Option<ar_info::ArPublicKey>,
 }
 /// Nested message and enum types in `ArInfo`.
 pub mod ar_info {
@@ -2332,13 +2299,13 @@ pub struct IpIdentity {
 pub struct IpInfo {
     /// Unique identifier of the identity provider.
     #[prost(message, optional, tag = "1")]
-    pub identity:       ::core::option::Option<IpIdentity>,
+    pub identity: ::core::option::Option<IpIdentity>,
     /// Description of the identity provider.
     #[prost(message, optional, tag = "2")]
-    pub description:    ::core::option::Option<Description>,
+    pub description: ::core::option::Option<Description>,
     /// Pointcheval-Sanders public key of the identity provider.
     #[prost(message, optional, tag = "3")]
-    pub verify_key:     ::core::option::Option<ip_info::IpVerifyKey>,
+    pub verify_key: ::core::option::Option<ip_info::IpVerifyKey>,
     /// Ed25519 public key of the identity provider.
     #[prost(message, optional, tag = "4")]
     pub cdi_verify_key: ::core::option::Option<ip_info::IpCdiVerifyKey>,
@@ -2385,10 +2352,10 @@ pub struct CommissionRanges {
     pub finalization: ::core::option::Option<InclusiveRangeAmountFraction>,
     /// The range of allowed baker commissions.
     #[prost(message, optional, tag = "2")]
-    pub baking:       ::core::option::Option<InclusiveRangeAmountFraction>,
+    pub baking: ::core::option::Option<InclusiveRangeAmountFraction>,
     /// The range of allowed transaction commissions.
     #[prost(message, optional, tag = "3")]
-    pub transaction:  ::core::option::Option<InclusiveRangeAmountFraction>,
+    pub transaction: ::core::option::Option<InclusiveRangeAmountFraction>,
 }
 /// A bound on the relative share of the total staked capital that a baker can
 /// have as its stake. This is required to be greater than 0.
@@ -2448,7 +2415,7 @@ pub struct CooldownParametersCpv1 {
     /// Number of seconds that a delegator must cooldown
     /// when reducing their delegated stake.
     #[prost(message, optional, tag = "2")]
-    pub delegator_cooldown:  ::core::option::Option<DurationSeconds>,
+    pub delegator_cooldown: ::core::option::Option<DurationSeconds>,
 }
 /// Parameters related to staking pools.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -2459,24 +2426,24 @@ pub struct PoolParametersCpv1 {
     pub passive_finalization_commission: ::core::option::Option<AmountFraction>,
     /// Fraction of baking rewards charged by the passive delegation.
     #[prost(message, optional, tag = "2")]
-    pub passive_baking_commission:       ::core::option::Option<AmountFraction>,
+    pub passive_baking_commission: ::core::option::Option<AmountFraction>,
     /// Fraction of transaction rewards charged by the L-pool.
     #[prost(message, optional, tag = "3")]
-    pub passive_transaction_commission:  ::core::option::Option<AmountFraction>,
+    pub passive_transaction_commission: ::core::option::Option<AmountFraction>,
     /// Bounds on the commission rates that may be charged by bakers.
     #[prost(message, optional, tag = "4")]
-    pub commission_bounds:               ::core::option::Option<CommissionRanges>,
+    pub commission_bounds: ::core::option::Option<CommissionRanges>,
     /// Minimum equity capital required for a new baker.
     #[prost(message, optional, tag = "5")]
-    pub minimum_equity_capital:          ::core::option::Option<Amount>,
+    pub minimum_equity_capital: ::core::option::Option<Amount>,
     /// Maximum fraction of the total staked capital of that a new baker can
     /// have.
     #[prost(message, optional, tag = "6")]
-    pub capital_bound:                   ::core::option::Option<CapitalBound>,
+    pub capital_bound: ::core::option::Option<CapitalBound>,
     /// The maximum leverage that a baker can have as a ratio of total stake
     /// to equity capital.
     #[prost(message, optional, tag = "7")]
-    pub leverage_bound:                  ::core::option::Option<LeverageFactor>,
+    pub leverage_bound: ::core::option::Option<LeverageFactor>,
 }
 /// The time parameters are introduced as of protocol version 4, and consist of
 /// the reward period length and the mint rate per payday. These are coupled as
@@ -2487,14 +2454,14 @@ pub struct TimeParametersCpv1 {
     #[prost(message, optional, tag = "1")]
     pub reward_period_length: ::core::option::Option<RewardPeriodLength>,
     #[prost(message, optional, tag = "2")]
-    pub mint_per_payday:      ::core::option::Option<MintRate>,
+    pub mint_per_payday: ::core::option::Option<MintRate>,
 }
 /// Mint distribution payload as it looks in protocol version 4 and onward.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MintDistributionCpv1 {
     #[prost(message, optional, tag = "1")]
-    pub baking_reward:       ::core::option::Option<AmountFraction>,
+    pub baking_reward: ::core::option::Option<AmountFraction>,
     #[prost(message, optional, tag = "2")]
     pub finalization_reward: ::core::option::Option<AmountFraction>,
 }
@@ -2523,10 +2490,10 @@ pub struct ProtocolUpdate {
 pub struct MintDistributionCpv0 {
     /// Mint rate per slot.
     #[prost(message, optional, tag = "1")]
-    pub mint_per_slot:       ::core::option::Option<MintRate>,
+    pub mint_per_slot: ::core::option::Option<MintRate>,
     /// The fraction of newly created CCD allocated to baker rewards.
     #[prost(message, optional, tag = "2")]
-    pub baking_reward:       ::core::option::Option<AmountFraction>,
+    pub baking_reward: ::core::option::Option<AmountFraction>,
     /// The fraction of newly created CCD allocated to finalization rewards.
     #[prost(message, optional, tag = "3")]
     pub finalization_reward: ::core::option::Option<AmountFraction>,
@@ -2537,7 +2504,7 @@ pub struct MintDistributionCpv0 {
 pub struct TransactionFeeDistribution {
     /// The fraction allocated to the baker.
     #[prost(message, optional, tag = "1")]
-    pub baker:       ::core::option::Option<AmountFraction>,
+    pub baker: ::core::option::Option<AmountFraction>,
     /// The fraction allocated to the GAS account.
     #[prost(message, optional, tag = "2")]
     pub gas_account: ::core::option::Option<AmountFraction>,
@@ -2548,17 +2515,16 @@ pub struct TransactionFeeDistribution {
 pub struct GasRewards {
     /// The fraction paid to the baker.
     #[prost(message, optional, tag = "1")]
-    pub baker:              ::core::option::Option<AmountFraction>,
+    pub baker: ::core::option::Option<AmountFraction>,
     /// Fraction paid for including a finalization proof in a block.
     #[prost(message, optional, tag = "2")]
     pub finalization_proof: ::core::option::Option<AmountFraction>,
-    /// Fraction paid for including each account creation transaction in a
-    /// block.
+    /// Fraction paid for including each account creation transaction in a block.
     #[prost(message, optional, tag = "3")]
-    pub account_creation:   ::core::option::Option<AmountFraction>,
+    pub account_creation: ::core::option::Option<AmountFraction>,
     /// Fraction paid for including an update transaction in a block.
     #[prost(message, optional, tag = "4")]
-    pub chain_update:       ::core::option::Option<AmountFraction>,
+    pub chain_update: ::core::option::Option<AmountFraction>,
 }
 /// Distribution of gas rewards for chain parameters version 2.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -2566,17 +2532,16 @@ pub struct GasRewards {
 pub struct GasRewardsCpv2 {
     /// The fraction paid to the baker.
     #[prost(message, optional, tag = "1")]
-    pub baker:            ::core::option::Option<AmountFraction>,
-    /// Fraction paid for including each account creation transaction in a
-    /// block.
+    pub baker: ::core::option::Option<AmountFraction>,
+    /// Fraction paid for including each account creation transaction in a block.
     #[prost(message, optional, tag = "3")]
     pub account_creation: ::core::option::Option<AmountFraction>,
     /// Fraction paid for including an update transaction in a block.
     #[prost(message, optional, tag = "4")]
-    pub chain_update:     ::core::option::Option<AmountFraction>,
+    pub chain_update: ::core::option::Option<AmountFraction>,
 }
-/// Minimum stake needed to become a baker. This only applies to protocol
-/// version 1-3.
+/// Minimum stake needed to become a baker. This only applies to protocol version
+/// 1-3.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerStakeThreshold {
@@ -2584,9 +2549,8 @@ pub struct BakerStakeThreshold {
     #[prost(message, optional, tag = "1")]
     pub baker_stake_threshold: ::core::option::Option<Amount>,
 }
-/// Root updates are the highest kind of key updates. They can update every
-/// other set of keys, even themselves. They can only be performed by Root level
-/// keys.
+/// Root updates are the highest kind of key updates. They can update every other set of keys,
+/// even themselves. They can only be performed by Root level keys.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RootUpdate {
@@ -2607,15 +2571,13 @@ pub mod root_update {
         /// The level 2 keys were updated.
         #[prost(message, tag = "3")]
         Level2KeysUpdateV0(super::AuthorizationsV0),
-        /// The level 2 keys were updated. This is similar to
-        /// `level_2_keys_update_v0` except that a few more keys can be updated.
+        /// The level 2 keys were updated. This is similar to `level_2_keys_update_v0` except that a few more keys can be updated.
         #[prost(message, tag = "4")]
         Level2KeysUpdateV1(super::AuthorizationsV1),
     }
 }
 /// Level 1 updates are the intermediate update kind.
-/// They can update themselves or level 2 keys. They can only be performed by
-/// level 1 keys.
+/// They can update themselves or level 2 keys. They can only be performed by level 1 keys.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Level1Update {
@@ -2633,8 +2595,7 @@ pub mod level1_update {
         /// The level 2 keys were updated.
         #[prost(message, tag = "2")]
         Level2KeysUpdateV0(super::AuthorizationsV0),
-        /// The level 2 keys were updated. This is similar to
-        /// `level_2_keys_update_v0` except that a few more keys can be updated.
+        /// The level 2 keys were updated. This is similar to `level_2_keys_update_v0` except that a few more keys can be updated.
         #[prost(message, tag = "3")]
         Level2KeysUpdateV1(super::AuthorizationsV1),
     }
@@ -2711,8 +2672,7 @@ pub mod update_payload {
         /// The consensus timeouts were updated (chain parameters version 2).
         #[prost(message, tag = "19")]
         TimeoutParametersUpdate(super::TimeoutParameters),
-        /// The minimum time between blocks was updated (chain parameters
-        /// version 2).
+        /// The minimum time between blocks was updated (chain parameters version 2).
         #[prost(message, tag = "20")]
         MinBlockTimeUpdate(super::Duration),
         /// The block energy limit was updated (chain parameters version 2).
@@ -2729,10 +2689,10 @@ pub mod update_payload {
 pub struct AccountTransactionDetails {
     /// The cost of the transaction. Paid by the sender.
     #[prost(message, optional, tag = "1")]
-    pub cost:    ::core::option::Option<Amount>,
+    pub cost: ::core::option::Option<Amount>,
     /// The sender of the transaction.
     #[prost(message, optional, tag = "2")]
-    pub sender:  ::core::option::Option<AccountAddress>,
+    pub sender: ::core::option::Option<AccountAddress>,
     /// The effects of the transaction.
     #[prost(message, optional, tag = "3")]
     pub effects: ::core::option::Option<AccountTransactionEffects>,
@@ -2748,10 +2708,10 @@ pub struct AccountCreationDetails {
     pub credential_type: i32,
     /// Address of the newly created account.
     #[prost(message, optional, tag = "2")]
-    pub address:         ::core::option::Option<AccountAddress>,
+    pub address: ::core::option::Option<AccountAddress>,
     /// Credential registration ID of the first credential.
     #[prost(message, optional, tag = "3")]
-    pub reg_id:          ::core::option::Option<CredentialRegistrationId>,
+    pub reg_id: ::core::option::Option<CredentialRegistrationId>,
 }
 /// Transaction time specified as seconds since unix epoch.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -2771,7 +2731,7 @@ pub struct UpdateDetails {
     pub effective_time: ::core::option::Option<TransactionTime>,
     /// The paylaod for the update.
     #[prost(message, optional, tag = "2")]
-    pub payload:        ::core::option::Option<UpdatePayload>,
+    pub payload: ::core::option::Option<UpdatePayload>,
 }
 /// Summary of the outcome of a block item in structured form.
 /// The summary determines which transaction type it was.
@@ -2780,16 +2740,16 @@ pub struct UpdateDetails {
 pub struct BlockItemSummary {
     /// Index of the transaction in the block where it is included.
     #[prost(message, optional, tag = "1")]
-    pub index:       ::core::option::Option<block_item_summary::TransactionIndex>,
+    pub index: ::core::option::Option<block_item_summary::TransactionIndex>,
     /// The amount of NRG the transaction cost.
     #[prost(message, optional, tag = "2")]
     pub energy_cost: ::core::option::Option<Energy>,
     /// Hash of the transaction.
     #[prost(message, optional, tag = "3")]
-    pub hash:        ::core::option::Option<TransactionHash>,
+    pub hash: ::core::option::Option<TransactionHash>,
     /// Details that are specific to different transaction types.
     #[prost(oneof = "block_item_summary::Details", tags = "4, 5, 6")]
-    pub details:     ::core::option::Option<block_item_summary::Details>,
+    pub details: ::core::option::Option<block_item_summary::Details>,
 }
 /// Nested message and enum types in `BlockItemSummary`.
 pub mod block_item_summary {
@@ -2830,122 +2790,111 @@ pub struct GenesisIndex {
 pub struct ConsensusInfo {
     /// Hash of the current best block.
     #[prost(message, optional, tag = "1")]
-    pub best_block:                  ::core::option::Option<BlockHash>,
+    pub best_block: ::core::option::Option<BlockHash>,
     /// Hash of the (original) genesis block.
     #[prost(message, optional, tag = "2")]
-    pub genesis_block:               ::core::option::Option<BlockHash>,
+    pub genesis_block: ::core::option::Option<BlockHash>,
     /// Time of the (original) genesis block.
     #[prost(message, optional, tag = "3")]
-    pub genesis_time:                ::core::option::Option<Timestamp>,
-    /// (Current) slot duration in milliseconds. Present only in protocol
-    /// versions 1-5.
+    pub genesis_time: ::core::option::Option<Timestamp>,
+    /// (Current) slot duration in milliseconds. Present only in protocol versions 1-5.
     #[prost(message, optional, tag = "4")]
-    pub slot_duration:               ::core::option::Option<Duration>,
+    pub slot_duration: ::core::option::Option<Duration>,
     /// (Current) epoch duration in milliseconds.
     #[prost(message, optional, tag = "5")]
-    pub epoch_duration:              ::core::option::Option<Duration>,
+    pub epoch_duration: ::core::option::Option<Duration>,
     /// Hash of the last finalized block.
     #[prost(message, optional, tag = "6")]
-    pub last_finalized_block:        ::core::option::Option<BlockHash>,
+    pub last_finalized_block: ::core::option::Option<BlockHash>,
     /// Absolute height of the best block.
     #[prost(message, optional, tag = "7")]
-    pub best_block_height:           ::core::option::Option<AbsoluteBlockHeight>,
+    pub best_block_height: ::core::option::Option<AbsoluteBlockHeight>,
     /// Absolute height of the last finalized block.
     #[prost(message, optional, tag = "8")]
     pub last_finalized_block_height: ::core::option::Option<AbsoluteBlockHeight>,
     /// Total number of blocks received.
     #[prost(uint32, tag = "9")]
-    pub blocks_received_count:       u32,
+    pub blocks_received_count: u32,
     /// The last time a block was received.
     #[prost(message, optional, tag = "10")]
-    pub block_last_received_time:    ::core::option::Option<Timestamp>,
-    /// Exponential moving average latency between a block's slot time and
-    /// received time.
+    pub block_last_received_time: ::core::option::Option<Timestamp>,
+    /// Exponential moving average latency between a block's slot time and received time.
     #[prost(double, tag = "11")]
-    pub block_receive_latency_ema:   f64,
-    /// Standard deviation of exponential moving average latency between a
-    /// block's slot time and received time.
+    pub block_receive_latency_ema: f64,
+    /// Standard deviation of exponential moving average latency between a block's slot time and received time.
     #[prost(double, tag = "12")]
-    pub block_receive_latency_emsd:  f64,
+    pub block_receive_latency_emsd: f64,
     /// Exponential moving average time between receiving blocks.
     #[prost(double, optional, tag = "13")]
-    pub block_receive_period_ema:    ::core::option::Option<f64>,
-    /// Standard deviation of exponential moving average time between receiving
-    /// blocks.
+    pub block_receive_period_ema: ::core::option::Option<f64>,
+    /// Standard deviation of exponential moving average time between receiving blocks.
     #[prost(double, optional, tag = "14")]
-    pub block_receive_period_emsd:   ::core::option::Option<f64>,
+    pub block_receive_period_emsd: ::core::option::Option<f64>,
     /// Total number of blocks received and verified.
     #[prost(uint32, tag = "15")]
-    pub blocks_verified_count:       u32,
+    pub blocks_verified_count: u32,
     /// The last time a block was verified (added to the tree).
     #[prost(message, optional, tag = "16")]
-    pub block_last_arrived_time:     ::core::option::Option<Timestamp>,
-    /// Exponential moving average latency between a block's slot time and its
-    /// arrival.
+    pub block_last_arrived_time: ::core::option::Option<Timestamp>,
+    /// Exponential moving average latency between a block's slot time and its arrival.
     #[prost(double, tag = "17")]
-    pub block_arrive_latency_ema:    f64,
-    /// Standard deviation of exponential moving average latency between a
-    /// block's slot time and its arrival.
+    pub block_arrive_latency_ema: f64,
+    /// Standard deviation of exponential moving average latency between a block's slot time and its arrival.
     #[prost(double, tag = "18")]
-    pub block_arrive_latency_emsd:   f64,
+    pub block_arrive_latency_emsd: f64,
     /// Exponential moving average time between block arrivals.
     #[prost(double, optional, tag = "19")]
-    pub block_arrive_period_ema:     ::core::option::Option<f64>,
-    /// Standard deviation of exponential moving average time between block
-    /// arrivals.
+    pub block_arrive_period_ema: ::core::option::Option<f64>,
+    /// Standard deviation of exponential moving average time between block arrivals.
     #[prost(double, optional, tag = "20")]
-    pub block_arrive_period_emsd:    ::core::option::Option<f64>,
+    pub block_arrive_period_emsd: ::core::option::Option<f64>,
     /// Exponential moving average number of transactions per block.
     #[prost(double, tag = "21")]
-    pub transactions_per_block_ema:  f64,
-    /// Standard deviation of exponential moving average number of transactions
-    /// per block.
+    pub transactions_per_block_ema: f64,
+    /// Standard deviation of exponential moving average number of transactions per block.
     #[prost(double, tag = "22")]
     pub transactions_per_block_emsd: f64,
     /// Number of finalizations.
     #[prost(uint32, tag = "23")]
-    pub finalization_count:          u32,
+    pub finalization_count: u32,
     /// Time of last verified finalization.
     #[prost(message, optional, tag = "24")]
-    pub last_finalized_time:         ::core::option::Option<Timestamp>,
+    pub last_finalized_time: ::core::option::Option<Timestamp>,
     /// Exponential moving average time between finalizations.
     #[prost(double, optional, tag = "25")]
-    pub finalization_period_ema:     ::core::option::Option<f64>,
-    /// Standard deviation of exponential moving average time between
-    /// finalizations.
+    pub finalization_period_ema: ::core::option::Option<f64>,
+    /// Standard deviation of exponential moving average time between finalizations.
     #[prost(double, optional, tag = "26")]
-    pub finalization_period_emsd:    ::core::option::Option<f64>,
+    pub finalization_period_emsd: ::core::option::Option<f64>,
     /// Currently active protocol version.
     #[prost(enumeration = "ProtocolVersion", tag = "27")]
-    pub protocol_version:            i32,
+    pub protocol_version: i32,
     /// The number of chain restarts via a protocol update. A completed
     /// protocol update instruction might not change the protocol version
     /// specified in the previous field, but it always increments the genesis
     /// index.
     #[prost(message, optional, tag = "28")]
-    pub genesis_index:               ::core::option::Option<GenesisIndex>,
-    /// Block hash of the genesis block of current era, i.e., since the last
-    /// protocol update. Initially this is equal to 'genesis_block'.
+    pub genesis_index: ::core::option::Option<GenesisIndex>,
+    /// Block hash of the genesis block of current era, i.e., since the last protocol update.
+    /// Initially this is equal to 'genesis_block'.
     #[prost(message, optional, tag = "29")]
-    pub current_era_genesis_block:   ::core::option::Option<BlockHash>,
+    pub current_era_genesis_block: ::core::option::Option<BlockHash>,
     /// Time when the current era started.
     #[prost(message, optional, tag = "30")]
-    pub current_era_genesis_time:    ::core::option::Option<Timestamp>,
-    /// The current duration to wait before a round times out. Present from
-    /// protocol version 6.
+    pub current_era_genesis_time: ::core::option::Option<Timestamp>,
+    /// The current duration to wait before a round times out. Present from protocol version 6.
     #[prost(message, optional, tag = "31")]
-    pub current_timeout_duration:    ::core::option::Option<Duration>,
+    pub current_timeout_duration: ::core::option::Option<Duration>,
     /// The current round. Present from protocol version 6.
     #[prost(message, optional, tag = "32")]
-    pub current_round:               ::core::option::Option<Round>,
+    pub current_round: ::core::option::Option<Round>,
     /// The current epoch. Present from protocol version 6.
     #[prost(message, optional, tag = "33")]
-    pub current_epoch:               ::core::option::Option<Epoch>,
-    /// The first block in the epoch with timestamp at least this is considered
-    /// to be the trigger block for the epoch transition. Present from
-    /// protocol version 6.
+    pub current_epoch: ::core::option::Option<Epoch>,
+    /// The first block in the epoch with timestamp at least this is considered to be the trigger block
+    /// for the epoch transition. Present from protocol version 6.
     #[prost(message, optional, tag = "34")]
-    pub trigger_block_time:          ::core::option::Option<Timestamp>,
+    pub trigger_block_time: ::core::option::Option<Timestamp>,
 }
 /// Information about an arrived block that is part of the streaming response.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -2953,7 +2902,7 @@ pub struct ConsensusInfo {
 pub struct ArrivedBlockInfo {
     /// Hash of the block.
     #[prost(message, optional, tag = "1")]
-    pub hash:   ::core::option::Option<BlockHash>,
+    pub hash: ::core::option::Option<BlockHash>,
     /// Absolute height of the block, height 0 is the genesis block.
     #[prost(message, optional, tag = "2")]
     pub height: ::core::option::Option<AbsoluteBlockHeight>,
@@ -2962,20 +2911,16 @@ pub struct ArrivedBlockInfo {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CryptographicParameters {
-    /// A free-form string used to distinguish between different chains even if
-    /// they share other parameters.
+    /// A free-form string used to distinguish between different chains even if they share other parameters.
     #[prost(string, tag = "1")]
-    pub genesis_string:          ::prost::alloc::string::String,
+    pub genesis_string: ::prost::alloc::string::String,
     /// Generators for the bulletproofs.
-    /// It is a serialized list of 256 group elements in the G1 group of the
-    /// BLS12-381 curve.
+    /// It is a serialized list of 256 group elements in the G1 group of the BLS12-381 curve.
     #[prost(bytes = "vec", tag = "2")]
-    pub bulletproof_generators:  ::prost::alloc::vec::Vec<u8>,
-    /// A shared commitment key known to the chain and the account holder (and
-    /// therefore it is public). The account holder uses this commitment key
-    /// to generate commitments to values in the attribute list.
-    /// It is a serialized pair of group elements  in the G1 group of the
-    /// BLS12-381 curve.
+    pub bulletproof_generators: ::prost::alloc::vec::Vec<u8>,
+    /// A shared commitment key known to the chain and the account holder (and therefore it is public).
+    /// The account holder uses this commitment key to generate commitments to values in the attribute list.
+    /// It is a serialized pair of group elements  in the G1 group of the BLS12-381 curve.
     #[prost(bytes = "vec", tag = "3")]
     pub on_chain_commitment_key: ::prost::alloc::vec::Vec<u8>,
 }
@@ -2985,67 +2930,63 @@ pub struct CryptographicParameters {
 pub struct BlockInfo {
     /// Hash of the block.
     #[prost(message, optional, tag = "1")]
-    pub hash:                     ::core::option::Option<BlockHash>,
+    pub hash: ::core::option::Option<BlockHash>,
     /// Absolute height of the block, height 0 is the genesis block.
     #[prost(message, optional, tag = "2")]
-    pub height:                   ::core::option::Option<AbsoluteBlockHeight>,
-    /// The parent block hash. For a re-genesis block, this will be the terminal
-    /// block of the previous chain. For the initial genesis block, this
-    /// will be the hash of the block itself.
+    pub height: ::core::option::Option<AbsoluteBlockHeight>,
+    /// The parent block hash. For a re-genesis block, this will be the terminal block of the
+    /// previous chain. For the initial genesis block, this will be the hash of the block itself.
     #[prost(message, optional, tag = "3")]
-    pub parent_block:             ::core::option::Option<BlockHash>,
+    pub parent_block: ::core::option::Option<BlockHash>,
     /// The last finalized block when this block was baked.
     #[prost(message, optional, tag = "4")]
-    pub last_finalized_block:     ::core::option::Option<BlockHash>,
-    /// The genesis index for this block. This counts the number of protocol
-    /// updates that have preceded this block, and defines the era of the
-    /// block.
+    pub last_finalized_block: ::core::option::Option<BlockHash>,
+    /// The genesis index for this block. This counts the number of protocol updates that have
+    /// preceded this block, and defines the era of the block.
     #[prost(message, optional, tag = "5")]
-    pub genesis_index:            ::core::option::Option<GenesisIndex>,
+    pub genesis_index: ::core::option::Option<GenesisIndex>,
     /// The height of this block relative to the (re)genesis block of its era.
     #[prost(message, optional, tag = "6")]
-    pub era_block_height:         ::core::option::Option<BlockHeight>,
+    pub era_block_height: ::core::option::Option<BlockHeight>,
     /// The time the block was received.
     #[prost(message, optional, tag = "7")]
-    pub receive_time:             ::core::option::Option<Timestamp>,
+    pub receive_time: ::core::option::Option<Timestamp>,
     /// The time the block was verified.
     #[prost(message, optional, tag = "8")]
-    pub arrive_time:              ::core::option::Option<Timestamp>,
-    /// The slot number in which the block was baked. Present in protocol
-    /// versions 1-5.
+    pub arrive_time: ::core::option::Option<Timestamp>,
+    /// The slot number in which the block was baked. Present in protocol versions 1-5.
     #[prost(message, optional, tag = "9")]
-    pub slot_number:              ::core::option::Option<Slot>,
+    pub slot_number: ::core::option::Option<Slot>,
     /// The time of the slot in which the block was baked.
     #[prost(message, optional, tag = "10")]
-    pub slot_time:                ::core::option::Option<Timestamp>,
-    /// The baker id of account baking this block. Not provided for a genesis
-    /// block.
+    pub slot_time: ::core::option::Option<Timestamp>,
+    /// The baker id of account baking this block. Not provided for a genesis block.
     #[prost(message, optional, tag = "11")]
-    pub baker:                    ::core::option::Option<BakerId>,
+    pub baker: ::core::option::Option<BakerId>,
     /// Whether the block is finalized.
     #[prost(bool, tag = "12")]
-    pub finalized:                bool,
+    pub finalized: bool,
     /// The number of transactions in the block.
     #[prost(uint32, tag = "13")]
-    pub transaction_count:        u32,
+    pub transaction_count: u32,
     /// The energy cost of the transactions in the block.
     #[prost(message, optional, tag = "14")]
     pub transactions_energy_cost: ::core::option::Option<Energy>,
     /// The total byte size of all transactions in the block.
     #[prost(uint32, tag = "15")]
-    pub transactions_size:        u32,
+    pub transactions_size: u32,
     /// The hash of the block state after this block.
     #[prost(message, optional, tag = "16")]
-    pub state_hash:               ::core::option::Option<StateHash>,
+    pub state_hash: ::core::option::Option<StateHash>,
     /// Protocol version to which the block belongs.
     #[prost(enumeration = "ProtocolVersion", tag = "17")]
-    pub protocol_version:         i32,
+    pub protocol_version: i32,
     /// Block round. Present from protocol version 6.
     #[prost(message, optional, tag = "18")]
-    pub round:                    ::core::option::Option<Round>,
+    pub round: ::core::option::Option<Round>,
     /// Block epoch. Present from protocol version 6.
     #[prost(message, optional, tag = "19")]
-    pub epoch:                    ::core::option::Option<Epoch>,
+    pub epoch: ::core::option::Option<Epoch>,
 }
 /// Request for GetPoolInfo.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -3056,7 +2997,7 @@ pub struct PoolInfoRequest {
     pub block_hash: ::core::option::Option<BlockHashInput>,
     /// The 'BakerId' of the pool owner.
     #[prost(message, optional, tag = "2")]
-    pub baker:      ::core::option::Option<BakerId>,
+    pub baker: ::core::option::Option<BakerId>,
 }
 /// A pending change to a baker pool.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -3076,7 +3017,7 @@ pub mod pool_pending_change {
         pub reduced_equity_capital: ::core::option::Option<super::Amount>,
         /// Timestamp when the change takes effect.
         #[prost(message, optional, tag = "2")]
-        pub effective_time:         ::core::option::Option<super::Timestamp>,
+        pub effective_time: ::core::option::Option<super::Timestamp>,
     }
     /// Removal of the pool is pending.
     #[allow(clippy::derive_partial_eq_without_eq)]
@@ -3101,36 +3042,34 @@ pub mod pool_pending_change {
 pub struct PoolCurrentPaydayInfo {
     /// The number of blocks baked in the current reward period.
     #[prost(uint64, tag = "1")]
-    pub blocks_baked:            u64,
-    /// Whether the baker has contributed a finalization proof in the current
-    /// reward period.
+    pub blocks_baked: u64,
+    /// Whether the baker has contributed a finalization proof in the current reward period.
     #[prost(bool, tag = "2")]
-    pub finalization_live:       bool,
+    pub finalization_live: bool,
     /// The transaction fees accruing to the pool in the current reward period.
     #[prost(message, optional, tag = "3")]
     pub transaction_fees_earned: ::core::option::Option<Amount>,
     /// The effective stake of the baker in the current reward period.
     #[prost(message, optional, tag = "4")]
-    pub effective_stake:         ::core::option::Option<Amount>,
+    pub effective_stake: ::core::option::Option<Amount>,
     /// The lottery power of the baker in the current reward period.
     #[prost(double, tag = "5")]
-    pub lottery_power:           f64,
+    pub lottery_power: f64,
     /// The effective equity capital of the baker for the current reward period.
     #[prost(message, optional, tag = "6")]
-    pub baker_equity_capital:    ::core::option::Option<Amount>,
-    /// The effective delegated capital to the pool for the current reward
-    /// period.
+    pub baker_equity_capital: ::core::option::Option<Amount>,
+    /// The effective delegated capital to the pool for the current reward period.
     #[prost(message, optional, tag = "7")]
-    pub delegated_capital:       ::core::option::Option<Amount>,
+    pub delegated_capital: ::core::option::Option<Amount>,
     /// The commission rates that apply for the current reward period.
     #[prost(message, optional, tag = "8")]
-    pub commission_rates:        ::core::option::Option<CommissionRates>,
+    pub commission_rates: ::core::option::Option<CommissionRates>,
 }
 /// Type for the response of GetPoolInfo.
 /// Contains information about a given pool at the end of a given block.
 /// From protocol version 7, pool removal has immediate effect, however, the
 /// pool may still be present for the current (and possibly next) reward period.
-/// In this case, the `current_payday_infor` field will be set, but the
+/// In this case, the `current_payday_info` field will be set, but the
 /// `equity_capital`, `delegated_capital`, `delegated_capital_cap` and,
 /// `pool_info` fields will all be absent. The `equity_pending_change` field
 /// will also be absent, as stake changes are immediate.
@@ -3139,32 +3078,31 @@ pub struct PoolCurrentPaydayInfo {
 pub struct PoolInfoResponse {
     /// The 'BakerId' of the pool owner.
     #[prost(message, optional, tag = "1")]
-    pub baker:                  ::core::option::Option<BakerId>,
+    pub baker: ::core::option::Option<BakerId>,
     /// The account address of the pool owner.
     #[prost(message, optional, tag = "2")]
-    pub address:                ::core::option::Option<AccountAddress>,
-    /// The equity capital provided by the pool owner.
+    pub address: ::core::option::Option<AccountAddress>,
+    /// The equity capital provided by the pool owner. Absent if the pool is removed.
     #[prost(message, optional, tag = "3")]
-    pub equity_capital:         ::core::option::Option<Amount>,
-    /// The capital delegated to the pool by other accounts.
+    pub equity_capital: ::core::option::Option<Amount>,
+    /// The capital delegated to the pool by other accounts. Absent if the pool is removed.
     #[prost(message, optional, tag = "4")]
-    pub delegated_capital:      ::core::option::Option<Amount>,
-    /// The maximum amount that may be delegated to the pool, accounting for
-    /// leverage and stake limits.
+    pub delegated_capital: ::core::option::Option<Amount>,
+    /// The maximum amount that may be delegated to the pool, accounting for leverage and stake limits.
+    /// Absent if the pool is removed.
     #[prost(message, optional, tag = "5")]
-    pub delegated_capital_cap:  ::core::option::Option<Amount>,
-    /// The pool info associated with the pool: open status, metadata URL and
-    /// commission rates.
+    pub delegated_capital_cap: ::core::option::Option<Amount>,
+    /// The pool info associated with the pool: open status, metadata URL and commission rates.
+    /// Absent if the pool is removed.
     #[prost(message, optional, tag = "6")]
-    pub pool_info:              ::core::option::Option<BakerPoolInfo>,
+    pub pool_info: ::core::option::Option<BakerPoolInfo>,
     /// Any pending change to the equity capital.
-    /// This is not used from protocol version 7 onwards, as stake changes are
-    /// immediate.
+    /// This is not used from protocol version 7 onwards, as stake changes are immediate.
     #[prost(message, optional, tag = "7")]
-    pub equity_pending_change:  ::core::option::Option<PoolPendingChange>,
+    pub equity_pending_change: ::core::option::Option<PoolPendingChange>,
     /// Information of the pool in the current reward period.
     #[prost(message, optional, tag = "8")]
-    pub current_payday_info:    ::core::option::Option<PoolCurrentPaydayInfo>,
+    pub current_payday_info: ::core::option::Option<PoolCurrentPaydayInfo>,
     /// Total capital staked across all pools, including passive delegation.
     #[prost(message, optional, tag = "9")]
     pub all_pool_total_capital: ::core::option::Option<Amount>,
@@ -3180,12 +3118,10 @@ pub struct PassiveDelegationInfo {
     /// The passive delegation commission rates.
     #[prost(message, optional, tag = "2")]
     pub commission_rates: ::core::option::Option<CommissionRates>,
-    /// The transaction fees accruing to the passive delegators in the current
-    /// reward period.
+    /// The transaction fees accruing to the passive delegators in the current reward period.
     #[prost(message, optional, tag = "3")]
     pub current_payday_transaction_fees_earned: ::core::option::Option<Amount>,
-    /// The effective delegated capital of passive delegators for the current
-    /// reward period.
+    /// The effective delegated capital of passive delegators for the current reward period.
     #[prost(message, optional, tag = "4")]
     pub current_payday_delegated_capital: ::core::option::Option<Amount>,
     /// Total capital staked across all pools, including passive delegation.
@@ -3197,7 +3133,9 @@ pub struct PassiveDelegationInfo {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlocksAtHeightRequest {
     #[prost(oneof = "blocks_at_height_request::BlocksAtHeight", tags = "1, 2")]
-    pub blocks_at_height: ::core::option::Option<blocks_at_height_request::BlocksAtHeight>,
+    pub blocks_at_height: ::core::option::Option<
+        blocks_at_height_request::BlocksAtHeight,
+    >,
 }
 /// Nested message and enum types in `BlocksAtHeightRequest`.
 pub mod blocks_at_height_request {
@@ -3218,12 +3156,11 @@ pub mod blocks_at_height_request {
         pub genesis_index: ::core::option::Option<super::GenesisIndex>,
         /// Height starting from the genesis block at the genesis index.
         #[prost(message, optional, tag = "2")]
-        pub height:        ::core::option::Option<super::BlockHeight>,
-        /// Whether to return results only from the specified genesis index
-        /// (`true`), or allow results from more recent genesis indices
-        /// as well (`false`).
+        pub height: ::core::option::Option<super::BlockHeight>,
+        /// Whether to return results only from the specified genesis index (`true`),
+        /// or allow results from more recent genesis indices as well (`false`).
         #[prost(bool, tag = "3")]
-        pub restrict:      bool,
+        pub restrict: bool,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
@@ -3258,22 +3195,22 @@ pub mod tokenomics_info {
     pub struct V0 {
         /// The total CCD in existence.
         #[prost(message, optional, tag = "1")]
-        pub total_amount:                ::core::option::Option<super::Amount>,
+        pub total_amount: ::core::option::Option<super::Amount>,
         /// The total CCD in encrypted balances.
         #[prost(message, optional, tag = "2")]
-        pub total_encrypted_amount:      ::core::option::Option<super::Amount>,
+        pub total_encrypted_amount: ::core::option::Option<super::Amount>,
         /// The amount in the baking reward account.
         #[prost(message, optional, tag = "3")]
-        pub baking_reward_account:       ::core::option::Option<super::Amount>,
+        pub baking_reward_account: ::core::option::Option<super::Amount>,
         /// The amount in the finalization reward account.
         #[prost(message, optional, tag = "4")]
         pub finalization_reward_account: ::core::option::Option<super::Amount>,
         /// The amount in the GAS account.
         #[prost(message, optional, tag = "5")]
-        pub gas_account:                 ::core::option::Option<super::Amount>,
+        pub gas_account: ::core::option::Option<super::Amount>,
         /// The protocol version.
         #[prost(enumeration = "super::ProtocolVersion", tag = "6")]
-        pub protocol_version:            i32,
+        pub protocol_version: i32,
     }
     /// Version 1 tokenomics.
     #[allow(clippy::derive_partial_eq_without_eq)]
@@ -3281,36 +3218,34 @@ pub mod tokenomics_info {
     pub struct V1 {
         /// The total CCD in existence.
         #[prost(message, optional, tag = "1")]
-        pub total_amount:                   ::core::option::Option<super::Amount>,
+        pub total_amount: ::core::option::Option<super::Amount>,
         /// The total CCD in encrypted balances.
         #[prost(message, optional, tag = "2")]
-        pub total_encrypted_amount:         ::core::option::Option<super::Amount>,
+        pub total_encrypted_amount: ::core::option::Option<super::Amount>,
         /// The amount in the baking reward account.
         #[prost(message, optional, tag = "3")]
-        pub baking_reward_account:          ::core::option::Option<super::Amount>,
+        pub baking_reward_account: ::core::option::Option<super::Amount>,
         /// The amount in the finalization reward account.
         #[prost(message, optional, tag = "4")]
-        pub finalization_reward_account:    ::core::option::Option<super::Amount>,
+        pub finalization_reward_account: ::core::option::Option<super::Amount>,
         /// The amount in the GAS account.
         #[prost(message, optional, tag = "5")]
-        pub gas_account:                    ::core::option::Option<super::Amount>,
-        /// The transaction reward fraction accruing to the foundation (to be
-        /// paid at next payday).
+        pub gas_account: ::core::option::Option<super::Amount>,
+        /// The transaction reward fraction accruing to the foundation (to be paid at next payday).
         #[prost(message, optional, tag = "6")]
         pub foundation_transaction_rewards: ::core::option::Option<super::Amount>,
         /// The time of the next payday.
         #[prost(message, optional, tag = "7")]
-        pub next_payday_time:               ::core::option::Option<super::Timestamp>,
-        /// The rate at which CCD will be minted (as a proportion of the total
-        /// supply) at the next payday.
+        pub next_payday_time: ::core::option::Option<super::Timestamp>,
+        /// The rate at which CCD will be minted (as a proportion of the total supply) at the next payday.
         #[prost(message, optional, tag = "8")]
-        pub next_payday_mint_rate:          ::core::option::Option<super::MintRate>,
+        pub next_payday_mint_rate: ::core::option::Option<super::MintRate>,
         /// The total capital put up as stake by bakers and delegators.
         #[prost(message, optional, tag = "9")]
-        pub total_staked_capital:           ::core::option::Option<super::Amount>,
+        pub total_staked_capital: ::core::option::Option<super::Amount>,
         /// The protocol version.
         #[prost(enumeration = "super::ProtocolVersion", tag = "10")]
-        pub protocol_version:               i32,
+        pub protocol_version: i32,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
@@ -3325,34 +3260,32 @@ pub mod tokenomics_info {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InvokeInstanceRequest {
-    /// Block to invoke the contract. The invocation will be at the end of the
-    /// given block.
+    /// Block to invoke the contract. The invocation will be at the end of the given block.
     #[prost(message, optional, tag = "1")]
     pub block_hash: ::core::option::Option<BlockHashInput>,
-    /// Invoker of the contract. If this is not supplied then the contract will
-    /// be invoked by an account with address 0, no credentials and
-    /// sufficient amount of CCD to cover the transfer amount. If given, the
-    /// relevant address (either account or contract) must exist in the
-    /// blockstate.
+    /// Invoker of the contract. If this is not supplied then the contract will be
+    /// invoked by an account with address 0, no credentials and sufficient amount
+    /// of CCD to cover the transfer amount. If given, the relevant address (either
+    /// account or contract) must exist in the blockstate.
     #[prost(message, optional, tag = "2")]
-    pub invoker:    ::core::option::Option<Address>,
+    pub invoker: ::core::option::Option<Address>,
     /// Address of the contract instance to invoke.
     #[prost(message, optional, tag = "3")]
-    pub instance:   ::core::option::Option<ContractAddress>,
+    pub instance: ::core::option::Option<ContractAddress>,
     /// Amount to invoke the smart contract instance with.
     #[prost(message, optional, tag = "4")]
-    pub amount:     ::core::option::Option<Amount>,
+    pub amount: ::core::option::Option<Amount>,
     /// The entrypoint of the smart contract instance to invoke.
     #[prost(message, optional, tag = "5")]
     pub entrypoint: ::core::option::Option<ReceiveName>,
     /// The parameter bytes to include in the invocation of the entrypoint.
     #[prost(message, optional, tag = "6")]
-    pub parameter:  ::core::option::Option<Parameter>,
+    pub parameter: ::core::option::Option<Parameter>,
     /// And what amount of energy to allow for execution. This cannot exceed
     /// `100_000_000_000`, but in practice it should be much less. The maximum
     /// block energy is typically in the range of a few million.
     #[prost(message, optional, tag = "7")]
-    pub energy:     ::core::option::Option<Energy>,
+    pub energy: ::core::option::Option<Energy>,
 }
 /// Response type for InvokeInstance.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -3368,18 +3301,17 @@ pub mod invoke_instance_response {
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Failure {
         /// If invoking a V0 contract this is not provided, otherwise it is
-        /// potentially return value produced by the call unless the call failed
-        /// with out of energy or runtime error. If the V1 contract
-        /// terminated with a logic error then the return value is
-        /// present.
+        /// potentially return value produced by the call unless the call failed with
+        /// out of energy or runtime error. If the V1 contract terminated with a
+        /// logic error then the return value is present.
         #[prost(bytes = "vec", optional, tag = "1")]
         pub return_value: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
         /// Energy used by the execution.
         #[prost(message, optional, tag = "2")]
-        pub used_energy:  ::core::option::Option<super::Energy>,
+        pub used_energy: ::core::option::Option<super::Energy>,
         /// Contract execution failed for the given reason.
         #[prost(message, optional, tag = "3")]
-        pub reason:       ::core::option::Option<super::RejectReason>,
+        pub reason: ::core::option::Option<super::RejectReason>,
     }
     /// Contract execution succeeded.
     #[allow(clippy::derive_partial_eq_without_eq)]
@@ -3391,10 +3323,10 @@ pub mod invoke_instance_response {
         pub return_value: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
         /// Energy used by the execution.
         #[prost(message, optional, tag = "2")]
-        pub used_energy:  ::core::option::Option<super::Energy>,
+        pub used_energy: ::core::option::Option<super::Energy>,
         /// Effects produced by contract execution.
         #[prost(message, repeated, tag = "3")]
-        pub effects:      ::prost::alloc::vec::Vec<super::ContractTraceElement>,
+        pub effects: ::prost::alloc::vec::Vec<super::ContractTraceElement>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
@@ -3414,7 +3346,7 @@ pub struct GetPoolDelegatorsRequest {
     pub block_hash: ::core::option::Option<BlockHashInput>,
     /// The 'BakerId' of the pool owner.
     #[prost(message, optional, tag = "2")]
-    pub baker:      ::core::option::Option<BakerId>,
+    pub baker: ::core::option::Option<BakerId>,
 }
 /// Stream item for GetPoolDelegators and GetPassiveDelegators.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -3422,16 +3354,15 @@ pub struct GetPoolDelegatorsRequest {
 pub struct DelegatorInfo {
     /// The delegator account address.
     #[prost(message, optional, tag = "1")]
-    pub account:        ::core::option::Option<AccountAddress>,
+    pub account: ::core::option::Option<AccountAddress>,
     /// The amount of stake currently staked to the pool.
     #[prost(message, optional, tag = "2")]
-    pub stake:          ::core::option::Option<Amount>,
+    pub stake: ::core::option::Option<Amount>,
     /// Pending change to the current stake of the delegator.
     #[prost(message, optional, tag = "3")]
     pub pending_change: ::core::option::Option<StakePendingChange>,
 }
-/// Stream item for GetPoolDelegatorsRewardPeriod and
-/// GetPassiveDelegatorsRewardPeriod.
+/// Stream item for GetPoolDelegatorsRewardPeriod and GetPassiveDelegatorsRewardPeriod.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DelegatorRewardPeriodInfo {
@@ -3440,7 +3371,7 @@ pub struct DelegatorRewardPeriodInfo {
     pub account: ::core::option::Option<AccountAddress>,
     /// The amount of stake currently staked to the pool.
     #[prost(message, optional, tag = "2")]
-    pub stake:   ::core::option::Option<Amount>,
+    pub stake: ::core::option::Option<Amount>,
 }
 /// Response type for GetBranches.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -3451,7 +3382,7 @@ pub struct Branch {
     pub block_hash: ::core::option::Option<BlockHash>,
     /// Further blocks branching of this block.
     #[prost(message, repeated, tag = "2")]
-    pub children:   ::prost::alloc::vec::Vec<Branch>,
+    pub children: ::prost::alloc::vec::Vec<Branch>,
 }
 /// The leadership election nonce is an unpredictable value updated once an
 /// epoch to make sure that bakers cannot predict too far in the future when
@@ -3467,13 +3398,12 @@ pub struct LeadershipElectionNonce {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ElectionInfo {
-    /// Baking lottery election difficulty. Present only in protocol versions
-    /// 1-5.
+    /// Baking lottery election difficulty. Present only in protocol versions 1-5.
     #[prost(message, optional, tag = "1")]
     pub election_difficulty: ::core::option::Option<ElectionDifficulty>,
     /// Current leadership election nonce for the lottery.
     #[prost(message, optional, tag = "2")]
-    pub election_nonce:      ::core::option::Option<LeadershipElectionNonce>,
+    pub election_nonce: ::core::option::Option<LeadershipElectionNonce>,
     /// List of the currently eligible bakers.
     #[prost(message, repeated, tag = "3")]
     pub baker_election_info: ::prost::alloc::vec::Vec<election_info::Baker>,
@@ -3485,19 +3415,17 @@ pub mod election_info {
     pub struct Baker {
         /// The ID of the baker.
         #[prost(message, optional, tag = "1")]
-        pub baker:         ::core::option::Option<super::BakerId>,
+        pub baker: ::core::option::Option<super::BakerId>,
         /// The account address of the baker.
         #[prost(message, optional, tag = "2")]
-        pub account:       ::core::option::Option<super::AccountAddress>,
-        /// The lottery power of the baker, rounded to the nearest representable
-        /// "double".
+        pub account: ::core::option::Option<super::AccountAddress>,
+        /// The lottery power of the baker, rounded to the nearest representable "double".
         #[prost(double, tag = "3")]
         pub lottery_power: f64,
     }
 }
-/// A protocol generated event that is not directly caused by a transaction.
-/// This includes minting new CCD, rewarding different bakers and delegators,
-/// etc.
+/// A protocol generated event that is not directly caused by a transaction. This
+/// includes minting new CCD, rewarding different bakers and delegators, etc.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockSpecialEvent {
@@ -3524,7 +3452,7 @@ pub mod block_special_event {
             pub account: ::core::option::Option<super::super::AccountAddress>,
             /// The value type
             #[prost(message, optional, tag = "2")]
-            pub amount:  ::core::option::Option<super::super::Amount>,
+            pub amount: ::core::option::Option<super::super::Amount>,
         }
     }
     /// Payment to each baker of a previous epoch, in proportion to the number
@@ -3537,7 +3465,7 @@ pub mod block_special_event {
         pub baker_rewards: ::core::option::Option<AccountAmounts>,
         /// The remaining balance of the baker reward account.
         #[prost(message, optional, tag = "2")]
-        pub remainder:     ::core::option::Option<super::Amount>,
+        pub remainder: ::core::option::Option<super::Amount>,
     }
     /// Minting of new CCD.
     #[allow(clippy::derive_partial_eq_without_eq)]
@@ -3545,19 +3473,18 @@ pub mod block_special_event {
     pub struct Mint {
         /// The amount allocated to the banking reward account.
         #[prost(message, optional, tag = "1")]
-        pub mint_baking_reward:               ::core::option::Option<super::Amount>,
+        pub mint_baking_reward: ::core::option::Option<super::Amount>,
         /// The amount allocated to the finalization reward account.
         #[prost(message, optional, tag = "2")]
-        pub mint_finalization_reward:         ::core::option::Option<super::Amount>,
+        pub mint_finalization_reward: ::core::option::Option<super::Amount>,
         /// The amount allocated as the platform development charge.
         #[prost(message, optional, tag = "3")]
         pub mint_platform_development_charge: ::core::option::Option<super::Amount>,
         /// The account to which the platform development charge is paid.
         #[prost(message, optional, tag = "4")]
-        pub foundation_account:               ::core::option::Option<super::AccountAddress>,
+        pub foundation_account: ::core::option::Option<super::AccountAddress>,
     }
-    /// Payment to each finalizer on inclusion of a finalization record in a
-    /// block.
+    /// Payment to each finalizer on inclusion of a finalization record in a block.
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct FinalizationRewards {
@@ -3566,34 +3493,33 @@ pub mod block_special_event {
         pub finalization_rewards: ::core::option::Option<AccountAmounts>,
         /// The remaining balance of the finalization reward account.
         #[prost(message, optional, tag = "2")]
-        pub remainder:            ::core::option::Option<super::Amount>,
+        pub remainder: ::core::option::Option<super::Amount>,
     }
     /// Disbursement of fees from a block between the GAS account,
     /// the baker, and the foundation. It should always be that:
     ///
-    /// ```transaction_fees + old_gas_account = new_gas_account + baker_reward +
-    /// foundation_charge```
+    /// ```transaction_fees + old_gas_account = new_gas_account + baker_reward + foundation_charge```
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BlockReward {
         /// The total fees paid for transactions in the block.
         #[prost(message, optional, tag = "1")]
-        pub transaction_fees:   ::core::option::Option<super::Amount>,
+        pub transaction_fees: ::core::option::Option<super::Amount>,
         /// The old balance of the GAS account.
         #[prost(message, optional, tag = "2")]
-        pub old_gas_account:    ::core::option::Option<super::Amount>,
+        pub old_gas_account: ::core::option::Option<super::Amount>,
         /// The new balance of the GAS account.
         #[prost(message, optional, tag = "3")]
-        pub new_gas_account:    ::core::option::Option<super::Amount>,
+        pub new_gas_account: ::core::option::Option<super::Amount>,
         /// The amount awarded to the baker.
         #[prost(message, optional, tag = "4")]
-        pub baker_reward:       ::core::option::Option<super::Amount>,
+        pub baker_reward: ::core::option::Option<super::Amount>,
         /// The amount awarded to the foundation.
         #[prost(message, optional, tag = "5")]
-        pub foundation_charge:  ::core::option::Option<super::Amount>,
+        pub foundation_charge: ::core::option::Option<super::Amount>,
         /// The baker of the block, who receives the award.
         #[prost(message, optional, tag = "6")]
-        pub baker:              ::core::option::Option<super::AccountAddress>,
+        pub baker: ::core::option::Option<super::AccountAddress>,
         /// The foundation account.
         #[prost(message, optional, tag = "7")]
         pub foundation_account: ::core::option::Option<super::AccountAddress>,
@@ -3615,13 +3541,13 @@ pub mod block_special_event {
     pub struct PaydayAccountReward {
         /// The account that got rewarded.
         #[prost(message, optional, tag = "1")]
-        pub account:             ::core::option::Option<super::AccountAddress>,
+        pub account: ::core::option::Option<super::AccountAddress>,
         /// The transaction fee reward at payday to the account.
         #[prost(message, optional, tag = "2")]
-        pub transaction_fees:    ::core::option::Option<super::Amount>,
+        pub transaction_fees: ::core::option::Option<super::Amount>,
         /// The baking reward at payday to the account.
         #[prost(message, optional, tag = "3")]
-        pub baker_reward:        ::core::option::Option<super::Amount>,
+        pub baker_reward: ::core::option::Option<super::Amount>,
         /// The finalization reward at payday to the account.
         #[prost(message, optional, tag = "4")]
         pub finalization_reward: ::core::option::Option<super::Amount>,
@@ -3632,25 +3558,25 @@ pub mod block_special_event {
     pub struct BlockAccrueReward {
         /// The total fees paid for transactions in the block.
         #[prost(message, optional, tag = "1")]
-        pub transaction_fees:  ::core::option::Option<super::Amount>,
+        pub transaction_fees: ::core::option::Option<super::Amount>,
         /// The old balance of the GAS account.
         #[prost(message, optional, tag = "2")]
-        pub old_gas_account:   ::core::option::Option<super::Amount>,
+        pub old_gas_account: ::core::option::Option<super::Amount>,
         /// The new balance of the GAS account.
         #[prost(message, optional, tag = "3")]
-        pub new_gas_account:   ::core::option::Option<super::Amount>,
+        pub new_gas_account: ::core::option::Option<super::Amount>,
         /// The amount awarded to the baker.
         #[prost(message, optional, tag = "4")]
-        pub baker_reward:      ::core::option::Option<super::Amount>,
+        pub baker_reward: ::core::option::Option<super::Amount>,
         /// The amount awarded to the passive delegators.
         #[prost(message, optional, tag = "5")]
-        pub passive_reward:    ::core::option::Option<super::Amount>,
+        pub passive_reward: ::core::option::Option<super::Amount>,
         /// The amount awarded to the foundation.
         #[prost(message, optional, tag = "6")]
         pub foundation_charge: ::core::option::Option<super::Amount>,
         /// The baker of the block, who will receive the award.
         #[prost(message, optional, tag = "7")]
-        pub baker:             ::core::option::Option<super::BakerId>,
+        pub baker: ::core::option::Option<super::BakerId>,
     }
     /// Payment distributed to a pool or passive delegators.
     #[allow(clippy::derive_partial_eq_without_eq)]
@@ -3658,13 +3584,13 @@ pub mod block_special_event {
     pub struct PaydayPoolReward {
         /// The pool owner (passive delegators when not present).
         #[prost(message, optional, tag = "1")]
-        pub pool_owner:          ::core::option::Option<super::BakerId>,
+        pub pool_owner: ::core::option::Option<super::BakerId>,
         /// Accrued transaction fees for pool.
         #[prost(message, optional, tag = "2")]
-        pub transaction_fees:    ::core::option::Option<super::Amount>,
+        pub transaction_fees: ::core::option::Option<super::Amount>,
         /// Accrued baking rewards for pool.
         #[prost(message, optional, tag = "3")]
-        pub baker_reward:        ::core::option::Option<super::Amount>,
+        pub baker_reward: ::core::option::Option<super::Amount>,
         /// Accrued finalization rewards for pool.
         #[prost(message, optional, tag = "4")]
         pub finalization_reward: ::core::option::Option<super::Amount>,
@@ -3700,10 +3626,9 @@ pub struct PendingUpdate {
     /// The effect of the update.
     #[prost(
         oneof = "pending_update::Effect",
-        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, \
-                24, 25"
+        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25"
     )]
-    pub effect:         ::core::option::Option<pending_update::Effect>,
+    pub effect: ::core::option::Option<pending_update::Effect>,
 }
 /// Nested message and enum types in `PendingUpdate`.
 pub mod pending_update {
@@ -3738,8 +3663,7 @@ pub mod pending_update {
         /// Updates to the foundation account.
         #[prost(message, tag = "10")]
         FoundationAccount(super::AccountAddress),
-        /// Updates to the mint distribution. Is only relevant prior to protocol
-        /// version 4.
+        /// Updates to the mint distribution. Is only relevant prior to protocol version 4.
         #[prost(message, tag = "11")]
         MintDistributionCpv0(super::MintDistributionCpv0),
         /// The mint distribution was updated. Introduced in protocol version 4.
@@ -3751,8 +3675,7 @@ pub mod pending_update {
         /// Updates to the GAS rewards.
         #[prost(message, tag = "14")]
         GasRewards(super::GasRewards),
-        /// Updates baker stake threshold. Is only relevant prior to protocol
-        /// version 4.
+        /// Updates baker stake threshold. Is only relevant prior to protocol version 4.
         #[prost(message, tag = "15")]
         PoolParametersCpv0(super::BakerStakeThreshold),
         /// Updates pool parameters. Introduced in protocol version 4.
@@ -3764,30 +3687,25 @@ pub mod pending_update {
         /// Adds a new identity provider.
         #[prost(message, tag = "18")]
         AddIdentityProvider(super::IpInfo),
-        /// Updates to cooldown parameters for chain parameters version 1
-        /// introduced in protocol version 4.
+        /// Updates to cooldown parameters for chain parameters version 1 introduced in protocol version 4.
         #[prost(message, tag = "19")]
         CooldownParameters(super::CooldownParametersCpv1),
-        /// Updates to time parameters for chain parameters version 1 introduced
-        /// in protocol version 4.
+        /// Updates to time parameters for chain parameters version 1 introduced in protocol version 4.
         #[prost(message, tag = "20")]
         TimeParameters(super::TimeParametersCpv1),
-        /// Updates to the GAS rewards effective from protocol version 6 (chain
-        /// parameters version 2).
+        /// Updates to the GAS rewards effective from protocol version 6 (chain parameters version 2).
         #[prost(message, tag = "21")]
         GasRewardsCpv2(super::GasRewardsCpv2),
         /// Updates to the consensus timeouts for chain parameters version 2.
         #[prost(message, tag = "22")]
         TimeoutParameters(super::TimeoutParameters),
-        /// Updates to the the minimum time between blocks for chain parameters
-        /// version 2.
+        /// Updates to the the minimum time between blocks for chain parameters version 2.
         #[prost(message, tag = "23")]
         MinBlockTime(super::Duration),
         /// Updates to the block energy limit for chain parameters version 2.
         #[prost(message, tag = "24")]
         BlockEnergyLimit(super::Energy),
-        /// Updates to the finalization committee for for chain parameters
-        /// version 2.
+        /// Updates to the finalization committee for for chain parameters version 2.
         #[prost(message, tag = "25")]
         FinalizationCommitteeParameters(super::FinalizationCommitteeParameters),
     }
@@ -3838,19 +3756,16 @@ pub struct NextUpdateSequenceNumbers {
     /// Adds a new identity provider.
     #[prost(message, optional, tag = "14")]
     pub add_identity_provider: ::core::option::Option<SequenceNumber>,
-    /// Updates to cooldown parameters for chain parameters version 1 introduced
-    /// in protocol version 4.
+    /// Updates to cooldown parameters for chain parameters version 1 introduced in protocol version 4.
     #[prost(message, optional, tag = "15")]
     pub cooldown_parameters: ::core::option::Option<SequenceNumber>,
-    /// Updates to time parameters for chain parameters version 1 introduced in
-    /// protocol version 4.
+    /// Updates to time parameters for chain parameters version 1 introduced in protocol version 4.
     #[prost(message, optional, tag = "16")]
     pub time_parameters: ::core::option::Option<SequenceNumber>,
     /// Updates to the timeout parameters
     #[prost(message, optional, tag = "17")]
     pub timeout_parameters: ::core::option::Option<SequenceNumber>,
-    /// Updates to the the minimum time between blocks for chain parameters
-    /// version 2.
+    /// Updates to the the minimum time between blocks for chain parameters version 2.
     #[prost(message, optional, tag = "18")]
     pub min_block_time: ::core::option::Option<SequenceNumber>,
     /// Updates to the block energy limit for chain parameters version 2.
@@ -3883,7 +3798,7 @@ pub struct Port {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IpSocketAddress {
     #[prost(message, optional, tag = "1")]
-    pub ip:   ::core::option::Option<IpAddress>,
+    pub ip: ::core::option::Option<IpAddress>,
     #[prost(message, optional, tag = "2")]
     pub port: ::core::option::Option<Port>,
 }
@@ -3934,7 +3849,7 @@ pub struct DumpRequest {
     pub file: ::prost::alloc::string::String,
     /// Whether the node should dump raw packages.
     #[prost(bool, tag = "2")]
-    pub raw:  bool,
+    pub raw: bool,
 }
 /// Peers and their associated network related statistics
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -3952,13 +3867,13 @@ pub mod peers_info {
         /// The identifier of the peer that it
         /// wishes to be identified by.
         #[prost(message, optional, tag = "1")]
-        pub peer_id:        ::core::option::Option<super::PeerId>,
+        pub peer_id: ::core::option::Option<super::PeerId>,
         /// The port of the peer.
         #[prost(message, optional, tag = "2")]
         pub socket_address: ::core::option::Option<super::IpSocketAddress>,
         /// Network related statistics for the peer.
         #[prost(message, optional, tag = "3")]
-        pub network_stats:  ::core::option::Option<peer::NetworkStats>,
+        pub network_stats: ::core::option::Option<peer::NetworkStats>,
         /// consensus related information of the peer.
         #[prost(oneof = "peer::ConsensusInfo", tags = "4, 5")]
         pub consensus_info: ::core::option::Option<peer::ConsensusInfo>,
@@ -3970,53 +3885,52 @@ pub mod peers_info {
         #[derive(Clone, PartialEq, ::prost::Message)]
         pub struct NetworkStats {
             /// The number of messages sent to the peer.
-            /// Packets are blocks, transactions, catchup messages, finalization
-            /// records and network messages such as pings and peer
-            /// requests.
+            /// Packets are blocks, transactions, catchup messages, finalization records
+            /// and network messages such as pings and peer requests.
             #[prost(uint64, tag = "2")]
-            pub packets_sent:     u64,
+            pub packets_sent: u64,
             /// The number of messages received from the peer.
-            /// Packets are blocks, transactions, catchup messages, finalization
-            /// records and network messages such as pings and peer
-            /// requests.
+            /// Packets are blocks, transactions, catchup messages, finalization records
+            /// and network messages such as pings and peer requests.
             #[prost(uint64, tag = "3")]
             pub packets_received: u64,
             /// The connection latency (i.e., ping time) in milliseconds.
             #[prost(uint64, tag = "4")]
-            pub latency:          u64,
+            pub latency: u64,
         }
         #[derive(
-            Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration,
+            Clone,
+            Copy,
+            Debug,
+            PartialEq,
+            Eq,
+            Hash,
+            PartialOrd,
+            Ord,
+            ::prost::Enumeration
         )]
         #[repr(i32)]
         pub enum CatchupStatus {
-            /// The peer does not have any data unknown to us. If we receive a
-            /// message from the peer that refers to unknown data
-            /// (e.g., an unknown block) the peer is marked as pending.
-            Uptodate   = 0,
-            /// The peer might have some data unknown to us. A peer can be in
-            /// this state either because it sent a message that
-            /// refers to data unknown to us, or before we have established a
-            /// baseline with it. The latter happens during node
-            /// startup, as well as upon protocol updates until the initial
-            /// catchup handshake completes.
-            Pending    = 1,
-            /// The node is currently catching up by requesting blocks from this
-            /// peer. There will be at most one peer with this
-            /// status at a time. Once the peer has responded to the
-            /// request, its status will be changed to:
-            /// - 'UPTODATE' if the peer has no more data that is not known to
-            ///   us
+            /// The peer does not have any data unknown to us. If we receive a message from the
+            /// peer that refers to unknown data (e.g., an unknown block) the peer is marked as pending.
+            Uptodate = 0,
+            /// The peer might have some data unknown to us. A peer can be in this state either because
+            /// it sent a message that refers to data unknown to us, or before we have established a baseline with it.
+            /// The latter happens during node startup, as well as upon protocol updates until the initial catchup handshake
+            /// completes.
+            Pending = 1,
+            /// The node is currently catching up by requesting blocks from this peer.
+            /// There will be at most one peer with this status at a time.
+            /// Once the peer has responded to the request, its status will be changed to:
+            /// - 'UPTODATE' if the peer has no more data that is not known to us
             /// - 'PENDING' if the node has more data that is unknown to us.
             Catchingup = 2,
         }
         impl CatchupStatus {
-            /// String value of the enum field names used in the ProtoBuf
-            /// definition.
+            /// String value of the enum field names used in the ProtoBuf definition.
             ///
-            /// The values are not transformed in any way and thus are
-            /// considered stable (if the ProtoBuf definition does
-            /// not change) and safe for programmatic use.
+            /// The values are not transformed in any way and thus are considered stable
+            /// (if the ProtoBuf definition does not change) and safe for programmatic use.
             pub fn as_str_name(&self) -> &'static str {
                 match self {
                     CatchupStatus::Uptodate => "UPTODATE",
@@ -4024,9 +3938,7 @@ pub mod peers_info {
                     CatchupStatus::Catchingup => "CATCHINGUP",
                 }
             }
-
-            /// Creates an enum from field names used in the ProtoBuf
-            /// definition.
+            /// Creates an enum from field names used in the ProtoBuf definition.
             pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
                 match value {
                     "UPTODATE" => Some(Self::Uptodate),
@@ -4040,8 +3952,8 @@ pub mod peers_info {
         #[allow(clippy::derive_partial_eq_without_eq)]
         #[derive(Clone, PartialEq, ::prost::Oneof)]
         pub enum ConsensusInfo {
-            /// The peer is of type `Bootstrapper` is not participating in
-            /// consensus and thus has no catchup status.
+            /// The peer is of type `Bootstrapper` is not participating in consensus
+            /// and thus has no catchup status.
             #[prost(message, tag = "4")]
             Bootstrapper(super::super::Empty),
             /// The peer is a regular node and have
@@ -4062,17 +3974,17 @@ pub struct NodeInfo {
     pub peer_version: ::prost::alloc::string::String,
     /// local time of the node.
     #[prost(message, optional, tag = "3")]
-    pub local_time:   ::core::option::Option<Timestamp>,
+    pub local_time: ::core::option::Option<Timestamp>,
     /// Number of milliseconds that the node
     /// has been alive.
     #[prost(message, optional, tag = "4")]
-    pub peer_uptime:  ::core::option::Option<Duration>,
+    pub peer_uptime: ::core::option::Option<Duration>,
     /// Information related to the p2p protocol.
     #[prost(message, optional, tag = "5")]
     pub network_info: ::core::option::Option<node_info::NetworkInfo>,
     /// Details of the node.
     #[prost(oneof = "node_info::Details", tags = "6, 7")]
-    pub details:      ::core::option::Option<node_info::Details>,
+    pub details: ::core::option::Option<node_info::Details>,
 }
 /// Nested message and enum types in `NodeInfo`.
 pub mod node_info {
@@ -4082,19 +3994,19 @@ pub mod node_info {
     pub struct NetworkInfo {
         /// The node id.
         #[prost(message, optional, tag = "1")]
-        pub node_id:             ::core::option::Option<super::PeerId>,
+        pub node_id: ::core::option::Option<super::PeerId>,
         /// Total number of packets sent by the node.
         #[prost(uint64, tag = "2")]
-        pub peer_total_sent:     u64,
+        pub peer_total_sent: u64,
         /// Total number of packets received by the node.
         #[prost(uint64, tag = "3")]
         pub peer_total_received: u64,
         /// Average outbound throughput in bytes per second.
         #[prost(uint64, tag = "4")]
-        pub avg_bps_in:          u64,
+        pub avg_bps_in: u64,
         /// Average inbound throughput in bytes per second.
         #[prost(uint64, tag = "5")]
-        pub avg_bps_out:         u64,
+        pub avg_bps_out: u64,
     }
     /// Consensus info for a node configured with baker keys.
     #[allow(clippy::derive_partial_eq_without_eq)]
@@ -4104,7 +4016,7 @@ pub mod node_info {
         pub baker_id: ::core::option::Option<super::BakerId>,
         /// Status of the baker configured node.
         #[prost(oneof = "baker_consensus_info::Status", tags = "2, 3, 4")]
-        pub status:   ::core::option::Option<baker_consensus_info::Status>,
+        pub status: ::core::option::Option<baker_consensus_info::Status>,
     }
     /// Nested message and enum types in `BakerConsensusInfo`.
     pub mod baker_consensus_info {
@@ -4124,15 +4036,23 @@ pub mod node_info {
         /// baker keys but somehow the node is _not_ part of the
         /// current baking committee.
         #[derive(
-            Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration,
+            Clone,
+            Copy,
+            Debug,
+            PartialEq,
+            Eq,
+            Hash,
+            PartialOrd,
+            Ord,
+            ::prost::Enumeration
         )]
         #[repr(i32)]
         pub enum PassiveCommitteeInfo {
-            /// The node is started with baker keys however it is currently not
-            /// in the baking committee. The node is __not__ baking.
-            NotInCommittee    = 0,
-            /// The account is registered as a baker but not in the current
-            /// `Epoch`. The node is __not__ baking.
+            /// The node is started with baker keys however it is currently not in the baking committee.
+            /// The node is __not__ baking.
+            NotInCommittee = 0,
+            /// The account is registered as a baker but not in the current `Epoch`.
+            /// The node is __not__ baking.
             AddedButNotActiveInCommittee = 1,
             /// The node has configured invalid baker keys i.e., the configured
             /// baker keys do not match the current keys on the baker account.
@@ -4140,12 +4060,10 @@ pub mod node_info {
             AddedButWrongKeys = 2,
         }
         impl PassiveCommitteeInfo {
-            /// String value of the enum field names used in the ProtoBuf
-            /// definition.
+            /// String value of the enum field names used in the ProtoBuf definition.
             ///
-            /// The values are not transformed in any way and thus are
-            /// considered stable (if the ProtoBuf definition does
-            /// not change) and safe for programmatic use.
+            /// The values are not transformed in any way and thus are considered stable
+            /// (if the ProtoBuf definition does not change) and safe for programmatic use.
             pub fn as_str_name(&self) -> &'static str {
                 match self {
                     PassiveCommitteeInfo::NotInCommittee => "NOT_IN_COMMITTEE",
@@ -4155,13 +4073,13 @@ pub mod node_info {
                     PassiveCommitteeInfo::AddedButWrongKeys => "ADDED_BUT_WRONG_KEYS",
                 }
             }
-
-            /// Creates an enum from field names used in the ProtoBuf
-            /// definition.
+            /// Creates an enum from field names used in the ProtoBuf definition.
             pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
                 match value {
                     "NOT_IN_COMMITTEE" => Some(Self::NotInCommittee),
-                    "ADDED_BUT_NOT_ACTIVE_IN_COMMITTEE" => Some(Self::AddedButNotActiveInCommittee),
+                    "ADDED_BUT_NOT_ACTIVE_IN_COMMITTEE" => {
+                        Some(Self::AddedButNotActiveInCommittee)
+                    }
                     "ADDED_BUT_WRONG_KEYS" => Some(Self::AddedButWrongKeys),
                     _ => None,
                 }
@@ -4209,8 +4127,7 @@ pub mod node_info {
             /// catchup messages.
             #[prost(message, tag = "2")]
             Passive(super::super::Empty),
-            /// The node is configured with baker credentials and consensus is
-            /// running.
+            /// The node is configured with baker credentials and consensus is running.
             #[prost(message, tag = "3")]
             Active(super::BakerConsensusInfo),
         }
@@ -4239,18 +4156,16 @@ pub mod send_block_item_request {
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum BlockItem {
-        /// Account transactions are messages which are signed and paid for by
-        /// an account.
+        /// Account transactions are messages which are signed and paid for by an account.
         #[prost(message, tag = "1")]
         AccountTransaction(super::AccountTransaction),
         /// Credential deployments create new accounts. They are not paid for
-        /// directly by the sender. Instead, bakers are rewarded by the protocol
-        /// for including them.
+        /// directly by the sender. Instead, bakers are rewarded by the protocol for
+        /// including them.
         #[prost(message, tag = "2")]
         CredentialDeployment(super::CredentialDeployment),
-        /// Update instructions are messages which can update the chain
-        /// parameters. Including which keys are allowed to make future
-        /// update instructions.
+        /// Update instructions are messages which can update the chain parameters. Including which keys are allowed
+        /// to make future update instructions.
         #[prost(message, tag = "3")]
         UpdateInstruction(super::UpdateInstruction),
     }
@@ -4265,7 +4180,7 @@ pub struct CredentialDeployment {
     pub message_expiry: ::core::option::Option<TransactionTime>,
     /// The credential to be added.
     #[prost(oneof = "credential_deployment::Payload", tags = "2")]
-    pub payload:        ::core::option::Option<credential_deployment::Payload>,
+    pub payload: ::core::option::Option<credential_deployment::Payload>,
 }
 /// Nested message and enum types in `CredentialDeployment`.
 pub mod credential_deployment {
@@ -4288,8 +4203,7 @@ pub struct Signature {
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
 /// A signature on an update instruction.
-/// The type `UpdateKeysIndex` is not used directly, as messages cannot be keys
-/// in maps.
+/// The type `UpdateKeysIndex` is not used directly, as messages cannot be keys in maps.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SignatureMap {
@@ -4309,29 +4223,28 @@ pub struct AccountSignatureMap {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountTransactionSignature {
     /// A map from `CredentialIndex` to `SignatureMap`s.
-    /// The type `CredentialIndex` is not used directly, as messages cannot be
-    /// keys in maps. The map cannot contain more than 2^8 signatures.
+    /// The type `CredentialIndex` is not used directly, as messages cannot be keys in maps.
+    /// The map cannot contain more than 2^8 signatures.
     #[prost(map = "uint32, message", tag = "1")]
     pub signatures: ::std::collections::HashMap<u32, AccountSignatureMap>,
 }
 /// Header of an account transaction that contains basic data to check whether
-/// the sender and the transaction are valid. The header is shared by all
-/// transaction types.
+/// the sender and the transaction are valid. The header is shared by all transaction types.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountTransactionHeader {
     /// Sender of the transaction.
     #[prost(message, optional, tag = "1")]
-    pub sender:          ::core::option::Option<AccountAddress>,
+    pub sender: ::core::option::Option<AccountAddress>,
     /// Sequence number of the transaction.
     #[prost(message, optional, tag = "2")]
     pub sequence_number: ::core::option::Option<SequenceNumber>,
     /// Maximum amount of energy the transaction can take to execute.
     #[prost(message, optional, tag = "3")]
-    pub energy_amount:   ::core::option::Option<Energy>,
+    pub energy_amount: ::core::option::Option<Energy>,
     /// Latest time the transaction can included in a block.
     #[prost(message, optional, tag = "5")]
-    pub expiry:          ::core::option::Option<TransactionTime>,
+    pub expiry: ::core::option::Option<TransactionTime>,
 }
 /// Data required to initialize a new contract instance.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -4339,17 +4252,17 @@ pub struct AccountTransactionHeader {
 pub struct InitContractPayload {
     /// Amount of CCD to send to the instance.
     #[prost(message, optional, tag = "1")]
-    pub amount:     ::core::option::Option<Amount>,
+    pub amount: ::core::option::Option<Amount>,
     /// Reference to the module from which the instance will be created.
     #[prost(message, optional, tag = "2")]
     pub module_ref: ::core::option::Option<ModuleRef>,
     /// Name of the contract to initialize. This is expected to be in the format
     /// `init_name`.
     #[prost(message, optional, tag = "3")]
-    pub init_name:  ::core::option::Option<InitName>,
+    pub init_name: ::core::option::Option<InitName>,
     /// Parameter to call the `init` of the contract with.
     #[prost(message, optional, tag = "4")]
-    pub parameter:  ::core::option::Option<Parameter>,
+    pub parameter: ::core::option::Option<Parameter>,
 }
 /// Data required to update a contract instance.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -4357,17 +4270,17 @@ pub struct InitContractPayload {
 pub struct UpdateContractPayload {
     /// Amount of CCD to send to the instance.
     #[prost(message, optional, tag = "1")]
-    pub amount:       ::core::option::Option<Amount>,
+    pub amount: ::core::option::Option<Amount>,
     /// Address of the instance to update.
     #[prost(message, optional, tag = "2")]
-    pub address:      ::core::option::Option<ContractAddress>,
+    pub address: ::core::option::Option<ContractAddress>,
     /// Name of the entrypoint to call to update the instance.
     /// This is expected to be in the format `contractName.entrypointName`.
     #[prost(message, optional, tag = "3")]
     pub receive_name: ::core::option::Option<ReceiveName>,
     /// Parameter to pass to the entrypoint.
     #[prost(message, optional, tag = "4")]
-    pub parameter:    ::core::option::Option<Parameter>,
+    pub parameter: ::core::option::Option<Parameter>,
 }
 /// Payload of a transfer between two accounts.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -4375,7 +4288,7 @@ pub struct UpdateContractPayload {
 pub struct TransferPayload {
     /// Amount of CCD to send.
     #[prost(message, optional, tag = "1")]
-    pub amount:   ::core::option::Option<Amount>,
+    pub amount: ::core::option::Option<Amount>,
     /// Receiver address.
     #[prost(message, optional, tag = "2")]
     pub receiver: ::core::option::Option<AccountAddress>,
@@ -4386,13 +4299,13 @@ pub struct TransferPayload {
 pub struct TransferWithMemoPayload {
     /// Amount of CCD to send.
     #[prost(message, optional, tag = "1")]
-    pub amount:   ::core::option::Option<Amount>,
+    pub amount: ::core::option::Option<Amount>,
     /// Receiver address.
     #[prost(message, optional, tag = "2")]
     pub receiver: ::core::option::Option<AccountAddress>,
     /// Memo to include with the transfer.
     #[prost(message, optional, tag = "3")]
-    pub memo:     ::core::option::Option<Memo>,
+    pub memo: ::core::option::Option<Memo>,
 }
 /// The payload for an account transaction.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -4434,21 +4347,21 @@ pub mod account_transaction_payload {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PreAccountTransaction {
     #[prost(message, optional, tag = "1")]
-    pub header:  ::core::option::Option<AccountTransactionHeader>,
+    pub header: ::core::option::Option<AccountTransactionHeader>,
     #[prost(message, optional, tag = "2")]
     pub payload: ::core::option::Option<AccountTransactionPayload>,
 }
-/// Account transactions are messages which are signed and paid for by the
-/// sender account.
+/// Account transactions are messages which are signed and paid for by the sender
+/// account.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountTransaction {
     #[prost(message, optional, tag = "1")]
     pub signature: ::core::option::Option<AccountTransactionSignature>,
     #[prost(message, optional, tag = "2")]
-    pub header:    ::core::option::Option<AccountTransactionHeader>,
+    pub header: ::core::option::Option<AccountTransactionHeader>,
     #[prost(message, optional, tag = "3")]
-    pub payload:   ::core::option::Option<AccountTransactionPayload>,
+    pub payload: ::core::option::Option<AccountTransactionPayload>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -4456,9 +4369,9 @@ pub struct UpdateInstructionHeader {
     #[prost(message, optional, tag = "1")]
     pub sequence_number: ::core::option::Option<UpdateSequenceNumber>,
     #[prost(message, optional, tag = "2")]
-    pub effective_time:  ::core::option::Option<TransactionTime>,
+    pub effective_time: ::core::option::Option<TransactionTime>,
     #[prost(message, optional, tag = "3")]
-    pub timeout:         ::core::option::Option<TransactionTime>,
+    pub timeout: ::core::option::Option<TransactionTime>,
 }
 /// The payload for an UpdateInstruction.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -4472,8 +4385,7 @@ pub mod update_instruction_payload {
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Payload {
-        /// A raw payload encoded according to the format defined by the
-        /// protocol.
+        /// A raw payload encoded according to the format defined by the protocol.
         #[prost(bytes, tag = "3")]
         RawPayload(::prost::alloc::vec::Vec<u8>),
     }
@@ -4485,9 +4397,9 @@ pub struct UpdateInstruction {
     #[prost(message, optional, tag = "1")]
     pub signatures: ::core::option::Option<SignatureMap>,
     #[prost(message, optional, tag = "2")]
-    pub header:     ::core::option::Option<UpdateInstructionHeader>,
+    pub header: ::core::option::Option<UpdateInstructionHeader>,
     #[prost(message, optional, tag = "3")]
-    pub payload:    ::core::option::Option<UpdateInstructionPayload>,
+    pub payload: ::core::option::Option<UpdateInstructionPayload>,
 }
 /// Signature on an account transaction is defined to be the signature on the
 /// hash of the `PreAccountTransaction`.
@@ -4511,44 +4423,44 @@ pub struct CredentialsPerBlockLimit {
 pub struct ChainParametersV0 {
     /// Election difficulty for consensus lottery.
     #[prost(message, optional, tag = "1")]
-    pub election_difficulty:          ::core::option::Option<ElectionDifficulty>,
+    pub election_difficulty: ::core::option::Option<ElectionDifficulty>,
     /// Euro per energy exchange rate.
     #[prost(message, optional, tag = "2")]
-    pub euro_per_energy:              ::core::option::Option<ExchangeRate>,
+    pub euro_per_energy: ::core::option::Option<ExchangeRate>,
     /// Micro CCD per euro exchange rate.
     #[prost(message, optional, tag = "3")]
-    pub micro_ccd_per_euro:           ::core::option::Option<ExchangeRate>,
+    pub micro_ccd_per_euro: ::core::option::Option<ExchangeRate>,
     /// Extra number of epochs before reduction in stake, or baker
     /// deregistration is completed.
     #[prost(message, optional, tag = "4")]
-    pub baker_cooldown_epochs:        ::core::option::Option<Epoch>,
+    pub baker_cooldown_epochs: ::core::option::Option<Epoch>,
     /// The limit for the number of account creations in a block.
     #[prost(message, optional, tag = "5")]
-    pub account_creation_limit:       ::core::option::Option<CredentialsPerBlockLimit>,
+    pub account_creation_limit: ::core::option::Option<CredentialsPerBlockLimit>,
     /// Current mint distribution
     #[prost(message, optional, tag = "6")]
-    pub mint_distribution:            ::core::option::Option<MintDistributionCpv0>,
+    pub mint_distribution: ::core::option::Option<MintDistributionCpv0>,
     /// Current transaction fee distribution.
     #[prost(message, optional, tag = "7")]
     pub transaction_fee_distribution: ::core::option::Option<TransactionFeeDistribution>,
     /// Current gas reward parameters.
     #[prost(message, optional, tag = "8")]
-    pub gas_rewards:                  ::core::option::Option<GasRewards>,
+    pub gas_rewards: ::core::option::Option<GasRewards>,
     /// The foundation account.
     #[prost(message, optional, tag = "9")]
-    pub foundation_account:           ::core::option::Option<AccountAddress>,
+    pub foundation_account: ::core::option::Option<AccountAddress>,
     /// Minimum threshold for becoming a baker.
     #[prost(message, optional, tag = "10")]
     pub minimum_threshold_for_baking: ::core::option::Option<Amount>,
     /// Keys allowed to do root updates.
     #[prost(message, optional, tag = "11")]
-    pub root_keys:                    ::core::option::Option<HigherLevelKeys>,
+    pub root_keys: ::core::option::Option<HigherLevelKeys>,
     /// Keys allowed to do level1 updates;
     #[prost(message, optional, tag = "12")]
-    pub level1_keys:                  ::core::option::Option<HigherLevelKeys>,
+    pub level1_keys: ::core::option::Option<HigherLevelKeys>,
     /// Keys allowed to do parameter updates.
     #[prost(message, optional, tag = "13")]
-    pub level2_keys:                  ::core::option::Option<AuthorizationsV0>,
+    pub level2_keys: ::core::option::Option<AuthorizationsV0>,
 }
 /// Updatable chain parameters that apply to protocol versions 4-5.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -4556,49 +4468,49 @@ pub struct ChainParametersV0 {
 pub struct ChainParametersV1 {
     /// Election difficulty for consensus lottery.
     #[prost(message, optional, tag = "1")]
-    pub election_difficulty:          ::core::option::Option<ElectionDifficulty>,
+    pub election_difficulty: ::core::option::Option<ElectionDifficulty>,
     /// Euro per energy exchange rate.
     #[prost(message, optional, tag = "2")]
-    pub euro_per_energy:              ::core::option::Option<ExchangeRate>,
+    pub euro_per_energy: ::core::option::Option<ExchangeRate>,
     /// Micro CCD per euro exchange rate.
     #[prost(message, optional, tag = "3")]
-    pub micro_ccd_per_euro:           ::core::option::Option<ExchangeRate>,
+    pub micro_ccd_per_euro: ::core::option::Option<ExchangeRate>,
     /// Extra number of epochs before reduction in stake, or baker
     /// deregistration is completed.
     #[prost(message, optional, tag = "4")]
-    pub cooldown_parameters:          ::core::option::Option<CooldownParametersCpv1>,
+    pub cooldown_parameters: ::core::option::Option<CooldownParametersCpv1>,
     /// Current time parameters.
     /// The time parameters indicates the mint rate and the
     /// reward period length, i.e. the time between paydays.
     #[prost(message, optional, tag = "5")]
-    pub time_parameters:              ::core::option::Option<TimeParametersCpv1>,
+    pub time_parameters: ::core::option::Option<TimeParametersCpv1>,
     /// The limit for the number of account creations in a block.
     #[prost(message, optional, tag = "6")]
-    pub account_creation_limit:       ::core::option::Option<CredentialsPerBlockLimit>,
+    pub account_creation_limit: ::core::option::Option<CredentialsPerBlockLimit>,
     /// Current mint distribution
     #[prost(message, optional, tag = "7")]
-    pub mint_distribution:            ::core::option::Option<MintDistributionCpv1>,
+    pub mint_distribution: ::core::option::Option<MintDistributionCpv1>,
     /// Current transaction fee distribution.
     #[prost(message, optional, tag = "8")]
     pub transaction_fee_distribution: ::core::option::Option<TransactionFeeDistribution>,
     /// Current gas reward parameters.
     #[prost(message, optional, tag = "9")]
-    pub gas_rewards:                  ::core::option::Option<GasRewards>,
+    pub gas_rewards: ::core::option::Option<GasRewards>,
     /// The foundation account.
     #[prost(message, optional, tag = "10")]
-    pub foundation_account:           ::core::option::Option<AccountAddress>,
+    pub foundation_account: ::core::option::Option<AccountAddress>,
     /// Parameters governing baking pools and their commissions.
     #[prost(message, optional, tag = "11")]
-    pub pool_parameters:              ::core::option::Option<PoolParametersCpv1>,
+    pub pool_parameters: ::core::option::Option<PoolParametersCpv1>,
     /// Keys allowed to do root updates.
     #[prost(message, optional, tag = "12")]
-    pub root_keys:                    ::core::option::Option<HigherLevelKeys>,
+    pub root_keys: ::core::option::Option<HigherLevelKeys>,
     /// Keys allowed to do level1 updates;
     #[prost(message, optional, tag = "13")]
-    pub level1_keys:                  ::core::option::Option<HigherLevelKeys>,
+    pub level1_keys: ::core::option::Option<HigherLevelKeys>,
     /// Keys allowed to do parameter updates.
     #[prost(message, optional, tag = "14")]
-    pub level2_keys:                  ::core::option::Option<AuthorizationsV1>,
+    pub level2_keys: ::core::option::Option<AuthorizationsV1>,
 }
 /// Updatable chain parameters that apply to protocol versions 6.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -4651,7 +4563,9 @@ pub struct ChainParametersV2 {
     pub level2_keys: ::core::option::Option<AuthorizationsV1>,
     /// Finalization committee parameters
     #[prost(message, optional, tag = "15")]
-    pub finalization_committee_parameters: ::core::option::Option<FinalizationCommitteeParameters>,
+    pub finalization_committee_parameters: ::core::option::Option<
+        FinalizationCommitteeParameters,
+    >,
 }
 /// Chain parameters.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -4665,16 +4579,13 @@ pub mod chain_parameters {
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Parameters {
-        /// Chain parameters that apply when the block is a protocol version 1-3
-        /// block.
+        /// Chain parameters that apply when the block is a protocol version 1-3 block.
         #[prost(message, tag = "1")]
         V0(super::ChainParametersV0),
-        /// Chain parameters that apply when the block is a protocol version 4-5
-        /// block.
+        /// Chain parameters that apply when the block is a protocol version 4-5 block.
         #[prost(message, tag = "2")]
         V1(super::ChainParametersV1),
-        /// Chain parameters that apply when the block is a protocol version 6-
-        /// block.
+        /// Chain parameters that apply when the block is a protocol version 6- block.
         #[prost(message, tag = "3")]
         V2(super::ChainParametersV2),
     }
@@ -4685,13 +4596,11 @@ pub mod chain_parameters {
 pub struct FinalizationSummaryParty {
     /// Baker ID. Every finalizer is in particular a baker.
     #[prost(message, optional, tag = "1")]
-    pub baker:  ::core::option::Option<BakerId>,
-    /// The weight of the finalizer in the committee. This is an "absolute"
-    /// weight.
+    pub baker: ::core::option::Option<BakerId>,
+    /// The weight of the finalizer in the committee. This is an "absolute" weight.
     #[prost(uint64, tag = "2")]
     pub weight: u64,
-    /// Whether the finalizer's signature was present on the particular
-    /// finalization record.
+    /// Whether the finalizer's signature was present on the particular finalization record.
     #[prost(bool, tag = "3")]
     pub signed: bool,
 }
@@ -4709,13 +4618,13 @@ pub struct FinalizationIndex {
 pub struct FinalizationSummary {
     /// Block that was finalized by the finalization record.
     #[prost(message, optional, tag = "1")]
-    pub block:      ::core::option::Option<BlockHash>,
+    pub block: ::core::option::Option<BlockHash>,
     /// Index of the finalization round that finalized the block.
     #[prost(message, optional, tag = "2")]
-    pub index:      ::core::option::Option<FinalizationIndex>,
+    pub index: ::core::option::Option<FinalizationIndex>,
     /// Finalization delay used for the finalization round.
     #[prost(message, optional, tag = "3")]
-    pub delay:      ::core::option::Option<BlockHeight>,
+    pub delay: ::core::option::Option<BlockHeight>,
     /// List of all finalizers with information about whether they signed the
     /// finalization record or not.
     #[prost(message, repeated, tag = "4")]
@@ -4746,7 +4655,7 @@ pub mod block_finalization_summary {
 pub struct BlockItem {
     /// The hash of the block item that identifies it to the chain.
     #[prost(message, optional, tag = "1")]
-    pub hash:       ::core::option::Option<TransactionHash>,
+    pub hash: ::core::option::Option<TransactionHash>,
     #[prost(oneof = "block_item::BlockItem", tags = "2, 3, 4")]
     pub block_item: ::core::option::Option<block_item::BlockItem>,
 }
@@ -4755,18 +4664,16 @@ pub mod block_item {
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum BlockItem {
-        /// Account transactions are messages which are signed and paid for by
-        /// an account.
+        /// Account transactions are messages which are signed and paid for by an account.
         #[prost(message, tag = "2")]
         AccountTransaction(super::AccountTransaction),
         /// Credential deployments create new accounts. They are not paid for
-        /// directly by the sender. Instead, bakers are rewarded by the protocol
-        /// for including them.
+        /// directly by the sender. Instead, bakers are rewarded by the protocol for
+        /// including them.
         #[prost(message, tag = "3")]
         CredentialDeployment(super::CredentialDeployment),
-        /// Update instructions are messages which can update the chain
-        /// parameters. Including which keys are allowed to make future
-        /// update instructions.
+        /// Update instructions are messages which can update the chain parameters. Including which keys are allowed
+        /// to make future update instructions.
         #[prost(message, tag = "4")]
         UpdateInstruction(super::UpdateInstruction),
     }
@@ -4778,25 +4685,23 @@ pub mod block_item {
 pub struct BakerRewardPeriodInfo {
     /// The baker id and public keys for the baker.
     #[prost(message, optional, tag = "1")]
-    pub baker:             ::core::option::Option<BakerInfo>,
+    pub baker: ::core::option::Option<BakerInfo>,
     /// The effective stake of the baker for the consensus protocol.
-    /// The returned amount accounts for delegation, capital bounds and leverage
-    /// bounds.
+    /// The returned amount accounts for delegation, capital bounds and leverage bounds.
     #[prost(message, optional, tag = "2")]
-    pub effective_stake:   ::core::option::Option<Amount>,
-    /// The effective commission rate for the baker that applies for the reward
-    /// period.
+    pub effective_stake: ::core::option::Option<Amount>,
+    /// The effective commission rate for the baker that applies for the reward period.
     #[prost(message, optional, tag = "3")]
-    pub commission_rates:  ::core::option::Option<CommissionRates>,
+    pub commission_rates: ::core::option::Option<CommissionRates>,
     /// The amount staked by the baker itself.
     #[prost(message, optional, tag = "4")]
-    pub equity_capital:    ::core::option::Option<Amount>,
+    pub equity_capital: ::core::option::Option<Amount>,
     /// The total amount of capital delegated to this baker pool.
     #[prost(message, optional, tag = "5")]
     pub delegated_capital: ::core::option::Option<Amount>,
     /// Whether the baker is a finalizer or not.
     #[prost(bool, tag = "6")]
-    pub is_finalizer:      bool,
+    pub is_finalizer: bool,
 }
 /// The signature of a 'QuorumCertificate'.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -4816,13 +4721,13 @@ pub struct QuorumSignature {
 pub struct QuorumCertificate {
     /// The hash of the block that the quorum certificate refers to.
     #[prost(message, optional, tag = "1")]
-    pub block_hash:          ::core::option::Option<BlockHash>,
+    pub block_hash: ::core::option::Option<BlockHash>,
     /// The round of the block.
     #[prost(message, optional, tag = "2")]
-    pub round:               ::core::option::Option<Round>,
+    pub round: ::core::option::Option<Round>,
     /// The epoch of the block.
     #[prost(message, optional, tag = "3")]
-    pub epoch:               ::core::option::Option<Epoch>,
+    pub epoch: ::core::option::Option<Epoch>,
     /// The aggregated signature by the finalization committee on the block.
     #[prost(message, optional, tag = "4")]
     pub aggregate_signature: ::core::option::Option<QuorumSignature>,
@@ -4831,7 +4736,7 @@ pub struct QuorumCertificate {
     /// The finalizers are identified by their baker id as this is stable
     /// across protocols and epochs.
     #[prost(message, repeated, tag = "5")]
-    pub signatories:         ::prost::alloc::vec::Vec<BakerId>,
+    pub signatories: ::prost::alloc::vec::Vec<BakerId>,
 }
 /// The finalizer round is a map from a 'Round'
 /// to the list of finalizers (identified by their 'BakerId') that signed
@@ -4841,7 +4746,7 @@ pub struct QuorumCertificate {
 pub struct FinalizerRound {
     /// The round that was signed off.
     #[prost(message, optional, tag = "1")]
-    pub round:      ::core::option::Option<Round>,
+    pub round: ::core::option::Option<Round>,
     /// The finalizers (identified by their 'BakerId' that
     /// signed off the in 'round'.
     #[prost(message, repeated, tag = "2")]
@@ -4865,15 +4770,15 @@ pub struct TimeoutSignature {
 pub struct TimeoutCertificate {
     /// The round that timed out.
     #[prost(message, optional, tag = "1")]
-    pub round:                  ::core::option::Option<Round>,
+    pub round: ::core::option::Option<Round>,
     /// The minimum epoch of which signatures are included
     /// in the 'aggregate_signature'.
     #[prost(message, optional, tag = "2")]
-    pub min_epoch:              ::core::option::Option<Epoch>,
+    pub min_epoch: ::core::option::Option<Epoch>,
     /// The rounds of which finalizers have their best
     /// QCs in the 'min_epoch'.
     #[prost(message, repeated, tag = "3")]
-    pub qc_rounds_first_epoch:  ::prost::alloc::vec::Vec<FinalizerRound>,
+    pub qc_rounds_first_epoch: ::prost::alloc::vec::Vec<FinalizerRound>,
     /// The rounds of which finalizers have their best
     /// QCs in the epoch 'min_epoch' + 1.
     #[prost(message, repeated, tag = "4")]
@@ -4881,7 +4786,7 @@ pub struct TimeoutCertificate {
     /// The aggregated signature by the finalization committee that witnessed
     /// the 'round' timed out.
     #[prost(message, optional, tag = "5")]
-    pub aggregate_signature:    ::core::option::Option<TimeoutSignature>,
+    pub aggregate_signature: ::core::option::Option<TimeoutSignature>,
 }
 /// A proof that establishes that the successor block of
 /// a 'EpochFinalizationEntry' is the immediate successor of
@@ -4903,11 +4808,11 @@ pub struct SuccessorProof {
 pub struct EpochFinalizationEntry {
     /// The quorum certificate for the finalized block.
     #[prost(message, optional, tag = "1")]
-    pub finalized_qc:    ::core::option::Option<QuorumCertificate>,
+    pub finalized_qc: ::core::option::Option<QuorumCertificate>,
     /// The quorum certificate for the block that finalizes
     /// the block that 'finalized_qc' points to.
     #[prost(message, optional, tag = "2")]
-    pub successor_qc:    ::core::option::Option<QuorumCertificate>,
+    pub successor_qc: ::core::option::Option<QuorumCertificate>,
     /// A proof that the successor block is an immediate
     /// successor of the finalized block.
     #[prost(message, optional, tag = "3")]
@@ -4921,35 +4826,33 @@ pub struct BlockCertificates {
     /// The quorum certificate. Is present if and only if the block is
     /// not a genesis block.
     #[prost(message, optional, tag = "1")]
-    pub quorum_certificate:       ::core::option::Option<QuorumCertificate>,
+    pub quorum_certificate: ::core::option::Option<QuorumCertificate>,
     /// The timeout certificate. Is present only if the round prior to the
     /// round of the block timed out.
     #[prost(message, optional, tag = "2")]
-    pub timeout_certificate:      ::core::option::Option<TimeoutCertificate>,
+    pub timeout_certificate: ::core::option::Option<TimeoutCertificate>,
     /// The epoch finalization entry. Is present only if the block initiates
     /// a new epoch.
     #[prost(message, optional, tag = "3")]
     pub epoch_finalization_entry: ::core::option::Option<EpochFinalizationEntry>,
 }
-/// Details of which baker won the lottery in a given round in consensus version
-/// 1.
+/// Details of which baker won the lottery in a given round in consensus version 1.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct WinningBaker {
     /// The round number.
     #[prost(message, optional, tag = "1")]
-    pub round:   ::core::option::Option<Round>,
+    pub round: ::core::option::Option<Round>,
     /// The baker that won the round.
     #[prost(message, optional, tag = "2")]
-    pub winner:  ::core::option::Option<BakerId>,
-    /// True if the baker produced a block in this round on the finalized chain,
-    /// and False otherwise.
+    pub winner: ::core::option::Option<BakerId>,
+    /// True if the baker produced a block in this round on the finalized chain, and False otherwise.
     #[prost(bool, tag = "3")]
     pub present: bool,
 }
-/// An operation to dry run.  The first operation in a dry-run sequence should
-/// be `load_block_state`: any other operation will be met with `NoState` until
-/// a state is successfully loaded.
+/// An operation to dry run.  The first operation in a dry-run sequence should be
+/// `load_block_state`: any other operation will be met with `NoState` until a
+/// state is successfully loaded.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DryRunRequest {
@@ -4961,10 +4864,9 @@ pub mod dry_run_request {
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Request {
-        /// Load the state of the specified block to use for subsequent
-        /// requests. The state is taken at the end of execution of the
-        /// block, and the block’s timestamp is used as the current
-        /// timestamp.
+        /// Load the state of the specified block to use for subsequent requests.
+        /// The state is taken at the end of execution of the block, and the block’s
+        /// timestamp is used as the current timestamp.
         ///
         /// The energy cost for this operation is 2000.
         #[prost(message, tag = "1")]
@@ -5000,11 +4902,10 @@ pub mod dry_run_state_query {
         #[prost(message, tag = "2")]
         GetInstanceInfo(super::ContractAddress),
         /// Invoke an entrypoint on a smart contract instance.
-        /// No changes made to the state are retained at the completion of the
-        /// operation.
+        /// No changes made to the state are retained at the completion of the operation.
         ///
-        /// The energy cost for this query is 200 plus the energy used by the
-        /// smart contract execution.
+        /// The energy cost for this query is 200 plus the energy used by the smart contract
+        /// execution.
         #[prost(message, tag = "3")]
         InvokeInstance(super::DryRunInvokeInstance),
     }
@@ -5013,29 +4914,28 @@ pub mod dry_run_state_query {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DryRunInvokeInstance {
-    /// Invoker of the contract. If this is not supplied then the contract will
-    /// be invoked by an account with address 0, no credentials and
-    /// sufficient amount of CCD to cover the transfer amount. If given, the
-    /// relevant address (either account or contract) must exist in the
-    /// blockstate.
+    /// Invoker of the contract. If this is not supplied then the contract will be
+    /// invoked by an account with address 0, no credentials and sufficient amount
+    /// of CCD to cover the transfer amount. If given, the relevant address (either
+    /// account or contract) must exist in the blockstate.
     #[prost(message, optional, tag = "1")]
-    pub invoker:    ::core::option::Option<Address>,
+    pub invoker: ::core::option::Option<Address>,
     /// Address of the contract instance to invoke.
     #[prost(message, optional, tag = "2")]
-    pub instance:   ::core::option::Option<ContractAddress>,
+    pub instance: ::core::option::Option<ContractAddress>,
     /// Amount to invoke the smart contract instance with.
     #[prost(message, optional, tag = "3")]
-    pub amount:     ::core::option::Option<Amount>,
+    pub amount: ::core::option::Option<Amount>,
     /// The entrypoint of the smart contract instance to invoke.
     #[prost(message, optional, tag = "4")]
     pub entrypoint: ::core::option::Option<ReceiveName>,
     /// The parameter bytes to include in the invocation of the entrypoint.
     #[prost(message, optional, tag = "5")]
-    pub parameter:  ::core::option::Option<Parameter>,
-    /// The maximum energy to allow for the invocation. Note that the node
-    /// imposes an energy quota that is enforced in addition to this limit.
+    pub parameter: ::core::option::Option<Parameter>,
+    /// The maximum energy to allow for the invocation. Note that the node imposes an energy
+    /// quota that is enforced in addition to this limit.
     #[prost(message, optional, tag = "6")]
-    pub energy:     ::core::option::Option<Energy>,
+    pub energy: ::core::option::Option<Energy>,
 }
 /// An operation that can update the state as part of a dry run.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -5049,8 +4949,8 @@ pub mod dry_run_state_operation {
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Operation {
-        /// Sets the current block time to the given timestamp for the purposes
-        /// of future transactions.
+        /// Sets the current block time to the given timestamp for the purposes of future
+        /// transactions.
         ///
         /// The energy cost of this operation is 50.
         #[prost(message, tag = "1")]
@@ -5063,14 +4963,13 @@ pub mod dry_run_state_operation {
         MintToAccount(super::DryRunMintToAccount),
         /// Dry run a transaction, updating the state if it succeeds.
         ///
-        /// The energy cost of this operation is 400 plus the energy used by
-        /// executing the transaction.
+        /// The energy cost of this operation is 400 plus the energy used by executing the
+        /// transaction.
         #[prost(message, tag = "3")]
         RunTransaction(super::DryRunTransaction),
     }
 }
-/// Mint a specified amount and credit it to the specified account as part of a
-/// dry run.
+/// Mint a specified amount and credit it to the specified account as part of a dry run.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DryRunMintToAccount {
@@ -5079,7 +4978,7 @@ pub struct DryRunMintToAccount {
     pub account: ::core::option::Option<AccountAddress>,
     /// The amount to mint and credit to the account.
     #[prost(message, optional, tag = "2")]
-    pub amount:  ::core::option::Option<Amount>,
+    pub amount: ::core::option::Option<Amount>,
 }
 /// Dry run an account transaction
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -5087,33 +4986,31 @@ pub struct DryRunMintToAccount {
 pub struct DryRunTransaction {
     /// The account to use as the sender of the transaction.
     #[prost(message, optional, tag = "1")]
-    pub sender:        ::core::option::Option<AccountAddress>,
+    pub sender: ::core::option::Option<AccountAddress>,
     /// The energy limit set for executing the transaction.
     #[prost(message, optional, tag = "2")]
     pub energy_amount: ::core::option::Option<Energy>,
     /// The payload of the transaction.
     #[prost(message, optional, tag = "3")]
-    pub payload:       ::core::option::Option<AccountTransactionPayload>,
-    /// Which credentials and keys should be treated as having signed the
-    /// transaction. If none is given, then the transaction is treated as
-    /// having one signature for credential 0, key 0. Therefore, this is
-    /// only required when the transaction is from a multi-signature
+    pub payload: ::core::option::Option<AccountTransactionPayload>,
+    /// Which credentials and keys should be treated as having signed the transaction.
+    /// If none is given, then the transaction is treated as having one signature for credential 0,
+    /// key 0. Therefore, this is only required when the transaction is from a multi-signature
     /// account. There are two reasons why you might want to specify signatures:
-    ///    * The cost of the transaction depends on the number of signatures, so
-    ///      if you want to get the correct cost for a multi-signature
-    ///      transaction, then specifying the signatures supports this.
-    ///    * When changing account keys on a multi-credential account, the
-    ///      transaction must be signed by the credential whose keys are being
-    ///      changed.
+    ///    * The cost of the transaction depends on the number of signatures, so if you want to
+    ///      get the correct cost for a multi-signature transaction, then specifying the signatures
+    ///      supports this.
+    ///    * When changing account keys on a multi-credential account, the transaction must be signed
+    ///      by the credential whose keys are being changed.
     ///
-    /// Note that the signature thresholds are not checked as part of the dry
-    /// run. Duplicated signatures are only counted once.
+    /// Note that the signature thresholds are not checked as part of the dry run. Duplicated
+    /// signatures are only counted once.
     #[prost(message, repeated, tag = "4")]
-    pub signatures:    ::prost::alloc::vec::Vec<DryRunSignature>,
+    pub signatures: ::prost::alloc::vec::Vec<DryRunSignature>,
 }
-/// A dry run signature is a pair of a credential index and key index,
-/// identifying the credential and key that is presumed to have signed the
-/// transaction. No actual cryptographic signature is included.
+/// A dry run signature is a pair of a credential index and key index, identifying the credential
+/// and key that is presumed to have signed the transaction. No actual cryptographic signature is
+/// included.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DryRunSignature {
@@ -5122,7 +5019,7 @@ pub struct DryRunSignature {
     pub credential: u32,
     /// Key index. Must not exceed 255.
     #[prost(uint32, tag = "2")]
-    pub key:        u32,
+    pub key: u32,
 }
 /// A response to a `DryRunRequest`.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -5132,15 +5029,14 @@ pub struct DryRunResponse {
     #[prost(message, optional, tag = "3")]
     pub quota_remaining: ::core::option::Option<Energy>,
     #[prost(oneof = "dry_run_response::Response", tags = "1, 2")]
-    pub response:        ::core::option::Option<dry_run_response::Response>,
+    pub response: ::core::option::Option<dry_run_response::Response>,
 }
 /// Nested message and enum types in `DryRunResponse`.
 pub mod dry_run_response {
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Response {
-        /// The request produced an error. The request otherwise has no effect
-        /// on the state.
+        /// The request produced an error. The request otherwise has no effect on the state.
         #[prost(message, tag = "1")]
         Error(super::DryRunErrorResponse),
         /// The request was successful.
@@ -5151,10 +5047,7 @@ pub mod dry_run_response {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DryRunErrorResponse {
-    #[prost(
-        oneof = "dry_run_error_response::Error",
-        tags = "1, 2, 3, 4, 5, 6, 8, 9"
-    )]
+    #[prost(oneof = "dry_run_error_response::Error", tags = "1, 2, 3, 4, 5, 6, 8, 9")]
     pub error: ::core::option::Option<dry_run_error_response::Error>,
 }
 /// Nested message and enum types in `DryRunErrorResponse`.
@@ -5176,39 +5069,35 @@ pub mod dry_run_error_response {
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct InstanceNotFound {}
-    /// The amount that was requested to be minted would overflow the total
-    /// supply.
+    /// The amount that was requested to be minted would overflow the total supply.
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct AmountOverLimit {
-        /// The maximum amount that can be minted without overflowing the
-        /// supply.
+        /// The maximum amount that can be minted without overflowing the supply.
         #[prost(message, optional, tag = "1")]
         pub amount_limit: ::core::option::Option<super::Amount>,
     }
-    /// The sender account for the transaction has insufficient balance to pay
-    /// the preliminary fees for the transaction to be included in a block.
+    /// The sender account for the transaction has insufficient balance to pay the preliminary fees
+    /// for the transaction to be included in a block.
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BalanceInsufficient {
         /// The minimum balance required to perform the operation.
         #[prost(message, optional, tag = "1")]
-        pub required_amount:  ::core::option::Option<super::Amount>,
-        /// The currently-available balance on the account to pay for the
-        /// operation.
+        pub required_amount: ::core::option::Option<super::Amount>,
+        /// The currently-available balance on the account to pay for the operation.
         #[prost(message, optional, tag = "2")]
         pub available_amount: ::core::option::Option<super::Amount>,
     }
-    /// The energy made available for the transaction is insufficient to cover
-    /// the basic processing required to include a transaction in a block.
+    /// The energy made available for the transaction is insufficient to cover the basic processing
+    /// required to include a transaction in a block.
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct EnergyInsufficient {
-        /// The minimum energy required for the transaction to be included in
-        /// the chain. Note that, even if the energy supplied for the
-        /// transaction is enough to prevent a `EnergyInsufficient`, the
-        /// transaction can still be rejected for having insufficient
-        /// energy. In that case, a `TransactionExecuted` response will be
+        /// The minimum energy required for the transaction to be included in the chain.
+        /// Note that, even if the energy supplied for the transaction is enough to prevent a
+        /// `EnergyInsufficient`, the transaction can still be rejected for having
+        /// insufficient energy. In that case, a `TransactionExecuted` response will be
         /// produced, but indicate the transaction was rejected.
         #[prost(message, optional, tag = "1")]
         pub energy_required: ::core::option::Option<super::Energy>,
@@ -5218,18 +5107,17 @@ pub mod dry_run_error_response {
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct InvokeFailure {
         /// If invoking a V0 contract this is not provided, otherwise it is
-        /// potentially return value produced by the call unless the call failed
-        /// with out of energy or runtime error. If the V1 contract
-        /// terminated with a logic error then the return value is
-        /// present.
+        /// potentially return value produced by the call unless the call failed with
+        /// out of energy or runtime error. If the V1 contract terminated with a
+        /// logic error then the return value is present.
         #[prost(bytes = "vec", optional, tag = "1")]
         pub return_value: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
         /// Energy used by the execution.
         #[prost(message, optional, tag = "2")]
-        pub used_energy:  ::core::option::Option<super::Energy>,
+        pub used_energy: ::core::option::Option<super::Energy>,
         /// Contract execution failed for the given reason.
         #[prost(message, optional, tag = "3")]
-        pub reason:       ::core::option::Option<super::RejectReason>,
+        pub reason: ::core::option::Option<super::RejectReason>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
@@ -5243,8 +5131,7 @@ pub mod dry_run_error_response {
         #[prost(message, tag = "2")]
         BlockNotFound(BlockNotFound),
         /// The specified account was not found.
-        /// Response to 'get_account_info', 'mint_to_account' and
-        /// 'run_transaction'.
+        /// Response to 'get_account_info', 'mint_to_account' and 'run_transaction'.
         #[prost(message, tag = "3")]
         AccountNotFound(AccountNotFound),
         /// The specified instance was not found.
@@ -5255,12 +5142,12 @@ pub mod dry_run_error_response {
         /// Response to 'mint_to_account'.
         #[prost(message, tag = "5")]
         AmountOverLimit(AmountOverLimit),
-        /// The balance of the sender account is not sufficient to pay for the
-        /// operation. Response to 'run_transaction'.
+        /// The balance of the sender account is not sufficient to pay for the operation.
+        /// Response to 'run_transaction'.
         #[prost(message, tag = "6")]
         BalanceInsufficient(BalanceInsufficient),
-        /// The energy supplied for the transaction was not sufficient to
-        /// perform the basic checks. Response to 'run_transaction'.
+        /// The energy supplied for the transaction was not sufficient to perform the basic checks.
+        /// Response to 'run_transaction'.
         #[prost(message, tag = "8")]
         EnergyInsufficient(EnergyInsufficient),
         /// The contract invocation failed.
@@ -5273,10 +5160,7 @@ pub mod dry_run_error_response {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DryRunSuccessResponse {
-    #[prost(
-        oneof = "dry_run_success_response::Response",
-        tags = "1, 2, 3, 4, 5, 6, 7"
-    )]
+    #[prost(oneof = "dry_run_success_response::Response", tags = "1, 2, 3, 4, 5, 6, 7")]
     pub response: ::core::option::Option<dry_run_success_response::Response>,
 }
 /// Nested message and enum types in `DryRunSuccessResponse`.
@@ -5290,11 +5174,11 @@ pub mod dry_run_success_response {
         pub current_timestamp: ::core::option::Option<super::Timestamp>,
         /// The hash of the block that was loaded.
         #[prost(message, optional, tag = "2")]
-        pub block_hash:        ::core::option::Option<super::BlockHash>,
-        /// The protocol version at the specified block. The behavior of
-        /// operations can vary across protocol versions.
+        pub block_hash: ::core::option::Option<super::BlockHash>,
+        /// The protocol version at the specified block. The behavior of operations can vary across
+        /// protocol versions.
         #[prost(enumeration = "super::ProtocolVersion", tag = "3")]
-        pub protocol_version:  i32,
+        pub protocol_version: i32,
     }
     /// The current apparent timestamp was updated to the specified value.
     #[allow(clippy::derive_partial_eq_without_eq)]
@@ -5310,12 +5194,12 @@ pub mod dry_run_success_response {
     pub struct TransactionExecuted {
         /// The amount of energy actually expended in executing the transaction.
         #[prost(message, optional, tag = "1")]
-        pub energy_cost:  ::core::option::Option<super::Energy>,
+        pub energy_cost: ::core::option::Option<super::Energy>,
         /// The details of the outcome of the transaction.
         #[prost(message, optional, tag = "2")]
-        pub details:      ::core::option::Option<super::AccountTransactionDetails>,
-        /// If this is an invocation of a V1 contract that produced a return
-        /// value, this is that value. Otherwise it is absent.
+        pub details: ::core::option::Option<super::AccountTransactionDetails>,
+        /// If this is an invocation of a V1 contract that produced a return value, this is that
+        /// value. Otherwise it is absent.
         #[prost(bytes = "vec", optional, tag = "3")]
         pub return_value: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
     }
@@ -5329,10 +5213,10 @@ pub mod dry_run_success_response {
         pub return_value: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
         /// Energy used by the execution.
         #[prost(message, optional, tag = "2")]
-        pub used_energy:  ::core::option::Option<super::Energy>,
+        pub used_energy: ::core::option::Option<super::Energy>,
         /// Effects produced by contract execution.
         #[prost(message, repeated, tag = "3")]
-        pub effects:      ::prost::alloc::vec::Vec<super::ContractTraceElement>,
+        pub effects: ::prost::alloc::vec::Vec<super::ContractTraceElement>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
@@ -5360,8 +5244,8 @@ pub mod dry_run_success_response {
         /// Response to 'mint_to_account'.
         #[prost(message, tag = "6")]
         MintedToAccount(MintedToAccount),
-        /// The specified transaction was executed. Note that the transaction
-        /// could still have been rejected.
+        /// The specified transaction was executed. Note that the transaction could still have
+        /// been rejected.
         /// Response to 'run_transaction'.
         #[prost(message, tag = "7")]
         TransactionExecuted(TransactionExecuted),
@@ -5371,7 +5255,7 @@ pub mod dry_run_success_response {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum OpenStatus {
-    OpenForAll   = 0,
+    OpenForAll = 0,
     ClosedForNew = 1,
     ClosedForAll = 2,
 }
@@ -5379,8 +5263,7 @@ impl OpenStatus {
     /// String value of the enum field names used in the ProtoBuf definition.
     ///
     /// The values are not transformed in any way and thus are considered stable
-    /// (if the ProtoBuf definition does not change) and safe for programmatic
-    /// use.
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
     pub fn as_str_name(&self) -> &'static str {
         match self {
             OpenStatus::OpenForAll => "OPEN_STATUS_OPEN_FOR_ALL",
@@ -5388,7 +5271,6 @@ impl OpenStatus {
             OpenStatus::ClosedForAll => "OPEN_STATUS_CLOSED_FOR_ALL",
         }
     }
-
     /// Creates an enum from field names used in the ProtoBuf definition.
     pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
         match value {
@@ -5410,15 +5292,13 @@ impl ContractVersion {
     /// String value of the enum field names used in the ProtoBuf definition.
     ///
     /// The values are not transformed in any way and thus are considered stable
-    /// (if the ProtoBuf definition does not change) and safe for programmatic
-    /// use.
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
     pub fn as_str_name(&self) -> &'static str {
         match self {
             ContractVersion::V0 => "V0",
             ContractVersion::V1 => "V1",
         }
     }
-
     /// Creates an enum from field names used in the ProtoBuf definition.
     pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
         match value {
@@ -5435,21 +5315,19 @@ pub enum CredentialType {
     /// An initial credential created by the identity provider.
     Initial = 0,
     /// A normal credential type created by the account.
-    Normal  = 1,
+    Normal = 1,
 }
 impl CredentialType {
     /// String value of the enum field names used in the ProtoBuf definition.
     ///
     /// The values are not transformed in any way and thus are considered stable
-    /// (if the ProtoBuf definition does not change) and safe for programmatic
-    /// use.
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
     pub fn as_str_name(&self) -> &'static str {
         match self {
             CredentialType::Initial => "CREDENTIAL_TYPE_INITIAL",
             CredentialType::Normal => "CREDENTIAL_TYPE_NORMAL",
         }
     }
-
     /// Creates an enum from field names used in the ProtoBuf definition.
     pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
         match value {
@@ -5463,24 +5341,24 @@ impl CredentialType {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum UpdateType {
-    UpdateProtocol       = 0,
+    UpdateProtocol = 0,
     UpdateElectionDifficulty = 1,
-    UpdateEuroPerEnergy  = 2,
+    UpdateEuroPerEnergy = 2,
     UpdateMicroCcdPerEuro = 3,
     UpdateFoundationAccount = 4,
     UpdateMintDistribution = 5,
     UpdateTransactionFeeDistribution = 6,
-    UpdateGasRewards     = 7,
+    UpdateGasRewards = 7,
     UpdatePoolParameters = 8,
-    AddAnonymityRevoker  = 9,
-    AddIdentityProvider  = 10,
-    UpdateRootKeys       = 11,
-    UpdateLevel1Keys     = 12,
-    UpdateLevel2Keys     = 13,
+    AddAnonymityRevoker = 9,
+    AddIdentityProvider = 10,
+    UpdateRootKeys = 11,
+    UpdateLevel1Keys = 12,
+    UpdateLevel2Keys = 13,
     UpdateCooldownParameters = 14,
     UpdateTimeParameters = 15,
     UpdateTimeoutParameters = 16,
-    UpdateMinBlockTime   = 17,
+    UpdateMinBlockTime = 17,
     UpdateBlockEnergyLimit = 18,
     UpdateFinalizationCommitteeParameters = 19,
 }
@@ -5488,8 +5366,7 @@ impl UpdateType {
     /// String value of the enum field names used in the ProtoBuf definition.
     ///
     /// The values are not transformed in any way and thus are considered stable
-    /// (if the ProtoBuf definition does not change) and safe for programmatic
-    /// use.
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
     pub fn as_str_name(&self) -> &'static str {
         match self {
             UpdateType::UpdateProtocol => "UPDATE_PROTOCOL",
@@ -5498,7 +5375,9 @@ impl UpdateType {
             UpdateType::UpdateMicroCcdPerEuro => "UPDATE_MICRO_CCD_PER_EURO",
             UpdateType::UpdateFoundationAccount => "UPDATE_FOUNDATION_ACCOUNT",
             UpdateType::UpdateMintDistribution => "UPDATE_MINT_DISTRIBUTION",
-            UpdateType::UpdateTransactionFeeDistribution => "UPDATE_TRANSACTION_FEE_DISTRIBUTION",
+            UpdateType::UpdateTransactionFeeDistribution => {
+                "UPDATE_TRANSACTION_FEE_DISTRIBUTION"
+            }
             UpdateType::UpdateGasRewards => "UPDATE_GAS_REWARDS",
             UpdateType::UpdatePoolParameters => "UPDATE_POOL_PARAMETERS",
             UpdateType::AddAnonymityRevoker => "ADD_ANONYMITY_REVOKER",
@@ -5516,7 +5395,6 @@ impl UpdateType {
             }
         }
     }
-
     /// Creates an enum from field names used in the ProtoBuf definition.
     pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
         match value {
@@ -5526,7 +5404,9 @@ impl UpdateType {
             "UPDATE_MICRO_CCD_PER_EURO" => Some(Self::UpdateMicroCcdPerEuro),
             "UPDATE_FOUNDATION_ACCOUNT" => Some(Self::UpdateFoundationAccount),
             "UPDATE_MINT_DISTRIBUTION" => Some(Self::UpdateMintDistribution),
-            "UPDATE_TRANSACTION_FEE_DISTRIBUTION" => Some(Self::UpdateTransactionFeeDistribution),
+            "UPDATE_TRANSACTION_FEE_DISTRIBUTION" => {
+                Some(Self::UpdateTransactionFeeDistribution)
+            }
             "UPDATE_GAS_REWARDS" => Some(Self::UpdateGasRewards),
             "UPDATE_POOL_PARAMETERS" => Some(Self::UpdatePoolParameters),
             "ADD_ANONYMITY_REVOKER" => Some(Self::AddAnonymityRevoker),
@@ -5550,34 +5430,33 @@ impl UpdateType {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum TransactionType {
-    DeployModule         = 0,
-    InitContract         = 1,
-    Update               = 2,
-    Transfer             = 3,
-    AddBaker             = 4,
-    RemoveBaker          = 5,
-    UpdateBakerStake     = 6,
+    DeployModule = 0,
+    InitContract = 1,
+    Update = 2,
+    Transfer = 3,
+    AddBaker = 4,
+    RemoveBaker = 5,
+    UpdateBakerStake = 6,
     UpdateBakerRestakeEarnings = 7,
-    UpdateBakerKeys      = 8,
+    UpdateBakerKeys = 8,
     UpdateCredentialKeys = 9,
     EncryptedAmountTransfer = 10,
-    TransferToEncrypted  = 11,
-    TransferToPublic     = 12,
+    TransferToEncrypted = 11,
+    TransferToPublic = 12,
     TransferWithSchedule = 13,
-    UpdateCredentials    = 14,
-    RegisterData         = 15,
-    TransferWithMemo     = 16,
+    UpdateCredentials = 14,
+    RegisterData = 15,
+    TransferWithMemo = 16,
     EncryptedAmountTransferWithMemo = 17,
     TransferWithScheduleAndMemo = 18,
-    ConfigureBaker       = 19,
-    ConfigureDelegation  = 20,
+    ConfigureBaker = 19,
+    ConfigureDelegation = 20,
 }
 impl TransactionType {
     /// String value of the enum field names used in the ProtoBuf definition.
     ///
     /// The values are not transformed in any way and thus are considered stable
-    /// (if the ProtoBuf definition does not change) and safe for programmatic
-    /// use.
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
     pub fn as_str_name(&self) -> &'static str {
         match self {
             TransactionType::DeployModule => "DEPLOY_MODULE",
@@ -5587,7 +5466,9 @@ impl TransactionType {
             TransactionType::AddBaker => "ADD_BAKER",
             TransactionType::RemoveBaker => "REMOVE_BAKER",
             TransactionType::UpdateBakerStake => "UPDATE_BAKER_STAKE",
-            TransactionType::UpdateBakerRestakeEarnings => "UPDATE_BAKER_RESTAKE_EARNINGS",
+            TransactionType::UpdateBakerRestakeEarnings => {
+                "UPDATE_BAKER_RESTAKE_EARNINGS"
+            }
             TransactionType::UpdateBakerKeys => "UPDATE_BAKER_KEYS",
             TransactionType::UpdateCredentialKeys => "UPDATE_CREDENTIAL_KEYS",
             TransactionType::EncryptedAmountTransfer => "ENCRYPTED_AMOUNT_TRANSFER",
@@ -5600,12 +5481,13 @@ impl TransactionType {
             TransactionType::EncryptedAmountTransferWithMemo => {
                 "ENCRYPTED_AMOUNT_TRANSFER_WITH_MEMO"
             }
-            TransactionType::TransferWithScheduleAndMemo => "TRANSFER_WITH_SCHEDULE_AND_MEMO",
+            TransactionType::TransferWithScheduleAndMemo => {
+                "TRANSFER_WITH_SCHEDULE_AND_MEMO"
+            }
             TransactionType::ConfigureBaker => "CONFIGURE_BAKER",
             TransactionType::ConfigureDelegation => "CONFIGURE_DELEGATION",
         }
     }
-
     /// Creates an enum from field names used in the ProtoBuf definition.
     pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
         match value {
@@ -5626,7 +5508,9 @@ impl TransactionType {
             "UPDATE_CREDENTIALS" => Some(Self::UpdateCredentials),
             "REGISTER_DATA" => Some(Self::RegisterData),
             "TRANSFER_WITH_MEMO" => Some(Self::TransferWithMemo),
-            "ENCRYPTED_AMOUNT_TRANSFER_WITH_MEMO" => Some(Self::EncryptedAmountTransferWithMemo),
+            "ENCRYPTED_AMOUNT_TRANSFER_WITH_MEMO" => {
+                Some(Self::EncryptedAmountTransferWithMemo)
+            }
             "TRANSFER_WITH_SCHEDULE_AND_MEMO" => Some(Self::TransferWithScheduleAndMemo),
             "CONFIGURE_BAKER" => Some(Self::ConfigureBaker),
             "CONFIGURE_DELEGATION" => Some(Self::ConfigureDelegation),
@@ -5650,8 +5534,7 @@ impl ProtocolVersion {
     /// String value of the enum field names used in the ProtoBuf definition.
     ///
     /// The values are not transformed in any way and thus are considered stable
-    /// (if the ProtoBuf definition does not change) and safe for programmatic
-    /// use.
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
     pub fn as_str_name(&self) -> &'static str {
         match self {
             ProtocolVersion::ProtocolVersion1 => "PROTOCOL_VERSION_1",
@@ -5663,7 +5546,6 @@ impl ProtocolVersion {
             ProtocolVersion::ProtocolVersion7 => "PROTOCOL_VERSION_7",
         }
     }
-
     /// Creates an enum from field names used in the ProtoBuf definition.
     pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
         match value {
@@ -5681,7 +5563,8 @@ impl ProtocolVersion {
 /// Generated client implementations.
 pub mod queries_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
-    use tonic::codegen::{http::Uri, *};
+    use tonic::codegen::*;
+    use tonic::codegen::http::Uri;
     #[derive(Debug, Clone)]
     pub struct QueriesClient<T> {
         inner: tonic::client::Grpc<T>,
@@ -5691,7 +5574,8 @@ pub mod queries_client {
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
             D: TryInto<tonic::transport::Endpoint>,
-            D::Error: Into<StdError>, {
+            D::Error: Into<StdError>,
+        {
             let conn = tonic::transport::Endpoint::new(dst)?.connect().await?;
             Ok(Self::new(conn))
         }
@@ -5707,12 +5591,10 @@ pub mod queries_client {
             let inner = tonic::client::Grpc::new(inner);
             Self { inner }
         }
-
         pub fn with_origin(inner: T, origin: Uri) -> Self {
             let inner = tonic::client::Grpc::with_origin(inner, origin);
             Self { inner }
         }
-
         pub fn with_interceptor<F>(
             inner: T,
             interceptor: F,
@@ -5726,28 +5608,27 @@ pub mod queries_client {
                     <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
             >,
-            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
-                Into<StdError> + Send + Sync, {
+            <T as tonic::codegen::Service<
+                http::Request<tonic::body::BoxBody>,
+            >>::Error: Into<StdError> + Send + Sync,
+        {
             QueriesClient::new(InterceptedService::new(inner, interceptor))
         }
-
         /// Compress requests with the given encoding.
         ///
-        /// This requires the server to support it otherwise it might respond
-        /// with an error.
+        /// This requires the server to support it otherwise it might respond with an
+        /// error.
         #[must_use]
         pub fn send_compressed(mut self, encoding: CompressionEncoding) -> Self {
             self.inner = self.inner.send_compressed(encoding);
             self
         }
-
         /// Enable decompressing responses.
         #[must_use]
         pub fn accept_compressed(mut self, encoding: CompressionEncoding) -> Self {
             self.inner = self.inner.accept_compressed(encoding);
             self
         }
-
         /// Limits the maximum size of a decoded message.
         ///
         /// Default: `4MB`
@@ -5756,7 +5637,6 @@ pub mod queries_client {
             self.inner = self.inner.max_decoding_message_size(limit);
             self
         }
-
         /// Limits the maximum size of an encoded message.
         ///
         /// Default: `usize::MAX`
@@ -5765,9 +5645,8 @@ pub mod queries_client {
             self.inner = self.inner.max_encoding_message_size(limit);
             self
         }
-
-        /// Return a stream of blocks that arrive from the time the query is
-        /// made onward. This can be used to listen for incoming blocks.
+        /// Return a stream of blocks that arrive from the time the query is made onward.
+        /// This can be used to listen for incoming blocks.
         pub async fn get_blocks(
             &mut self,
             request: impl tonic::IntoRequest<super::Empty>,
@@ -5775,25 +5654,28 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::ArrivedBlockInfo>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetBlocks");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetBlocks",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetBlocks"));
             self.inner.server_streaming(req, path, codec).await
         }
-
-        /// Return a stream of blocks that are finalized from the time the query
-        /// is made onward. This can be used to listen for newly
-        /// finalized blocks. Note that there is no guarantee that
-        /// blocks will not be skipped if the client is too slow in
-        /// processing the stream, however blocks will always be sent by
+        /// Return a stream of blocks that are finalized from the time the query is
+        /// made onward. This can be used to listen for newly finalized blocks. Note
+        /// that there is no guarantee that blocks will not be skipped if the client is
+        /// too slow in processing the stream, however blocks will always be sent by
         /// increasing block height.
         pub async fn get_finalized_blocks(
             &mut self,
@@ -5802,45 +5684,48 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::FinalizedBlockInfo>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetFinalizedBlocks");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetFinalizedBlocks",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetFinalizedBlocks",
-            ));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("concordium.v2.Queries", "GetFinalizedBlocks"));
             self.inner.server_streaming(req, path, codec).await
         }
-
         /// Retrieve the information about the given account in the given block.
         pub async fn get_account_info(
             &mut self,
             request: impl tonic::IntoRequest<super::AccountInfoRequest>,
         ) -> std::result::Result<tonic::Response<super::AccountInfo>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetAccountInfo");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetAccountInfo",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetAccountInfo"));
             self.inner.unary(req, path, codec).await
         }
-
-        /// Retrieve the list of accounts that exist at the end of the given
-        /// block.
+        /// Retrieve the list of accounts that exist at the end of the given block.
         pub async fn get_account_list(
             &mut self,
             request: impl tonic::IntoRequest<super::BlockHashInput>,
@@ -5848,21 +5733,24 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::AccountAddress>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetAccountList");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetAccountList",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetAccountList"));
             self.inner.server_streaming(req, path, codec).await
         }
-
         /// Get a list of all smart contract modules. The stream will end
         /// when all modules that exist in the state at the end of the given
         /// block have been returned.
@@ -5873,24 +5761,27 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::ModuleRef>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetModuleList");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetModuleList",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetModuleList"));
             self.inner.server_streaming(req, path, codec).await
         }
-
         /// Get a stream of ancestors for the provided block.
-        /// Starting with the provided block itself, moving backwards until no
-        /// more ancestors or the requested number of ancestors has been
-        /// returned.
+        /// Starting with the provided block itself, moving backwards until no more
+        /// ancestors or the requested number of ancestors has been returned.
         pub async fn get_ancestors(
             &mut self,
             request: impl tonic::IntoRequest<super::AncestorsRequest>,
@@ -5898,44 +5789,53 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::BlockHash>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetAncestors");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetAncestors",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetAncestors"));
             self.inner.server_streaming(req, path, codec).await
         }
-
         /// Get the source of a smart contract module.
         pub async fn get_module_source(
             &mut self,
             request: impl tonic::IntoRequest<super::ModuleSourceRequest>,
-        ) -> std::result::Result<tonic::Response<super::VersionedModuleSource>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::VersionedModuleSource>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetModuleSource");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetModuleSource",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetModuleSource"));
             self.inner.unary(req, path, codec).await
         }
-
         /// Get a list of addresses for all smart contract instances. The stream
-        /// will end when all instances that exist in the state at the end of
-        /// the given block has been returned.
+        /// will end when all instances that exist in the state at the end of the
+        /// given block has been returned.
         pub async fn get_instance_list(
             &mut self,
             request: impl tonic::IntoRequest<super::BlockHashInput>,
@@ -5943,45 +5843,50 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::ContractAddress>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetInstanceList");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetInstanceList",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetInstanceList"));
             self.inner.server_streaming(req, path, codec).await
         }
-
-        /// Get info about a smart contract instance as it appears at the end of
-        /// the given block.
+        /// Get info about a smart contract instance as it appears at the end of the
+        /// given block.
         pub async fn get_instance_info(
             &mut self,
             request: impl tonic::IntoRequest<super::InstanceInfoRequest>,
         ) -> std::result::Result<tonic::Response<super::InstanceInfo>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetInstanceInfo");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetInstanceInfo",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetInstanceInfo"));
             self.inner.unary(req, path, codec).await
         }
-
-        /// Get the exact state of a specific contract instance, streamed as a
-        /// list of key-value pairs. The list is streamed in
-        /// lexicographic order of keys.
+        /// Get the exact state of a specific contract instance, streamed as a list of
+        /// key-value pairs. The list is streamed in lexicographic order of keys.
         pub async fn get_instance_state(
             &mut self,
             request: impl tonic::IntoRequest<super::InstanceInfoRequest>,
@@ -5989,161 +5894,189 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::InstanceStateKvPair>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetInstanceState");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetInstanceState",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetInstanceState"));
             self.inner.server_streaming(req, path, codec).await
         }
-
         /// Get the value at a specific key of a contract state. In contrast to
-        /// `GetInstanceState` this is more efficient, but requires the user to
-        /// know the specific key to look for.
+        /// `GetInstanceState` this is more efficient, but requires the user to know
+        /// the specific key to look for.
         pub async fn instance_state_lookup(
             &mut self,
             request: impl tonic::IntoRequest<super::InstanceStateLookupRequest>,
-        ) -> std::result::Result<tonic::Response<super::InstanceStateValueAtKey>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::InstanceStateValueAtKey>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/InstanceStateLookup");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/InstanceStateLookup",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "InstanceStateLookup",
-            ));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("concordium.v2.Queries", "InstanceStateLookup"));
             self.inner.unary(req, path, codec).await
         }
-
-        /// Get the best guess as to what the next account sequence number
-        /// should be. If all account transactions are finalized then
-        /// this information is reliable. Otherwise this is the best
-        /// guess, assuming all other transactions will be committed to
-        /// blocks and eventually finalized.
+        /// Get the best guess as to what the next account sequence number should be.
+        /// If all account transactions are finalized then this information is reliable.
+        /// Otherwise this is the best guess, assuming all other transactions will be
+        /// committed to blocks and eventually finalized.
         pub async fn get_next_account_sequence_number(
             &mut self,
             request: impl tonic::IntoRequest<super::AccountAddress>,
-        ) -> std::result::Result<tonic::Response<super::NextAccountSequenceNumber>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::NextAccountSequenceNumber>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/concordium.v2.Queries/GetNextAccountSequenceNumber",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetNextAccountSequenceNumber",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "concordium.v2.Queries",
+                        "GetNextAccountSequenceNumber",
+                    ),
+                );
             self.inner.unary(req, path, codec).await
         }
-
         /// Get information about the current state of consensus.
         pub async fn get_consensus_info(
             &mut self,
             request: impl tonic::IntoRequest<super::Empty>,
         ) -> std::result::Result<tonic::Response<super::ConsensusInfo>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetConsensusInfo");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetConsensusInfo",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetConsensusInfo"));
             self.inner.unary(req, path, codec).await
         }
-
-        /// Get the status of and information about a specific block item
-        /// (transaction).
+        /// Get the status of and information about a specific block item (transaction).
         pub async fn get_block_item_status(
             &mut self,
             request: impl tonic::IntoRequest<super::TransactionHash>,
-        ) -> std::result::Result<tonic::Response<super::BlockItemStatus>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::BlockItemStatus>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetBlockItemStatus");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetBlockItemStatus",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetBlockItemStatus",
-            ));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("concordium.v2.Queries", "GetBlockItemStatus"));
             self.inner.unary(req, path, codec).await
         }
-
         /// Get the cryptographic parameters in a given block.
         pub async fn get_cryptographic_parameters(
             &mut self,
             request: impl tonic::IntoRequest<super::BlockHashInput>,
-        ) -> std::result::Result<tonic::Response<super::CryptographicParameters>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::CryptographicParameters>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/concordium.v2.Queries/GetCryptographicParameters",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetCryptographicParameters",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "concordium.v2.Queries",
+                        "GetCryptographicParameters",
+                    ),
+                );
             self.inner.unary(req, path, codec).await
         }
-
-        /// Get information, such as height, timings, and transaction counts for
-        /// the given block.
+        /// Get information, such as height, timings, and transaction counts for the given block.
         pub async fn get_block_info(
             &mut self,
             request: impl tonic::IntoRequest<super::BlockHashInput>,
         ) -> std::result::Result<tonic::Response<super::BlockInfo>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetBlockInfo");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetBlockInfo",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetBlockInfo"));
             self.inner.unary(req, path, codec).await
         }
-
         /// Get all the bakers at the end of the given block.
         pub async fn get_baker_list(
             &mut self,
@@ -6152,137 +6085,159 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::BakerId>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetBakerList");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetBakerList",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetBakerList"));
             self.inner.server_streaming(req, path, codec).await
         }
-
         /// Get information about a given pool at the end of a given block.
         pub async fn get_pool_info(
             &mut self,
             request: impl tonic::IntoRequest<super::PoolInfoRequest>,
-        ) -> std::result::Result<tonic::Response<super::PoolInfoResponse>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::PoolInfoResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetPoolInfo");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetPoolInfo",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetPoolInfo"));
             self.inner.unary(req, path, codec).await
         }
-
-        /// Get information about the passive delegators at the end of a given
-        /// block.
+        /// Get information about the passive delegators at the end of a given block.
         pub async fn get_passive_delegation_info(
             &mut self,
             request: impl tonic::IntoRequest<super::BlockHashInput>,
-        ) -> std::result::Result<tonic::Response<super::PassiveDelegationInfo>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::PassiveDelegationInfo>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/concordium.v2.Queries/GetPassiveDelegationInfo",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetPassiveDelegationInfo",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("concordium.v2.Queries", "GetPassiveDelegationInfo"),
+                );
             self.inner.unary(req, path, codec).await
         }
-
         /// Get a list of live blocks at a given height.
         pub async fn get_blocks_at_height(
             &mut self,
             request: impl tonic::IntoRequest<super::BlocksAtHeightRequest>,
-        ) -> std::result::Result<tonic::Response<super::BlocksAtHeightResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::BlocksAtHeightResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetBlocksAtHeight");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetBlocksAtHeight",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetBlocksAtHeight",
-            ));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("concordium.v2.Queries", "GetBlocksAtHeight"));
             self.inner.unary(req, path, codec).await
         }
-
         /// Get information about tokenomics at the end of a given block.
         pub async fn get_tokenomics_info(
             &mut self,
             request: impl tonic::IntoRequest<super::BlockHashInput>,
         ) -> std::result::Result<tonic::Response<super::TokenomicsInfo>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetTokenomicsInfo");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetTokenomicsInfo",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetTokenomicsInfo",
-            ));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("concordium.v2.Queries", "GetTokenomicsInfo"));
             self.inner.unary(req, path, codec).await
         }
-
-        /// Run the smart contract entrypoint in a given context and in the
-        /// state at the end of the given block.
+        /// Run the smart contract entrypoint in a given context and in the state at
+        /// the end of the given block.
         pub async fn invoke_instance(
             &mut self,
             request: impl tonic::IntoRequest<super::InvokeInstanceRequest>,
-        ) -> std::result::Result<tonic::Response<super::InvokeInstanceResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::InvokeInstanceResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/InvokeInstance");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/InvokeInstance",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "InvokeInstance"));
             self.inner.unary(req, path, codec).await
         }
-
-        /// Get the registered delegators of a given pool at the end of a given
-        /// block. In contrast to the `GetPoolDelegatorsRewardPeriod`
-        /// which returns delegators that are fixed for the reward
-        /// period of the block, this endpoint returns the
-        /// list of delegators that are registered in the block. Any changes to
-        /// delegators are immediately visible in this list.
+        /// Get the registered delegators of a given pool at the end of a given block.
+        /// In contrast to the `GetPoolDelegatorsRewardPeriod` which returns delegators
+        /// that are fixed for the reward period of the block, this endpoint returns the
+        /// list of delegators that are registered in the block. Any changes to delegators
+        /// are immediately visible in this list.
         /// The stream will end when all the delegators has been returned.
         pub async fn get_pool_delegators(
             &mut self,
@@ -6291,27 +6246,27 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::DelegatorInfo>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetPoolDelegators");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetPoolDelegators",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetPoolDelegators",
-            ));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("concordium.v2.Queries", "GetPoolDelegators"));
             self.inner.server_streaming(req, path, codec).await
         }
-
-        /// Get the fixed delegators of a given pool for the reward period of
-        /// the given block. In contracts to the `GetPoolDelegators`
-        /// which returns delegators registered for the given block,
-        /// this endpoint returns the fixed delegators contributing
+        /// Get the fixed delegators of a given pool for the reward period of the given block.
+        /// In contracts to the `GetPoolDelegators` which returns delegators registered
+        /// for the given block, this endpoint returns the fixed delegators contributing
         /// stake in the reward period containing the given block.
         /// The stream will end when all the delegators has been returned.
         pub async fn get_pool_delegators_reward_period(
@@ -6321,29 +6276,33 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::DelegatorRewardPeriodInfo>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/concordium.v2.Queries/GetPoolDelegatorsRewardPeriod",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetPoolDelegatorsRewardPeriod",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "concordium.v2.Queries",
+                        "GetPoolDelegatorsRewardPeriod",
+                    ),
+                );
             self.inner.server_streaming(req, path, codec).await
         }
-
         /// Get the registered passive delegators at the end of a given block.
-        /// In contrast to the `GetPassiveDelegatorsRewardPeriod` which returns
-        /// delegators that are fixed for the reward period of the
-        /// block, this endpoint returns the list of delegators that are
-        /// registered in the block. Any changes to delegators
+        /// In contrast to the `GetPassiveDelegatorsRewardPeriod` which returns delegators
+        /// that are fixed for the reward period of the block, this endpoint returns the
+        /// list of delegators that are registered in the block. Any changes to delegators
         /// are immediately visible in this list.
         /// The stream will end when all the delegators has been returned.
         pub async fn get_passive_delegators(
@@ -6353,27 +6312,29 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::DelegatorInfo>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetPassiveDelegators");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetPassiveDelegators",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetPassiveDelegators",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("concordium.v2.Queries", "GetPassiveDelegators"),
+                );
             self.inner.server_streaming(req, path, codec).await
         }
-
-        /// Get the fixed passive delegators for the reward period of the given
-        /// block. In contracts to the `GetPassiveDelegators` which
-        /// returns delegators registered for the given block, this
-        /// endpoint returns the fixed delegators contributing
+        /// Get the fixed passive delegators for the reward period of the given block.
+        /// In contracts to the `GetPassiveDelegators` which returns delegators registered
+        /// for the given block, this endpoint returns the fixed delegators contributing
         /// stake in the reward period containing the given block.
         /// The stream will end when all the delegators has been returned.
         pub async fn get_passive_delegators_reward_period(
@@ -6383,68 +6344,77 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::DelegatorRewardPeriodInfo>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/concordium.v2.Queries/GetPassiveDelegatorsRewardPeriod",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetPassiveDelegatorsRewardPeriod",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "concordium.v2.Queries",
+                        "GetPassiveDelegatorsRewardPeriod",
+                    ),
+                );
             self.inner.server_streaming(req, path, codec).await
         }
-
-        /// Get the current branches of blocks starting from and including the
-        /// last finalized block.
+        /// Get the current branches of blocks starting from and including the last finalized block.
         pub async fn get_branches(
             &mut self,
             request: impl tonic::IntoRequest<super::Empty>,
         ) -> std::result::Result<tonic::Response<super::Branch>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetBranches");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetBranches",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetBranches"));
             self.inner.unary(req, path, codec).await
         }
-
-        /// Get information related to the baker election for a particular
-        /// block.
+        /// Get information related to the baker election for a particular block.
         pub async fn get_election_info(
             &mut self,
             request: impl tonic::IntoRequest<super::BlockHashInput>,
         ) -> std::result::Result<tonic::Response<super::ElectionInfo>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetElectionInfo");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetElectionInfo",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetElectionInfo"));
             self.inner.unary(req, path, codec).await
         }
-
-        /// Get the identity providers registered as of the end of a given
-        /// block. The stream will end when all the identity providers
-        /// have been returned.
+        /// Get the identity providers registered as of the end of a given block.
+        /// The stream will end when all the identity providers have been returned.
         pub async fn get_identity_providers(
             &mut self,
             request: impl tonic::IntoRequest<super::BlockHashInput>,
@@ -6452,26 +6422,28 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::IpInfo>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetIdentityProviders");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetIdentityProviders",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetIdentityProviders",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("concordium.v2.Queries", "GetIdentityProviders"),
+                );
             self.inner.server_streaming(req, path, codec).await
         }
-
-        /// Get the anonymity revokers registered as of the end of a given
-        /// block. The stream will end when all the anonymity revokers
-        /// have been returned.
+        /// Get the anonymity revokers registered as of the end of a given block.
+        /// The stream will end when all the anonymity revokers have been returned.
         pub async fn get_anonymity_revokers(
             &mut self,
             request: impl tonic::IntoRequest<super::BlockHashInput>,
@@ -6479,28 +6451,30 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::ArInfo>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetAnonymityRevokers");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetAnonymityRevokers",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetAnonymityRevokers",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("concordium.v2.Queries", "GetAnonymityRevokers"),
+                );
             self.inner.server_streaming(req, path, codec).await
         }
-
-        /// Get a list of non-finalized transaction hashes for a given account.
-        /// This endpoint is not expected to return a large amount of
-        /// data in most cases, but in bad network condtions it might.
-        /// The stream will end when all the non-finalized transaction
-        /// hashes have been returned.
+        /// Get a list of non-finalized transaction hashes for a given account. This
+        /// endpoint is not expected to return a large amount of data in most cases,
+        /// but in bad network condtions it might. The stream will end when all the
+        /// non-finalized transaction hashes have been returned.
         pub async fn get_account_non_finalized_transactions(
             &mut self,
             request: impl tonic::IntoRequest<super::AccountAddress>,
@@ -6508,27 +6482,31 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::TransactionHash>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/concordium.v2.Queries/GetAccountNonFinalizedTransactions",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetAccountNonFinalizedTransactions",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "concordium.v2.Queries",
+                        "GetAccountNonFinalizedTransactions",
+                    ),
+                );
             self.inner.server_streaming(req, path, codec).await
         }
-
         /// Get a list of transaction events in a given block.
-        /// The stream will end when all the transaction events for a given
-        /// block have been returned.
+        /// The stream will end when all the transaction events for a given block have been returned.
         pub async fn get_block_transaction_events(
             &mut self,
             request: impl tonic::IntoRequest<super::BlockHashInput>,
@@ -6536,29 +6514,30 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::BlockItemSummary>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/concordium.v2.Queries/GetBlockTransactionEvents",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetBlockTransactionEvents",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("concordium.v2.Queries", "GetBlockTransactionEvents"),
+                );
             self.inner.server_streaming(req, path, codec).await
         }
-
-        /// Get a list of special events in a given block. These are events
-        /// generated by the protocol, such as minting and reward
-        /// payouts. They are not directly generated by any transaction.
-        /// The stream will end when all the special events for a given
-        /// block have been returned.
+        /// Get a list of special events in a given block. These are events generated
+        /// by the protocol, such as minting and reward payouts. They are not directly
+        /// generated by any transaction. The stream will end when all the special
+        /// events for a given block have been returned.
         pub async fn get_block_special_events(
             &mut self,
             request: impl tonic::IntoRequest<super::BlockHashInput>,
@@ -6566,27 +6545,28 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::BlockSpecialEvent>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/concordium.v2.Queries/GetBlockSpecialEvents",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetBlockSpecialEvents",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("concordium.v2.Queries", "GetBlockSpecialEvents"),
+                );
             self.inner.server_streaming(req, path, codec).await
         }
-
-        /// Get the pending updates to chain parameters at the end of a given
-        /// block. The stream will end when all the pending updates for
-        /// a given block have been returned.
+        /// Get the pending updates to chain parameters at the end of a given block.
+        /// The stream will end when all the pending updates for a given block have been returned.
         pub async fn get_block_pending_updates(
             &mut self,
             request: impl tonic::IntoRequest<super::BlockHashInput>,
@@ -6594,111 +6574,119 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::PendingUpdate>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/concordium.v2.Queries/GetBlockPendingUpdates",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetBlockPendingUpdates",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("concordium.v2.Queries", "GetBlockPendingUpdates"),
+                );
             self.inner.server_streaming(req, path, codec).await
         }
-
-        /// Get next available sequence numbers for updating chain parameters
-        /// after a given block.
+        /// Get next available sequence numbers for updating chain parameters after a given block.
         pub async fn get_next_update_sequence_numbers(
             &mut self,
             request: impl tonic::IntoRequest<super::BlockHashInput>,
-        ) -> std::result::Result<tonic::Response<super::NextUpdateSequenceNumbers>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::NextUpdateSequenceNumbers>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/concordium.v2.Queries/GetNextUpdateSequenceNumbers",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetNextUpdateSequenceNumbers",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "concordium.v2.Queries",
+                        "GetNextUpdateSequenceNumbers",
+                    ),
+                );
             self.inner.unary(req, path, codec).await
         }
-
-        /// Get the projected earliest time at which a particular baker will be
-        /// required to bake a block. If the current consensus version
-        /// is 0, this returns the status 'Unavailable', as the endpoint
+        /// Get the projected earliest time at which a particular baker will be required to bake a block.
+        /// If the current consensus version is 0, this returns the status 'Unavailable', as the endpoint
         /// is only supported by consensus version 1.
         ///
-        /// If the baker is not a baker for the current reward period, this
-        /// returns a timestamp at the start of the next reward period.
-        /// If the baker is a baker for the current reward period, the
-        /// earliest win time is projected from the current round forward,
-        /// assuming that each round after the last finalized round will
-        /// take the minimum block time. (If blocks take longer, or timeouts
-        /// occur, the actual time may be later, and the reported time in
-        /// subsequent queries may reflect this.) At the end of an epoch
-        /// (or if the baker is not projected to bake before the end of the
-        /// epoch) the earliest win time for a (current) baker will be projected
-        /// as the start of the next epoch. This is because the seed for
-        /// the leader election is updated at the epoch boundary, and so
-        /// the winners cannot be predicted beyond that. Note that in some
-        /// circumstances the returned timestamp can be in the past,
-        /// especially at the end of an epoch.
+        /// If the baker is not a baker for the current reward period, this returns a timestamp at the
+        /// start of the next reward period. If the baker is a baker for the current reward period, the
+        /// earliest win time is projected from the current round forward, assuming that each round after
+        /// the last finalized round will take the minimum block time. (If blocks take longer, or timeouts
+        /// occur, the actual time may be later, and the reported time in subsequent queries may reflect
+        /// this.) At the end of an epoch (or if the baker is not projected to bake before the end of the
+        /// epoch) the earliest win time for a (current) baker will be projected as the start of the next
+        /// epoch. This is because the seed for the leader election is updated at the epoch boundary, and
+        /// so the winners cannot be predicted beyond that. Note that in some circumstances the returned
+        /// timestamp can be in the past, especially at the end of an epoch.
         pub async fn get_baker_earliest_win_time(
             &mut self,
             request: impl tonic::IntoRequest<super::BakerId>,
         ) -> std::result::Result<tonic::Response<super::Timestamp>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/concordium.v2.Queries/GetBakerEarliestWinTime",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetBakerEarliestWinTime",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("concordium.v2.Queries", "GetBakerEarliestWinTime"),
+                );
             self.inner.unary(req, path, codec).await
         }
-
         /// Shut down the node.
         /// Return a GRPC error if the shutdown failed.
         pub async fn shutdown(
             &mut self,
             request: impl tonic::IntoRequest<super::Empty>,
         ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/Shutdown");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/Shutdown",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "Shutdown"));
             self.inner.unary(req, path, codec).await
         }
-
         /// Suggest to a peer to connect to the submitted peer details.
         /// This, if successful, adds the peer to the list of given addresses.
         /// Otherwise return a GRPC error.
@@ -6709,102 +6697,120 @@ pub mod queries_client {
             &mut self,
             request: impl tonic::IntoRequest<super::IpSocketAddress>,
         ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/PeerConnect");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/PeerConnect",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "PeerConnect"));
             self.inner.unary(req, path, codec).await
         }
-
-        /// Disconnect from the peer and remove them from the given addresses
-        /// list if they are on it. Return if the request was processed
-        /// successfully. Otherwise return a GRPC error.
+        /// Disconnect from the peer and remove them from the given addresses list
+        /// if they are on it. Return if the request was processed successfully.
+        /// Otherwise return a GRPC error.
         pub async fn peer_disconnect(
             &mut self,
             request: impl tonic::IntoRequest<super::IpSocketAddress>,
         ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/PeerDisconnect");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/PeerDisconnect",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "PeerDisconnect"));
             self.inner.unary(req, path, codec).await
         }
-
         /// Get a list of banned peers.
         pub async fn get_banned_peers(
             &mut self,
             request: impl tonic::IntoRequest<super::Empty>,
         ) -> std::result::Result<tonic::Response<super::BannedPeers>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetBannedPeers");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetBannedPeers",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetBannedPeers"));
             self.inner.unary(req, path, codec).await
         }
-
         /// Ban the given peer.
         /// Returns a GRPC error if the action failed.
         pub async fn ban_peer(
             &mut self,
             request: impl tonic::IntoRequest<super::PeerToBan>,
         ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/BanPeer");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/BanPeer",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "BanPeer"));
             self.inner.unary(req, path, codec).await
         }
-
         /// Unban the banned peer.
         /// Returns a GRPC error if the action failed.
         pub async fn unban_peer(
             &mut self,
             request: impl tonic::IntoRequest<super::BannedPeer>,
         ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/UnbanPeer");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/UnbanPeer",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "UnbanPeer"));
             self.inner.unary(req, path, codec).await
         }
-
         /// Start dumping packages into the specified file.
         /// Only enabled if the node was built with the `network_dump` feature.
         /// Returns a GRPC error if the network dump failed to start.
@@ -6812,20 +6818,24 @@ pub mod queries_client {
             &mut self,
             request: impl tonic::IntoRequest<super::DumpRequest>,
         ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/DumpStart");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/DumpStart",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "DumpStart"));
             self.inner.unary(req, path, codec).await
         }
-
         /// Stop dumping packages.
         /// Only enabled if the node was built with the `network_dump` feature.
         /// Returns a GRPC error if the network dump failed to be stopped.
@@ -6833,72 +6843,81 @@ pub mod queries_client {
             &mut self,
             request: impl tonic::IntoRequest<super::Empty>,
         ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/DumpStop");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/DumpStop",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "DumpStop"));
             self.inner.unary(req, path, codec).await
         }
-
         /// / Get a list of the peers that the node is connected to
         /// / and assoicated network related information for each peer.
         pub async fn get_peers_info(
             &mut self,
             request: impl tonic::IntoRequest<super::Empty>,
         ) -> std::result::Result<tonic::Response<super::PeersInfo>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetPeersInfo");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetPeersInfo",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetPeersInfo"));
             self.inner.unary(req, path, codec).await
         }
-
         /// Get information about the node.
         /// The `NodeInfo` includes information of
-        /// * Meta information such as the, version of the node, type of the
-        ///   node, uptime and the local time of the node.
-        /// * NetworkInfo which yields data such as the node id, packets
-        ///   sent/received, average bytes per second sent/received.
-        /// * ConsensusInfo. The `ConsensusInfo` returned depends on if the node
-        ///   supports the protocol on chain and whether the node is configured
-        ///   as a baker or not.
+        /// * Meta information such as the, version of the node, type of the node, uptime and the local time of the node.
+        /// * NetworkInfo which yields data such as the node id, packets sent/received,
+        ///   average bytes per second sent/received.
+        /// * ConsensusInfo. The `ConsensusInfo` returned depends on if the node supports
+        ///   the protocol on chain and whether the node is configured as a baker or not.
         pub async fn get_node_info(
             &mut self,
             request: impl tonic::IntoRequest<super::Empty>,
         ) -> std::result::Result<tonic::Response<super::NodeInfo>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetNodeInfo");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetNodeInfo",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetNodeInfo"));
             self.inner.unary(req, path, codec).await
         }
-
-        /// Send a block item. A block item is either an `AccountTransaction`,
-        /// which is a transaction signed and paid for by an account, a
-        /// `CredentialDeployment`, which creates a new account, or
-        /// `UpdateInstruction`, which is an instruction to change some
-        /// parameters of the chain. Update instructions can
+        /// Send a block item. A block item is either an `AccountTransaction`, which is
+        /// a transaction signed and paid for by an account, a `CredentialDeployment`,
+        /// which creates a new account, or `UpdateInstruction`, which is an
+        /// instruction to change some parameters of the chain. Update instructions can
         /// only be sent by the governance committee.
         ///
         /// Returns a hash of the block item, which can be used with
@@ -6906,100 +6925,124 @@ pub mod queries_client {
         pub async fn send_block_item(
             &mut self,
             request: impl tonic::IntoRequest<super::SendBlockItemRequest>,
-        ) -> std::result::Result<tonic::Response<super::TransactionHash>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::TransactionHash>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/SendBlockItem");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/SendBlockItem",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "SendBlockItem"));
             self.inner.unary(req, path, codec).await
         }
-
-        /// Get the hash to be signed for an account transaction. The hash
-        /// returned should be signed and the signatures included as an
-        /// AccountTransactionSignature when calling `SendBlockItem`. This is
-        /// provided as a convenience to support cases where the right
-        /// SDK is not available for interacting with the node. If an
-        /// SDK is available then it is strongly recommended to compute
-        /// this hash off-line using it. That reduces the trust
-        /// in the node, removes networking failure modes, and will perform
-        /// better.
+        /// Get the hash to be signed for an account transaction. The hash returned
+        /// should be signed and the signatures included as an
+        /// AccountTransactionSignature when calling `SendBlockItem`. This is provided as
+        /// a convenience to support cases where the right SDK is not available for
+        /// interacting with the node. If an SDK is available then it is strongly
+        /// recommended to compute this hash off-line using it. That reduces the trust
+        /// in the node, removes networking failure modes, and will perform better.
         pub async fn get_account_transaction_sign_hash(
             &mut self,
             request: impl tonic::IntoRequest<super::PreAccountTransaction>,
-        ) -> std::result::Result<tonic::Response<super::AccountTransactionSignHash>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::AccountTransactionSignHash>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/concordium.v2.Queries/GetAccountTransactionSignHash",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetAccountTransactionSignHash",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "concordium.v2.Queries",
+                        "GetAccountTransactionSignHash",
+                    ),
+                );
             self.inner.unary(req, path, codec).await
         }
-
         /// Get the values of chain parameters in effect in the given block.
         pub async fn get_block_chain_parameters(
             &mut self,
             request: impl tonic::IntoRequest<super::BlockHashInput>,
-        ) -> std::result::Result<tonic::Response<super::ChainParameters>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::ChainParameters>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/concordium.v2.Queries/GetBlockChainParameters",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetBlockChainParameters",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("concordium.v2.Queries", "GetBlockChainParameters"),
+                );
             self.inner.unary(req, path, codec).await
         }
-
         /// Get the summary of the finalization data in a given block.
         pub async fn get_block_finalization_summary(
             &mut self,
             request: impl tonic::IntoRequest<super::BlockHashInput>,
-        ) -> std::result::Result<tonic::Response<super::BlockFinalizationSummary>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::BlockFinalizationSummary>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/concordium.v2.Queries/GetBlockFinalizationSummary",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetBlockFinalizationSummary",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "concordium.v2.Queries",
+                        "GetBlockFinalizationSummary",
+                    ),
+                );
             self.inner.unary(req, path, codec).await
         }
-
         /// Get the items of a block.
         pub async fn get_block_items(
             &mut self,
@@ -7008,24 +7051,27 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::BlockItem>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetBlockItems");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetBlockItems",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetBlockItems"));
             self.inner.server_streaming(req, path, codec).await
         }
-
         /// Get all bakers in the reward period of a block.
         /// This endpoint is only supported for protocol version 6 and onwards.
-        /// If the protocol does not support the endpoint then an
-        /// 'IllegalArgument' error is returned.
+        /// If the protocol does not support the endpoint then an  'IllegalArgument' error is returned.
         pub async fn get_bakers_reward_period(
             &mut self,
             request: impl tonic::IntoRequest<super::BlockHashInput>,
@@ -7033,69 +7079,72 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::BakerRewardPeriodInfo>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/concordium.v2.Queries/GetBakersRewardPeriod",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetBakersRewardPeriod",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("concordium.v2.Queries", "GetBakersRewardPeriod"),
+                );
             self.inner.server_streaming(req, path, codec).await
         }
-
-        /// For a non-genesis block, this returns the quorum certificate, a
-        /// timeout certificate (if present) and epoch finalization
-        /// entry (if present). Note that, if the block being pointed to
-        /// is not a product of ConcordiumBFT, then the response will be
-        /// a grpc error (invalid argument). If the endpoint is not
-        /// enabled by the node, then an 'unimplemented' error
+        /// For a non-genesis block, this returns the quorum certificate, a timeout
+        /// certificate (if present) and epoch finalization entry (if present).
+        /// Note that, if the block being pointed to is not a product of ConcordiumBFT,
+        /// then the response will be a grpc error (invalid argument).
+        /// If the endpoint is not enabled by the node, then an 'unimplemented' error
         /// will be returned.
         pub async fn get_block_certificates(
             &mut self,
             request: impl tonic::IntoRequest<super::BlockHashInput>,
-        ) -> std::result::Result<tonic::Response<super::BlockCertificates>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::BlockCertificates>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetBlockCertificates");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetBlockCertificates",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetBlockCertificates",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("concordium.v2.Queries", "GetBlockCertificates"),
+                );
             self.inner.unary(req, path, codec).await
         }
-
-        /// Get the list of bakers that won the lottery in a particular
-        /// historical epoch (i.e. the last finalized block is in a
-        /// later epoch). This lists the winners for each round in the
-        /// epoch, starting from the round after the last block in the previous
-        /// epoch, running to the round before the first block in the
-        /// next epoch. It also indicates if a block in each
+        /// Get the list of bakers that won the lottery in a particular historical epoch (i.e. the
+        /// last finalized block is in a later epoch). This lists the winners for each round in the
+        /// epoch, starting from the round after the last block in the previous epoch, running to
+        /// the round before the first block in the next epoch. It also indicates if a block in each
         /// round was included in the finalized chain.
         ///
         /// The following error cases are possible:
         ///  * `NOT_FOUND` if the query specifies an unknown block.
-        ///  * `UNAVAILABLE` if the query is for an epoch that is not finalized
-        ///    in the current genesis
+        ///  * `UNAVAILABLE` if the query is for an epoch that is not finalized in the current genesis
         /// /    index, or is for a future genesis index.
-        ///  * `INVALID_ARGUMENT` if the query is for an epoch that is not
-        ///    finalized for a past genesis index.
-        ///  * `INVALID_ARGUMENT` if the query is for a genesis index at
-        ///    consensus version 0.
+        ///  * `INVALID_ARGUMENT` if the query is for an epoch that is not finalized for a past genesis
+        ///    index.
+        ///  * `INVALID_ARGUMENT` if the query is for a genesis index at consensus version 0.
         ///  * `INVALID_ARGUMENT` if the input `EpochRequest` is malformed.
         ///  * `UNIMPLEMENTED` if the endpoint is disabled on the node.
         pub async fn get_winning_bakers_epoch(
@@ -7105,90 +7154,85 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::WinningBaker>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/concordium.v2.Queries/GetWinningBakersEpoch",
             );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetWinningBakersEpoch",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("concordium.v2.Queries", "GetWinningBakersEpoch"),
+                );
             self.inner.server_streaming(req, path, codec).await
         }
-
-        /// Get the block hash of the first finalized block in a specified
-        /// epoch.
+        /// Get the block hash of the first finalized block in a specified epoch.
         ///
         /// The following error cases are possible:
         ///  * `NOT_FOUND` if the query specifies an unknown block.
-        ///  * `UNAVAILABLE` if the query is for an epoch that is not finalized
-        ///    in the current genesis index, or is for a future genesis index.
-        ///  * `INVALID_ARGUMENT` if the query is for an epoch with no finalized
-        ///    blocks for a past genesis index.
+        ///  * `UNAVAILABLE` if the query is for an epoch that is not finalized in the current genesis
+        ///    index, or is for a future genesis index.
+        ///  * `INVALID_ARGUMENT` if the query is for an epoch with no finalized blocks for a past genesis
+        ///    index.
         ///  * `INVALID_ARGUMENT` if the input `EpochRequest` is malformed.
         ///  * `UNIMPLEMENTED` if the endpoint is disabled on the node.
         pub async fn get_first_block_epoch(
             &mut self,
             request: impl tonic::IntoRequest<super::EpochRequest>,
         ) -> std::result::Result<tonic::Response<super::BlockHash>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/concordium.v2.Queries/GetFirstBlockEpoch");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetFirstBlockEpoch",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "concordium.v2.Queries",
-                "GetFirstBlockEpoch",
-            ));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("concordium.v2.Queries", "GetFirstBlockEpoch"));
             self.inner.unary(req, path, codec).await
         }
-
-        /// Dry run a series of transactions and operations on a state derived
-        /// from a specified block. The server should send a single
-        /// `DryRunResponse` for each `DryRunRequest` received, unless
-        /// the call fails with an error status code. If a request produces a
-        /// `DryRunErrorResponse`, then the server will still process
-        /// subsequent requests, just as if the request causing the error
+        /// Dry run a series of transactions and operations on a state derived from a specified block.
+        /// The server should send a single `DryRunResponse` for each `DryRunRequest` received, unless
+        /// the call fails with an error status code. If a request produces a `DryRunErrorResponse`, then
+        /// the server will still process subsequent requests, just as if the request causing the error
         /// did not happen.
         ///
-        /// The first request should be `load_block_at_state` to determine the
-        /// block state that will be used for the dry run.
+        /// The first request should be `load_block_at_state` to determine the block state that will be
+        /// used for the dry run.
         ///
-        /// The server associates each request with an energy cost, and limits
-        /// the total energy that may be expended in a single invocation
-        /// of `DryRun`. This limit is reported as `quota` in the
-        /// initial metadata returned by the server. If executing an operation
-        /// exceeds the limit, the server terminates the session with
-        /// `RESOURCE_EXHAUSTED`.
+        /// The server associates each request with an energy cost, and limits the total energy that may
+        /// be expended in a single invocation of `DryRun`. This limit is reported as `quota` in the
+        /// initial metadata returned by the server. If executing an operation exceeds the limit,
+        /// the server terminates the session with `RESOURCE_EXHAUSTED`.
         ///
-        /// The server also imposes a timeout for a dry-run session to complete.
-        /// The server reports the timeout duration in milliseconds in
-        /// the initial metadata field `timeout`. If the session
-        /// is not completed before the timeout elapses, the server terminates
-        /// the session with `DEADLINE_EXCEEDED`.
+        /// The server also imposes a timeout for a dry-run session to complete. The server reports
+        /// the timeout duration in milliseconds in the initial metadata field `timeout`. If the session
+        /// is not completed before the timeout elapses, the server terminates the session with
+        /// `DEADLINE_EXCEEDED`.
         ///
         /// The following error cases are possible:
         ///  * `INVALID_ARGUMENT` if any `DryRunRequest` is malformed.
         ///  * `RESOURCE_EXHAUSTED` if the energy quota is exceeded.
-        ///  * `DEADLINE_EXCEEDED` if the session does not complete before the
-        ///    server-imposed timeout.
-        ///  * `RESOURCE_EXHAUSTED` if the server is not currently accepting new
-        ///    `DryRun` sessions. (The server may impose a limit on the number
-        ///    of concurrent sessions.)
-        ///  * `INTERNAL` if an interal server error occurs. This should not
-        ///    happen, and likely indicates a bug.
+        ///  * `DEADLINE_EXCEEDED` if the session does not complete before the server-imposed timeout.
+        ///  * `RESOURCE_EXHAUSTED` if the server is not currently accepting new `DryRun` sessions.
+        ///    (The server may impose a limit on the number of concurrent sessions.)
+        ///  * `INTERNAL` if an interal server error occurs. This should not happen, and likely indicates
+        ///    a bug.
         ///  * `UNIMPLEMENTED` if the endpoint is disabled on the node.
         pub async fn dry_run(
             &mut self,
@@ -7197,14 +7241,19 @@ pub mod queries_client {
             tonic::Response<tonic::codec::Streaming<super::DryRunResponse>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/concordium.v2.Queries/DryRun");
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/DryRun",
+            );
             let mut req = request.into_streaming_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "DryRun"));
