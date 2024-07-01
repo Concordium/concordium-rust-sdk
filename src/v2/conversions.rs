@@ -972,6 +972,9 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
         // calculation of it changes in the future. It should be present if the node
         // uses protocol version 7 (or later). If the available balance is not present,
         // we calculate it manually instead.
+        // If we up the minimum supported node version to version 7, we can remove this
+        // fallback calculation and instead require the available balance field to
+        // always be present.
         let available_balance = available_balance.map(|ab| ab.into()).unwrap_or_else(|| {
             let active_stake = account_stake
                 .as_ref()
