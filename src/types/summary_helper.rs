@@ -462,11 +462,13 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                         },
                         Event::TransferMemo { memo },
                     ),
-                    super::AccountTransactionEffects::BakerAdded { data } => {
+                    super::AccountTransactionEffects::BakerAdded { data } =>
+                    {
                         #[allow(deprecated)]
                         mk_success_1(TransactionType::AddBaker, Event::BakerAdded { data })
                     }
-                    super::AccountTransactionEffects::BakerRemoved { baker_id } => {
+                    super::AccountTransactionEffects::BakerRemoved { baker_id } =>
+                    {
                         #[allow(deprecated)]
                         mk_success_1(TransactionType::RemoveBaker, Event::BakerRemoved {
                             baker_id,
@@ -512,7 +514,8 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                             restake_earnings,
                         },
                     ),
-                    super::AccountTransactionEffects::BakerKeysUpdated { data } => {
+                    super::AccountTransactionEffects::BakerKeysUpdated { data } =>
+                    {
                         #[allow(deprecated)]
                         mk_success_1(TransactionType::UpdateBakerKeys, Event::BakerKeysUpdated {
                             data,
@@ -538,7 +541,8 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                         Event::NewEncryptedAmount { data: added },
                         Event::TransferMemo { memo },
                     ),
-                    super::AccountTransactionEffects::TransferredToEncrypted { data } => {
+                    super::AccountTransactionEffects::TransferredToEncrypted { data } =>
+                    {
                         #[allow(deprecated)]
                         mk_success_1(
                             TransactionType::TransferToEncrypted,

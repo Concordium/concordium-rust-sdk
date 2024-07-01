@@ -13,7 +13,7 @@ use crate::{
 };
 use chrono::TimeZone;
 use concordium_base::{
-    base, common,
+    base,
     common::{Deserial, Versioned, VERSION_0},
     id::{
         constants::{ArCurve, AttributeKind, IpPairing},
@@ -973,10 +973,10 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
         // uses protocol version 7 (or later). If the available balance is not present,
         // we calculate it manually instead.
         let available_balance = available_balance.map(|ab| ab.into()).unwrap_or_else(|| {
-            let active_stake = account_stake.as_ref()
+            let active_stake = account_stake
+                .as_ref()
                 .map(|s| s.staked_amount())
-                // FIXME: Give common::types::Amount a `Default` impl and use .unwrap_or_default();
-                .unwrap_or(common::types::Amount::zero());
+                .unwrap_or_default();
 
             let inactive_stake = cooldowns.iter().map(|cd| cd.amount).sum();
 
