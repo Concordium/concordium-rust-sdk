@@ -47,8 +47,10 @@ use v2::{QueryError, RPCError};
 /// and parsing of responses when sending transactions, or invoking smart
 /// contracts.
 ///
-/// Note that cloning is cheap and is, therefore, the intended way of sharing
-/// values of this type between multiple tasks.
+/// Note that cloning of the `ContractClient` can get expensive with large
+/// schemas. If you don't rely on reject reason decoding of failed transactions,
+/// you can initialize the `ContractClient` without a schema and clone the
+/// `ContractClient` cheaply between multiple tasks.
 #[derive(Debug)]
 pub struct ContractClient<Type> {
     /// The underlying network client.
@@ -57,6 +59,7 @@ pub struct ContractClient<Type> {
     pub address:       ContractAddress,
     /// The name of the contract at the address.
     pub contract_name: Arc<contracts_common::OwnedContractName>,
+    /// The schema of the contract at the address.
     pub schema:        Arc<Option<VersionedModuleSchema>>,
     phantom:           PhantomData<Type>,
 }
@@ -674,32 +677,53 @@ impl ModuleDeployHandle {
     }
 }
 
-// TODO: comments
+/// The outcome of invoking (dry-running) a transaction to update a smart
+/// contract instance. The variants describe the two cases of successfully
+/// simulating the transaction and rejecting the transaction due to some
+/// reverts.
 pub enum InvokeContractOutcome {
-    ///
-    Success(InvokedTransaction),
-    ///
+    /// The simulation of the transaction was successful.
+    Success(SimulatedTransaction),
+    /// The transaction was rejected due to some reverts.
     Failure(RejectedTransaction),
 }
 
-/// An `InvokedTransaction` is an alias for the already `ContractUpdateBuilder`
-/// which . A builder to simplify sending smart contract updates.
-pub type InvokedTransaction = ContractUpdateBuilder;
+/// The `InvokedTransaction` type is an alias for the `ContractUpdateBuilder`
+/// type. This type is used when an invoke (dry-run) of a transaction succeeds.
+/// This type includes a convenient send method to send and execute the
+/// transaction on-chain in a subsequent action. As such, it is a builder to
+/// simplify sending smart contract updates.
+pub type SimulatedTransaction = ContractUpdateBuilder;
 
+/// This type is used when an invoke (dry-run) of a transaction gets rejected.
 pub struct RejectedTransaction {
-    ///
+    /// The return value of the transaction.
     pub return_value:   Option<ReturnValue>,
-    ///
+    /// The reject reason of the transaction.
     pub reason:         RejectReason,
-    ///
+    /// An optional human-readable decoded reason for the reject reason.
+    /// This is only available if the reject reason is a smart contract logical
+    /// revert and a valid error schema is available for decoding, or the
+    /// reject reason originates from the `concordium-std` crate.
     pub decoded_reason: Option<String>,
-    ///
+    /// The energy used by the transaction.
     pub used_energy:    Energy,
-    ///
+    /// The payload of the transaction.
     pub payload:        transactions::Payload,
 }
 
-/// Decodes the reject_reason into a human-readable error based on the error
+#[derive(Debug, thiserror::Error)]
+/// An error that may occur when decoding the reject reason of a transaction.
+pub enum RejectReasonDecodeError {
+    #[error("To JSON conversion failed with error: {0}")]
+    ToJsonError(#[from] ToJsonError),
+    #[error("No matching error variant in the error schema found for the given reject reason")]
+    NoMatchingErrorVariant,
+    #[error("The error variant in the error schema is missing for the given reject reason")]
+    MissingErrorVariant,
+}
+
+/// Decode the `reject_reason` into a human-readable error based on the error
 /// code definition in the `concordium-std` crate.
 pub fn decode_concordium_std_error(reject_reason: i32) -> Option<String> {
     match reject_reason {
@@ -733,7 +757,8 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<String> {
     }
 }
 
-///
+/// Extract the error schema for the given `receive_name` and `contract_name`
+/// from the provided `schema`.
 pub fn get_error_schema(
     schema: &VersionedModuleSchema,
     receive_name: OwnedReceiveName,
@@ -751,18 +776,7 @@ pub fn get_error_schema(
         .ok()
 }
 
-#[derive(Debug, thiserror::Error)]
-/// An error that may occur when decoding the reject reason of a transaction.
-pub enum RejectReasonDecodeError {
-    #[error("To JSON conversion failed with error: {0}")]
-    ToJsonError(#[from] ToJsonError),
-    #[error("No matching error variant in the error schema found for the given reject reason")]
-    NoMatchingErrorVariant(),
-    #[error("The error variant in the error schema is missing for the given reject reason")]
-    MissingErrorVariant,
-}
-
-/// Decodes the reason for the transaction failure and returns a human-readable
+/// Decode the smart contract logical revert reason and return a human-readable
 /// error string.
 ///
 /// If the error is NOT caused by a smart contract logical revert, the
@@ -772,14 +786,14 @@ pub enum RejectReasonDecodeError {
 /// transaction runs out of energy which is represented by the human-readable
 /// error variant "OutOfEnergy".
 ///
-/// If the error is caused by a smart contract logical revert coming from the
-/// `concordium-std` crate, this function decodes the error based on the error
-/// code definition in the `concordium-std` crate.
+/// Step 1: If the error is caused by a smart contract logical revert coming
+/// from the `concordium-std` crate, this function decodes the error based on
+/// the error code definition in the `concordium-std` crate.
 ///
-/// If the error is caused by a smart contract logical revert coming from the
-/// smart contract itself, this function uses the provided `error_schema` and
-/// `return_value` to decode the `reject_reason` into a human-readable error
-/// string.
+/// Step 2: If the error is caused by a smart contract logical revert coming
+/// from the smart contract itself, this function uses the provided
+/// `error_schema` and `return_value` to decode the `reject_reason` into a
+/// human-readable error string.
 ///
 /// Disclaimer: A smart contract can have logic to overwrite/change the meaning
 /// of the error codes as defined in the `concordium-std` crate. While it is not
@@ -789,7 +803,7 @@ pub enum RejectReasonDecodeError {
 /// overwritten with other meanings in the smart contract logic). No guarantee
 /// are given as such that the meaning of the decoded reject reason haven't been
 /// altered by the smart contract logic.
-pub async fn decode_reject_reason(
+pub async fn decode_smart_contract_revert(
     return_value: Option<ReturnValue>,
     reject_reason: RejectReason,
     schema: &Option<VersionedModuleSchema>,
@@ -823,14 +837,14 @@ pub async fn decode_reject_reason(
                             if let Some(key) = obj.keys().next() {
                                 return Ok(Some(key.to_string()));
                             }
-                            // This error can not happen if a valid error_schema is provided.
+                            // This error can not happen if a valid `error_schema` is provided.
                             return Err(RejectReasonDecodeError::MissingErrorVariant);
                         }
                         Ok(_) => {
-                            // This error can not happen if a valid error_schema is provided.
-                            return Err(RejectReasonDecodeError::NoMatchingErrorVariant());
+                            // This error can not happen if a valid `error_schema` is provided.
+                            return Err(RejectReasonDecodeError::NoMatchingErrorVariant);
                         }
-                        // This error can not happen if a valid error_schema is provided.
+                        // This error can not happen if a valid `error_schema` is provided.
                         Err(e) => {
                             return Err(e.into());
                         }
@@ -857,9 +871,7 @@ impl<Type> ContractClient<Type> {
     ///
     /// * `client` - The RPC client for the concordium node.
     /// * `address` - The contract address of the smart contract instance.
-    pub async fn create<E>(mut client: Client, address: ContractAddress) -> Result<Self, E>
-    where
-        E: From<anyhow::Error> + From<v2::QueryError>, {
+    pub async fn create(mut client: Client, address: ContractAddress) -> v2::QueryResult<Self> {
         // Get the smart contract instance info.
         let contract_instance_info = client
             .get_instance_info(address, BlockIdentifier::LastFinal)
@@ -877,8 +889,8 @@ impl<Type> ContractClient<Type> {
 
         // Get the schema associated to the contract instance.
         let schema = match wasm_module.version {
-            WasmVersion::V0 => utils::get_embedded_schema_v0(wasm_module.source.as_ref())?,
-            WasmVersion::V1 => utils::get_embedded_schema_v1(wasm_module.source.as_ref())?,
+            WasmVersion::V0 => utils::get_embedded_schema_v0(wasm_module.source.as_ref()).ok(),
+            WasmVersion::V1 => utils::get_embedded_schema_v1(wasm_module.source.as_ref()).ok(),
         };
 
         Ok(Self {
@@ -886,7 +898,7 @@ impl<Type> ContractClient<Type> {
             address,
             contract_name: Arc::new(contract_name),
             phantom: PhantomData,
-            schema: Arc::new(Some(schema)),
+            schema: Arc::new(schema),
         })
     }
 
@@ -902,8 +914,8 @@ impl<Type> ContractClient<Type> {
     /// * `address` - The contract address of the smart contract.
     /// * `contract_name` - The name of the contract. This must match the name
     ///   on the chain, otherwise the constructed client will not work.
-    /// * `schema` - The versioned module schema of the contract to be used to
-    ///   decode the error codes in rejected transactions.
+    /// * `schema` - An optional versioned module schema of the contract. If
+    ///   present it is used to decode the error codes in rejected transactions.
     pub fn new(
         client: Client,
         address: ContractAddress,
@@ -1031,9 +1043,9 @@ impl<Type> ContractClient<Type> {
     /// Dry run an update. In comparison to
     /// [`dry_run_update`](Self::dry_run_update) this function does not throw an
     /// error when the transaction reverts and instead tries to decode the
-    /// reject reason. If the dry run succeeds the return value is an object
-    /// that has a send method to send the transaction that was simulated during
-    /// the dry run.
+    /// reject reason into a human-readable error. If the dry run succeeds the
+    /// return value is an object that has a send method to send the
+    /// transaction that was simulated during the dry run.
     ///
     /// The arguments are
     /// - `entrypoint` the name of the entrypoint to be invoked. Note that this
@@ -1144,7 +1156,7 @@ impl<Type> ContractClient<Type> {
                 used_energy,
                 return_value,
                 events,
-            } => Ok(InvokeContractOutcome::Success(InvokedTransaction::new(
+            } => Ok(InvokeContractOutcome::Success(SimulatedTransaction::new(
                 self.client.clone(),
                 sender,
                 used_energy,
@@ -1159,7 +1171,7 @@ impl<Type> ContractClient<Type> {
                 return_value,
                 used_energy,
             } => {
-                let decoded_reason = decode_reject_reason(
+                let decoded_reason = decode_smart_contract_revert(
                     return_value.clone(),
                     reason.clone(),
                     &self.schema,
