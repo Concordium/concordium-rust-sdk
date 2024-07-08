@@ -18,13 +18,13 @@ use crate::{
         BlockIdentifier, Client,
     },
 };
-use anyhow::{anyhow, Result};
 use concordium_base::{
     base::{Energy, Nonce},
     common::types::{self, TransactionTime},
     contracts_common::{
         self,
         schema::{Type, VersionedModuleSchema},
+        schema_json::ToJsonError,
         AccountAddress, Address, Amount, ContractAddress, Cursor, NewContractNameError,
         NewReceiveNameError,
     },
@@ -751,6 +751,17 @@ pub fn get_error_schema(
         .ok()
 }
 
+#[derive(Debug, thiserror::Error)]
+/// An error that may occur when decoding the reject reason of a transaction.
+pub enum RejectReasonDecodeError {
+    #[error("To JSON conversion failed with error: {0}")]
+    ToJsonError(#[from] ToJsonError),
+    #[error("No matching error variant in the error schema found for the given reject reason")]
+    NoMatchingErrorVariant(),
+    #[error("The error variant in the error schema is missing for the given reject reason")]
+    MissingErrorVariant,
+}
+
 /// Decodes the reason for the transaction failure and returns a human-readable
 /// error string.
 ///
@@ -766,24 +777,25 @@ pub fn get_error_schema(
 /// code definition in the `concordium-std` crate.
 ///
 /// If the error is caused by a smart contract logical revert coming from the
-/// smart contract itself, this function uses the embedded `error_schema` to
-/// decode the `reject_reason` into a human-readable error string.
+/// smart contract itself, this function uses the provided `error_schema` and
+/// `return_value` to decode the `reject_reason` into a human-readable error
+/// string.
 ///
 /// Disclaimer: A smart contract can have logic to overwrite/change the meaning
-/// of the error codes as defined in the concordium-std crate. While it is not
-/// advised to overwrite these error codes and is rather unusual to do so, it's
-/// important to note that this function decodes the error codes based on the
-/// definitions in the concordium-std crate (assuming they have not been
+/// of the error codes as defined in the `concordium-std` crate. While it is not
+/// advised to overwrite these error codes and is rather unusual to do so, this
+/// function decodes the error codes based on the
+/// definitions in the `concordium-std` crate (assuming they have not been
 /// overwritten with other meanings in the smart contract logic). No guarantee
 /// are given as such that the meaning of the decoded reject reason haven't been
 /// altered by the smart contract logic.
 pub async fn decode_reject_reason(
-    return_value: ReturnValue,
+    return_value: Option<ReturnValue>,
     reject_reason: RejectReason,
-    schema: &VersionedModuleSchema,
+    schema: &Option<VersionedModuleSchema>,
     receive_name: OwnedReceiveName,
     contract_name: &OwnedContractName,
-) -> anyhow::Result<Option<String>> {
+) -> Result<Option<String>, RejectReasonDecodeError> {
     match reject_reason {
         RejectReason::RejectedReceive {
             reject_reason: reject_reason_code,
@@ -797,35 +809,37 @@ pub async fn decode_reject_reason(
                 return Ok(Some(decoded_error));
             }
 
-            // Step 2: Try to decode the `reject_reason` using the `error_schema`.
-            if let Some(error_schema) = get_error_schema(schema, receive_name, contract_name) {
-                let mut cursor = Cursor::new(return_value.value);
+            // Step 2: Try to decode the `reject_reason` using the `error_schema` and the
+            // `return_value`.
+            if let Some(schema) = schema {
+                if let (Some(error_schema), Some(return_value)) = (
+                    get_error_schema(schema, receive_name, contract_name),
+                    return_value,
+                ) {
+                    let mut cursor = Cursor::new(return_value.value);
 
-                match error_schema.to_json(&mut cursor) {
-                    Ok(serde_json::Value::Object(obj)) => {
-                        if let Some(key) = obj.keys().next() {
-                            return Ok(Some(key.to_string()));
+                    match error_schema.to_json(&mut cursor) {
+                        Ok(serde_json::Value::Object(obj)) => {
+                            if let Some(key) = obj.keys().next() {
+                                return Ok(Some(key.to_string()));
+                            }
+                            // This error can not happen if a valid error_schema is provided.
+                            return Err(RejectReasonDecodeError::MissingErrorVariant);
+                        }
+                        Ok(_) => {
+                            // This error can not happen if a valid error_schema is provided.
+                            return Err(RejectReasonDecodeError::NoMatchingErrorVariant());
                         }
                         // This error can not happen if a valid error_schema is provided.
-                        return Err(anyhow!(
-                            "No matching error variant in the error schema found for the given \
-                             reject reason. Exactly one error variant is expected."
-                        ));
-                    }
-                    Ok(_) => {
-                        // This error can not happen if a valid error_schema is provided.
-                        return Err(anyhow!(
-                            "No matching error variant found in the error schema for the given \
-                             reject reason."
-                        ));
-                    }
-                    Err(e) => {
-                        return Err(e.into());
+                        Err(e) => {
+                            return Err(e.into());
+                        }
                     }
                 }
             }
 
-            // If no error schema is provided, the `reject_reason` can not be decoded.
+            // If no `error_schema` and/or `return_value` is provided, the `reject_reason`
+            // can not be decoded.
             Ok(None)
         }
         // If the error is NOT caused by a smart contract logical revert, the
@@ -1027,103 +1041,22 @@ impl<Type> ContractClient<Type> {
     /// - `amount` the amount of CCD to send to the contract instance
     /// - `sender` the account that will be sending the transaction
     /// - `message` the parameter to the smart contract entrypoint.
-    pub async fn dry_run_update_with_reject_reason_info<P: contracts_common::Serial>(
+    pub async fn dry_run_update_with_reject_reason_info<P: contracts_common::Serial, E>(
         &mut self,
         entrypoint: &str,
         amount: Amount,
         sender: AccountAddress,
         message: &P,
-    ) -> anyhow::Result<InvokeContractOutcome>
-// Result<InvokeContractOutcome, E>
-    // where
-    //     E: From<NewReceiveNameError>
-    //         + From<RejectReason>
-    //         + From<v2::QueryError>
-    //         + From<ExceedsParameterSize>,
-    {
+    ) -> Result<InvokeContractOutcome, E>
+    where
+        E: From<RejectReasonDecodeError>
+            + From<NewReceiveNameError>
+            + From<RejectReason>
+            + From<v2::QueryError>
+            + From<ExceedsParameterSize>, {
         let message = OwnedParameter::from_serial(message)?;
         self.dry_run_update_raw_with_reject_reason_info(entrypoint, amount, sender, message)
             .await
-    }
-
-    /// Like [`dry_run_update_with_reject_reason_info`](Self::dry_run_update_with_reject_reason_info) but expects an already
-    /// formed parameter.
-    pub async fn dry_run_update_raw_with_reject_reason_info(
-        &mut self,
-        entrypoint: &str,
-        amount: Amount,
-        sender: AccountAddress,
-        message: OwnedParameter,
-    ) -> anyhow::Result<InvokeContractOutcome>
-// Result<InvokeContractOutcome, E>
-    // where
-    //     E: From<NewReceiveNameError> + From<RejectReason> + From<v2::QueryError>,
-    {
-        let contract_name = self.contract_name.as_contract_name().contract_name();
-        let receive_name = OwnedReceiveName::try_from(format!("{contract_name}.{entrypoint}"))?;
-
-        let payload = UpdateContractPayload {
-            amount,
-            address: self.address,
-            receive_name: receive_name.clone(),
-            message,
-        };
-
-        let context = ContractContext::new_from_payload(sender, None, payload.clone());
-
-        let invoke_result = self
-            .client
-            .invoke_instance(BlockIdentifier::LastFinal, &context)
-            .await?
-            .response;
-
-        match invoke_result {
-            InvokeContractResult::Success {
-                used_energy,
-                return_value,
-                events,
-            } => Ok(InvokeContractOutcome::Success(InvokedTransaction::new(
-                self.client.clone(),
-                sender,
-                used_energy,
-                transactions::Payload::Update { payload },
-                ContractUpdateInner {
-                    return_value,
-                    events,
-                },
-            ))),
-            InvokeContractResult::Failure {
-                reason,
-                return_value,
-                used_energy,
-            } => {
-                // If `return_value` and `schema` are present, decode the reject reason.
-                let decoded_reason = match return_value.clone() {
-                    Some(return_value) => match &*self.schema {
-                        Some(schema) => {
-                            decode_reject_reason(
-                                return_value,
-                                reason.clone(),
-                                schema,
-                                receive_name,
-                                &self.contract_name,
-                            )
-                            .await?
-                        }
-                        None => None,
-                    },
-                    None => None,
-                };
-
-                Ok(InvokeContractOutcome::Failure(RejectedTransaction {
-                    payload: transactions::Payload::Update { payload },
-                    return_value,
-                    used_energy,
-                    reason,
-                    decoded_reason,
-                }))
-            }
-        }
     }
 
     /// Like [`dry_run_update`](Self::dry_run_update) but expects an already
@@ -1171,6 +1104,78 @@ impl<Type> ContractClient<Type> {
                 },
             )),
             InvokeContractResult::Failure { reason, .. } => Err(reason.into()),
+        }
+    }
+
+    /// Like [`dry_run_update_with_reject_reason_info`](Self::dry_run_update_with_reject_reason_info) but expects an already
+    /// formed parameter.
+    pub async fn dry_run_update_raw_with_reject_reason_info<E>(
+        &mut self,
+        entrypoint: &str,
+        amount: Amount,
+        sender: AccountAddress,
+        message: OwnedParameter,
+    ) -> Result<InvokeContractOutcome, E>
+    where
+        E: From<RejectReasonDecodeError>
+            + From<NewReceiveNameError>
+            + From<RejectReason>
+            + From<v2::QueryError>, {
+        let contract_name = self.contract_name.as_contract_name().contract_name();
+        let receive_name = OwnedReceiveName::try_from(format!("{contract_name}.{entrypoint}"))?;
+
+        let payload = UpdateContractPayload {
+            amount,
+            address: self.address,
+            receive_name: receive_name.clone(),
+            message,
+        };
+
+        let context = ContractContext::new_from_payload(sender, None, payload.clone());
+
+        let invoke_result = self
+            .client
+            .invoke_instance(BlockIdentifier::LastFinal, &context)
+            .await?
+            .response;
+
+        match invoke_result {
+            InvokeContractResult::Success {
+                used_energy,
+                return_value,
+                events,
+            } => Ok(InvokeContractOutcome::Success(InvokedTransaction::new(
+                self.client.clone(),
+                sender,
+                used_energy,
+                transactions::Payload::Update { payload },
+                ContractUpdateInner {
+                    return_value,
+                    events,
+                },
+            ))),
+            InvokeContractResult::Failure {
+                reason,
+                return_value,
+                used_energy,
+            } => {
+                let decoded_reason = decode_reject_reason(
+                    return_value.clone(),
+                    reason.clone(),
+                    &self.schema,
+                    receive_name,
+                    &self.contract_name,
+                )
+                .await?;
+
+                Ok(InvokeContractOutcome::Failure(RejectedTransaction {
+                    payload: transactions::Payload::Update { payload },
+                    return_value,
+                    used_energy,
+                    reason,
+                    decoded_reason,
+                }))
+            }
         }
     }
 
