@@ -4,6 +4,7 @@ use crate::{
     cis4::{Cis4Contract, Cis4QueryError},
     v2::{self, BlockIdentifier, IntoBlockIdentifier},
 };
+use anyhow::Error;
 pub use concordium_base::web3id::*;
 use concordium_base::{
     base::CredentialRegistrationID,
@@ -36,6 +37,8 @@ pub enum CredentialLookupError {
     InitialCredential { cred_id: CredentialRegistrationID },
     #[error("Unexpected response from the node: {0}")]
     InvalidResponse(String),
+    #[error("An error occurred: {0}")]
+    AnyhowError(#[from] Error),
 }
 
 /// The public cryptographic data of a credential together with its current
@@ -124,7 +127,8 @@ pub async fn verify_credential_metadata(
             }
         }
         CredentialMetadata::Web3Id { contract, holder } => {
-            let mut contract_client = Cis4Contract::create(client, contract).await?;
+            let mut contract_client =
+                Cis4Contract::create::<CredentialLookupError>(client, contract).await?;
             let issuer_pk = contract_client.issuer(bi).await?;
 
             let inputs = CredentialsInputs::Web3 { issuer_pk };
