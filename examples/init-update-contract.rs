@@ -126,7 +126,8 @@ async fn main() -> anyhow::Result<()> {
         }
         Action::Update { weather, address } => {
             let mut contract_client =
-                ContractClient::<WeatherContractMarker>::create(client, address).await?;
+                ContractClient::<WeatherContractMarker>::create::<anyhow::Error>(client, address)
+                    .await?;
             let builder = contract_client
                 .dry_run_update::<_, ViewError>("set", Amount::zero(), account.address, &weather)
                 .await?;
