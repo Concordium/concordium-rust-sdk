@@ -759,7 +759,7 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<String> {
 
 /// Extract the error schema for the given `receive_name` and `contract_name`
 /// from the provided `schema`.
-pub fn get_error_schema(
+fn get_error_schema(
     schema: &VersionedModuleSchema,
     receive_name: OwnedReceiveName,
     contract_name: &OwnedContractName,
