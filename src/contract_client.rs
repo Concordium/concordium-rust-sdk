@@ -803,7 +803,7 @@ fn get_error_schema(
 /// overwritten with other meanings in the smart contract logic). No guarantee
 /// are given as such that the meaning of the decoded reject reason haven't been
 /// altered by the smart contract logic.
-pub async fn decode_smart_contract_revert(
+pub fn decode_smart_contract_revert(
     return_value: Option<ReturnValue>,
     reject_reason: RejectReason,
     schema: &Option<VersionedModuleSchema>,
@@ -1177,8 +1177,7 @@ impl<Type> ContractClient<Type> {
                     &self.schema,
                     receive_name,
                     &self.contract_name,
-                )
-                .await?;
+                )?;
 
                 Ok(InvokeContractOutcome::Failure(RejectedTransaction {
                     payload: transactions::Payload::Update { payload },
