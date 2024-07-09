@@ -295,8 +295,7 @@ impl<Type> ContractInitHandle<Type> {
         match result.details {
             crate::types::BlockItemSummaryDetails::AccountTransaction(at) => match at.effects {
                 AccountTransactionEffects::ContractInitialized { data } => {
-                    let contract_client =
-                        ContractClient::new(self.client, data.address, data.init_name);
+                    let contract_client = ContractClient::create(self.client, data.address).await?;
                     Ok((contract_client, data.events))
                 }
                 AccountTransactionEffects::None {
@@ -780,7 +779,7 @@ pub enum ConcordiumStdRejectReason {
 /// Decode the `reject_reason` into a human-readable error based on the error
 /// code definition in the `concordium-std` crate.
 pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRejectReason> {
-    if reject_reason <= -2147483622 && reject_reason >= -2147483648 {
+    if (-2147483648..=-2147483622).contains(&reject_reason) {
         let reason: ConcordiumStdRejectReason = unsafe { ::std::mem::transmute(reject_reason) };
         Some(reason)
     } else {
@@ -798,14 +797,14 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 /// transaction runs out of energy which is represented by the human-readable
 /// error variant "OutOfEnergy".
 ///
-/// Step 1: If the error is caused by a smart contract logical revert coming
+/// Step 1: If the error matches a smart contract logical revert code coming
+/// from the `concordium-std` crate, this function decodes the error based on
+/// the error code definition in the `concordium-std` crate.
+///
+/// Step 2: If the error is caused by a smart contract logical revert coming
 /// from the smart contract itself, this function uses the provided
 /// `error_schema` and `return_value` to decode the `reject_reason` into a
 /// human-readable error string.
-///
-/// Step 2: If the error matches a smart contract logical revert code coming
-/// from the `concordium-std` crate, this function decodes the error based on
-/// the error code definition in the `concordium-std` crate.
 ///
 /// Disclaimer: A smart contract can have logic to overwrite/change the meaning
 /// of the error codes as defined in the `concordium-std` crate. While it is not
@@ -829,50 +828,50 @@ pub fn decode_smart_contract_revert(
         } => {
             let receive_name = receive_name.as_receive_name();
 
-            // Step 1: Try to decode the `reject_reason` using the `error_schema` and the
-            // `return_value`.
-            if let Some(schema) = schema {
-                if let (Some(error_schema), Some(return_value)) = (
-                    schema
-                        .get_receive_error_schema(
-                            receive_name.contract_name(),
-                            receive_name.entrypoint_name().into(),
-                        )
-                        .ok(),
-                    return_value,
-                ) {
-                    let mut cursor = Cursor::new(return_value.value.clone());
-
-                    match error_schema.to_json(&mut cursor) {
-                        Ok(serde_json::Value::Object(obj)) => {
-                            if let Some(key) = obj.keys().next() {
-                                return Ok(Some(key.to_string()));
-                            }
-                            // This error can not happen if a valid `error_schema` is provided.
-                            return Err(RejectReasonDecodeError::MissingErrorVariant);
-                        }
-                        Ok(_) => {
-                            // This error can not happen if a valid `error_schema` is provided.
-                            return Err(RejectReasonDecodeError::NoMatchingErrorVariant);
-                        }
-                        // This error can not happen if a valid `error_schema` is provided.
-                        Err(e) => {
-                            return Err(e.into());
-                        }
-                    }
-                }
-            }
-
-            // Step 2: Try to decode the `reject_reason` using the `concordium-std`
+            // Step 1: Try to decode the `reject_reason` using the `concordium-std`
             // error codes.
             if let Some(decoded_error) = decode_concordium_std_error(*reject_reason_code) {
                 return Ok(Some(decoded_error.to_string()));
             }
 
-            // If no `error_schema` and/or `return_value` is provided, and the error code
-            // does not originate from the `concordium-std` crate, the
-            // `reject_reason` can not be decoded.
-            Ok(None)
+            // Step 2: Try to decode the `reject_reason` using the `error_schema` and the
+            // `return_value`.
+            let Some(schema) = schema else {
+                // If no `schema` is provided, the
+                // `reject_reason` can not be decoded further.
+                return Ok(None)
+             };
+
+            let (Some(error_schema), Some(return_value)) = (
+                schema
+                .get_receive_error_schema(
+                    receive_name.contract_name(),
+                    receive_name.entrypoint_name().into(),
+                )
+                .ok(), return_value,
+            ) else {
+                // If no `error_schema` and/or `return_value` is provided, the
+                // `reject_reason` can not be decoded further.
+                return Ok(None)
+            };
+
+            let mut cursor = Cursor::new(return_value.value.clone());
+
+            match error_schema.to_json(&mut cursor) {
+                Ok(serde_json::Value::Object(obj)) => {
+                    if let Some(key) = obj.keys().next() {
+                        return Ok(Some(key.to_string()));
+                    }
+                    // This error can not happen if a valid `error_schema` is provided.
+                    Err(RejectReasonDecodeError::MissingErrorVariant)
+                }
+                Ok(_) => {
+                    // This error can not happen if a valid `error_schema` is provided.
+                    Err(RejectReasonDecodeError::NoMatchingErrorVariant)
+                }
+                // This error can not happen if a valid `error_schema` is provided.
+                Err(e) => Err(e.into()),
+            }
         }
         // If the error is NOT caused by a smart contract logical revert, the
         // `reject_reason` is already a human-readable error. No
@@ -1105,7 +1104,6 @@ impl<Type> ContractClient<Type> {
     where
         E: From<RejectReasonDecodeError>
             + From<NewReceiveNameError>
-            + From<RejectReason>
             + From<v2::QueryError>
             + From<ExceedsParameterSize>, {
         let message = OwnedParameter::from_serial(message)?;
@@ -1171,10 +1169,7 @@ impl<Type> ContractClient<Type> {
         message: OwnedParameter,
     ) -> Result<InvokeContractOutcome, E>
     where
-        E: From<RejectReasonDecodeError>
-            + From<NewReceiveNameError>
-            + From<RejectReason>
-            + From<v2::QueryError>, {
+        E: From<RejectReasonDecodeError> + From<NewReceiveNameError> + From<v2::QueryError>, {
         let contract_name = self.contract_name.as_contract_name().contract_name();
         let receive_name = OwnedReceiveName::try_from(format!("{contract_name}.{entrypoint}"))?;
 
