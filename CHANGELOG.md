@@ -1,7 +1,8 @@
 ## Unreleased changes
 
-- Update the `ContractClient` to optionally include a schema. Cloning of the `ContractClient` can get expensive with large schemas as a result.
+- Update the `ContractClient` to optionally include a schema.
 - Update the `create` method to the `ContractClient` to look up the embedded schema from the chain.
+- Add the `new_with_schema` method to the `ContractClient` to create a `ContractClient` with a given schema.
 - Add `dry_run_update_with_reject_reason_info` and `dry_run_update_raw_with_reject_reason_info` methods to the `ContractClient`. They are like the `dry_run_update` and `dry_run_update_raw` methods but in case of a reject, decode the reject reason into a human-readable error.
 - Add `decode_concordium_std_error` and `decode_smart_contract_revert` functions to facilitate reject reason decoding of failed transactions.
 - Add `cis3` module and `Cis3Contract` for interacting with CIS3 contracts.
