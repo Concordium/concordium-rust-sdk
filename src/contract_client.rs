@@ -22,8 +22,8 @@ use concordium_base::{
     base::{Energy, Nonce},
     common::types::{self, TransactionTime},
     contracts_common::{
-        self, schema::VersionedModuleSchema, schema_json::ToJsonError, AccountAddress, Address,
-        Amount, ContractAddress, Cursor, NewContractNameError, NewReceiveNameError,
+        self, schema::VersionedModuleSchema, AccountAddress, Address, Amount, ContractAddress,
+        Cursor, NewContractNameError, NewReceiveNameError,
     },
     hashes::TransactionHash,
     smart_contracts::{
@@ -37,7 +37,8 @@ use concordium_base::{
 };
 pub use concordium_base::{cis2_types::MetadataUrl, cis4_types::*};
 use concordium_smart_contract_engine::utils;
-use std::{marker::PhantomData, sync::Arc};
+use serde_json::{json, Value};
+use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 use v2::{QueryError, RPCError};
 
 /// A contract client that handles some of the boilerplate such as serialization
@@ -690,6 +691,7 @@ pub enum InvokeContractOutcome {
 pub type SimulatedTransaction = ContractUpdateBuilder;
 
 /// This type is used when an invoke (dry-run) of a transaction gets rejected.
+#[derive(Debug, Clone)]
 pub struct RejectedTransaction {
     /// The return value of the transaction.
     pub return_value:   Option<ReturnValue>,
@@ -699,25 +701,14 @@ pub struct RejectedTransaction {
     /// This is only available if the reject reason is a smart contract logical
     /// revert and a valid error schema is available for decoding, or the
     /// reject reason originates from the `concordium-std` crate.
-    pub decoded_reason: Option<String>,
+    pub decoded_reason: Option<Value>,
     /// The energy used by the transaction.
     pub used_energy:    Energy,
     /// The payload of the transaction.
     pub payload:        transactions::Payload,
 }
 
-#[derive(Debug, thiserror::Error)]
-/// An error that may occur when decoding the reject reason of a transaction.
-pub enum RejectReasonDecodeError {
-    #[error("To JSON conversion failed with error: {0}")]
-    ToJsonError(#[from] ToJsonError),
-    #[error("No matching error variant in the error schema found for the given reject reason")]
-    NoMatchingErrorVariant,
-    #[error("The error variant in the error schema is missing for the given reject reason")]
-    MissingErrorVariant,
-}
-
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, serde::Serialize, serde::Deserialize)]
 #[repr(i32)]
 pub enum ConcordiumStdRejectReason {
     #[error("[Unspecified (Default reject)]")]
@@ -818,7 +809,7 @@ pub fn decode_smart_contract_revert(
     return_value: Option<&ReturnValue>,
     reject_reason: &RejectReason,
     schema: Option<&VersionedModuleSchema>,
-) -> Result<Option<String>, RejectReasonDecodeError> {
+) -> Option<Value> {
     match reject_reason {
         RejectReason::RejectedReceive {
             reject_reason: reject_reason_code,
@@ -831,16 +822,19 @@ pub fn decode_smart_contract_revert(
             // Step 1: Try to decode the `reject_reason` using the `concordium-std`
             // error codes.
             if let Some(decoded_error) = decode_concordium_std_error(*reject_reason_code) {
-                return Ok(Some(decoded_error.to_string()));
+                // Convert the `decoded_error` into the same format as errors decoded
+                // with the error schema from smart contracts.
+                let mut error_schema_format: HashMap<String, Value> = HashMap::new();
+                error_schema_format.insert(decoded_error.to_string(), Value::Array(vec![]));
+                return Some(json!(error_schema_format));
             }
 
             // Step 2: Try to decode the `reject_reason` using the `error_schema` and the
             // `return_value`.
-            let Some(schema) = schema else {
-                // If no `schema` is provided, the
-                // `reject_reason` can not be decoded further.
-                return Ok(None)
-             };
+
+            // If no `schema` is provided, the
+            // `reject_reason` can not be decoded further.
+            let schema = schema?;
 
             let (Some(error_schema), Some(return_value)) = (
                 schema
@@ -852,32 +846,17 @@ pub fn decode_smart_contract_revert(
             ) else {
                 // If no `error_schema` and/or `return_value` is provided, the
                 // `reject_reason` can not be decoded further.
-                return Ok(None)
+                return None
             };
 
             let mut cursor = Cursor::new(return_value.value.clone());
-
-            match error_schema.to_json(&mut cursor) {
-                Ok(serde_json::Value::Object(obj)) => {
-                    if let Some(key) = obj.keys().next() {
-                        return Ok(Some(key.to_string()));
-                    }
-                    // This error can not happen if a valid `error_schema` is provided.
-                    Err(RejectReasonDecodeError::MissingErrorVariant)
-                }
-                Ok(_) => {
-                    // This error can not happen if a valid `error_schema` is provided.
-                    Err(RejectReasonDecodeError::NoMatchingErrorVariant)
-                }
-                // This error can not happen if a valid `error_schema` is provided.
-                Err(e) => Err(e.into()),
-            }
+            error_schema.to_json(&mut cursor).ok()
         }
         // If the error is NOT caused by a smart contract logical revert, the
         // `reject_reason` is already a human-readable error. No
         // further decoding of the error is needed. An example of
         // such a transaction is the error variant "OutOfEnergy".
-        _ => Ok(None),
+        _ => None,
     }
 }
 
@@ -1102,10 +1081,7 @@ impl<Type> ContractClient<Type> {
         message: &P,
     ) -> Result<InvokeContractOutcome, E>
     where
-        E: From<RejectReasonDecodeError>
-            + From<NewReceiveNameError>
-            + From<v2::QueryError>
-            + From<ExceedsParameterSize>, {
+        E: From<NewReceiveNameError> + From<v2::QueryError> + From<ExceedsParameterSize>, {
         let message = OwnedParameter::from_serial(message)?;
         self.dry_run_update_raw_with_reject_reason_info(entrypoint, amount, sender, message)
             .await
@@ -1169,7 +1145,7 @@ impl<Type> ContractClient<Type> {
         message: OwnedParameter,
     ) -> Result<InvokeContractOutcome, E>
     where
-        E: From<RejectReasonDecodeError> + From<NewReceiveNameError> + From<v2::QueryError>, {
+        E: From<NewReceiveNameError> + From<v2::QueryError>, {
         let contract_name = self.contract_name.as_contract_name().contract_name();
         let receive_name = OwnedReceiveName::try_from(format!("{contract_name}.{entrypoint}"))?;
 
@@ -1212,7 +1188,7 @@ impl<Type> ContractClient<Type> {
                     return_value.as_ref(),
                     &reason,
                     (*self.schema).as_ref(),
-                )?;
+                );
 
                 Ok(InvokeContractOutcome::Failure(RejectedTransaction {
                     payload: transactions::Payload::Update { payload },
