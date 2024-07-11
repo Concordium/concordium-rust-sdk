@@ -701,6 +701,11 @@ pub struct RejectedTransaction {
     /// This is only available if the reject reason is a smart contract logical
     /// revert and a valid error schema is available for decoding, or the
     /// reject reason originates from the `concordium-std` crate.
+    /// The JSON value format of such errors is for example:
+    /// Object {\"Unauthorized\": Array []} or
+    /// Object {\"Custom\": Array [Object {\"Unauthorized\": Array []}]} (e.g.
+    /// the cis2_library error)
+    /// ...
     pub decoded_reason: Option<Value>,
     /// The energy used by the transaction.
     pub used_energy:    Energy,
@@ -712,11 +717,11 @@ pub struct RejectedTransaction {
 #[repr(i32)]
 pub enum ConcordiumStdRejectReason {
     #[error("[Unspecified (Default reject)]")]
-    Unspecified          = -2147483648,
+    Unspecified          = -2147483648, // i32::MIN
     #[error("[Error ()]")]
-    Unit                 = -2147483647,
+    Unit                 = -2147483647, // i32::MIN + 1
     #[error("[ParseError]")]
-    Parse                = -2147483646,
+    Parse                = -2147483646, // ...
     #[error("[LogError::Full]")]
     LogFull              = -2147483645,
     #[error("[LogError::Malformed]")]
@@ -779,7 +784,7 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 }
 
 /// Decode the smart contract logical revert reason and return a human-readable
-/// error string.
+/// error.
 ///
 /// If the error is NOT caused by a smart contract logical revert, the
 /// `reject_reason` is already a human-readable error. No further decoding of
@@ -795,16 +800,198 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 /// Step 2: If the error is caused by a smart contract logical revert coming
 /// from the smart contract itself, this function uses the provided
 /// `error_schema` and `return_value` to decode the `reject_reason` into a
-/// human-readable error string.
+/// human-readable error.
 ///
-/// Disclaimer: A smart contract can have logic to overwrite/change the meaning
-/// of the error codes as defined in the `concordium-std` crate. While it is not
-/// advised to overwrite these error codes and is rather unusual to do so, this
-/// function decodes the error codes based on the
+/// `Return_values` vs. `error_codes` in rejected transactions:
+/// Historically, Concordium had smart contracts V0 which had no `retun_value`.
+/// Error codes (negative values used commonly in computer science to represent
+/// errors) were chosen as a method to report the reject reason. Smart
+/// contracts could only revert using one "[Unspecified (Default reject)]" error
+/// and the error code (i32::MIN) was used to represent this error. This
+/// "[Unspecified (Default reject)]" error definition still exists in the
+/// `concordium-std` crate.
+///
+/// `Return_values` were introduced in smart contract V1 and smart contracts
+/// were fitted with features to revert with different reasons (as defined in
+/// the smart contract logic). The `return_value` is used to distinguish between
+/// the different reasons for the revert coming from the smart contract logic.
+///
+/// There are some older types used by the node (such as `RejectReason`) that
+/// only include the `error_code` but not the `return_value`. The reason can be
+/// explained by the historical development of smart contracts in Concordium to
+/// avoid breaking changes as well as to keep the size of the nodes as small as
+/// possible since the `return_value` does not need to be saved by the nodes for
+/// achieving consensus.
+///
+/// As a result, this decoding function needs both the `return_value` and the
+/// `error_code` to decode the `reject_reason` into a human-readable error.
+///
+/// How is the `return_value` and `error_code` assigned in rejected
+/// transactions:
+/// - If the transaction reverts due to an error in the `concordium-std` crate,
+/// the `return_value` is None and the `error_code` is assigned as defined in
+/// the `concordium-std` crate.
+/// - If the transaction reverts due to an error in the smart contract logic:
+/// A smart contract V1 needs to implement a conversion to `Reject` for its
+/// smart contract errors.
+/// `<https://docs.rs/concordium-std/latest/concordium_std/struct.Reject.html>`
+///
+/// 1. Example: Deriving `Reject` in the smart contract.
+/// The simplest way to implement `Reject` in the smart contract is by deriving
+/// it.
+///
+/// ```ignore
+/// /// The custom errors the contract can produce.
+/// #[derive(Serialize, Debug, Reject, SchemaType)]
+/// pub enum CustomContractError {
+///     /// CustomError1 defined in smart contract logic.
+///     CustomError1, // return_value: 00; error_code: -1
+///     /// CustomError2 defined in smart contract logic.
+///     CustomError2, // return_value: 01; error_code: -2
+/// }
+/// ```
+///
+/// The `Reject` macro assigns the `error_codes` starting from `-1` to the enum
+/// variants and assigns the `return_values` by serializing the enum variants.
+/// The `return_values` are equivalent to the enum tags in the above example.
+///
+/// The JSON value returned by this function for the above `CustomError1` is:
+/// ```json
+/// {\"CustomError1\/": Array []}
+/// ```
+///
+/// 2. Example: Deriving `Reject` in the smart contract with nested errors.
+/// Nested errors are often used to inherit the errors from a smart
+/// contract library such as the cis2-library.
+/// `<https://github.com/Concordium/concordium-rust-smart-contracts/blob/dde42fa62254a55b46a4c9c52c32bbe661127001/concordium-cis2/src/lib.rs#L1093>`
+///
+/// Library:
+/// ```ignore
+/// /// The custom errors the library can produce.
+/// #[derive(Serialize, Debug, Reject, SchemaType)]
+/// pub enum Cis2Error<R> {
+///     /// CustomErrorLibrary1 defined in smart contract logic.
+///     CustomErrorLibrary1, // return_value: 00; error_code: -1
+///     /// Nested error variant.
+///     Custom(R),
+///     // return_value: 0100; error_code: -1
+///     // return_value: 0101; error_code: -2
+///     // return_value: 0102; error_code: -3
+///     // ...
+///     /// CustomErrorLibrary2 defined in smart contract logic.
+///     CustomErrorLibrary2, // return_value: 02; error_code: -3
+/// }
+/// ```
+///
+/// Smart contract:
+/// ```ignore
+/// /// The different errors the contract can produce.
+/// #[derive(Serialize, Debug, PartialEq, Eq, Reject, SchemaType)]
+/// pub enum CustomContractError {
+///     /// CustomError1 defined in smart contract logic.
+///     CustomError1, // return_value: 0100; error_code: -1
+///     /// CustomError2 defined in smart contract logic.
+///     CustomError2, // return_value: 0101; error_code: -2
+///     /// CustomError3 defined in smart contract logic.
+///     CustomError3, // return_value: 0102; error_code: -2
+/// }
+///
+/// /// Mapping CustomContractError to ContractError
+/// impl From<CustomContractError> for ContractError {
+///     fn from(c: CustomContractError) -> Self { Cis2Error::Custom(c) }
+/// }
+///
+/// pub type ContractError = Cis2Error<CustomContractError>;
+///
+/// pub type ContractResult<A> = Result<A, ContractError>;
+/// ```
+///
+/// The `Reject` macro assigns the `error_codes` starting from `-1` to the enum
+/// variants and assigns the `return_values` by serializing the enum variants
+/// starting with the topmost enum. The `return_values` are equivalent to the
+/// enum tags of all enums in the nested chain.
+///
+/// The JSON value returned by this function for the above `CustomError1` is:
+/// ```json
+/// {\"Custom\/": Array [Object {\"CustomError1\/": Array []}]}
+/// ```
+///
+/// 3. Example: `Reject::default()`.
+/// The historical `Reject::default()` can be used by implementing the
+/// conversion to `Reject` manually.
+///
+/// ```ignore
+/// /// The custom errors the contract can produce.
+/// #[derive(Serialize, Debug, SchemaType)]
+/// pub enum CustomContractError {
+///     /// CustomError1 defined in smart contract logic.
+///     CustomError1, // return_value: None; error_code: -2147483648 (i32::MIN)
+/// }
+///
+/// impl From<CustomContractError> for Reject {
+///     fn from(error: CustomContractError) -> Self {
+///         match error {
+///             _ => Reject::default(),
+///         }
+///     }
+/// }
+/// ```
+///
+/// `Reject::default()` assigns `-2147483648` as `error_code` and `None` to the
+/// `return_value`.
+///
+/// The JSON value returned by this function for the above `CustomError1` is:
+/// ```json
+/// {\"[Unspecified (Default reject)]\/": Array []}
+/// ```
+///
+/// 4. Example: Implementing the conversion to `Reject` manually.
+/// A smart contract can implement the conversion to `Reject` manually and
+/// define custom error codes. The convention for the `return_value` is to set
+/// the value to the serialization of the enum variants so that decoding of the
+/// error is possible.
+///
+/// ```ignore
+/// /// The custom errors the contract can produce.
+/// #[derive(Serialize, Debug, SchemaType)]
+/// pub enum CustomContractError {
+///     /// CustomError1 defined in smart contract logic.
+///     CustomError1, // return_value: 00; error_code: -123
+///     /// CustomError2 defined in smart contract logic.
+///     CustomError2, // return_value: 01; error_code: -124
+/// }
+///
+/// impl From<CustomContractError> for Reject {
+///     fn from(error: CustomContractError) -> Self {
+///         match error {
+///             CustomContractError::CustomError1 => Reject {
+///                 error_code:   NonZeroI32::new(-123).unwrap(),
+///                 return_value: Some(vec![00]),
+///             },
+///             CustomContractError::CustomError2 => Reject {
+///                 error_code:   NonZeroI32::new(-124).unwrap(),
+///                 return_value: Some(vec![01]),
+///             },
+///         }
+///     }
+/// }
+/// ```
+///
+/// The JSON value returned by this function for the above `CustomError1` is:
+/// ```json
+/// {\"CustomError1\/": Array []}
+/// ```
+///
+/// Disclaimer: A smart contract can have logic to overwrite/change/reuse the
+/// meaning of the error codes as defined in the `concordium-std` crate (see
+/// Example 4 above). While it is not advised to reuse these error codes and is
+/// rather unusual to do so, this function decodes the error codes based on the
 /// definitions in the `concordium-std` crate (assuming they have not been
-/// overwritten with other meanings in the smart contract logic). No guarantee
-/// are given as such that the meaning of the decoded reject reason haven't been
-/// altered by the smart contract logic.
+/// reused with other meanings in the smart contract logic). No guarantee
+/// are given as such that the meaning of the decoded reject reason hasn't been
+/// altered by the smart contract logic. The main reason for setting the
+/// `concordium-std` crate errors to `i32::MIN`,`i32::MIN+1`, etc., is to avoid
+/// conflicts with the error codes used in the smart contract logic.
 pub fn decode_smart_contract_revert(
     return_value: Option<&ReturnValue>,
     reject_reason: &RejectReason,
@@ -812,7 +999,7 @@ pub fn decode_smart_contract_revert(
 ) -> Option<Value> {
     match reject_reason {
         RejectReason::RejectedReceive {
-            reject_reason: reject_reason_code,
+            reject_reason: error_code,
             contract_address: _,
             receive_name,
             parameter: _,
@@ -821,7 +1008,7 @@ pub fn decode_smart_contract_revert(
 
             // Step 1: Try to decode the `reject_reason` using the `concordium-std`
             // error codes.
-            if let Some(decoded_error) = decode_concordium_std_error(*reject_reason_code) {
+            if let Some(decoded_error) = decode_concordium_std_error(*error_code) {
                 // Convert the `decoded_error` into the same format as errors decoded
                 // with the error schema from smart contracts.
                 let mut error_schema_format: HashMap<String, Value> = HashMap::new();
