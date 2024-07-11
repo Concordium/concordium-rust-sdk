@@ -683,7 +683,7 @@ pub enum InvokeContractOutcome {
     Failure(RejectedTransaction),
 }
 
-/// The `InvokedTransaction` type is an alias for the `ContractUpdateBuilder`
+/// The `SimulatedTransaction` type is an alias for the `ContractUpdateBuilder`
 /// type. This type is used when an invoke (dry-run) of a transaction succeeds.
 /// This type includes a convenient send method to send and execute the
 /// transaction on-chain in a subsequent action. As such, it is a builder to
@@ -811,20 +811,22 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 /// "[Unspecified (Default reject)]" error definition still exists in the
 /// `concordium-std` crate.
 ///
-/// `Return_values` were introduced in smart contract V1 and smart contracts
+/// `Return_values` were introduced in smart contracts V1 and smart contracts
 /// were fitted with features to revert with different reasons (as defined in
 /// the smart contract logic). The `return_value` is used to distinguish between
 /// the different reasons for the revert coming from the smart contract logic.
 ///
-/// There are some older types used by the node (such as `RejectReason`) that
-/// only include the `error_code` but not the `return_value`. The reason can be
-/// explained by the historical development of smart contracts in Concordium to
-/// avoid breaking changes as well as to keep the size of the nodes as small as
-/// possible since the `return_value` does not need to be saved by the nodes for
+/// There are some historical types used by the node which spread into this Rust
+/// SDK code base (such as `RejectReason`) that only include the `error_code`
+/// but not the `return_value`. The reason can be explained by the historical
+/// development of smart contracts on Concordium (types were not expanded to
+/// avoid breaking changes) as well as to keep the size of the node as small as
+/// possible since the `return_value` does not need to be saved by the node for
 /// achieving consensus.
 ///
-/// As a result, this decoding function needs both the `return_value` and the
-/// `error_code` to decode the `reject_reason` into a human-readable error.
+/// As a result, this decoding function needs to have access to both the
+/// `return_value` and the `error_code` to decode the `reject_reason` of a
+/// reverted transaction into a human-readable error.
 ///
 /// How is the `return_value` and `error_code` assigned in rejected
 /// transactions:
@@ -844,9 +846,9 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 /// /// The custom errors the contract can produce.
 /// #[derive(Serialize, Debug, Reject, SchemaType)]
 /// pub enum CustomContractError {
-///     /// CustomError1 defined in smart contract logic.
+///     /// CustomError1 defined in the smart contract logic.
 ///     CustomError1, // return_value: 00; error_code: -1
-///     /// CustomError2 defined in smart contract logic.
+///     /// CustomError2 defined in the smart contract logic.
 ///     CustomError2, // return_value: 01; error_code: -2
 /// }
 /// ```
@@ -857,7 +859,7 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 ///
 /// The JSON value returned by this function for the above `CustomError1` is:
 /// ```json
-/// {\"CustomError1\/": Array []}
+/// {"CustomError1":[]}
 /// ```
 ///
 /// 2. Example: Deriving `Reject` in the smart contract with nested errors.
@@ -870,15 +872,15 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 /// /// The custom errors the library can produce.
 /// #[derive(Serialize, Debug, Reject, SchemaType)]
 /// pub enum Cis2Error<R> {
-///     /// CustomErrorLibrary1 defined in smart contract logic.
+///     /// CustomErrorLibrary1 defined in the smart contract logic.
 ///     CustomErrorLibrary1, // return_value: 00; error_code: -1
 ///     /// Nested error variant.
 ///     Custom(R),
-///     // return_value: 0100; error_code: -1
-///     // return_value: 0101; error_code: -2
-///     // return_value: 0102; error_code: -3
+///     // Custom::CustomError1 -> return_value: 0100; error_code: -1
+///     // Custom::CustomError2 -> return_value: 0101; error_code: -2
+///     // Custom::CustomError3 -> return_value: 0102; error_code: -3
 ///     // ...
-///     /// CustomErrorLibrary2 defined in smart contract logic.
+///     /// CustomErrorLibrary2 defined in the smart contract logic.
 ///     CustomErrorLibrary2, // return_value: 02; error_code: -3
 /// }
 /// ```
@@ -888,11 +890,11 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 /// /// The different errors the contract can produce.
 /// #[derive(Serialize, Debug, PartialEq, Eq, Reject, SchemaType)]
 /// pub enum CustomContractError {
-///     /// CustomError1 defined in smart contract logic.
+///     /// CustomError1 defined in the smart contract logic.
 ///     CustomError1, // return_value: 0100; error_code: -1
-///     /// CustomError2 defined in smart contract logic.
+///     /// CustomError2 defined in the smart contract logic.
 ///     CustomError2, // return_value: 0101; error_code: -2
-///     /// CustomError3 defined in smart contract logic.
+///     /// CustomError3 defined in the smart contract logic.
 ///     CustomError3, // return_value: 0102; error_code: -2
 /// }
 ///
@@ -913,7 +915,7 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 ///
 /// The JSON value returned by this function for the above `CustomError1` is:
 /// ```json
-/// {\"Custom\/": Array [Object {\"CustomError1\/": Array []}]}
+/// {"Custom":[{"CustomError1":[]}]}
 /// ```
 ///
 /// 3. Example: `Reject::default()`.
@@ -924,7 +926,7 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 /// /// The custom errors the contract can produce.
 /// #[derive(Serialize, Debug, SchemaType)]
 /// pub enum CustomContractError {
-///     /// CustomError1 defined in smart contract logic.
+///     /// CustomError1 defined in the smart contract logic.
 ///     CustomError1, // return_value: None; error_code: -2147483648 (i32::MIN)
 /// }
 ///
@@ -942,7 +944,7 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 ///
 /// The JSON value returned by this function for the above `CustomError1` is:
 /// ```json
-/// {\"[Unspecified (Default reject)]\/": Array []}
+/// {"[Unspecified (Default reject)]":[]}
 /// ```
 ///
 /// 4. Example: Implementing the conversion to `Reject` manually.
@@ -955,9 +957,9 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 /// /// The custom errors the contract can produce.
 /// #[derive(Serialize, Debug, SchemaType)]
 /// pub enum CustomContractError {
-///     /// CustomError1 defined in smart contract logic.
+///     /// CustomError1 defined in the smart contract logic.
 ///     CustomError1, // return_value: 00; error_code: -123
-///     /// CustomError2 defined in smart contract logic.
+///     /// CustomError2 defined in the smart contract logic.
 ///     CustomError2, // return_value: 01; error_code: -124
 /// }
 ///
@@ -979,7 +981,7 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 ///
 /// The JSON value returned by this function for the above `CustomError1` is:
 /// ```json
-/// {\"CustomError1\/": Array []}
+/// {"CustomError1":[]}
 /// ```
 ///
 /// Disclaimer: A smart contract can have logic to overwrite/change/reuse the
@@ -991,7 +993,7 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 /// are given as such that the meaning of the decoded reject reason hasn't been
 /// altered by the smart contract logic. The main reason for setting the
 /// `concordium-std` crate errors to `i32::MIN`,`i32::MIN+1`, etc., is to avoid
-/// conflicts with the error codes used in the smart contract logic.
+/// conflicts/reuse of the error codes used in the smart contract logic.
 pub fn decode_smart_contract_revert(
     return_value: Option<&ReturnValue>,
     reject_reason: &RejectReason,
