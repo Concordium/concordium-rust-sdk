@@ -22,13 +22,13 @@ use concordium_base::{
     base::{Energy, Nonce},
     common::types::{self, TransactionTime},
     contracts_common::{
-        self, AccountAddress, Address, Amount, ContractAddress, NewContractNameError,
-        NewReceiveNameError,
+        self, schema::VersionedModuleSchema, AccountAddress, Address, Amount, ContractAddress,
+        Cursor, NewContractNameError, NewReceiveNameError,
     },
     hashes::TransactionHash,
     smart_contracts::{
         ContractEvent, ContractTraceElement, ExceedsParameterSize, ModuleReference,
-        OwnedContractName, OwnedParameter, OwnedReceiveName, WasmModule,
+        OwnedContractName, OwnedParameter, OwnedReceiveName, WasmModule, WasmVersion,
     },
     transactions::{
         construct::TRANSACTION_HEADER_SIZE, AccountTransaction, EncodedPayload,
@@ -36,7 +36,9 @@ use concordium_base::{
     },
 };
 pub use concordium_base::{cis2_types::MetadataUrl, cis4_types::*};
-use std::{marker::PhantomData, sync::Arc};
+use concordium_smart_contract_engine::utils;
+use serde_json::Value;
+use std::{fmt, marker::PhantomData, sync::Arc};
 use v2::{QueryError, RPCError};
 
 /// A contract client that handles some of the boilerplate such as serialization
@@ -53,6 +55,8 @@ pub struct ContractClient<Type> {
     pub address:       ContractAddress,
     /// The name of the contract at the address.
     pub contract_name: Arc<contracts_common::OwnedContractName>,
+    /// The schema of the contract at the address.
+    pub schema:        Arc<Option<VersionedModuleSchema>>,
     phantom:           PhantomData<Type>,
 }
 
@@ -63,6 +67,7 @@ impl<Type> Clone for ContractClient<Type> {
             address:       self.address,
             contract_name: self.contract_name.clone(),
             phantom:       PhantomData,
+            schema:        self.schema.clone(),
         }
     }
 }
@@ -291,8 +296,7 @@ impl<Type> ContractInitHandle<Type> {
         match result.details {
             crate::types::BlockItemSummaryDetails::AccountTransaction(at) => match at.effects {
                 AccountTransactionEffects::ContractInitialized { data } => {
-                    let contract_client =
-                        ContractClient::new(self.client, data.address, data.init_name);
+                    let contract_client = ContractClient::create(self.client, data.address).await?;
                     Ok((contract_client, data.events))
                 }
                 AccountTransactionEffects::None {
@@ -668,18 +672,504 @@ impl ModuleDeployHandle {
     }
 }
 
+/// Define a newtype wrapper around the error schema type.
+#[derive(Debug, Clone)]
+pub struct ErrorSchema(pub Value);
+
+/// Write a custom display implementation for the error schema type.
+/// This implementation displays nested errors meaningfully.
+/// For example the nested error: `Object {\"Custom\": Array
+/// [Object {\"Unauthorized\": Array []}]}` is displayed as
+/// `Custom::Unauthorized`.
+impl std::fmt::Display for ErrorSchema {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.0 {
+            Value::Object(map) => {
+                if let Some(key) = map.keys().next() {
+                    write!(f, "{}", key)?;
+                    if let Some(value) = map.values().next() {
+                        if value.is_array() {
+                            write!(f, "{}", ErrorSchema(value.clone()))?;
+                        }
+                    }
+                }
+            }
+            Value::Array(arr) => {
+                if let Some(value) = arr.iter().next() {
+                    write!(f, "::{}", ErrorSchema(value.clone()))?;
+                }
+            }
+            _ => write!(f, "{}", self.0)?,
+        }
+        Ok(())
+    }
+}
+
+/// A human-readable decoded error for the reject reason of a reverted
+/// transaction.
+#[derive(Debug, Clone)]
+pub enum DecodedReason {
+    Std {
+        /// The error code of the transaction.
+        reject_reason: i32,
+        /// The decoded human-readable error.
+        parsed:        ConcordiumStdRejectReason,
+    },
+    Custom {
+        /// The return value of the transaction.
+        return_value:  ReturnValue,
+        /// The error code of the transaction.
+        reject_reason: i32,
+        /// The decoded human-readable error.
+        /// For example:
+        /// Object {\"Unauthorized\": Array []} or
+        /// Object {\"Custom\": Array [Object {\"Unauthorized\": Array []}]}
+        /// (e.g. the cis2_library error)
+        parsed:        ErrorSchema,
+    },
+}
+
+/// Write a custom display implementation for the decoded human-readable error
+/// of the `DecodedReason` type.
+impl std::fmt::Display for DecodedReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DecodedReason::Std { parsed, .. } => {
+                write!(f, "{}", parsed)
+            }
+            DecodedReason::Custom { parsed, .. } => {
+                write!(f, "{}", parsed)
+            }
+        }
+    }
+}
+
+/// The outcome of invoking (dry-running) a transaction to update a smart
+/// contract instance. The variants describe the two cases of successfully
+/// simulating the transaction and rejecting the transaction due to some
+/// reverts.
+pub enum InvokeContractOutcome {
+    /// The simulation of the transaction was successful.
+    Success(SimulatedTransaction),
+    /// The transaction was rejected due to some reverts.
+    Failure(RejectedTransaction),
+}
+
+/// The `SimulatedTransaction` type is an alias for the `ContractUpdateBuilder`
+/// type. This type is used when an invoke (dry-run) of a transaction succeeds.
+/// This type includes a convenient send method to send and execute the
+/// transaction on-chain in a subsequent action. As such, it is a builder to
+/// simplify sending smart contract updates.
+pub type SimulatedTransaction = ContractUpdateBuilder;
+
+/// This type is used when an invoke (dry-run) of a transaction gets rejected.
+#[derive(Debug, Clone)]
+pub struct RejectedTransaction {
+    /// The return value of the transaction.
+    pub return_value:   Option<ReturnValue>,
+    /// The reject reason of the transaction.
+    pub reason:         RejectReason,
+    /// An optional human-readable decoded reason for the reject reason.
+    /// This is only available if the reject reason is a smart contract logical
+    /// revert and a valid error schema is available for decoding, or the
+    /// reject reason originates from the `concordium-std` crate.
+    pub decoded_reason: Option<DecodedReason>,
+    /// The energy used by the transaction.
+    pub used_energy:    Energy,
+    /// The payload of the transaction.
+    pub payload:        transactions::Payload,
+}
+
+impl InvokeContractOutcome {
+    /// This converts `InvokeContractOutcome` into a result type.
+    pub fn success(self) -> Result<SimulatedTransaction, RejectedTransaction> {
+        match self {
+            InvokeContractOutcome::Success(simulated_transaction) => Ok(simulated_transaction),
+            InvokeContractOutcome::Failure(rejected_transaction) => Err(rejected_transaction),
+        }
+    }
+}
+
+#[derive(thiserror::Error, Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[repr(i32)]
+pub enum ConcordiumStdRejectReason {
+    #[error("[Unspecified (Default reject)]")]
+    Unspecified          = -2147483648, // i32::MIN
+    #[error("[Error ()]")]
+    Unit                 = -2147483647, // i32::MIN + 1
+    #[error("[ParseError]")]
+    Parse                = -2147483646, // ...
+    #[error("[LogError::Full]")]
+    LogFull              = -2147483645,
+    #[error("[LogError::Malformed]")]
+    LogMalformed         = -2147483644,
+    #[error("[NewContractNameError::MissingInitPrefix]")]
+    NewContractNameMissingInitPrefix = -2147483643,
+    #[error("[NewContractNameError::TooLong]")]
+    NewContractNameTooLong = -2147483642,
+    #[error("[NewReceiveNameError::MissingDotSeparator]")]
+    NewReceiveNameMissingDotSeparator = -2147483641,
+    #[error("[NewReceiveNameError::TooLong]")]
+    NewReceiveNameTooLong = -2147483640,
+    #[error("[NewContractNameError::ContainsDot]")]
+    NewContractNameContainsDot = -2147483639,
+    #[error("[NewContractNameError::InvalidCharacters]")]
+    NewContractNameInvalidCharacters = -2147483638,
+    #[error("[NewReceiveNameError::InvalidCharacters]")]
+    NewReceiveNameInvalidCharacters = -2147483637,
+    #[error("[NotPayableError]")]
+    NotPayableError      = -2147483636,
+    #[error("[TransferError::AmountTooLarge]")]
+    TransferAmountTooLarge = -2147483635,
+    #[error("[TransferError::MissingAccount]")]
+    TransferMissingAccount = -2147483634,
+    #[error("[CallContractError::AmountTooLarge]")]
+    CallContractAmountTooLarge = -2147483633,
+    #[error("[CallContractError::MissingAccount]")]
+    CallContractMissingAccount = -2147483632,
+    #[error("[CallContractError::MissingContract]")]
+    CallContractMissingContract = -2147483631,
+    #[error("[CallContractError::MissingEntrypoint]")]
+    CallContractMissingEntrypoint = -2147483630,
+    #[error("[CallContractError::MessageFailed]")]
+    CallContractMessageFailed = -2147483629,
+    #[error("[CallContractError::LogicReject]")]
+    CallContractLogicReject = -2147483628,
+    #[error("[CallContractError::Trap]")]
+    CallContractTrap     = -2147483627,
+    #[error("[UpgradeError::MissingModule]")]
+    UpgradeMissingModule = -2147483626,
+    #[error("[UpgradeError::MissingContract]")]
+    UpgradeMissingContract = -2147483625,
+    #[error("[UpgradeError::UnsupportedModuleVersion]")]
+    UpgradeUnsupportedModuleVersion = -2147483624,
+    #[error("[QueryAccountBalanceError]")]
+    QueryAccountBalanceError = -2147483623,
+    #[error("[QueryContractBalanceError]")]
+    QueryContractBalanceError = -2147483622,
+}
+
+/// Decode the `reject_reason` into a human-readable error based on the error
+/// code definition in the `concordium-std` crate.
+pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRejectReason> {
+    if (-2147483648..=-2147483622).contains(&reject_reason) {
+        let reason: ConcordiumStdRejectReason = unsafe { ::std::mem::transmute(reject_reason) };
+        Some(reason)
+    } else {
+        None
+    }
+}
+
+/// Decode the smart contract logical revert reason and return a human-readable
+/// error.
+///
+/// If the error is NOT caused by a smart contract logical revert, the
+/// `reject_reason` is already a human-readable error. No further decoding of
+/// the error is needed and as such this function returns `None`.
+/// An example of such a failure (rejected transaction) is the case when the
+/// transaction runs out of energy which is represented by the human-readable
+/// error variant "OutOfEnergy".
+///
+/// Step 1: If the error matches a smart contract logical revert code coming
+/// from the `concordium-std` crate, this function decodes the error based on
+/// the error code definition in the `concordium-std` crate.
+///
+/// Step 2: If the error is caused by a smart contract logical revert coming
+/// from the smart contract itself, this function uses the provided
+/// `error_schema` and `return_value` to decode the `reject_reason` into a
+/// human-readable error.
+///
+/// `Return_values` vs. `error_codes` in rejected transactions:
+/// Historically, Concordium had smart contracts V0 which had no `retun_value`.
+/// Error codes (negative values used commonly in computer science to represent
+/// errors) were chosen as a method to report the reject reason. Smart
+/// contracts could only revert using one "[Unspecified (Default reject)]" error
+/// and the error code (i32::MIN) was used to represent this error. This
+/// "[Unspecified (Default reject)]" error definition still exists in the
+/// `concordium-std` crate.
+///
+/// `Return_values` were introduced in smart contracts V1 and smart contracts
+/// were fitted with features to revert with different reasons (as defined in
+/// the smart contract logic). The `return_value` is used to distinguish between
+/// the different reasons for the revert coming from the smart contract logic.
+///
+/// There are some historical types used by the node which spread into this Rust
+/// SDK code base (such as `RejectReason`) that only include the `error_code`
+/// but not the `return_value`. The reason can be explained by the historical
+/// development of smart contracts on Concordium (types were not expanded to
+/// avoid breaking changes) as well as to keep the size of the node as small as
+/// possible since the `return_value` does not need to be saved by the node for
+/// achieving consensus.
+///
+/// As a result, this decoding function needs to have access to both the
+/// `return_value` and the `error_code` to decode the `reject_reason` of a
+/// reverted transaction into a human-readable error.
+///
+/// How is the `return_value` and `error_code` assigned in rejected
+/// transactions:
+/// - If the transaction reverts due to an error in the `concordium-std` crate,
+/// the `return_value` is None and the `error_code` is assigned as defined in
+/// the `concordium-std` crate.
+/// - If the transaction reverts due to an error in the smart contract logic:
+/// A smart contract V1 needs to implement a conversion to `Reject` for its
+/// smart contract errors.
+/// `<https://docs.rs/concordium-std/latest/concordium_std/struct.Reject.html>`
+///
+/// 1. Example: Deriving `Reject` in the smart contract.
+/// The simplest way to implement `Reject` in the smart contract is by deriving
+/// it.
+///
+/// ```ignore
+/// /// The custom errors the contract can produce.
+/// #[derive(Serialize, Debug, Reject, SchemaType)]
+/// pub enum CustomContractError {
+///     /// CustomError1 defined in the smart contract logic.
+///     CustomError1, // return_value: 00; error_code: -1
+///     /// CustomError2 defined in the smart contract logic.
+///     CustomError2, // return_value: 01; error_code: -2
+/// }
+/// ```
+///
+/// The `Reject` macro assigns the `error_codes` starting from `-1` to the enum
+/// variants and assigns the `return_values` by serializing the enum variants.
+/// The `return_values` are equivalent to the enum tags in the above example.
+///
+/// The JSON value returned by this function for the above `CustomError1` is:
+/// ```json
+/// {"CustomError1":[]}
+/// ```
+///
+/// 2. Example: Deriving `Reject` in the smart contract with nested errors.
+/// Nested errors are often used to inherit the errors from a smart
+/// contract library such as the cis2-library.
+/// `<https://github.com/Concordium/concordium-rust-smart-contracts/blob/dde42fa62254a55b46a4c9c52c32bbe661127001/concordium-cis2/src/lib.rs#L1093>`
+///
+/// Parent Smart contract:
+/// ```ignore
+/// /// The custom errors the contract/library can produce.
+/// #[derive(Serialize, Debug, Reject, SchemaType)]
+/// pub enum ParentError<R> {
+///     /// ParentCustomError1 defined in the smart contract logic.
+///     ParentCustomError1, // return_value: 00; error_code: -1
+///     /// Nested error variant.
+///     Custom(R),
+///     // ChildCustomError1 -> return_value: 0100; error_code: -1
+///     // ChildCustomError2 -> return_value: 0101; error_code: -2
+///     // ChildCustomError3 -> return_value: 0102; error_code: -3
+///     // ...
+///     /// ParentCustomError2 defined in the smart contract logic.
+///     ParentCustomError2, // return_value: 02; error_code: -3
+/// }
+/// ```
+///
+/// Child Smart contract:
+/// ```ignore
+/// /// The different errors the contract/library can produce.
+/// #[derive(Serialize, Debug, PartialEq, Eq, Reject, SchemaType)]
+/// pub enum ChildError {
+///     /// ChildCustomError1 defined in the smart contract logic.
+///     ChildCustomError1, // return_value: 0100; error_code: -1
+///     /// ChildCustomError2 defined in the smart contract logic.
+///     ChildCustomError2, // return_value: 0101; error_code: -2
+///     /// ChildCustomError3 defined in the smart contract logic.
+///     ChildCustomError3, // return_value: 0102; error_code: -2
+/// }
+///
+/// /// Mapping ChildError to ContractError
+/// impl From<ChildError> for ContractError {
+///     fn from(c: ChildError) -> Self { ParentError::Custom(c) }
+/// }
+///
+/// pub type ContractError = ParentError<ChildError>;
+///
+/// pub type ContractResult<A> = Result<A, ContractError>;
+/// ```
+///
+/// The `Reject` macro assigns the `error_codes` starting from `-1` to the enum
+/// variants and assigns the `return_values` by serializing the enum variants
+/// starting with the topmost enum. The `return_values` are equivalent to the
+/// enum tags of all enums in the nested chain.
+///
+/// The JSON value returned by this function for the above `CustomError1` is:
+/// ```json
+/// {"Custom":[{"CustomError1":[]}]}
+/// ```
+///
+/// 3. Example: `Reject::default()`.
+/// The historical `Reject::default()` can be used by implementing the
+/// conversion to `Reject` manually.
+///
+/// ```ignore
+/// /// The custom errors the contract can produce.
+/// #[derive(Serialize, Debug, SchemaType)]
+/// pub enum CustomContractError {
+///     /// CustomError1 defined in the smart contract logic.
+///     CustomError1, // return_value: None; error_code: -2147483648 (i32::MIN)
+/// }
+///
+/// impl From<CustomContractError> for Reject {
+///     fn from(error: CustomContractError) -> Self {
+///         match error {
+///             _ => Reject::default(),
+///         }
+///     }
+/// }
+/// ```
+///
+/// `Reject::default()` assigns `-2147483648` as `error_code` and `None` to the
+/// `return_value`.
+///
+/// The JSON value returned by this function for the above `CustomError1` is:
+/// ```json
+/// {"[Unspecified (Default reject)]":[]}
+/// ```
+///
+/// 4. Example: Implementing the conversion to `Reject` manually.
+/// A smart contract can implement the conversion to `Reject` manually and
+/// define custom error codes. The convention for the `return_value` is to set
+/// the value to the serialization of the enum variants so that decoding of the
+/// error is possible.
+///
+/// ```ignore
+/// /// The custom errors the contract can produce.
+/// #[derive(Serialize, Debug, SchemaType)]
+/// pub enum CustomContractError {
+///     /// CustomError1 defined in the smart contract logic.
+///     CustomError1, // return_value: 00; error_code: -123
+///     /// CustomError2 defined in the smart contract logic.
+///     CustomError2, // return_value: 01; error_code: -124
+/// }
+///
+/// impl From<CustomContractError> for Reject {
+///     fn from(error: CustomContractError) -> Self {
+///         match error {
+///             CustomContractError::CustomError1 => Reject {
+///                 error_code:   NonZeroI32::new(-123).unwrap(),
+///                 return_value: Some(vec![00]),
+///             },
+///             CustomContractError::CustomError2 => Reject {
+///                 error_code:   NonZeroI32::new(-124).unwrap(),
+///                 return_value: Some(vec![01]),
+///             },
+///         }
+///     }
+/// }
+/// ```
+///
+/// The JSON value returned by this function for the above `CustomError1` is:
+/// ```json
+/// {"CustomError1":[]}
+/// ```
+///
+/// Disclaimer: A smart contract can have logic to overwrite/change/reuse the
+/// meaning of the error codes as defined in the `concordium-std` crate (see
+/// Example 4 above). While it is not advised to reuse these error codes and is
+/// rather unusual to do so, this function decodes the error codes based on the
+/// definitions in the `concordium-std` crate (assuming they have not been
+/// reused with other meanings in the smart contract logic). No guarantee
+/// are given as such that the meaning of the decoded reject reason hasn't been
+/// altered by the smart contract logic. The main reason for setting the
+/// `concordium-std` crate errors to `i32::MIN`,`i32::MIN+1`, etc., is to avoid
+/// conflicts/reuse of the error codes used in the smart contract logic.
+pub fn decode_smart_contract_revert(
+    return_value: Option<&ReturnValue>,
+    reject_reason: &RejectReason,
+    schema: Option<&VersionedModuleSchema>,
+) -> Option<DecodedReason> {
+    match reject_reason {
+        RejectReason::RejectedReceive {
+            reject_reason: error_code,
+            contract_address: _,
+            receive_name,
+            parameter: _,
+        } => {
+            let receive_name = receive_name.as_receive_name();
+
+            // Step 1: Try to decode the `reject_reason` using the `concordium-std`
+            // error codes.
+            if let Some(decoded_error) = decode_concordium_std_error(*error_code) {
+                return Some(DecodedReason::Std {
+                    reject_reason: *error_code,
+                    parsed:        decoded_error,
+                });
+            }
+
+            // Step 2: Try to decode the `reject_reason` using the `error_schema` and the
+            // `return_value`.
+
+            // If no `schema` is provided, the
+            // `reject_reason` can not be decoded further.
+            let schema = schema?;
+
+            let (Some(error_schema), Some(return_value)) = (
+                schema
+                .get_receive_error_schema(
+                    receive_name.contract_name(),
+                    receive_name.entrypoint_name().into(),
+                )
+                .ok(), return_value,
+            ) else {
+                // If no `error_schema` and/or `return_value` is provided, the
+                // `reject_reason` can not be decoded further.
+                return None
+            };
+
+            let mut cursor = Cursor::new(&return_value.value);
+
+            error_schema
+                .to_json(&mut cursor)
+                .ok()
+                .map(|decoded_reason| DecodedReason::Custom {
+                    return_value:  return_value.clone(),
+                    reject_reason: *error_code,
+                    parsed:        ErrorSchema(decoded_reason),
+                })
+        }
+        // If the error is NOT caused by a smart contract logical revert, the
+        // `reject_reason` is already a human-readable error. No
+        // further decoding of the error is needed. An example of
+        // such a transaction is the error variant "OutOfEnergy".
+        _ => None,
+    }
+}
+
 impl<Type> ContractClient<Type> {
-    /// Construct a [`ContractClient`] by looking up metadata from the chain.
+    /// Construct a [`ContractClient`] by looking up metadata from the chain
+    /// (such as the contract_name and the embedded schema).
     ///
     /// # Arguments
     ///
     /// * `client` - The RPC client for the concordium node.
     /// * `address` - The contract address of the smart contract instance.
     pub async fn create(mut client: Client, address: ContractAddress) -> v2::QueryResult<Self> {
-        let ci = client
+        // Get the smart contract instance info.
+        let contract_instance_info = client
             .get_instance_info(address, BlockIdentifier::LastFinal)
-            .await?;
-        Ok(Self::new(client, address, ci.response.name().clone()))
+            .await?
+            .response;
+
+        let contract_name = contract_instance_info.name().clone();
+        let module_reference = contract_instance_info.source_module();
+
+        // Get the wasm module associated to the contract instance.
+        let wasm_module = client
+            .get_module_source(&module_reference, BlockIdentifier::LastFinal)
+            .await?
+            .response;
+
+        // Get the schema associated to the contract instance.
+        let schema = match wasm_module.version {
+            WasmVersion::V0 => utils::get_embedded_schema_v0(wasm_module.source.as_ref()).ok(),
+            WasmVersion::V1 => utils::get_embedded_schema_v1(wasm_module.source.as_ref()).ok(),
+        };
+
+        Ok(Self {
+            client,
+            address,
+            contract_name: Arc::new(contract_name),
+            phantom: PhantomData,
+            schema: Arc::new(schema),
+        })
     }
 
     /// Construct a [`ContractClient`] locally. In comparison to
@@ -692,14 +1182,45 @@ impl<Type> ContractClient<Type> {
     ///   [`Client`] is cheap and is therefore the intended way of sharing.
     /// * `address` - The contract address of the smart contract.
     /// * `contract_name` - The name of the contract. This must match the name
-    ///   on the chain,
-    /// otherwise the constructed client will not work.
+    ///   on the chain, otherwise the constructed client will not work.
     pub fn new(client: Client, address: ContractAddress, contract_name: OwnedContractName) -> Self {
         Self {
             client,
             address,
             contract_name: Arc::new(contract_name),
             phantom: PhantomData,
+            schema: Arc::new(None),
+        }
+    }
+
+    /// Construct a [`ContractClient`] locally. In comparison to
+    /// [`create`](Self::create) this always succeeds and does not check
+    /// existence of the contract and does not look up metadata from the chain
+    /// (such as embedded schemas). In comparison to
+    /// [`new`](Self::new) this constructor also takes a versioned module
+    /// schema.
+    ///
+    /// # Arguments
+    ///
+    /// * `client` - The RPC client for the concordium node. Note that cloning
+    ///   [`Client`] is cheap and is therefore the intended way of sharing.
+    /// * `address` - The contract address of the smart contract.
+    /// * `contract_name` - The name of the contract. This must match the name
+    ///   on the chain, otherwise the constructed client will not work.
+    /// * `schema` - A versioned module schema of the contract. It is used by
+    ///   the client to decode the error codes in rejected transactions.
+    pub fn new_with_schema(
+        client: Client,
+        address: ContractAddress,
+        contract_name: OwnedContractName,
+        schema: VersionedModuleSchema,
+    ) -> Self {
+        Self {
+            client,
+            address,
+            contract_name: Arc::new(contract_name),
+            phantom: PhantomData,
+            schema: Arc::new(Some(schema)),
         }
     }
 
@@ -747,8 +1268,9 @@ impl<Type> ContractClient<Type> {
             .await?;
         match ir {
             smart_contracts::InvokeContractResult::Success { return_value, .. } => {
-                let Some(bytes) = return_value else {return Err(contracts_common::ParseError {}.into()
-            )};
+                let Some(bytes) = return_value else {
+                    return Err(contracts_common::ParseError {}.into());
+                };
                 let response: A = contracts_common::from_bytes(&bytes.value)?;
                 Ok(response)
             }
@@ -811,6 +1333,33 @@ impl<Type> ContractClient<Type> {
             .await
     }
 
+    /// Dry run an update. In comparison to
+    /// [`dry_run_update`](Self::dry_run_update) this function does not throw an
+    /// error when the transaction reverts and instead tries to decode the
+    /// reject reason into a human-readable error. If the dry run succeeds the
+    /// return value is an object that has a send method to send the
+    /// transaction that was simulated during the dry run.
+    ///
+    /// The arguments are
+    /// - `entrypoint` the name of the entrypoint to be invoked. Note that this
+    ///   is just the entrypoint name without the contract name.
+    /// - `amount` the amount of CCD to send to the contract instance
+    /// - `sender` the account that will be sending the transaction
+    /// - `message` the parameter to the smart contract entrypoint.
+    pub async fn dry_run_update_with_reject_reason_info<P: contracts_common::Serial, E>(
+        &mut self,
+        entrypoint: &str,
+        amount: Amount,
+        sender: AccountAddress,
+        message: &P,
+    ) -> Result<InvokeContractOutcome, E>
+    where
+        E: From<NewReceiveNameError> + From<v2::QueryError> + From<ExceedsParameterSize>, {
+        let message = OwnedParameter::from_serial(message)?;
+        self.dry_run_update_raw_with_reject_reason_info(entrypoint, amount, sender, message)
+            .await
+    }
+
     /// Like [`dry_run_update`](Self::dry_run_update) but expects an already
     /// formed parameter.
     pub async fn dry_run_update_raw<E>(
@@ -845,6 +1394,7 @@ impl<Type> ContractClient<Type> {
             receive_name: context.method,
             message: context.parameter,
         };
+
         match invoke_result {
             InvokeContractResult::Success {
                 used_energy,
@@ -861,6 +1411,72 @@ impl<Type> ContractClient<Type> {
                 },
             )),
             InvokeContractResult::Failure { reason, .. } => Err(reason.into()),
+        }
+    }
+
+    /// Like [`dry_run_update_with_reject_reason_info`](Self::dry_run_update_with_reject_reason_info) but expects an already
+    /// formed parameter.
+    pub async fn dry_run_update_raw_with_reject_reason_info<E>(
+        &mut self,
+        entrypoint: &str,
+        amount: Amount,
+        sender: AccountAddress,
+        message: OwnedParameter,
+    ) -> Result<InvokeContractOutcome, E>
+    where
+        E: From<NewReceiveNameError> + From<v2::QueryError>, {
+        let contract_name = self.contract_name.as_contract_name().contract_name();
+        let receive_name = OwnedReceiveName::try_from(format!("{contract_name}.{entrypoint}"))?;
+
+        let payload = UpdateContractPayload {
+            amount,
+            address: self.address,
+            receive_name: receive_name.clone(),
+            message,
+        };
+
+        let context = ContractContext::new_from_payload(sender, None, payload.clone());
+
+        let invoke_result = self
+            .client
+            .invoke_instance(BlockIdentifier::LastFinal, &context)
+            .await?
+            .response;
+
+        match invoke_result {
+            InvokeContractResult::Success {
+                used_energy,
+                return_value,
+                events,
+            } => Ok(InvokeContractOutcome::Success(SimulatedTransaction::new(
+                self.client.clone(),
+                sender,
+                used_energy,
+                transactions::Payload::Update { payload },
+                ContractUpdateInner {
+                    return_value,
+                    events,
+                },
+            ))),
+            InvokeContractResult::Failure {
+                reason,
+                return_value,
+                used_energy,
+            } => {
+                let decoded_reason = decode_smart_contract_revert(
+                    return_value.as_ref(),
+                    &reason,
+                    (*self.schema).as_ref(),
+                );
+
+                Ok(InvokeContractOutcome::Failure(RejectedTransaction {
+                    payload: transactions::Payload::Update { payload },
+                    return_value,
+                    used_energy,
+                    reason,
+                    decoded_reason,
+                }))
+            }
         }
     }
 
@@ -1019,8 +1635,8 @@ impl ContractUpdateHandle {
             crate::types::BlockItemSummaryDetails::AccountTransaction(at) => match at.effects {
                 AccountTransactionEffects::ContractUpdateIssued { effects } => {
                     let Some(execution_tree) = crate::types::execution_tree(effects) else {
-                        return mk_error("Expected smart contract update, but received invalid execution tree.");
-                    };
+                            return mk_error("Expected smart contract update, but received invalid execution tree.");
+                        };
                     Ok(ContractUpdateInfo {
                         execution_tree,
                         energy_cost: result.energy_cost,
