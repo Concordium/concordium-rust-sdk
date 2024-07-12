@@ -37,8 +37,8 @@ use concordium_base::{
 };
 pub use concordium_base::{cis2_types::MetadataUrl, cis4_types::*};
 use concordium_smart_contract_engine::utils;
-use serde_json::{json, Value};
-use std::{collections::HashMap, marker::PhantomData, sync::Arc};
+use serde_json::Value;
+use std::{fmt, marker::PhantomData, sync::Arc};
 use v2::{QueryError, RPCError};
 
 /// A contract client that handles some of the boilerplate such as serialization
@@ -672,6 +672,78 @@ impl ModuleDeployHandle {
     }
 }
 
+/// Define a newtype wrapper around the error schema type.
+#[derive(Debug, Clone)]
+pub struct ErrorSchema(pub Value);
+
+/// Write a custom display implementation for the error schema type.
+/// This implementation displays nested errors meaningfully.
+/// For example the nested error: `Object {\"Custom\": Array
+/// [Object {\"Unauthorized\": Array []}]}` is displayed as
+/// `Custom::Unauthorized`.
+impl std::fmt::Display for ErrorSchema {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.0 {
+            Value::Object(map) => {
+                if let Some(key) = map.keys().next() {
+                    write!(f, "{}", key)?;
+                    if let Some(value) = map.values().next() {
+                        if value.is_array() {
+                            write!(f, "{}", ErrorSchema(value.clone()))?;
+                        }
+                    }
+                }
+            }
+            Value::Array(arr) => {
+                if let Some(value) = arr.iter().next() {
+                    write!(f, "::{}", ErrorSchema(value.clone()))?;
+                }
+            }
+            _ => write!(f, "{}", self.0)?,
+        }
+        Ok(())
+    }
+}
+
+/// A human-readable decoded error for the reject reason of a reverted
+/// transaction.
+#[derive(Debug, Clone)]
+pub enum DecodedReason {
+    Std {
+        /// The error code of the transaction.
+        reject_reason: i32,
+        /// The decoded human-readable error.
+        parsed:        ConcordiumStdRejectReason,
+    },
+    Custom {
+        /// The return value of the transaction.
+        return_value:  ReturnValue,
+        /// The error code of the transaction.
+        reject_reason: i32,
+        /// The decoded human-readable error.
+        /// For example:
+        /// Object {\"Unauthorized\": Array []} or
+        /// Object {\"Custom\": Array [Object {\"Unauthorized\": Array []}]}
+        /// (e.g. the cis2_library error)
+        parsed:        ErrorSchema,
+    },
+}
+
+/// Write a custom display implementation for the decoded human-readable error
+/// of the `DecodedReason` type.
+impl std::fmt::Display for DecodedReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DecodedReason::Std { parsed, .. } => {
+                write!(f, "{}", parsed)
+            }
+            DecodedReason::Custom { parsed, .. } => {
+                write!(f, "{}", parsed)
+            }
+        }
+    }
+}
+
 /// The outcome of invoking (dry-running) a transaction to update a smart
 /// contract instance. The variants describe the two cases of successfully
 /// simulating the transaction and rejecting the transaction due to some
@@ -701,19 +773,24 @@ pub struct RejectedTransaction {
     /// This is only available if the reject reason is a smart contract logical
     /// revert and a valid error schema is available for decoding, or the
     /// reject reason originates from the `concordium-std` crate.
-    /// The JSON value format of such errors is for example:
-    /// Object {\"Unauthorized\": Array []} or
-    /// Object {\"Custom\": Array [Object {\"Unauthorized\": Array []}]} (e.g.
-    /// the cis2_library error)
-    /// ...
-    pub decoded_reason: Option<Value>,
+    pub decoded_reason: Option<DecodedReason>,
     /// The energy used by the transaction.
     pub used_energy:    Energy,
     /// The payload of the transaction.
     pub payload:        transactions::Payload,
 }
 
-#[derive(thiserror::Error, Debug, serde::Serialize, serde::Deserialize)]
+impl InvokeContractOutcome {
+    /// This converts `InvokeContractOutcome` into a result type.
+    pub fn success(self) -> Result<SimulatedTransaction, RejectedTransaction> {
+        match self {
+            InvokeContractOutcome::Success(simulated_transaction) => Ok(simulated_transaction),
+            InvokeContractOutcome::Failure(rejected_transaction) => Err(rejected_transaction),
+        }
+    }
+}
+
+#[derive(thiserror::Error, Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[repr(i32)]
 pub enum ConcordiumStdRejectReason {
     #[error("[Unspecified (Default reject)]")]
@@ -867,43 +944,43 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 /// contract library such as the cis2-library.
 /// `<https://github.com/Concordium/concordium-rust-smart-contracts/blob/dde42fa62254a55b46a4c9c52c32bbe661127001/concordium-cis2/src/lib.rs#L1093>`
 ///
-/// Library:
+/// Parent Smart contract:
 /// ```ignore
-/// /// The custom errors the library can produce.
+/// /// The custom errors the contract/library can produce.
 /// #[derive(Serialize, Debug, Reject, SchemaType)]
-/// pub enum Cis2Error<R> {
-///     /// CustomErrorLibrary1 defined in the smart contract logic.
-///     CustomErrorLibrary1, // return_value: 00; error_code: -1
+/// pub enum ParentError<R> {
+///     /// ParentCustomError1 defined in the smart contract logic.
+///     ParentCustomError1, // return_value: 00; error_code: -1
 ///     /// Nested error variant.
 ///     Custom(R),
-///     // Custom::CustomError1 -> return_value: 0100; error_code: -1
-///     // Custom::CustomError2 -> return_value: 0101; error_code: -2
-///     // Custom::CustomError3 -> return_value: 0102; error_code: -3
+///     // ChildCustomError1 -> return_value: 0100; error_code: -1
+///     // ChildCustomError2 -> return_value: 0101; error_code: -2
+///     // ChildCustomError3 -> return_value: 0102; error_code: -3
 ///     // ...
-///     /// CustomErrorLibrary2 defined in the smart contract logic.
-///     CustomErrorLibrary2, // return_value: 02; error_code: -3
+///     /// ParentCustomError2 defined in the smart contract logic.
+///     ParentCustomError2, // return_value: 02; error_code: -3
 /// }
 /// ```
 ///
-/// Smart contract:
+/// Child Smart contract:
 /// ```ignore
-/// /// The different errors the contract can produce.
+/// /// The different errors the contract/library can produce.
 /// #[derive(Serialize, Debug, PartialEq, Eq, Reject, SchemaType)]
-/// pub enum CustomContractError {
-///     /// CustomError1 defined in the smart contract logic.
-///     CustomError1, // return_value: 0100; error_code: -1
-///     /// CustomError2 defined in the smart contract logic.
-///     CustomError2, // return_value: 0101; error_code: -2
-///     /// CustomError3 defined in the smart contract logic.
-///     CustomError3, // return_value: 0102; error_code: -2
+/// pub enum ChildError {
+///     /// ChildCustomError1 defined in the smart contract logic.
+///     ChildCustomError1, // return_value: 0100; error_code: -1
+///     /// ChildCustomError2 defined in the smart contract logic.
+///     ChildCustomError2, // return_value: 0101; error_code: -2
+///     /// ChildCustomError3 defined in the smart contract logic.
+///     ChildCustomError3, // return_value: 0102; error_code: -2
 /// }
 ///
-/// /// Mapping CustomContractError to ContractError
-/// impl From<CustomContractError> for ContractError {
-///     fn from(c: CustomContractError) -> Self { Cis2Error::Custom(c) }
+/// /// Mapping ChildError to ContractError
+/// impl From<ChildError> for ContractError {
+///     fn from(c: ChildError) -> Self { ParentError::Custom(c) }
 /// }
 ///
-/// pub type ContractError = Cis2Error<CustomContractError>;
+/// pub type ContractError = ParentError<ChildError>;
 ///
 /// pub type ContractResult<A> = Result<A, ContractError>;
 /// ```
@@ -998,7 +1075,7 @@ pub fn decode_smart_contract_revert(
     return_value: Option<&ReturnValue>,
     reject_reason: &RejectReason,
     schema: Option<&VersionedModuleSchema>,
-) -> Option<Value> {
+) -> Option<DecodedReason> {
     match reject_reason {
         RejectReason::RejectedReceive {
             reject_reason: error_code,
@@ -1011,11 +1088,10 @@ pub fn decode_smart_contract_revert(
             // Step 1: Try to decode the `reject_reason` using the `concordium-std`
             // error codes.
             if let Some(decoded_error) = decode_concordium_std_error(*error_code) {
-                // Convert the `decoded_error` into the same format as errors decoded
-                // with the error schema from smart contracts.
-                let mut error_schema_format: HashMap<String, Value> = HashMap::new();
-                error_schema_format.insert(decoded_error.to_string(), Value::Array(vec![]));
-                return Some(json!(error_schema_format));
+                return Some(DecodedReason::Std {
+                    reject_reason: *error_code,
+                    parsed:        decoded_error,
+                });
             }
 
             // Step 2: Try to decode the `reject_reason` using the `error_schema` and the
@@ -1038,8 +1114,16 @@ pub fn decode_smart_contract_revert(
                 return None
             };
 
-            let mut cursor = Cursor::new(return_value.value.clone());
-            error_schema.to_json(&mut cursor).ok()
+            let mut cursor = Cursor::new(&return_value.value);
+
+            error_schema
+                .to_json(&mut cursor)
+                .ok()
+                .map(|decoded_reason| DecodedReason::Custom {
+                    return_value:  return_value.clone(),
+                    reject_reason: *error_code,
+                    parsed:        ErrorSchema(decoded_reason),
+                })
         }
         // If the error is NOT caused by a smart contract logical revert, the
         // `reject_reason` is already a human-readable error. No
@@ -1297,13 +1381,19 @@ impl<Type> ContractClient<Type> {
             message,
         };
 
-        let context = ContractContext::new_from_payload(sender, None, payload.clone());
+        let context = ContractContext::new_from_payload(sender, None, payload);
 
         let invoke_result = self
             .client
             .invoke_instance(BlockIdentifier::LastFinal, &context)
             .await?
             .response;
+        let payload = UpdateContractPayload {
+            amount,
+            address: context.contract,
+            receive_name: context.method,
+            message: context.parameter,
+        };
 
         match invoke_result {
             InvokeContractResult::Success {
