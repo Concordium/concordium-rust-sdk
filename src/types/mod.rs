@@ -2031,6 +2031,10 @@ pub enum DelegationEvent {
         /// Delegator's id
         delegator_id: DelegatorId,
     },
+    BakerRemoved {
+        /// Baker's id
+        baker_id: BakerId,
+    },
 }
 
 /// Events that may result from the [TransactionType::ConfigureBaker]
@@ -2094,6 +2098,11 @@ pub enum BakerEvent {
         baker_id: BakerId,
         /// The finalization reward commission
         finalization_reward_commission: AmountFraction,
+    },
+    /// Removed an existing delegator
+    DelegationRemoved {
+        /// Delegator's id
+        delegator_id: DelegatorId,
     },
 }
 

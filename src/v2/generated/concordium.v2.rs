@@ -1668,7 +1668,7 @@ pub struct RegisteredData {
 pub struct BakerEvent {
     #[prost(
         oneof = "baker_event::Event",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11"
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12"
     )]
     pub event: ::core::option::Option<baker_event::Event>,
 }
@@ -1776,6 +1776,14 @@ pub mod baker_event {
         #[prost(message, optional, tag = "2")]
         pub finalization_reward_commission: ::core::option::Option<super::AmountFraction>,
     }
+    /// Removed an existing delegator.
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct DelegationRemoved {
+        /// Delegator's id.
+        #[prost(message, optional, tag = "1")]
+        pub delegator_id: ::core::option::Option<super::DelegatorId>,
+    }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Event {
@@ -1812,6 +1820,9 @@ pub mod baker_event {
         /// The baker's finalization reward commission was updated.
         #[prost(message, tag = "11")]
         BakerSetFinalizationRewardCommission(BakerSetFinalizationRewardCommission),
+        /// An existing delegator was removed.
+        #[prost(message, tag = "12")]
+        DelegationRemoved(DelegationRemoved),
     }
 }
 /// The identifier for a delegator.
@@ -1824,7 +1835,7 @@ pub struct DelegatorId {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DelegationEvent {
-    #[prost(oneof = "delegation_event::Event", tags = "1, 2, 3, 4, 5, 6")]
+    #[prost(oneof = "delegation_event::Event", tags = "1, 2, 3, 4, 5, 6, 7")]
     pub event: ::core::option::Option<delegation_event::Event>,
 }
 /// Nested message and enum types in `DelegationEvent`.
@@ -1870,6 +1881,13 @@ pub mod delegation_event {
         pub delegation_target: ::core::option::Option<super::DelegationTarget>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct BakerRemoved {
+        /// Baker's id
+        #[prost(message, optional, tag = "1")]
+        pub baker_id: ::core::option::Option<super::BakerId>,
+    }
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Event {
         /// The delegator's stake increased.
@@ -1890,6 +1908,9 @@ pub mod delegation_event {
         /// A delegator was removed.
         #[prost(message, tag = "6")]
         DelegationRemoved(super::DelegatorId),
+        /// An existing baker was removed.
+        #[prost(message, tag = "7")]
+        BakerRemoved(BakerRemoved),
     }
 }
 /// Effects of an account transaction. All variants except `None`

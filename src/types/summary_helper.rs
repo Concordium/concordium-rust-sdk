@@ -687,6 +687,12 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                                 super::BakerEvent::BakerKeysUpdated { data } => {
                                     Event::BakerKeysUpdated { data }
                                 }
+                                super::BakerEvent::DelegationRemoved { delegator_id } => {
+                                    Event::DelegationRemoved {
+                                        delegator_id,
+                                        account: sender,
+                                    }
+                                }
                             })
                             .collect();
                         (Some(ty), BlockItemResult::Success { events })
@@ -737,6 +743,12 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                                 super::DelegationEvent::DelegationRemoved { delegator_id } => {
                                     Event::DelegationRemoved {
                                         delegator_id,
+                                        account: sender,
+                                    }
+                                }
+                                super::DelegationEvent::BakerRemoved { baker_id } => {
+                                    Event::BakerRemoved {
+                                        baker_id,
                                         account: sender,
                                     }
                                 }
@@ -1187,6 +1199,10 @@ fn convert_account_transaction(
                         baker_id,
                         finalization_reward_commission,
                     }),
+                    Event::DelegationRemoved {
+                        delegator_id,
+                        account: _,
+                    } => Ok(super::BakerEvent::DelegationRemoved { delegator_id }),
                     _ => Err(ConversionError::InvalidTransactionResult),
                 })
                 .collect::<Result<_, ConversionError>>()?;
@@ -1236,6 +1252,10 @@ fn convert_account_transaction(
                         delegator_id,
                         account: _,
                     } => Ok(super::DelegationEvent::DelegationRemoved { delegator_id }),
+                    Event::BakerRemoved {
+                        baker_id,
+                        account: _,
+                    } => Ok(super::DelegationEvent::BakerRemoved { baker_id }),
                     _ => Err(ConversionError::InvalidTransactionResult),
                 })
                 .collect::<Result<_, ConversionError>>()?;

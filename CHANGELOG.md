@@ -15,6 +15,10 @@
       and `baker_stake_pending_change` fields are moved into a new type, `ActiveBakerPoolStatus`. A new field is added
       to `BakerPoolStatus` which includes these fields, namely `active_baker_pool_status: Option<ActiveBakerPoolStatus>`.
       This field is `Some(..)` iff `pool_info` is included in the node's `PoolInfoResponse`.
+- `DelegationEvent` adds a `BakerRemoved` case, as `ConfigureDelegation` can replace a
+  baker with delegation from protocol 7.
+- `BakerEvent` adds a `DelegationRemove` case, as `ConfigureBaker` can replace a delegator
+  with a baker from protocol 7.
 
 ## 4.3.0
 
