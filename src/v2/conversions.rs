@@ -1857,6 +1857,9 @@ impl TryFrom<DelegationEvent> for super::types::DelegationEvent {
             delegation_event::Event::DelegationRemoved(v) => Self::DelegationRemoved {
                 delegator_id: v.try_into()?,
             },
+            delegation_event::Event::BakerRemoved(v) => Self::BakerRemoved {
+                baker_id: v.baker_id.require()?.into(),
+            },
         })
     }
 }
@@ -1935,6 +1938,9 @@ impl TryFrom<BakerEvent> for super::types::BakerEvent {
                         .into(),
                 }
             }
+            baker_event::Event::DelegationRemoved(v) => Self::DelegationRemoved {
+                delegator_id: v.delegator_id.require()?.try_into()?,
+            },
         })
     }
 }
