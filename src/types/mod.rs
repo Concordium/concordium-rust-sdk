@@ -2032,7 +2032,10 @@ pub enum DelegationEvent {
         delegator_id: DelegatorId,
     },
     BakerRemoved {
-        /// Baker's id
+        /// The id of the baker that was removed. If the account is a baker in
+        /// the current payday, it will remain so until the next payday,
+        /// although the baker record will be removed from the account
+        /// immediately.
         baker_id: BakerId,
     },
 }
@@ -2101,7 +2104,10 @@ pub enum BakerEvent {
     },
     /// Removed an existing delegator
     DelegationRemoved {
-        /// Delegator's id
+        /// The id of the delegator that was removed. If the account is a
+        /// delegator in the current payday, it will remain so until the
+        /// next payday, although the delegation record will be removed
+        /// from the account immediately.
         delegator_id: DelegatorId,
     },
 }
