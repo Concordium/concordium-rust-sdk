@@ -19,6 +19,7 @@
   baker with delegation from protocol 7.
 - `BakerEvent` adds a `DelegationRemove` case, as `ConfigureBaker` can replace a delegator
   with a baker from protocol 7.
+- Removed the `postgres` feature and all associated functionality. The intent is for this to be part of [the transaction logger](https://github.com/Concordium/concordium-transaction-logger) instead.
 
 ## 4.3.0
 
