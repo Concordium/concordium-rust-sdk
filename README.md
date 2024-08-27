@@ -89,12 +89,6 @@ for example
 cargo build --release --example v2_send_transfer
 ```
 
-## Optional features
-
-The SDK has an optional `postgres` feature which enables functionality to
-interface with a postgres database where the node logs transactions indexed by
-affected account.
-
 ## Documentation
 
 The rendered documentation is available at https://docs.rs/concordium-rust-sdk/latest/

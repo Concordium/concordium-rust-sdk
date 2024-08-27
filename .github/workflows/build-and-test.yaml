@@ -47,7 +47,7 @@ jobs:
         run: |
           rustup default $RUST_VERSION
           rustup component add rust-docs
-          RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --features postgres --color=always
+          RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --color=always
 
   # Check compilation of just the crate without tests and examples. This is to
   # make sure that the features are correctly set for the normal dependencies.
@@ -80,7 +80,7 @@ jobs:
         run: |
           rustup default $RUST_VERSION
           rustup component add clippy
-          cargo clippy --features=postgres --color=always --tests --benches --examples -- -D warnings
+          cargo clippy --color=always --tests --benches --examples -- -D warnings
           # Examples can be large with a lot of debug info due to tokio. So we
           # disable debug info generation.
           RUSTFLAGS="-C debuginfo=0" cargo test
