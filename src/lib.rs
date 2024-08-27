@@ -34,10 +34,6 @@ pub mod constants;
 /// structured values.
 pub mod endpoints;
 mod internal;
-/// Interface to the (optional) postgres database that the node logs finalized
-/// transactions in.
-#[cfg(feature = "postgres")]
-pub mod postgres;
 /// Type definitions used throughout the rest of the SDK.
 pub mod types;
 
