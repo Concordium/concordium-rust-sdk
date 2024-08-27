@@ -2781,13 +2781,14 @@ impl Drop for FinalizedBlocksStream {
 }
 
 impl FinalizedBlocksStream {
-    /// Get the next finalized block in the stream. Or [`None`] if the there are
-    /// no more. This function blocks until a finalized block becomes available,
-    /// so in general it is a good idea to c
+    /// Retrieves the next finalized block from the stream. This function will
+    /// block until a finalized block becomes available. To avoid waiting
+    /// indefinitely, consider using [`FinalizedBlocksStream::next_timeout`]
+    /// instead. If the channel is closed, the next element is `None`.
     pub async fn next(&mut self) -> Option<FinalizedBlockInfo> { self.receiver.recv().await }
 
-    /// Like [`FinalizedBlocksStream::next`], but only waits at most the
-    /// specified duration.
+    /// Similar to [`FinalizedBlocksStream::next`], but with a maximum wait time
+    /// defined by the specified duration between each finalized block.
     pub async fn next_timeout(
         &mut self,
         duration: std::time::Duration,
