@@ -19,7 +19,7 @@ MSRV bump will be accompanied by at least a minor version bump of the SDK.
 
 The SDK is published on [crates.io](https://crates.io/crates/concordium-rust-sdk).
 
-```toml
+```shell
 cargo add concordium-rust-sdk
 ```
 
