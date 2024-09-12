@@ -1,6 +1,6 @@
 [package]
 name = "concordium-rust-sdk"
-version = "4.3.0"
+version = "5.0.0"
 authors = ["Concordium <developers@concordium.com>"]
 edition = "2021"
 rust-version = "1.73"
@@ -34,17 +34,15 @@ rand = {version = "0.8", features = ["small_rng"]}
 num = "0.4"
 num-bigint = "0.4"
 num-traits = "0.2"
-tokio-postgres = { version = "^0.7.8", features = ["with-serde_json-1"], optional = true }
 http = "0.2"
 tokio-stream = "0.1"
 
-concordium_base = { version = "5.0", path = "./concordium-base/rust-src/concordium_base/", features = ["encryption"] }
-concordium-smart-contract-engine = { version = "5.0", path = "./concordium-base/smart-contracts/wasm-chain-integration/", default-features = false, features = ["async"]}
+concordium_base = { version = "6.0", path = "./concordium-base/rust-src/concordium_base/", features = ["encryption"] }
+concordium-smart-contract-engine = { version = "6.0", path = "./concordium-base/smart-contracts/wasm-chain-integration/", default-features = false, features = ["async"]}
 aes-gcm = { version = "0.10", features = ["std"] }
 tracing = "0.1"
 
 [features]
-postgres = ["tokio-postgres"]
 generate-protos = ["tonic-build", "git2"]
 
 [dev-dependencies]
@@ -56,14 +54,6 @@ tokio-test = { version = "0.4" }
 tonic = {version = "0.10", features = ["tls", "tls-roots"]} # Use system trust roots.
 tracing-subscriber = "0.3"
 sqlite = "0.33"
-
-[[example]]
-name = "postgres"
-required-features = ["postgres"]
-
-[[example]]
-name = "monitor-postgres"
-required-features = ["postgres"]
 
 [build-dependencies]
 tonic-build = {version = "0.10", optional = true}

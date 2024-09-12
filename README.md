@@ -19,9 +19,8 @@ MSRV bump will be accompanied by at least a minor version bump of the SDK.
 
 The SDK is published on [crates.io](https://crates.io/crates/concordium-rust-sdk).
 
-```toml
-[dependencies]
-concordium-rust-sdk = "2"
+```shell
+cargo add concordium-rust-sdk
 ```
 
 ## Versions
@@ -88,12 +87,6 @@ for example
 ```shell
 cargo build --release --example v2_send_transfer
 ```
-
-## Optional features
-
-The SDK has an optional `postgres` feature which enables functionality to
-interface with a postgres database where the node logs transactions indexed by
-affected account.
 
 ## Documentation
 
