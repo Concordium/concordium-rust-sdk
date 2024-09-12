@@ -785,7 +785,7 @@ pub enum SpecialTransactionOutcome {
     BakingRewards {
         #[serde(with = "crate::internal::account_amounts")]
         baker_rewards: BTreeMap<AccountAddress, Amount>,
-        /// Remaining balance of the baking account. This will be transfered to
+        /// Remaining balance of the baking account. This will be transferred to
         /// the next epoch's reward account. It exists since it is not possible
         /// to perfectly distribute the accumulated rewards. The reason this is
         /// not possible is that amounts are integers.
@@ -1344,7 +1344,7 @@ impl ExecutionTree {
     }
 
     /// Get an iterator over the events logged by the contracts that were called
-    /// as part of the execution tree. The iterator retuns triples of the
+    /// as part of the execution tree. The iterator returns triples of the
     /// `(address, entrypoint, logs)` where the meaning is that the contract
     /// at the given address, while executing the entrypoint `entrypoint`
     /// produced the `logs`. Note that the `logs` might be an empty slice.
@@ -2621,7 +2621,7 @@ pub enum RejectReason {
     NonExistentCredIDs {
         contents: Vec<CredentialRegistrationID>,
     },
-    /// Attemp to remove the first credential
+    /// Attempt to remove the first credential
     RemoveFirstCredential,
     /// The credential holder of the keys to be updated did not sign the
     /// transaction

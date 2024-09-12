@@ -1353,7 +1353,7 @@ pub mod reject_reason {
         /// A credential id that was to be removed is not part of the account.
         #[prost(message, tag = "35")]
         NonExistentCredIds(NonExistentCredIds),
-        /// Attemp to remove the first credential.
+        /// Attempt to remove the first credential.
         #[prost(message, tag = "36")]
         RemoveFirstCredential(super::Empty),
         /// The credential holder of the keys to be updated did not sign the
@@ -3804,7 +3804,7 @@ pub mod pending_update {
         /// Updates to the consensus timeouts for chain parameters version 2.
         #[prost(message, tag = "22")]
         TimeoutParameters(super::TimeoutParameters),
-        /// Updates to the the minimum time between blocks for chain parameters
+        /// Updates to the minimum time between blocks for chain parameters
         /// version 2.
         #[prost(message, tag = "23")]
         MinBlockTime(super::Duration),
@@ -3874,7 +3874,7 @@ pub struct NextUpdateSequenceNumbers {
     /// Updates to the timeout parameters
     #[prost(message, optional, tag = "17")]
     pub timeout_parameters: ::core::option::Option<SequenceNumber>,
-    /// Updates to the the minimum time between blocks for chain parameters
+    /// Updates to the minimum time between blocks for chain parameters
     /// version 2.
     #[prost(message, optional, tag = "18")]
     pub min_block_time: ::core::option::Option<SequenceNumber>,

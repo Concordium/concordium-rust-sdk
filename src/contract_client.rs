@@ -609,7 +609,7 @@ pub enum ModuleDeployError {
 #[derive(Debug, Clone, Copy)]
 /// Result of successful module deployment.
 pub struct ModuleDeployData {
-    /// Energy used for the trasaction.
+    /// Energy used for the transaction.
     pub energy:           Energy,
     /// The CCD cost of the transaction.
     pub cost:             Amount,
