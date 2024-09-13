@@ -140,7 +140,7 @@ async fn main() -> anyhow::Result<()> {
             baking:       "0.1".parse().unwrap(),
             transaction:  "0.1".parse().unwrap(),
         },
-        update_default_pool_state: OpenStatus::OpenForAll,
+        update_default_pool_state: OpenStatus::ClosedForAll,
         update_cooldown_parameters_access_structure: summary
             .common_update_keys()
             .pool_parameters
@@ -150,34 +150,35 @@ async fn main() -> anyhow::Result<()> {
             .pool_parameters
             .clone(),
         update_cooldown_parameters: CooldownParameters {
-            pool_owner_cooldown: 1800.into(),
-            delegator_cooldown:  900.into(),
+            pool_owner_cooldown: 5400.into(),
+            delegator_cooldown:  5400.into(),
         },
         update_time_parameters: TimeParameters {
             reward_period_length: Epoch::from(4u64).into(),
-            mint_per_payday:      "0.00035997".parse().unwrap(),
+            // mint_per_payday:      "0.00035997".parse().unwrap()
+            mint_per_payday:      "0.00001582".parse().unwrap(),
         },
         update_pool_parameters: PoolParameters {
             passive_finalization_commission: "1".parse()?,
-            passive_baking_commission:       "0.12".parse()?,
-            passive_transaction_commission:  "0.12".parse()?,
+            passive_baking_commission:       "0.25".parse()?,
+            passive_transaction_commission:  "0.25".parse()?,
             commission_bounds:               CommissionRanges {
                 finalization: InclusiveRange {
                     min: "1".parse()?,
                     max: "1".parse()?,
                 },
                 baking:       InclusiveRange {
-                    min: "0.1".parse()?,
-                    max: "0.1".parse()?,
+                    min: "0".parse()?,
+                    max: "1".parse()?,
                 },
                 transaction:  InclusiveRange {
-                    min: "0.1".parse()?,
-                    max: "0.1".parse()?,
+                    min: "0".parse()?,
+                    max: "1".parse()?,
                 },
             },
-            minimum_equity_capital:          Amount::from_ccd(100),
-            capital_bound:                   "0.1".parse()?,
-            leverage_bound:                  LeverageFactor::new_integral(3),
+            minimum_equity_capital:          Amount::from_ccd(11000),
+            capital_bound:                   "0.05".parse()?,
+            leverage_bound:                  LeverageFactor::new_integral(6),
         },
     };
 
@@ -211,15 +212,15 @@ async fn main() -> anyhow::Result<()> {
     let params_p6 = ProtocolUpdateDataP6 {
         timeout_parameters:    TimeoutParameters {
             base:     Duration::from_seconds(10),
-            increase: Ratio::new(6, 5)?,
-            decrease: Ratio::new(3, 4)?,
+            increase: Ratio::new(3, 2)?,
+            decrease: Ratio::new(1, 2)?,
         },
         min_block_time:        Duration::from_millis(2000),
-        block_energy_limit:    Energy { energy: 3_000_000 },
+        block_energy_limit:    Energy { energy: 5_000_000 },
         finalization_commitee: FinalizationCommitteeParameters {
-            min_finalizers: 40,
-            max_finalizers: 1000,
-            finalizers_relative_stake_threshold: "0.001".parse()?,
+            min_finalizers: 5,
+            max_finalizers: 20,
+            finalizers_relative_stake_threshold: "0.005".parse()?,
         },
     };
 
