@@ -1501,7 +1501,7 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
                         Worker::Partial(mut partial) => {
                             if partial.resumed {
                                 // terminate it.
-                                let  ExecutionTree::V1(mut tree) = tree else {
+                                let ExecutionTree::V1(mut tree) = tree else {
                                     return None;
                                 };
                                 std::mem::swap(&mut tree.events, &mut partial.events);

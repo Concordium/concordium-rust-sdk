@@ -80,8 +80,16 @@ pub async fn verify_credential_metadata(
             let ai = client
                 .get_account_info(&cred_id.into(), BlockIdentifier::LastFinal)
                 .await?;
-            let Some(cred) = ai.response.account_credentials.values().find(|cred| cred.value.cred_id() == cred_id.as_ref()) else {
-                return Err(CredentialLookupError::CredentialNotPresent{ cred_id, account: ai.response.account_address });
+            let Some(cred) = ai
+                .response
+                .account_credentials
+                .values()
+                .find(|cred| cred.value.cred_id() == cred_id.as_ref())
+            else {
+                return Err(CredentialLookupError::CredentialNotPresent {
+                    cred_id,
+                    account: ai.response.account_address,
+                });
             };
             if cred.value.issuer() != issuer {
                 return Err(CredentialLookupError::InconsistentIssuer {

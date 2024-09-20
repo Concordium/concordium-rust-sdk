@@ -29,7 +29,7 @@ async fn main() -> anyhow::Result<()> {
 
     let Ok((_, bh, _)) = client.find_account_creation(.., app.account).await else {
         println!("Account not found.");
-        return Ok(())
+        return Ok(());
     };
     println!("Account created in block {}.", bh);
     let bi = client.get_block_info(&bh).await?.response;
