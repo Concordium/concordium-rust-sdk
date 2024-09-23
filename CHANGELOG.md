@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+- `ProcessorConfig` now requires the future for signaling graceful shutdown is marked `Send` effectively marking `ProcessorConfig` as `Send`. This is a minor breaking change, but expected to be the case for most if not all use cases.
+
 ## 5.0.0
 
 - Update the `ContractClient` to optionally include a schema.
