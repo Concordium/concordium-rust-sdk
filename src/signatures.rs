@@ -6,19 +6,14 @@
 // TODO: check account with several keys.
 // TODO: better zip and check that the maps and indexes correspond to each
 // other.
-use std::collections::BTreeMap;
-
+use crate::v2::{self, AccountIdentifier, IntoBlockIdentifier, QueryError};
 use concordium_base::{
-    common::types::Signature as Signature2,
-    contracts_common::{
-        to_bytes, AccountAddress, AccountSignatures, CredentialSignatures, Signature,
-        SignatureEd25519,
-    },
+    common::types::Signature,
+    contracts_common::{to_bytes, AccountAddress},
     id::types::{AccountCredentialWithoutProofs, AccountKeys, VerifyKey},
 };
 use sha2::Digest;
-
-use crate::v2::{self, AccountIdentifier, IntoBlockIdentifier, QueryError};
+use std::collections::BTreeMap;
 
 #[derive(thiserror::Error, Debug)]
 /// An error that can be used as the error for the
@@ -64,6 +59,35 @@ impl AccountPublicKeys {
 
         AccountPublicKeys {
             keys: [(0, credential_map)].into_iter().collect(),
+        }
+    }
+}
+
+/// Account signatures. This is an analogue of transaction signatures that are
+/// part of transactions that get sent to the chain.
+///
+/// It should be thought of as a nested map, indexed on the outer layer by
+/// credential indexes, and the inner map maps key indices to [`Signature`]s.
+#[derive(Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[repr(transparent)]
+pub struct AccountSignatures {
+    pub sigs: BTreeMap<u8, CredentialSignatures>,
+}
+
+#[derive(Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[repr(transparent)]
+pub struct CredentialSignatures {
+    pub sigs: BTreeMap<u8, Signature>,
+}
+
+impl AccountSignatures {
+    pub fn singleton(signature: Signature) -> Self {
+        let credential_map = CredentialSignatures {
+            sigs: [(0, signature)].into_iter().collect(),
+        };
+
+        AccountSignatures {
+            sigs: [(0, credential_map)].into_iter().collect(),
         }
     }
 }
@@ -151,15 +175,8 @@ pub async fn verify_account_signature(
                             key_index:        key_index.0,
                         })?;
 
-                    match signature {
-                        Signature::Ed25519(signature) => {
-                            if !public_key.verify(message_hash, &Signature2 {
-                                sig: signature.0.to_vec(),
-                            }) {
-                                return Ok(false);
-                            }
-                        }
-                        _ => return Ok(false),
+                    if !public_key.verify(message_hash, signature) {
+                        return Ok(false);
                     }
                 }
             }
@@ -179,15 +196,8 @@ pub async fn verify_account_signature(
                             key_index:        key_index.0,
                         })?;
 
-                    match signature {
-                        Signature::Ed25519(signature) => {
-                            if !public_key.verify(message_hash, &Signature2 {
-                                sig: signature.0.to_vec(),
-                            }) {
-                                return Ok(false);
-                            }
-                        }
-                        _ => return Ok(false),
+                    if !public_key.verify(message_hash, signature) {
+                        return Ok(false);
                     }
                 }
             }
@@ -221,15 +231,8 @@ pub fn verify_account_signature_unchecked(
                     key_index,
                 })?;
 
-            match signature {
-                Signature::Ed25519(signature) => {
-                    if !public_key.verify(message_hash, &Signature2 {
-                        sig: signature.0.to_vec(),
-                    }) {
-                        return Ok(false);
-                    }
-                }
-                _ => return Ok(false),
+            if !public_key.verify(message_hash, signature) {
+                return Ok(false);
             }
         }
     }
@@ -292,10 +295,7 @@ pub async fn sign_as_account(
                             sigs: BTreeMap::new(),
                         })
                         .sigs
-                        .insert(
-                            key_index.0,
-                            Signature::Ed25519(SignatureEd25519(signature.into())),
-                        );
+                        .insert(key_index.0, signature.into());
                 }
             }
             AccountCredentialWithoutProofs::Normal { cdv, .. } => {
@@ -332,10 +332,7 @@ pub async fn sign_as_account(
                             sigs: BTreeMap::new(),
                         })
                         .sigs
-                        .insert(
-                            key_index.0,
-                            Signature::Ed25519(SignatureEd25519(signature.into())),
-                        );
+                        .insert(key_index.0, signature.into());
                 }
             }
         };
@@ -366,10 +363,7 @@ pub fn sign_as_account_unchecked(
                     sigs: BTreeMap::new(),
                 })
                 .sigs
-                .insert(
-                    key_index.0,
-                    Signature::Ed25519(SignatureEd25519(signature.into())),
-                );
+                .insert(key_index.0, signature.into());
         }
     }
 
