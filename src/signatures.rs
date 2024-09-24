@@ -2,7 +2,7 @@
 
 // TODO: add function that signs as a singleton.
 // TODO: test for binary and string signing with external repo.
-// TODO: test for binary and string signing checked.
+// TODO: test for binary and string signing checked with external repo.
 // TODO: check account with several keys.
 // TODO: better zip and check that the maps and indexes correspond to each
 // other.
@@ -237,6 +237,113 @@ pub fn verify_account_signature_unchecked(
     Ok(true)
 }
 
+pub async fn sign_as_account(
+    mut client: v2::Client,
+    signer: AccountAddress,
+    account_keys: AccountKeys,
+    message: &Message<'_>,
+    bi: impl IntoBlockIdentifier,
+) -> Result<AccountSignatures, SignatureError> {
+    let message_hash = calculate_message_hash(message, signer)?;
+
+    let mut account_signatures = AccountSignatures {
+        sigs: BTreeMap::new(),
+    };
+
+    let signer_account_info = client
+        .get_account_info(&AccountIdentifier::Address(signer), bi)
+        .await?;
+
+    let signer_account_credentials = signer_account_info.response.account_credentials;
+
+    for (credential_index, credential) in signer_account_credentials {
+        match credential.value {
+            AccountCredentialWithoutProofs::Initial { icdv } => {
+                for (key_index, public_key) in icdv.cred_account.keys {
+                    let signing_keys = account_keys
+                        .keys
+                        .get(&credential_index)
+                        .ok_or(SignatureError::MissingSignature {
+                            credential_index: credential_index.index,
+                            key_index:        key_index.0,
+                        })?
+                        .keys
+                        .get(&key_index)
+                        .ok_or(SignatureError::MissingSignature {
+                            credential_index: credential_index.index,
+                            key_index:        key_index.0,
+                        })?;
+
+                    let VerifyKey::Ed25519VerifyKey(verifying_key) = public_key;
+
+                    if signing_keys.public() != verifying_key {
+                        return Err(SignatureError::MissingSignature {
+                            credential_index: credential_index.index,
+                            key_index:        key_index.0,
+                        });
+                    };
+
+                    let signature = signing_keys.sign(&message_hash);
+
+                    account_signatures
+                        .sigs
+                        .entry(credential_index.index)
+                        .or_insert_with(|| CredentialSignatures {
+                            sigs: BTreeMap::new(),
+                        })
+                        .sigs
+                        .insert(
+                            key_index.0,
+                            Signature::Ed25519(SignatureEd25519(signature.into())),
+                        );
+                }
+            }
+            AccountCredentialWithoutProofs::Normal { cdv, .. } => {
+                for (key_index, public_key) in cdv.cred_key_info.keys {
+                    let signing_keys = account_keys
+                        .keys
+                        .get(&credential_index)
+                        .ok_or(SignatureError::MissingSignature {
+                            credential_index: credential_index.index,
+                            key_index:        key_index.0,
+                        })?
+                        .keys
+                        .get(&key_index)
+                        .ok_or(SignatureError::MissingSignature {
+                            credential_index: credential_index.index,
+                            key_index:        key_index.0,
+                        })?;
+
+                    let VerifyKey::Ed25519VerifyKey(verifying_key) = public_key;
+
+                    if signing_keys.public() != verifying_key {
+                        return Err(SignatureError::MissingSignature {
+                            credential_index: credential_index.index,
+                            key_index:        key_index.0,
+                        });
+                    };
+
+                    let signature = signing_keys.sign(&message_hash);
+
+                    account_signatures
+                        .sigs
+                        .entry(credential_index.index)
+                        .or_insert_with(|| CredentialSignatures {
+                            sigs: BTreeMap::new(),
+                        })
+                        .sigs
+                        .insert(
+                            key_index.0,
+                            Signature::Ed25519(SignatureEd25519(signature.into())),
+                        );
+                }
+            }
+        };
+    }
+
+    Ok(account_signatures)
+}
+
 pub fn sign_as_account_unchecked(
     signer: AccountAddress,
     account_keys: AccountKeys,
@@ -249,8 +356,8 @@ pub fn sign_as_account_unchecked(
     };
 
     for (credential_index, credential) in account_keys.keys {
-        for (key_index, public_key) in credential.keys {
-            let signature = public_key.sign(&message_hash);
+        for (key_index, signing_keys) in credential.keys {
+            let signature = signing_keys.sign(&message_hash);
 
             account_signatures
                 .sigs
@@ -306,10 +413,105 @@ mod tests {
     }
 
     #[test]
-    fn test_sign_text_message_unchecked() {
+    fn test_sign_and_verify_text_message_unchecked() {
         // Create a message to sign.
         let message: &str = "test";
-        let binary_message = &Message::TextMessage(message);
+        let text_message = &Message::TextMessage(message);
+
+        let rng = &mut rand::thread_rng();
+
+        // Generate account keys that have one keypair at index 0 in both maps.
+        let keypairs = AccountKeys::singleton(rng);
+
+        // Get public key from map.
+        let credential_keys = &keypairs.keys[&CredentialIndex { index: 0 }];
+        let key_pair = &credential_keys.keys[&KeyIndex(0)];
+        let public_key = key_pair.public();
+
+        // Create an account address.
+        let account_address = AccountAddress([0u8; 32]);
+
+        // Generate signature.
+        let account_signature = sign_as_account_unchecked(account_address, keypairs, text_message)
+            .expect("Expect signing to succeed");
+
+        // Check that the signature is valid.
+        let is_valid = verify_account_signature_unchecked(
+            account_address,
+            account_signature,
+            AccountPublicKeys::singleton(public_key.into()),
+            text_message,
+        )
+        .expect("Expect verification to succeed");
+        assert_eq!(is_valid, true);
+    }
+
+    #[tokio::test]
+    async fn test_sign_and_verify_text_message_checked() {
+        // Create a message to sign.
+        let message: &str = "test";
+        let text_message = &Message::TextMessage(message);
+
+        // Create a keypair from a private key.
+        let private_key = "f74e3188e4766841600f6fd0095a0ac1c30e4c2e97b9797d7e05a28a48f5c37c";
+        let bytes = hex::decode(private_key).expect("Invalid hex string for private key.");
+
+        let signing_key = SigningKey::from_bytes(
+            bytes
+                .as_slice()
+                .try_into()
+                .expect("Invalid private key size"),
+        );
+        let keypair: KeyPair = KeyPair::from(signing_key);
+        // Generate account keys that have one keypair at index 0 in both maps.
+        let keypairs = AccountKeys::from(InitialAccountData {
+            keys:      [(KeyIndex(0), keypair)].into_iter().collect(),
+            threshold: SignatureThreshold::ONE,
+        });
+
+        // Add the corresponding account address from testnet associated with above
+        // private key.
+        let account_address =
+            AccountAddress::from_str("47b6Qe2XtZANHetanWKP1PbApLKtS3AyiCtcXaqLMbypKjCaRw")
+                .expect("Expect generating account address successfully");
+
+        // Establish a connection to the node client.
+        let client = v2::Client::new(
+            v2::Endpoint::new("http://node.testnet.concordium.com:20000")
+                .expect("Expect generating endpoint successfully"),
+        )
+        .await
+        .expect("Expect generating node client successfully");
+
+        // Generate signature.
+        let account_signature = sign_as_account(
+            client.clone(),
+            account_address,
+            keypairs,
+            text_message,
+            BlockIdentifier::Best,
+        )
+        .await
+        .expect("Expect signing to succeed");
+
+        // Check that the signature is valid.
+        let is_valid = verify_account_signature(
+            client,
+            account_address,
+            account_signature,
+            text_message,
+            BlockIdentifier::Best,
+        )
+        .await
+        .expect("Expect verification to succeed");
+        assert_eq!(is_valid, true);
+    }
+
+    #[test]
+    fn test_sign_and_verify_binary_message_unchecked() {
+        // Create a message to sign.
+        let message: &[u8] = b"test";
+        let binary_message = &Message::BinaryMessage(message);
 
         let rng = &mut rand::thread_rng();
 
@@ -341,10 +543,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_sign_text_message_checked() {
+    async fn test_sign_and_verify_binary_message_checked() {
         // Create a message to sign.
-        let message: &str = "test";
-        let binary_message = &Message::TextMessage(message);
+        let message: &[u8] = b"test";
+        let binary_message = &Message::BinaryMessage(message);
 
         // Create a keypair from a private key.
         let private_key = "f74e3188e4766841600f6fd0095a0ac1c30e4c2e97b9797d7e05a28a48f5c37c";
@@ -369,11 +571,6 @@ mod tests {
             AccountAddress::from_str("47b6Qe2XtZANHetanWKP1PbApLKtS3AyiCtcXaqLMbypKjCaRw")
                 .expect("Expect generating account address successfully");
 
-        // Generate signature.
-        let account_signature =
-            sign_as_account_unchecked(account_address, keypairs, binary_message)
-                .expect("Expect signing to succeed");
-
         // Establish a connection to the node client.
         let client = v2::Client::new(
             v2::Endpoint::new("http://node.testnet.concordium.com:20000")
@@ -381,6 +578,17 @@ mod tests {
         )
         .await
         .expect("Expect generating node client successfully");
+
+        // Generate signature.
+        let account_signature = sign_as_account(
+            client.clone(),
+            account_address,
+            keypairs,
+            binary_message,
+            BlockIdentifier::Best,
+        )
+        .await
+        .expect("Expect signing to succeed");
 
         // Check that the signature is valid.
         let is_valid = verify_account_signature(
@@ -391,41 +599,6 @@ mod tests {
             BlockIdentifier::Best,
         )
         .await
-        .expect("Expect verification to succeed");
-        assert_eq!(is_valid, true);
-    }
-
-    #[test]
-    fn test_sign_binary_message_unchecked() {
-        // Create a message to sign.
-        let message: &[u8] = b"test";
-        let binary_message = &Message::BinaryMessage(message);
-
-        let rng = &mut rand::thread_rng();
-
-        // Generate account keys that have one keypair at index 0 in both maps.
-        let keypairs = AccountKeys::singleton(rng);
-
-        // Get public key from map.
-        let credential_keys = &keypairs.keys[&CredentialIndex { index: 0 }];
-        let key_pair = &credential_keys.keys[&KeyIndex(0)];
-        let public_key = key_pair.public();
-
-        // Create an account address.
-        let account_address = AccountAddress([0u8; 32]);
-
-        // Generate signature.
-        let account_signature =
-            sign_as_account_unchecked(account_address, keypairs, binary_message)
-                .expect("Expect signing to succeed");
-
-        // Check that the signature is valid.
-        let is_valid = verify_account_signature_unchecked(
-            account_address,
-            account_signature,
-            AccountPublicKeys::singleton(public_key.into()),
-            binary_message,
-        )
         .expect("Expect verification to succeed");
         assert_eq!(is_valid, true);
     }
