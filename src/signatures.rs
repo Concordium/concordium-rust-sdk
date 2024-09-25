@@ -1,6 +1,5 @@
 //! Functionality for generating, and verifying account signatures.
 
-// TODO: add function that signs as a singleton.
 // TODO: test for binary and string signing with external repo.
 // TODO: test for binary and string signing checked with external repo.
 // TODO: check account with several keys.
@@ -8,10 +7,11 @@
 // other.
 use crate::v2::{self, AccountIdentifier, IntoBlockIdentifier, QueryError};
 use concordium_base::{
-    common::types::Signature,
-    contracts_common::{to_bytes, AccountAddress},
-    id::types::{AccountCredentialWithoutProofs, AccountKeys, VerifyKey},
+    common::types::{KeyIndex, KeyPair, Signature},
+    contracts_common::{to_bytes, AccountAddress, SignatureThreshold},
+    id::types::{AccountCredentialWithoutProofs, AccountKeys, InitialAccountData, VerifyKey},
 };
+use ed25519_dalek::SigningKey;
 use sha2::Digest;
 use std::collections::BTreeMap;
 
@@ -207,6 +207,23 @@ pub async fn verify_account_signature(
     Ok(true)
 }
 
+pub async fn verify_single_account_signature(
+    client: v2::Client,
+    signer: AccountAddress,
+    signature: Signature,
+    message: &Message<'_>,
+    bi: impl IntoBlockIdentifier,
+) -> Result<bool, SignatureError> {
+    verify_account_signature(
+        client,
+        signer,
+        AccountSignatures::singleton(signature),
+        message,
+        bi,
+    )
+    .await
+}
+
 pub fn verify_account_signature_unchecked(
     signer: AccountAddress,
     signatures: AccountSignatures,
@@ -238,6 +255,20 @@ pub fn verify_account_signature_unchecked(
     }
 
     Ok(true)
+}
+
+pub fn verify_single_account_signature_unchecked(
+    signer: AccountAddress,
+    signature: Signature,
+    public_keys: AccountPublicKeys,
+    message: &Message<'_>,
+) -> Result<bool, SignatureError> {
+    verify_account_signature_unchecked(
+        signer,
+        AccountSignatures::singleton(signature),
+        public_keys,
+        message,
+    )
 }
 
 pub async fn sign_as_account(
@@ -341,6 +372,25 @@ pub async fn sign_as_account(
     Ok(account_signatures)
 }
 
+pub async fn sign_as_single_signer_account(
+    client: v2::Client,
+    signer: AccountAddress,
+    signing_key: SigningKey,
+    message: &Message<'_>,
+    bi: impl IntoBlockIdentifier,
+) -> Result<Signature, SignatureError> {
+    let keypair: KeyPair = KeyPair::from(signing_key);
+    // Generate account keys that have one keypair at index 0 in both maps.
+    let keypairs = AccountKeys::from(InitialAccountData {
+        keys:      [(KeyIndex(0), keypair)].into_iter().collect(),
+        threshold: SignatureThreshold::ONE,
+    });
+    let signature = sign_as_account(client, signer, keypairs, message, bi).await?;
+    // Accessing the maps at index 0 is safe because we generated an
+    // AccountSignature with a keypair at index 0 at both maps.
+    Ok(signature.sigs[&0].sigs[&0].clone())
+}
+
 pub fn sign_as_account_unchecked(
     signer: AccountAddress,
     account_keys: AccountKeys,
@@ -370,17 +420,28 @@ pub fn sign_as_account_unchecked(
     Ok(account_signatures)
 }
 
+pub fn sign_as_single_signer_account_unchecked(
+    signer: AccountAddress,
+    signing_key: SigningKey,
+    message: &Message<'_>,
+) -> Result<Signature, SignatureError> {
+    let keypair: KeyPair = KeyPair::from(signing_key);
+    // Generate account keys that have one keypair at index 0 in both maps.
+    let keypairs = AccountKeys::from(InitialAccountData {
+        keys:      [(KeyIndex(0), keypair)].into_iter().collect(),
+        threshold: SignatureThreshold::ONE,
+    });
+    let signature = sign_as_account_unchecked(signer, keypairs, message)?;
+    // Accessing the maps at index 0 is safe because we generated an
+    // AccountSignature with a keypair at index 0 at both maps.
+    Ok(signature.sigs[&0].sigs[&0].clone())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use concordium_base::{
-        common::types::{CredentialIndex, KeyIndex, KeyPair},
-        contracts_common::SignatureThreshold,
-        id::types::InitialAccountData,
-    };
-    use ed25519_dalek::SigningKey;
+    use concordium_base::common::types::CredentialIndex;
     use std::str::FromStr;
-    use tokio;
     use v2::BlockIdentifier;
 
     #[test]
@@ -407,6 +468,20 @@ mod tests {
     }
 
     #[test]
+    fn test_serde_account_signatures() {
+        // Generate account signature.
+        let ed25519_signature = ed25519_dalek::Signature::from_bytes(&[0u8; 64]);
+        let account_signatures = AccountSignatures::singleton(Signature::from(ed25519_signature));
+
+        // Check that the serialization and deserialization works.
+        let serialized = serde_json::to_string(&account_signatures)
+            .expect("Failed to serialize account_signatures");
+        let deserialized: AccountSignatures =
+            serde_json::from_str(&serialized).expect("Failed to deserialize account_signatures");
+        assert_eq!(account_signatures, deserialized);
+    }
+
+    #[test]
     fn test_sign_and_verify_text_message_unchecked() {
         // Create a message to sign.
         let message: &str = "test";
@@ -416,6 +491,7 @@ mod tests {
 
         // Generate account keys that have one keypair at index 0 in both maps.
         let keypairs = AccountKeys::singleton(rng);
+        let single_key = keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)].clone();
 
         // Get public key from map.
         let credential_keys = &keypairs.keys[&CredentialIndex { index: 0 }];
@@ -428,11 +504,25 @@ mod tests {
         // Generate signature.
         let account_signature = sign_as_account_unchecked(account_address, keypairs, text_message)
             .expect("Expect signing to succeed");
+        let single_account_signature = sign_as_single_signer_account_unchecked(
+            account_address,
+            single_key.into(),
+            text_message,
+        )
+        .expect("Expect signing to succeed");
 
         // Check that the signature is valid.
         let is_valid = verify_account_signature_unchecked(
             account_address,
             account_signature,
+            AccountPublicKeys::singleton(public_key.into()),
+            text_message,
+        )
+        .expect("Expect verification to succeed");
+        assert_eq!(is_valid, true);
+        let is_valid = verify_single_account_signature_unchecked(
+            account_address,
+            single_account_signature,
             AccountPublicKeys::singleton(public_key.into()),
             text_message,
         )
@@ -462,6 +552,7 @@ mod tests {
             keys:      [(KeyIndex(0), keypair)].into_iter().collect(),
             threshold: SignatureThreshold::ONE,
         });
+        let single_key = keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)].clone();
 
         // Add the corresponding account address from testnet associated with above
         // private key.
@@ -487,12 +578,32 @@ mod tests {
         )
         .await
         .expect("Expect signing to succeed");
+        let single_account_signature = sign_as_single_signer_account(
+            client.clone(),
+            account_address,
+            single_key.into(),
+            text_message,
+            BlockIdentifier::Best,
+        )
+        .await
+        .expect("Expect signing to succeed");
 
         // Check that the signature is valid.
         let is_valid = verify_account_signature(
-            client,
+            client.clone(),
             account_address,
             account_signature,
+            text_message,
+            BlockIdentifier::Best,
+        )
+        .await
+        .expect("Expect verification to succeed");
+        assert_eq!(is_valid, true);
+        // Check that the signature is valid.
+        let is_valid = verify_single_account_signature(
+            client,
+            account_address,
+            single_account_signature,
             text_message,
             BlockIdentifier::Best,
         )
