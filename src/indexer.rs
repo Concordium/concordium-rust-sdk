@@ -769,14 +769,33 @@ impl ProcessorConfig {
     /// The function will log progress using the `tracing` library with the
     /// target set to `ccd_event_processor`.
     pub async fn process_events<P: ProcessEvent>(
-        mut self,
-        mut process: P,
-        mut events: tokio::sync::mpsc::Receiver<P::Data>,
+        self,
+        process: P,
+        events: tokio::sync::mpsc::Receiver<P::Data>,
     ) {
+        let stream = tokio_stream::wrappers::ReceiverStream::new(events);
+        self.process_event_stream(process, stream).await
+    }
+
+    /// Process events that are coming in on the provided stream.
+    ///
+    /// This handler will only terminate in the case of
+    ///
+    /// - the [`on_failure`](ProcessEvent::on_failure) method indicates so.
+    /// - the sender part of the `events` channel has been dropped
+    /// - the [`ProcessorConfig`] was configured with a termination signal that
+    ///   was triggered.
+    ///
+    /// The function will log progress using the `tracing` library with the
+    /// target set to `ccd_event_processor`.
+    pub async fn process_event_stream<P, E>(mut self, mut process: P, mut events: E)
+    where
+        P: ProcessEvent,
+        E: futures::Stream<Item = P::Data> + Unpin, {
         while let Some(event) = tokio::select! {
             biased;
             _ = &mut self.stop => None,
-            r = events.recv() => r,
+            r = events.next() => r,
         } {
             let mut try_number: u32 = 0;
             'outer: loop {
