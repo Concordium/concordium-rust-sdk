@@ -15,7 +15,8 @@ use concordium_base::{
     contracts_common::{to_bytes, AccountAddress, SignatureThreshold},
     curve_arithmetic::Curve,
     id::types::{
-        AccountCredentialWithoutProofs, AccountKeys, Attribute, InitialAccountData, VerifyKey,
+        AccountCredentialWithoutProofs, AccountKeys, Attribute, InitialAccountData,
+        PublicCredentialData, VerifyKey,
     },
 };
 use ed25519_dalek::SigningKey;
@@ -50,35 +51,6 @@ pub enum Message<'a> {
 /// credential indexes, and the inner map maps key indices to [`Signature`]s.
 #[derive(Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[repr(transparent)]
-pub struct AccountPublicKeys {
-    pub keys: BTreeMap<u8, CredentialPublicKeys>,
-}
-
-#[derive(Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-#[repr(transparent)]
-pub struct CredentialPublicKeys {
-    pub keys: BTreeMap<u8, VerifyKey>,
-}
-
-impl AccountPublicKeys {
-    pub fn singleton(public_key: VerifyKey) -> Self {
-        let credential_map = CredentialPublicKeys {
-            keys: [(0, public_key)].into_iter().collect(),
-        };
-
-        AccountPublicKeys {
-            keys: [(0, credential_map)].into_iter().collect(),
-        }
-    }
-}
-
-/// Account signatures. This is an analogue of transaction signatures that are
-/// part of transactions that get sent to the chain.
-///
-/// It should be thought of as a nested map, indexed on the outer layer by
-/// credential indexes, and the inner map maps key indices to [`Signature`]s.
-#[derive(Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-#[repr(transparent)]
 pub struct AccountSignatures {
     pub sigs: BTreeMap<u8, CredentialSignatures>,
 }
@@ -98,6 +70,90 @@ impl AccountSignatures {
         AccountSignatures {
             sigs: [(0, credential_map)].into_iter().collect(),
         }
+    }
+}
+
+/// Account signatures. This is an analogue of transaction signatures that are
+/// part of transactions that get sent to the chain.
+///
+/// It should be thought of as a nested map, indexed on the outer layer by
+/// credential indexes, and the inner map maps key indices to [`Signature`]s.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[repr(transparent)]
+pub struct AccountSignaturesVerificationData {
+    pub data: BTreeMap<u8, CredentialSignaturesVerificationData>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[repr(transparent)]
+pub struct CredentialSignaturesVerificationData {
+    pub data: BTreeMap<u8, AccountSignaturesVerificationEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct AccountSignaturesVerificationEntry {
+    pub signature:  Signature,
+    pub public_key: VerifyKey,
+}
+
+impl AccountSignaturesVerificationData {
+    pub fn singleton(signature: Signature, public_key: VerifyKey) -> Self {
+        let credential_map = CredentialSignaturesVerificationData {
+            data: [(0, AccountSignaturesVerificationEntry {
+                signature,
+                public_key,
+            })]
+            .into_iter()
+            .collect(),
+        };
+
+        AccountSignaturesVerificationData {
+            data: [(0, credential_map)].into_iter().collect(),
+        }
+    }
+
+    pub fn zip_signatures_and_keys(
+        account_signatures: &AccountSignatures,
+        account_keys: &AccountKeys,
+    ) -> Result<Self, SignatureError> {
+        let mut outer_map = BTreeMap::new();
+
+        for (&outer_key, credential_sigs) in &account_signatures.sigs {
+            // Check if corresponding account key exists
+            if let Some(account_key_pair) =
+                account_keys.keys.get(&CredentialIndex { index: outer_key })
+            {
+                let public_keys = account_key_pair.get_public_keys();
+
+                // Create the inner map
+                let inner_map: Result<
+                    BTreeMap<u8, AccountSignaturesVerificationEntry>,
+                    SignatureError,
+                > = credential_sigs
+                    .sigs
+                    .iter()
+                    .zip(public_keys.iter())
+                    .map(|((&inner_key, signature), (key_index, public_key))| {
+                        // Ensure that inner_key and key_index match
+                        if inner_key != key_index.0 {
+                            return Err(SignatureError::MismatchMapIndexes);
+                        }
+                        Ok((inner_key, AccountSignaturesVerificationEntry {
+                            signature:  signature.clone(),
+                            public_key: public_key.clone(),
+                        }))
+                    })
+                    .collect();
+
+                outer_map.insert(outer_key, CredentialSignaturesVerificationData {
+                    data: inner_map?,
+                });
+            } else {
+                return Err(SignatureError::MismatchMapIndexes);
+            }
+        }
+
+        Ok(AccountSignaturesVerificationData { data: outer_map })
     }
 }
 
@@ -161,7 +217,7 @@ fn exist_signature_map_keys_on_chain<C: Curve, AttributeType: Attribute<C::Scala
         Versioned<AccountCredentialWithoutProofs<C, AttributeType>>,
     >,
 ) -> bool {
-    // Ensure all top-level keys in signatures exist in on_chain_credentials
+    // Ensure all top-level keys in signatures exist in the on_chain_credentials map
     signatures.sigs.keys().all(|outer_key| {
         // Check if the outer key exists in the on_chain_credentials map
         on_chain_credentials
@@ -176,6 +232,36 @@ fn exist_signature_map_keys_on_chain<C: Curve, AttributeType: Attribute<C::Scala
                         }
                     };
                     map.contains_key(&KeyIndex(*inner_key))
+                })
+            })
+    })
+}
+
+/// Check that all key indexes in the account_keys map exist on chain but not
+/// vice versa.
+fn exist_account_keys_on_chain<C: Curve, AttributeType: Attribute<C::Scalar>>(
+    account_keys: &AccountKeys,
+    on_chain_credentials: &BTreeMap<
+        CredentialIndex,
+        Versioned<AccountCredentialWithoutProofs<C, AttributeType>>,
+    >,
+) -> bool {
+    // Ensure all top-level keys in account_keys exist in the on_chain_credentials
+    // map
+    account_keys.keys.keys().all(|outer_key| {
+        // Check if the outer key exists in the on_chain_credentials map
+        on_chain_credentials
+            .get(outer_key)
+            .map_or(false, |on_chain_cred| {
+                // Ensure that second-level keys in signatures exist in on_chain_credentials
+                account_keys.keys[outer_key].keys.keys().all(|inner_key| {
+                    let map = match &on_chain_cred.value {
+                        AccountCredentialWithoutProofs::Initial { icdv } => &icdv.cred_account.keys,
+                        AccountCredentialWithoutProofs::Normal { cdv, .. } => {
+                            &cdv.cred_key_info.keys
+                        }
+                    };
+                    map.contains_key(inner_key)
                 })
             })
     })
@@ -266,52 +352,25 @@ pub async fn verify_single_account_signature(
     .await
 }
 
-fn have_maps_equal_keys(signatures: &AccountSignatures, public_keys: &AccountPublicKeys) -> bool {
-    // Check the top-level keys and second-level keys are equal in the maps
-    signatures.sigs.keys().all(|outer_key| {
-        public_keys
-            .keys
-            .get(outer_key)
-            .map_or(false, |pub_key_map| {
-                signatures.sigs[outer_key]
-                    .sigs
-                    .keys()
-                    .eq(pub_key_map.keys.keys())
-            })
-    })
-}
-
 // No check is done if that account exists on chain or if the thresholds on
 // chain are followed.
 pub fn verify_account_signature_unchecked(
     signer: AccountAddress,
-    signatures: AccountSignatures,
-    public_keys: AccountPublicKeys,
+    signature_data: AccountSignaturesVerificationData,
     message: &Message<'_>,
 ) -> Result<bool, SignatureError> {
     let message_hash = calculate_message_hash(message, signer)?;
 
-    if !have_maps_equal_keys(&signatures, &public_keys) {
-        return Err(SignatureError::MismatchMapIndexes);
-    }
-
-    for (credential_index, credential) in public_keys.keys {
-        for (key_index, public_key) in credential.keys {
-            let signature = signatures
-                .sigs
-                .get(&credential_index)
-                .ok_or(SignatureError::MissingSignature {
-                    credential_index,
-                    key_index,
-                })?
-                .sigs
-                .get(&key_index)
-                .ok_or(SignatureError::MissingSignature {
-                    credential_index,
-                    key_index,
-                })?;
-
-            if !public_key.verify(message_hash, signature) {
+    for (_, credential) in signature_data.data {
+        for (
+            _,
+            AccountSignaturesVerificationEntry {
+                signature,
+                public_key,
+            },
+        ) in credential.data
+        {
+            if !public_key.verify(message_hash, &signature) {
                 return Ok(false);
             }
         }
@@ -323,13 +382,12 @@ pub fn verify_account_signature_unchecked(
 pub fn verify_single_account_signature_unchecked(
     signer: AccountAddress,
     signature: Signature,
-    public_keys: AccountPublicKeys,
+    public_key: VerifyKey,
     message: &Message<'_>,
 ) -> Result<bool, SignatureError> {
     verify_account_signature_unchecked(
         signer,
-        AccountSignatures::singleton(signature),
-        public_keys,
+        AccountSignaturesVerificationData::singleton(signature, public_key),
         message,
     )
 }
@@ -352,6 +410,10 @@ pub async fn sign_as_account(
         .await?;
 
     let signer_account_credentials = signer_account_info.response.account_credentials;
+
+    if !exist_account_keys_on_chain(&account_keys, &signer_account_credentials) {
+        return Err(SignatureError::MismatchMapIndexes);
+    }
 
     for (credential_index, credential) in signer_account_credentials {
         let keys = match credential.value {
@@ -419,7 +481,7 @@ pub async fn sign_as_single_signer_account(
 
 pub fn sign_as_account_unchecked(
     signer: AccountAddress,
-    account_keys: AccountKeys,
+    account_keys: &AccountKeys,
     message: &Message<'_>,
 ) -> Result<AccountSignatures, SignatureError> {
     let message_hash = calculate_message_hash(message, signer)?;
@@ -428,8 +490,8 @@ pub fn sign_as_account_unchecked(
         sigs: BTreeMap::new(),
     };
 
-    for (credential_index, credential) in account_keys.keys {
-        for (key_index, signing_keys) in credential.keys {
+    for (credential_index, credential) in &account_keys.keys {
+        for (key_index, signing_keys) in &credential.keys {
             let signature = signing_keys.sign(&message_hash);
 
             account_signatures
@@ -457,7 +519,7 @@ pub fn sign_as_single_signer_account_unchecked(
         keys:      [(KeyIndex(0), keypair)].into_iter().collect(),
         threshold: SignatureThreshold::ONE,
     });
-    let signature = sign_as_account_unchecked(signer, keypairs, message)?;
+    let signature = sign_as_account_unchecked(signer, &keypairs, message)?;
     // Accessing the maps at index 0 is safe because we generated an
     // AccountSignature with a keypair at index 0 at both maps.
     Ok(signature.sigs[&0].sigs[&0].clone())
@@ -477,18 +539,24 @@ mod tests {
         // Generate account keys that have one keypair at index 0 in both maps.
         let keypairs = AccountKeys::singleton(rng);
 
+        // Generate account signature.
+        let ed25519_signature = ed25519_dalek::Signature::from_bytes(&[0u8; 64]);
+
         // Get public key from map.
         let credential_keys = &keypairs.keys[&CredentialIndex { index: 0 }];
         let key_pair = &credential_keys.keys[&KeyIndex(0)];
         let public_key = key_pair.public();
 
         // Create AccountPublicKeys type with the public key.
-        let account_public_keys = AccountPublicKeys::singleton(public_key.into());
+        let account_public_keys = AccountSignaturesVerificationData::singleton(
+            Signature::from(ed25519_signature),
+            public_key.into(),
+        );
 
         // Check that the serialization and deserialization works.
         let serialized = serde_json::to_string(&account_public_keys)
             .expect("Failed to serialize account_public_keys");
-        let deserialized: AccountPublicKeys =
+        let deserialized: AccountSignaturesVerificationData =
             serde_json::from_str(&serialized).expect("Failed to deserialize account_public_keys");
         assert_eq!(account_public_keys, deserialized);
     }
@@ -528,7 +596,7 @@ mod tests {
         let account_address = AccountAddress([0u8; 32]);
 
         // Generate signature.
-        let account_signature = sign_as_account_unchecked(account_address, keypairs, text_message)
+        let account_signature = sign_as_account_unchecked(account_address, &keypairs, text_message)
             .expect("Expect signing to succeed");
         let single_account_signature = sign_as_single_signer_account_unchecked(
             account_address,
@@ -537,11 +605,17 @@ mod tests {
         )
         .expect("Expect signing to succeed");
 
+        let account_signatures_verification_data =
+            AccountSignaturesVerificationData::zip_signatures_and_keys(
+                &account_signature,
+                &keypairs,
+            )
+            .expect("Expect zipping of maps to succeed");
+
         // Check that the signature is valid.
         let is_valid = verify_account_signature_unchecked(
             account_address,
-            account_signature,
-            AccountPublicKeys::singleton(public_key.into()),
+            account_signatures_verification_data,
             text_message,
         )
         .expect("Expect verification to succeed");
@@ -549,7 +623,7 @@ mod tests {
         let is_valid = verify_single_account_signature_unchecked(
             account_address,
             single_account_signature,
-            AccountPublicKeys::singleton(public_key.into()),
+            public_key.into(),
             text_message,
         )
         .expect("Expect verification to succeed");
@@ -649,24 +723,25 @@ mod tests {
         // Generate account keys that have one keypair at index 0 in both maps.
         let keypairs = AccountKeys::singleton(rng);
 
-        // Get public key from map.
-        let credential_keys = &keypairs.keys[&CredentialIndex { index: 0 }];
-        let key_pair = &credential_keys.keys[&KeyIndex(0)];
-        let public_key = key_pair.public();
-
         // Create an account address.
         let account_address = AccountAddress([0u8; 32]);
 
         // Generate signature.
         let account_signature =
-            sign_as_account_unchecked(account_address, keypairs, binary_message)
+            sign_as_account_unchecked(account_address, &keypairs, binary_message)
                 .expect("Expect signing to succeed");
+
+        let account_signatures_verification_data =
+            AccountSignaturesVerificationData::zip_signatures_and_keys(
+                &account_signature,
+                &keypairs,
+            )
+            .expect("Expect zipping of maps to succeed");
 
         // Check that the signature is valid.
         let is_valid = verify_account_signature_unchecked(
             account_address,
-            account_signature,
-            AccountPublicKeys::singleton(public_key.into()),
+            account_signatures_verification_data,
             binary_message,
         )
         .expect("Expect verification to succeed");
