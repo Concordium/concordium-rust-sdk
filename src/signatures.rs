@@ -2,7 +2,6 @@
 // TODO: test for binary and string signing with external repo.
 // TODO: test for binary and string signing checked with external repo.
 // TODO: check account with several keys.
-// TODO: correct the error name `MissingSignature`
 use crate::v2::{self, AccountIdentifier, BlockIdentifier, IntoBlockIdentifier, QueryError};
 use concordium_base::{
     common::{
@@ -16,7 +15,7 @@ use concordium_base::{
         PublicCredentialData, VerifyKey,
     },
 };
-use ed25519_dalek::SigningKey;
+use ed25519_dalek::{SigningKey, VerifyingKey};
 use sha2::Digest;
 use std::collections::BTreeMap;
 
@@ -26,8 +25,11 @@ use std::collections::BTreeMap;
 pub enum SignatureError {
     #[error("Network error: {0}")]
     QueryError(#[from] QueryError),
-    #[error("Missing signature at credential index {credential_index} and key index {key_index}")]
-    MissingSignature {
+    #[error(
+        "Key indexes do not exist on chain (credential index: `{credential_index}`, key index: \
+         `{key_index}`)"
+    )]
+    MissingKeyIndexesOnChain {
         credential_index: u8,
         key_index:        u8,
     },
@@ -35,6 +37,17 @@ pub enum SignatureError {
     MismatchMapIndexes,
     #[error("The public key and private key do not match")]
     MismatchPublicPrivateKeys,
+    #[error(
+        "The public key on chain `{expected_public_key:?}` and the public key \
+         `{actual_public_key:?}` in the signature map do not match for credential index \
+         `{credential_index}` and key index `{key_index}`"
+    )]
+    MismatchPublicKeyOnChain {
+        credential_index:    u8,
+        key_index:           u8,
+        expected_public_key: Box<VerifyingKey>,
+        actual_public_key:   Box<VerifyingKey>,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -156,10 +169,7 @@ impl AccountSignaturesVerificationData {
     }
 }
 
-pub fn calculate_message_hash(
-    message: &Message<'_>,
-    signer: AccountAddress,
-) -> Result<[u8; 32], SignatureError> {
+pub fn calculate_message_hash(message: &Message<'_>, signer: AccountAddress) -> [u8; 32] {
     let message_bytes;
     let message_signed_in_wallet: &[u8] = match message {
         Message::BinaryMessage(message) => message,
@@ -177,7 +187,7 @@ pub fn calculate_message_hash(
     // address and 8 zero bytes). Hence, the 8 zero bytes ensure that the user
     // does not accidentally sign a transaction. The account nonce is of type
     // u64 (8 bytes).
-    Ok(sha2::Sha256::digest(
+    sha2::Sha256::digest(
         [
             &signer.as_ref() as &[u8],
             &[0u8; 8],
@@ -185,7 +195,7 @@ pub fn calculate_message_hash(
         ]
         .concat(),
     )
-    .into())
+    .into()
 }
 
 /// Retrieve and validate credential metadata in a particular block.
@@ -236,36 +246,6 @@ fn exist_signature_map_keys_on_chain<C: Curve, AttributeType: Attribute<C::Scala
     })
 }
 
-/// Check that all key indexes in the account_keys map exist on chain but not
-/// vice versa.
-fn exist_account_keys_on_chain<C: Curve, AttributeType: Attribute<C::Scalar>>(
-    account_keys: &AccountKeys,
-    on_chain_credentials: &BTreeMap<
-        CredentialIndex,
-        Versioned<AccountCredentialWithoutProofs<C, AttributeType>>,
-    >,
-) -> bool {
-    // Ensure all top-level keys in account_keys exist in the on_chain_credentials
-    // map
-    account_keys.keys.keys().all(|outer_key| {
-        // Check if the outer key exists in the on_chain_credentials map
-        on_chain_credentials
-            .get(outer_key)
-            .map_or(false, |on_chain_cred| {
-                // Ensure that second-level keys in signatures exist in on_chain_credentials
-                account_keys.keys[outer_key].keys.keys().all(|inner_key| {
-                    let map = match &on_chain_cred.value {
-                        AccountCredentialWithoutProofs::Initial { icdv } => &icdv.cred_account.keys,
-                        AccountCredentialWithoutProofs::Normal { cdv, .. } => {
-                            &cdv.cred_key_info.keys
-                        }
-                    };
-                    map.contains_key(inner_key)
-                })
-            })
-    })
-}
-
 /// Verify a given message was signed by the given account.
 /// Concretely this means
 ///
@@ -280,7 +260,7 @@ pub async fn verify_account_signature(
     message: &Message<'_>,
     bi: impl IntoBlockIdentifier,
 ) -> Result<bool, SignatureError> {
-    let message_hash = calculate_message_hash(message, signer)?;
+    let message_hash = calculate_message_hash(message, signer);
 
     let signer_account_info = client
         .get_account_info(&AccountIdentifier::Address(signer), bi)
@@ -358,7 +338,7 @@ pub fn verify_account_signature_unchecked(
     signature_data: AccountSignaturesVerificationData,
     message: &Message<'_>,
 ) -> Result<bool, SignatureError> {
-    let message_hash = calculate_message_hash(message, signer)?;
+    let message_hash = calculate_message_hash(message, signer);
 
     for (_, credential) in signature_data.data {
         for (
@@ -398,7 +378,7 @@ pub async fn sign_as_account(
     message: &Message<'_>,
     bi: BlockIdentifier,
 ) -> Result<AccountSignatures, SignatureError> {
-    let message_hash = calculate_message_hash(message, signer)?;
+    let message_hash = calculate_message_hash(message, signer);
 
     let mut account_signatures = AccountSignatures {
         sigs: BTreeMap::new(),
@@ -410,15 +390,11 @@ pub async fn sign_as_account(
 
     let signer_account_credentials = signer_account_info.response.account_credentials;
 
-    if !exist_account_keys_on_chain(&account_keys, &signer_account_credentials) {
-        return Err(SignatureError::MismatchMapIndexes);
-    }
-
     for (credential_index, credential) in account_keys.keys {
         for (key_index, signing_key) in credential.keys {
             let on_chain_credential = &signer_account_credentials
                 .get(&credential_index)
-                .ok_or(SignatureError::MissingSignature {
+                .ok_or(SignatureError::MissingKeyIndexesOnChain {
                     credential_index: credential_index.index,
                     key_index:        key_index.0,
                 })?
@@ -432,7 +408,7 @@ pub async fn sign_as_account(
             let on_chain_public_key =
                 on_chain_keys
                     .get(&key_index)
-                    .ok_or(SignatureError::MissingSignature {
+                    .ok_or(SignatureError::MissingKeyIndexesOnChain {
                         credential_index: credential_index.index,
                         key_index:        key_index.0,
                     })?;
@@ -440,9 +416,11 @@ pub async fn sign_as_account(
             let VerifyKey::Ed25519VerifyKey(verifying_key) = *on_chain_public_key;
 
             if signing_key.public() != verifying_key {
-                return Err(SignatureError::MissingSignature {
-                    credential_index: credential_index.index,
-                    key_index:        key_index.0,
+                return Err(SignatureError::MismatchPublicKeyOnChain {
+                    credential_index:    credential_index.index,
+                    key_index:           key_index.0,
+                    expected_public_key: Box::new(verifying_key),
+                    actual_public_key:   Box::new(signing_key.public()),
                 });
             };
 
@@ -495,8 +473,8 @@ pub fn sign_as_account_unchecked(
     signer: AccountAddress,
     account_keys: &AccountKeys,
     message: &Message<'_>,
-) -> Result<AccountSignatures, SignatureError> {
-    let message_hash = calculate_message_hash(message, signer)?;
+) -> AccountSignatures {
+    let message_hash = calculate_message_hash(message, signer);
 
     let mut account_signatures = AccountSignatures {
         sigs: BTreeMap::new(),
@@ -517,7 +495,7 @@ pub fn sign_as_account_unchecked(
         }
     }
 
-    Ok(account_signatures)
+    account_signatures
 }
 
 pub fn sign_as_single_signer_account_unchecked(
@@ -531,7 +509,7 @@ pub fn sign_as_single_signer_account_unchecked(
         keys:      [(KeyIndex(0), keypair)].into_iter().collect(),
         threshold: SignatureThreshold::ONE,
     });
-    let signature = sign_as_account_unchecked(signer, &keypairs, message)?;
+    let signature = sign_as_account_unchecked(signer, &keypairs, message);
     // Accessing the maps at index 0 is safe because we generated an
     // AccountSignature with a keypair at index 0 at both maps.
     Ok(signature.sigs[&0].sigs[&0].clone())
@@ -544,38 +522,37 @@ mod tests {
     use std::str::FromStr;
     use v2::BlockIdentifier;
 
+    const NODE_URL: &str = "http://node.testnet.concordium.com:20000";
+
     #[test]
-    fn test_serde_account_public_keys() {
+    fn test_serde_account_signatures_verification_data() {
         let rng = &mut rand::thread_rng();
 
         // Generate account keys that have one keypair at index 0 in both maps.
         let keypairs = AccountKeys::singleton(rng);
-
-        // Generate account signature.
-        let ed25519_signature = ed25519_dalek::Signature::from_bytes(&[0u8; 64]);
-
         // Get public key from map.
         let credential_keys = &keypairs.keys[&CredentialIndex { index: 0 }];
         let key_pair = &credential_keys.keys[&KeyIndex(0)];
-        let public_key = key_pair.public();
+        let public_key = key_pair.public().into();
 
-        // Create AccountPublicKeys type with the public key.
-        let account_public_keys = AccountSignaturesVerificationData::singleton(
-            Signature::from(ed25519_signature),
-            public_key.into(),
-        );
+        // Generate a signature.
+        let signature = Signature::from(ed25519_dalek::Signature::from_bytes(&[0u8; 64]));
+
+        // Create AccountSignaturesVerificationData type.
+        let account_signatures_verification_data =
+            AccountSignaturesVerificationData::singleton(signature, public_key);
 
         // Check that the serialization and deserialization works.
-        let serialized = serde_json::to_string(&account_public_keys)
-            .expect("Failed to serialize account_public_keys");
-        let deserialized: AccountSignaturesVerificationData =
-            serde_json::from_str(&serialized).expect("Failed to deserialize account_public_keys");
-        assert_eq!(account_public_keys, deserialized);
+        let serialized = serde_json::to_string(&account_signatures_verification_data)
+            .expect("Failed to serialize account_signatures_verification_data");
+        let deserialized: AccountSignaturesVerificationData = serde_json::from_str(&serialized)
+            .expect("Failed to deserialize account_signatures_verification_data");
+        assert_eq!(account_signatures_verification_data, deserialized);
     }
 
     #[test]
     fn test_serde_account_signatures() {
-        // Generate account signature.
+        // Create AccountSignatures type.
         let ed25519_signature = ed25519_dalek::Signature::from_bytes(&[0u8; 64]);
         let account_signatures = AccountSignatures::singleton(Signature::from(ed25519_signature));
 
@@ -587,8 +564,46 @@ mod tests {
         assert_eq!(account_signatures, deserialized);
     }
 
+    // We test signing and verifying of a text messages here. We use the `unchecked`
+    // version of the functions.
     #[test]
     fn test_sign_and_verify_text_message_unchecked() {
+        // Create a message to sign.
+        let message: &str = "test";
+        let text_message = &Message::TextMessage(message);
+
+        let rng = &mut rand::thread_rng();
+
+        // Generate account keys that have one keypair at index 0 in both maps.
+        let keypairs = AccountKeys::singleton(rng);
+
+        // Create an account address.
+        let account_address = AccountAddress([0u8; 32]);
+
+        // Generate signature.
+        let account_signature = sign_as_account_unchecked(account_address, &keypairs, text_message);
+
+        let account_signatures_verification_data =
+            AccountSignaturesVerificationData::zip_signatures_and_keys(
+                &account_signature,
+                &keypairs,
+            )
+            .expect("Expect zipping of maps to succeed");
+
+        // Check that the signature is valid.
+        let is_valid = verify_account_signature_unchecked(
+            account_address,
+            account_signatures_verification_data,
+            text_message,
+        )
+        .expect("Expect verification to succeed");
+        assert_eq!(is_valid, true);
+    }
+
+    // We test signing and verifying of a text messages here. We use the `unchecked`
+    // and `single` version of the functions.
+    #[test]
+    fn test_sign_and_verify_text_message_unchecked_single() {
         // Create a message to sign.
         let message: &str = "test";
         let text_message = &Message::TextMessage(message);
@@ -608,8 +623,6 @@ mod tests {
         let account_address = AccountAddress([0u8; 32]);
 
         // Generate signature.
-        let account_signature = sign_as_account_unchecked(account_address, &keypairs, text_message)
-            .expect("Expect signing to succeed");
         let single_account_signature = sign_as_single_signer_account_unchecked(
             account_address,
             single_key.into(),
@@ -617,21 +630,7 @@ mod tests {
         )
         .expect("Expect signing to succeed");
 
-        let account_signatures_verification_data =
-            AccountSignaturesVerificationData::zip_signatures_and_keys(
-                &account_signature,
-                &keypairs,
-            )
-            .expect("Expect zipping of maps to succeed");
-
         // Check that the signature is valid.
-        let is_valid = verify_account_signature_unchecked(
-            account_address,
-            account_signatures_verification_data,
-            text_message,
-        )
-        .expect("Expect verification to succeed");
-        assert_eq!(is_valid, true);
         let is_valid = verify_single_account_signature_unchecked(
             account_address,
             single_account_signature,
@@ -642,8 +641,72 @@ mod tests {
         assert_eq!(is_valid, true);
     }
 
+    // We test signing and verifying of a text messages here. We use the `checked`
+    // version of the functions.
     #[tokio::test]
     async fn test_sign_and_verify_text_message_checked() {
+        // Create a message to sign.
+        let message: &str = "test";
+        let text_message = &Message::TextMessage(message);
+
+        // Create a keypair from a private key.
+        let private_key = "f74e3188e4766841600f6fd0095a0ac1c30e4c2e97b9797d7e05a28a48f5c37c";
+        let bytes = hex::decode(private_key).expect("Invalid hex string for private key.");
+
+        let signing_key = SigningKey::from_bytes(
+            bytes
+                .as_slice()
+                .try_into()
+                .expect("Invalid private key size"),
+        );
+        let keypair: KeyPair = KeyPair::from(signing_key);
+        // Generate account keys that have one keypair at index 0 in both maps.
+        let keypairs = AccountKeys::from(InitialAccountData {
+            keys:      [(KeyIndex(0), keypair)].into_iter().collect(),
+            threshold: SignatureThreshold::ONE,
+        });
+
+        // Add the corresponding account address from testnet associated with above
+        // private key.
+        let account_address =
+            AccountAddress::from_str("47b6Qe2XtZANHetanWKP1PbApLKtS3AyiCtcXaqLMbypKjCaRw")
+                .expect("Expect generating account address successfully");
+
+        // Establish a connection to the node client.
+        let client = v2::Client::new(
+            v2::Endpoint::new(NODE_URL).expect("Expect generating endpoint successfully"),
+        )
+        .await
+        .expect("Expect generating node client successfully");
+
+        // Generate signature.
+        let account_signature = sign_as_account(
+            client.clone(),
+            account_address,
+            keypairs,
+            text_message,
+            BlockIdentifier::Best,
+        )
+        .await
+        .expect("Expect signing to succeed");
+
+        // Check that the signature is valid.
+        let is_valid = verify_account_signature(
+            client.clone(),
+            account_address,
+            &account_signature,
+            text_message,
+            BlockIdentifier::Best,
+        )
+        .await
+        .expect("Expect verification to succeed");
+        assert_eq!(is_valid, true);
+    }
+
+    // We test signing and verifying of a text messages here. We use the `checked`
+    // and `single` version of the functions.
+    #[tokio::test]
+    async fn test_sign_and_verify_text_message_checked_single() {
         // Create a message to sign.
         let message: &str = "test";
         let text_message = &Message::TextMessage(message);
@@ -674,22 +737,12 @@ mod tests {
 
         // Establish a connection to the node client.
         let client = v2::Client::new(
-            v2::Endpoint::new("http://node.testnet.concordium.com:20000")
-                .expect("Expect generating endpoint successfully"),
+            v2::Endpoint::new(NODE_URL).expect("Expect generating endpoint successfully"),
         )
         .await
         .expect("Expect generating node client successfully");
 
         // Generate signature.
-        let account_signature = sign_as_account(
-            client.clone(),
-            account_address,
-            keypairs,
-            text_message,
-            BlockIdentifier::Best,
-        )
-        .await
-        .expect("Expect signing to succeed");
         let single_account_signature = sign_as_single_signer_account(
             client.clone(),
             account_address,
@@ -700,17 +753,6 @@ mod tests {
         .await
         .expect("Expect signing to succeed");
 
-        // Check that the signature is valid.
-        let is_valid = verify_account_signature(
-            client.clone(),
-            account_address,
-            &account_signature,
-            text_message,
-            BlockIdentifier::Best,
-        )
-        .await
-        .expect("Expect verification to succeed");
-        assert_eq!(is_valid, true);
         // Check that the signature is valid.
         let is_valid = verify_single_account_signature(
             client,
@@ -724,6 +766,8 @@ mod tests {
         assert_eq!(is_valid, true);
     }
 
+    // We test signing and verifying of a binary messages here. We use the
+    // `unchecked` version of the functions.
     #[test]
     fn test_sign_and_verify_binary_message_unchecked() {
         // Create a message to sign.
@@ -740,8 +784,7 @@ mod tests {
 
         // Generate signature.
         let account_signature =
-            sign_as_account_unchecked(account_address, &keypairs, binary_message)
-                .expect("Expect signing to succeed");
+            sign_as_account_unchecked(account_address, &keypairs, binary_message);
 
         let account_signatures_verification_data =
             AccountSignaturesVerificationData::zip_signatures_and_keys(
@@ -760,6 +803,44 @@ mod tests {
         assert_eq!(is_valid, true);
     }
 
+    // We test signing and verifying of a binary messages here. We use the
+    // `unchecked` and `single` version of the functions.
+    #[test]
+    fn test_sign_and_verify_binary_message_unchecked_single() {
+        // Create a message to sign.
+        let message: &[u8] = b"test";
+        let binary_message = &Message::BinaryMessage(message);
+
+        let rng = &mut rand::thread_rng();
+
+        // Generate account keys that have one keypair at index 0 in both maps.
+        let keypairs = AccountKeys::singleton(rng);
+        let single_key = keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)].clone();
+
+        // Create an account address.
+        let account_address = AccountAddress([0u8; 32]);
+
+        // Generate signature.
+        let single_account_signature = sign_as_single_signer_account_unchecked(
+            account_address,
+            single_key.clone().into(),
+            binary_message,
+        )
+        .expect("Expect signing to succeed");
+
+        // Check that the signature is valid.
+        let is_valid = verify_single_account_signature_unchecked(
+            account_address,
+            single_account_signature,
+            single_key.public().into(),
+            binary_message,
+        )
+        .expect("Expect verification to succeed");
+        assert_eq!(is_valid, true);
+    }
+
+    // We test signing and verifying of a binary messages here. We use the `checked`
+    // version of the functions.
     #[tokio::test]
     async fn test_sign_and_verify_binary_message_checked() {
         // Create a message to sign.
@@ -791,8 +872,7 @@ mod tests {
 
         // Establish a connection to the node client.
         let client = v2::Client::new(
-            v2::Endpoint::new("http://node.testnet.concordium.com:20000")
-                .expect("Expect generating endpoint successfully"),
+            v2::Endpoint::new(NODE_URL).expect("Expect generating endpoint successfully"),
         )
         .await
         .expect("Expect generating node client successfully");
@@ -813,6 +893,69 @@ mod tests {
             client,
             account_address,
             &account_signature,
+            binary_message,
+            BlockIdentifier::Best,
+        )
+        .await
+        .expect("Expect verification to succeed");
+        assert_eq!(is_valid, true);
+    }
+
+    // We test signing and verifying of a binary messages here. We use the `checked`
+    // and `single` version of the functions.
+    #[tokio::test]
+    async fn test_sign_and_verify_binary_message_checked_single() {
+        // Create a message to sign.
+        let message: &[u8] = b"test";
+        let binary_message = &Message::BinaryMessage(message);
+
+        // Create a keypair from a private key.
+        let private_key = "f74e3188e4766841600f6fd0095a0ac1c30e4c2e97b9797d7e05a28a48f5c37c";
+        let bytes = hex::decode(private_key).expect("Invalid hex string for private key.");
+
+        let signing_key = SigningKey::from_bytes(
+            bytes
+                .as_slice()
+                .try_into()
+                .expect("Invalid private key size"),
+        );
+        let keypair: KeyPair = KeyPair::from(signing_key);
+        // Generate account keys that have one keypair at index 0 in both maps.
+        let keypairs = AccountKeys::from(InitialAccountData {
+            keys:      [(KeyIndex(0), keypair)].into_iter().collect(),
+            threshold: SignatureThreshold::ONE,
+        });
+        let single_key = keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)].clone();
+
+        // Add the corresponding account address from testnet associated with above
+        // private key.
+        let account_address =
+            AccountAddress::from_str("47b6Qe2XtZANHetanWKP1PbApLKtS3AyiCtcXaqLMbypKjCaRw")
+                .expect("Expect generating account address successfully");
+
+        // Establish a connection to the node client.
+        let client = v2::Client::new(
+            v2::Endpoint::new(NODE_URL).expect("Expect generating endpoint successfully"),
+        )
+        .await
+        .expect("Expect generating node client successfully");
+
+        // Generate signature.
+        let single_account_signature = sign_as_single_signer_account(
+            client.clone(),
+            account_address,
+            single_key.clone().into(),
+            binary_message,
+            BlockIdentifier::Best,
+        )
+        .await
+        .expect("Expect signing to succeed");
+
+        // Check that the signature is valid.
+        let is_valid = verify_single_account_signature(
+            client,
+            account_address,
+            single_account_signature,
             binary_message,
             BlockIdentifier::Best,
         )
