@@ -1,12 +1,9 @@
 //! Functionality for generating, and verifying account signatures.
-
 // TODO: test for binary and string signing with external repo.
 // TODO: test for binary and string signing checked with external repo.
 // TODO: check account with several keys.
-// TODO: better zip and check that the maps and indexes correspond to each
-// other.
 // TODO: correct the error name `MissingSignature`
-use crate::v2::{self, AccountIdentifier, IntoBlockIdentifier, QueryError};
+use crate::v2::{self, AccountIdentifier, BlockIdentifier, IntoBlockIdentifier, QueryError};
 use concordium_base::{
     common::{
         types::{CredentialIndex, KeyIndex, KeyPair, Signature},
@@ -36,6 +33,8 @@ pub enum SignatureError {
     },
     #[error("The indexes in the maps do not match")]
     MismatchMapIndexes,
+    #[error("The public key and private key do not match")]
+    MismatchPublicPrivateKeys,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -277,7 +276,7 @@ fn exist_account_keys_on_chain<C: Curve, AttributeType: Attribute<C::Scalar>>(
 pub async fn verify_account_signature(
     mut client: v2::Client,
     signer: AccountAddress,
-    signatures: AccountSignatures,
+    signatures: &AccountSignatures,
     message: &Message<'_>,
     bi: impl IntoBlockIdentifier,
 ) -> Result<bool, SignatureError> {
@@ -290,7 +289,7 @@ pub async fn verify_account_signature(
     let signer_account_credentials = signer_account_info.response.account_credentials;
     let credential_signatures_threshold = signer_account_info.response.account_threshold;
 
-    if !exist_signature_map_keys_on_chain(&signatures, &signer_account_credentials) {
+    if !exist_signature_map_keys_on_chain(signatures, &signer_account_credentials) {
         return Err(SignatureError::MismatchMapIndexes);
     }
 
@@ -345,7 +344,7 @@ pub async fn verify_single_account_signature(
     verify_account_signature(
         client,
         signer,
-        AccountSignatures::singleton(signature),
+        &AccountSignatures::singleton(signature),
         message,
         bi,
     )
@@ -397,7 +396,7 @@ pub async fn sign_as_account(
     signer: AccountAddress,
     account_keys: AccountKeys,
     message: &Message<'_>,
-    bi: impl IntoBlockIdentifier,
+    bi: BlockIdentifier,
 ) -> Result<AccountSignatures, SignatureError> {
     let message_hash = calculate_message_hash(message, signer)?;
 
@@ -415,36 +414,39 @@ pub async fn sign_as_account(
         return Err(SignatureError::MismatchMapIndexes);
     }
 
-    for (credential_index, credential) in signer_account_credentials {
-        let keys = match credential.value {
-            AccountCredentialWithoutProofs::Initial { icdv } => icdv.cred_account.keys,
-            AccountCredentialWithoutProofs::Normal { cdv, .. } => cdv.cred_key_info.keys,
-        };
-        for (key_index, public_key) in keys {
-            let signing_keys = account_keys
-                .keys
+    for (credential_index, credential) in account_keys.keys {
+        for (key_index, signing_key) in credential.keys {
+            let on_chain_credential = &signer_account_credentials
                 .get(&credential_index)
                 .ok_or(SignatureError::MissingSignature {
                     credential_index: credential_index.index,
                     key_index:        key_index.0,
                 })?
-                .keys
-                .get(&key_index)
-                .ok_or(SignatureError::MissingSignature {
-                    credential_index: credential_index.index,
-                    key_index:        key_index.0,
-                })?;
+                .value;
 
-            let VerifyKey::Ed25519VerifyKey(verifying_key) = public_key;
+            let on_chain_keys = match on_chain_credential {
+                AccountCredentialWithoutProofs::Initial { icdv } => &icdv.cred_account.keys,
+                AccountCredentialWithoutProofs::Normal { cdv, .. } => &cdv.cred_key_info.keys,
+            };
 
-            if signing_keys.public() != verifying_key {
+            let on_chain_public_key =
+                on_chain_keys
+                    .get(&key_index)
+                    .ok_or(SignatureError::MissingSignature {
+                        credential_index: credential_index.index,
+                        key_index:        key_index.0,
+                    })?;
+
+            let VerifyKey::Ed25519VerifyKey(verifying_key) = *on_chain_public_key;
+
+            if signing_key.public() != verifying_key {
                 return Err(SignatureError::MissingSignature {
                     credential_index: credential_index.index,
                     key_index:        key_index.0,
                 });
             };
 
-            let signature = signing_keys.sign(&message_hash);
+            let signature = signing_key.sign(&message_hash);
 
             account_signatures
                 .sigs
@@ -457,7 +459,17 @@ pub async fn sign_as_account(
         }
     }
 
-    Ok(account_signatures)
+    // Check that the signatures are valid to ensure
+    // that public and private keys in the `account_keys` map match.
+    let is_valid = verify_account_signature(client, signer, &account_signatures, message, bi)
+        .await
+        .map_err(|_| SignatureError::MismatchPublicPrivateKeys)?;
+
+    if is_valid {
+        Ok(account_signatures)
+    } else {
+        Err(SignatureError::MismatchPublicPrivateKeys)
+    }
 }
 
 pub async fn sign_as_single_signer_account(
@@ -465,7 +477,7 @@ pub async fn sign_as_single_signer_account(
     signer: AccountAddress,
     signing_key: SigningKey,
     message: &Message<'_>,
-    bi: impl IntoBlockIdentifier,
+    bi: BlockIdentifier,
 ) -> Result<Signature, SignatureError> {
     let keypair: KeyPair = KeyPair::from(signing_key);
     // Generate account keys that have one keypair at index 0 in both maps.
@@ -692,7 +704,7 @@ mod tests {
         let is_valid = verify_account_signature(
             client.clone(),
             account_address,
-            account_signature,
+            &account_signature,
             text_message,
             BlockIdentifier::Best,
         )
@@ -800,7 +812,7 @@ mod tests {
         let is_valid = verify_account_signature(
             client,
             account_address,
-            account_signature,
+            &account_signature,
             binary_message,
             BlockIdentifier::Best,
         )
