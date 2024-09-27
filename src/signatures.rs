@@ -1,8 +1,8 @@
 //! Functionality for generating, and verifying account signatures.
 // TODO: test for binary and string signing with external repo.
 // TODO: test for binary and string signing checked with external repo.
-// TODO: check account with several keys.
-use crate::v2::{self, AccountIdentifier, BlockIdentifier, IntoBlockIdentifier, QueryError};
+// TODO: add comments
+use crate::v2::{self, AccountIdentifier, BlockIdentifier, QueryError};
 use concordium_base::{
     common::{
         types::{CredentialIndex, KeyIndex, KeyPair, Signature},
@@ -136,6 +136,8 @@ impl AccountSignaturesVerificationData {
     ) -> Result<Self, SignatureError> {
         let mut outer_map = BTreeMap::new();
 
+        // TODO: fix
+
         for (&outer_key, credential_sigs) in &account_signatures.sigs {
             // Check if corresponding account key exists
             if let Some(account_key_pair) =
@@ -225,31 +227,40 @@ pub fn calculate_message_hash(message: &Message<'_>, signer: AccountAddress) -> 
 ///
 /// Check that all key indexes in the signatures map exist on chain but not vice
 /// versa.
-fn exist_signature_map_keys_on_chain<C: Curve, AttributeType: Attribute<C::Scalar>>(
+fn assert_signature_map_key_indexes_on_chain<C: Curve, AttributeType: Attribute<C::Scalar>>(
     signatures: &AccountSignatures,
     on_chain_credentials: &BTreeMap<
         CredentialIndex,
         Versioned<AccountCredentialWithoutProofs<C, AttributeType>>,
     >,
-) -> bool {
+) -> Result<(), SignatureError> {
     // Ensure all top-level keys in signatures exist in the on_chain_credentials map
-    signatures.sigs.keys().all(|outer_key| {
+    for outer_key in signatures.sigs.keys() {
         // Check if the outer key exists in the on_chain_credentials map
-        on_chain_credentials
+        let on_chain_cred = on_chain_credentials
             .get(&CredentialIndex { index: *outer_key })
-            .map_or(false, |on_chain_cred| {
-                // Ensure that second-level keys in signatures exist in on_chain_credentials
-                signatures.sigs[outer_key].sigs.keys().all(|inner_key| {
-                    let map = match &on_chain_cred.value {
-                        AccountCredentialWithoutProofs::Initial { icdv } => &icdv.cred_account.keys,
-                        AccountCredentialWithoutProofs::Normal { cdv, .. } => {
-                            &cdv.cred_key_info.keys
-                        }
-                    };
-                    map.contains_key(&KeyIndex(*inner_key))
-                })
-            })
-    })
+            .ok_or(SignatureError::MissingKeyIndexesOnChain {
+                credential_index: *outer_key,
+                // The key index does not exist in this context, use the default value.
+                key_index:        0u8,
+            })?;
+
+        // Ensure that second-level keys in signatures exist in on_chain_credentials
+        for inner_key in signatures.sigs[outer_key].sigs.keys() {
+            let map = match &on_chain_cred.value {
+                AccountCredentialWithoutProofs::Initial { icdv } => &icdv.cred_account.keys,
+                AccountCredentialWithoutProofs::Normal { cdv, .. } => &cdv.cred_key_info.keys,
+            };
+
+            if !map.contains_key(&KeyIndex(*inner_key)) {
+                return Err(SignatureError::MissingKeyIndexesOnChain {
+                    credential_index: *outer_key,
+                    key_index:        *inner_key,
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Verify a given message was signed by the given account.
@@ -264,7 +275,7 @@ pub async fn verify_account_signature(
     signer: AccountAddress,
     signatures: &AccountSignatures,
     message: &Message<'_>,
-    bi: impl IntoBlockIdentifier,
+    bi: BlockIdentifier,
 ) -> Result<bool, SignatureError> {
     let message_hash = calculate_message_hash(message, signer);
 
@@ -275,9 +286,7 @@ pub async fn verify_account_signature(
     let signer_account_credentials = signer_account_info.response.account_credentials;
     let credential_signatures_threshold = signer_account_info.response.account_threshold;
 
-    if !exist_signature_map_keys_on_chain(signatures, &signer_account_credentials) {
-        return Err(SignatureError::MismatchMapIndexes);
-    }
+    assert_signature_map_key_indexes_on_chain(signatures, &signer_account_credentials)?;
 
     let mut valid_credential_signatures_count = 0u8;
     for (credential_index, credential) in signer_account_credentials {
@@ -325,7 +334,7 @@ pub async fn verify_single_account_signature(
     signer: AccountAddress,
     signature: Signature,
     message: &Message<'_>,
-    bi: impl IntoBlockIdentifier,
+    bi: BlockIdentifier,
 ) -> Result<bool, SignatureError> {
     verify_account_signature(
         client,
@@ -523,9 +532,8 @@ pub fn sign_as_single_signer_account_unchecked(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use concordium_base::common::types::CredentialIndex;
+    use concordium_base::{base::AccountThreshold, id::types::CredentialData};
     use std::str::FromStr;
-    use v2::BlockIdentifier;
 
     const NODE_URL: &str = "http://node.testnet.concordium.com:20000";
 
@@ -588,12 +596,16 @@ mod tests {
         // Generate signature.
         let account_signature = sign_as_account_unchecked(account_address, &keypairs, text_message);
 
+        assert_eq!(account_signature.sigs.len(), 1);
+
         let account_signatures_verification_data =
             AccountSignaturesVerificationData::zip_signatures_and_keys(
                 &account_signature,
                 &keypairs,
             )
             .expect("Expect zipping of maps to succeed");
+
+        assert_eq!(account_signatures_verification_data.data.len(), 1);
 
         // Check that the signature is valid.
         let is_valid = verify_account_signature_unchecked(
@@ -695,6 +707,8 @@ mod tests {
         .await
         .expect("Expect signing to succeed");
 
+        assert_eq!(account_signature.sigs.len(), 1);
+
         // Check that the signature is valid.
         let is_valid = verify_account_signature(
             client.clone(),
@@ -791,12 +805,16 @@ mod tests {
         let account_signature =
             sign_as_account_unchecked(account_address, &keypairs, binary_message);
 
+        assert_eq!(account_signature.sigs.len(), 1);
+
         let account_signatures_verification_data =
             AccountSignaturesVerificationData::zip_signatures_and_keys(
                 &account_signature,
                 &keypairs,
             )
             .expect("Expect zipping of maps to succeed");
+
+        assert_eq!(account_signatures_verification_data.data.len(), 1);
 
         // Check that the signature is valid.
         let is_valid = verify_account_signature_unchecked(
@@ -893,6 +911,8 @@ mod tests {
         .await
         .expect("Expect signing to succeed");
 
+        assert_eq!(account_signature.sigs.len(), 1);
+
         // Check that the signature is valid.
         let is_valid = verify_account_signature(
             client,
@@ -961,6 +981,177 @@ mod tests {
             client,
             account_address,
             single_account_signature,
+            binary_message,
+            BlockIdentifier::Best,
+        )
+        .await
+        .expect("Expect verification to succeed");
+        assert_eq!(is_valid, true);
+    }
+
+    // We test signing and verifying of a text messages here with a multi-sig
+    // account. We use the `unchecked` version of the functions.
+    #[test]
+    fn test_sign_and_verify_text_message_unchecked_multi_sig_account() {
+        // Create a message to sign.
+        let message: &str = "test";
+        let text_message = &Message::TextMessage(message);
+
+        let rng = &mut rand::thread_rng();
+
+        // Generate account keys that have one keypair at index 0 in both maps.
+        let single_keypairs = AccountKeys::singleton(rng);
+
+        // Create a multi-sig account from the above keypairs.
+        let credential_map = [
+            (CredentialIndex { index: 0 }, CredentialData {
+                keys:      [
+                    (
+                        KeyIndex(0u8),
+                        single_keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)]
+                            .clone(),
+                    ),
+                    (
+                        KeyIndex(1u8),
+                        single_keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)]
+                            .clone(),
+                    ),
+                ]
+                .into_iter()
+                .collect(),
+                threshold: SignatureThreshold::TWO,
+            }),
+            (CredentialIndex { index: 1 }, CredentialData {
+                keys:      [
+                    (
+                        KeyIndex(0u8),
+                        single_keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)]
+                            .clone(),
+                    ),
+                    (
+                        KeyIndex(1u8),
+                        single_keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)]
+                            .clone(),
+                    ),
+                ]
+                .into_iter()
+                .collect(),
+                threshold: SignatureThreshold::TWO,
+            }),
+        ]
+        .into_iter()
+        .collect();
+
+        let keypairs_multi_sig_account = AccountKeys {
+            keys:      credential_map,
+            threshold: AccountThreshold::TWO,
+        };
+
+        // Create an account address.
+        let account_address = AccountAddress([0u8; 32]);
+
+        // Generate signatures.
+        let account_signatures =
+            sign_as_account_unchecked(account_address, &keypairs_multi_sig_account, text_message);
+
+        assert_eq!(account_signatures.sigs.len(), 2);
+        assert_eq!(account_signatures.sigs[&0].sigs.len(), 2);
+        assert_eq!(account_signatures.sigs[&1].sigs.len(), 2);
+
+        let account_signatures_verification_data =
+            AccountSignaturesVerificationData::zip_signatures_and_keys(
+                &account_signatures,
+                &keypairs_multi_sig_account,
+            )
+            .expect("Expect zipping of maps to succeed");
+
+        assert_eq!(account_signatures_verification_data.data.len(), 2);
+        assert_eq!(account_signatures_verification_data.data[&0].data.len(), 2);
+        assert_eq!(account_signatures_verification_data.data[&1].data.len(), 2);
+
+        // Check that the signature is valid.
+        let is_valid = verify_account_signature_unchecked(
+            account_address,
+            account_signatures_verification_data,
+            text_message,
+        )
+        .expect("Expect verification to succeed");
+        assert_eq!(is_valid, true);
+    }
+
+    // We test signing and verifying of a binary messages here with a multi-sig
+    // account. We use the `checked` version of the functions.
+    #[tokio::test]
+    async fn test_sign_and_verify_binary_message_multi_sig_account() {
+        // Create a message to sign.
+        let message: &[u8] = b"test";
+        let binary_message = &Message::BinaryMessage(message);
+
+        // Create first keypair from a private key.
+        let private_key = "bbabcd59e5ca2edb2073e1936f4df84fbe352fb03c4e55061957f5099b94f562";
+        let bytes = hex::decode(private_key).expect("Invalid hex string for private key.");
+        let signing_key = SigningKey::from_bytes(
+            bytes
+                .as_slice()
+                .try_into()
+                .expect("Invalid private key size"),
+        );
+        let keypair1: KeyPair = KeyPair::from(signing_key);
+
+        // Create second keypair from a private key.
+        let private_key = "751c9c11a7e9f4729779d8795c21aa02973bb2e7276700444ead643c255a38ae";
+        let bytes = hex::decode(private_key).expect("Invalid hex string for private key.");
+        let signing_key = SigningKey::from_bytes(
+            bytes
+                .as_slice()
+                .try_into()
+                .expect("Invalid private key size"),
+        );
+        let keypair2: KeyPair = KeyPair::from(signing_key);
+
+        // Generate account keys of multi-sig account.
+        let keypairs = AccountKeys::from(InitialAccountData {
+            keys:      [
+                (KeyIndex(0), keypair1.clone()),
+                (KeyIndex(1), keypair2.clone()),
+            ]
+            .into_iter()
+            .collect(),
+            threshold: SignatureThreshold::TWO,
+        });
+
+        // Add the corresponding account address from testnet associated with above
+        // private key.
+        let account_address =
+            AccountAddress::from_str("4jxvYasaPncfmCFCLZCvuL5cZuvR5HAQezCHZH7ZA7AGsRYpix")
+                .expect("Expect generating account address successfully");
+
+        // Establish a connection to the node client.
+        let client = v2::Client::new(
+            v2::Endpoint::new(NODE_URL).expect("Expect generating endpoint successfully"),
+        )
+        .await
+        .expect("Expect generating node client successfully");
+
+        // Generate signature.
+        let account_signatures = sign_as_account(
+            client.clone(),
+            account_address,
+            keypairs,
+            binary_message,
+            BlockIdentifier::Best,
+        )
+        .await
+        .expect("Expect signing to succeed");
+
+        assert_eq!(account_signatures.sigs.len(), 1);
+        assert_eq!(account_signatures.sigs[&0].sigs.len(), 2);
+
+        // Check that the signature is valid.
+        let is_valid = verify_account_signature(
+            client,
+            account_address,
+            &account_signatures,
             binary_message,
             BlockIdentifier::Best,
         )
