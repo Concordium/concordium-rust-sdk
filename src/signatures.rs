@@ -1,5 +1,4 @@
 //! Functionality for generating, and verifying account signatures.
-// TODO: add comments
 use crate::v2::{self, AccountIdentifier, BlockIdentifier, QueryError};
 use concordium_base::{
     common::{
@@ -17,25 +16,24 @@ use ed25519_dalek::{SigningKey, VerifyingKey};
 use sha2::Digest;
 use std::collections::BTreeMap;
 
+/// Errors that can occur during generating or verifying account signatures.
 #[derive(thiserror::Error, Debug)]
-/// An error that can be used as the error for the
-/// [`view`](ContractClient::view) family of functions.
 pub enum SignatureError {
     #[error("Network error: {0}")]
     QueryError(#[from] QueryError),
     #[error(
-        "Key indexes do not exist on chain (credential index: `{credential_index}`, key index: \
-         `{key_index}`)"
+        "Indices do not exist on chain for credential index `{credential_index}` and key index \
+         `{key_index}`"
     )]
-    MissingKeyIndexesOnChain {
+    MissingIndicesOnChain {
         credential_index: u8,
         key_index:        u8,
     },
-    #[error("The indexes in the maps do not match")]
-    MismatchMapIndexes,
+    #[error("The indices in the maps do not match")]
+    MismatchMapIndices,
     #[error(
-        "The public key on chain and the private key in the `account_keys` map do not match for \
-         credential index `{credential_index}` and key index `{key_index}`"
+        "The public key and the private key in the `account_keys` map do not match for credential \
+         index `{credential_index}` and key index `{key_index}`"
     )]
     MismatchPublicPrivateKeys {
         credential_index: u8,
@@ -54,17 +52,23 @@ pub enum SignatureError {
     },
 }
 
+/// Message types that can be signed and verified. The Concordium wallets can
+/// either sign binary or text messages.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Message<'a> {
     BinaryMessage(&'a [u8]),
     TextMessage(&'a str),
 }
 
-/// Account signatures. This is an analogue of transaction signatures that are
-/// part of transactions that get sent to the chain.
+/// Account signatures are constructed similarly to transaction signatures. The
+/// only difference is that account signatures use as account nonce the value 0
+/// when signing. This is to ensure that the user does not accidentally sign a
+/// valid transaction. As such account signatures can be used to sign messages
+/// in wallets that can then be verified in a smart contract or by a backend.
 ///
-/// It should be thought of as a nested map, indexed on the outer layer by
-/// credential indexes, and the inner map maps key indices to [`Signature`]s.
+/// Account signatures should be thought of as a nested map, indexed on the
+/// outer layer by credential indices, and the inner map maps key indices to
+/// [`Signature`]s.
 #[derive(Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[repr(transparent)]
 pub struct AccountSignatures {
@@ -78,6 +82,8 @@ pub struct CredentialSignatures {
 }
 
 impl AccountSignatures {
+    /// Create the account signature type from a single signature at credential
+    /// and key indices 0.
     pub fn singleton(signature: Signature) -> Self {
         let credential_map = CredentialSignatures {
             sigs: [(0, signature)].into_iter().collect(),
@@ -89,11 +95,12 @@ impl AccountSignatures {
     }
 }
 
-/// Account signatures. This is an analogue of transaction signatures that are
-/// part of transactions that get sent to the chain.
+/// Account signatures verification data includes the [`Signature`]s and
+/// associated [`VerifyKey`]s for some credentials and key indices.
 ///
-/// It should be thought of as a nested map, indexed on the outer layer by
-/// credential indexes, and the inner map maps key indices to [`Signature`]s.
+/// Account signatures verification data should be thought of as a nested map,
+/// indexed on the outer layer by credential indices, and the inner map maps key
+/// indices to [`Signature`]s and [`VerifyKey`]s.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[repr(transparent)]
 pub struct AccountSignaturesVerificationData {
@@ -113,6 +120,8 @@ pub struct AccountSignaturesVerificationEntry {
 }
 
 impl AccountSignaturesVerificationData {
+    /// Create the account signatures verification data type from a single
+    /// signature and public key at credential and key indices 0.
     pub fn singleton(signature: Signature, public_key: VerifyKey) -> Self {
         let credential_map = CredentialSignaturesVerificationData {
             data: [(0, AccountSignaturesVerificationEntry {
@@ -128,22 +137,33 @@ impl AccountSignaturesVerificationData {
         }
     }
 
+    /// Zip an [`AccountSignatures`] and an [`AccountKeys`] into
+    /// an [`AccountSignaturesVerificationData`] type. The function reverts if
+    /// the indices in the maps do not match.
     pub fn zip_signatures_and_keys(
         account_signatures: &AccountSignatures,
         account_keys: &AccountKeys,
     ) -> Result<Self, SignatureError> {
         let mut outer_map = BTreeMap::new();
 
-        // TODO: fix
+        // Check that the length of the outer map matches.
+        if account_signatures.sigs.len() != account_keys.keys.len() {
+            return Err(SignatureError::MismatchMapIndices);
+        }
 
         for (&outer_key, credential_sigs) in &account_signatures.sigs {
-            // Check if corresponding account key exists
+            // Check if corresponding account key exists.
             if let Some(account_key_pair) =
                 account_keys.keys.get(&CredentialIndex { index: outer_key })
             {
                 let public_keys = account_key_pair.get_public_keys();
 
-                // Create the inner map
+                // Check that the length of the inner map matches.
+                if credential_sigs.sigs.len() != public_keys.len() {
+                    return Err(SignatureError::MismatchMapIndices);
+                }
+
+                // Create the zipped inner map.
                 let inner_map: Result<
                     BTreeMap<u8, AccountSignaturesVerificationEntry>,
                     SignatureError,
@@ -152,9 +172,9 @@ impl AccountSignaturesVerificationData {
                     .iter()
                     .zip(public_keys.iter())
                     .map(|((&inner_key, signature), (key_index, public_key))| {
-                        // Ensure that inner_key and key_index match
+                        // Ensure that inner_key and key_index matches.
                         if inner_key != key_index.0 {
-                            return Err(SignatureError::MismatchMapIndexes);
+                            return Err(SignatureError::MismatchMapIndices);
                         }
                         Ok((inner_key, AccountSignaturesVerificationEntry {
                             signature:  signature.clone(),
@@ -167,7 +187,7 @@ impl AccountSignaturesVerificationData {
                     data: inner_map?,
                 });
             } else {
-                return Err(SignatureError::MismatchMapIndexes);
+                return Err(SignatureError::MismatchMapIndices);
             }
         }
 
@@ -175,6 +195,7 @@ impl AccountSignaturesVerificationData {
     }
 }
 
+/// Calculate the message hash that is signed in Concordium wallets.
 pub fn calculate_message_hash(message: &Message<'_>, signer: AccountAddress) -> [u8; 32] {
     let message_signed_in_wallet = match message {
         Message::BinaryMessage(message) => message,
@@ -200,46 +221,29 @@ pub fn calculate_message_hash(message: &Message<'_>, signer: AccountAddress) -> 
     .into()
 }
 
-/// Retrieve and validate credential metadata in a particular block.
-///
-/// This does not validate the cryptographic proofs, only the metadata. In
-/// particular it checks.
-///
-/// - credential exists
-/// - the credential's network is as supplied to this function
-/// - in case of account credentials, the credential issuer is as stated in the
-///   proof
-/// - credential commitments can be correctly parsed
-/// - credential is active and not expired at the timestamp of the supplied
-///   block
-/// - in case of an account credential, the credential is a normal credential,
-///   and not initial.
-///
-/// For web3id credentials the issuer contract is the source of truth, and this
-/// function does not perform additional validity checks apart from querying the
-/// contract.
-///
-/// Check that all key indexes in the signatures map exist on chain but not vice
+/// Check that all key indices in the signatures map exist on chain but not vice
 /// versa.
-fn assert_signature_map_key_indexes_on_chain<C: Curve, AttributeType: Attribute<C::Scalar>>(
+fn assert_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C::Scalar>>(
     signatures: &AccountSignatures,
     on_chain_credentials: &BTreeMap<
         CredentialIndex,
         Versioned<AccountCredentialWithoutProofs<C, AttributeType>>,
     >,
 ) -> Result<(), SignatureError> {
-    // Ensure all top-level keys in signatures exist in the on_chain_credentials map
+    // Ensure all outer-level keys in the signatures map exist in the
+    // on_chain_credentials map.
     for outer_key in signatures.sigs.keys() {
-        // Check if the outer key exists in the on_chain_credentials map
+        // Check if the outer_key exists in the on_chain_credentials map.
         let on_chain_cred = on_chain_credentials
             .get(&CredentialIndex { index: *outer_key })
-            .ok_or(SignatureError::MissingKeyIndexesOnChain {
+            .ok_or(SignatureError::MissingIndicesOnChain {
                 credential_index: *outer_key,
-                // The key index does not exist in this context, use the default value.
+                // The key_index does not exist in this context, use the default value.
                 key_index:        0u8,
             })?;
 
-        // Ensure that second-level keys in signatures exist in on_chain_credentials
+        // Ensure that the inner-level keys in the signatures map exist in the
+        // on_chain_credentials map.
         for inner_key in signatures.sigs[outer_key].sigs.keys() {
             let map = match &on_chain_cred.value {
                 AccountCredentialWithoutProofs::Initial { icdv } => &icdv.cred_account.keys,
@@ -247,7 +251,7 @@ fn assert_signature_map_key_indexes_on_chain<C: Curve, AttributeType: Attribute<
             };
 
             if !map.contains_key(&KeyIndex(*inner_key)) {
-                return Err(SignatureError::MissingKeyIndexesOnChain {
+                return Err(SignatureError::MissingIndicesOnChain {
                     credential_index: *outer_key,
                     key_index:        *inner_key,
                 });
@@ -258,12 +262,12 @@ fn assert_signature_map_key_indexes_on_chain<C: Curve, AttributeType: Attribute<
 }
 
 /// Verify a given message was signed by the given account.
-/// Concretely this means
-///
-/// - enough credential holders signed the message
+/// Concretely this means:
+/// - enough credential holders signed the message.
 /// - each of the credential signatures has the required number of signatures.
 /// - all of the signatures are valid, that is, it is not sufficient that a
-///   threshold number are valid, and some extra signarues included are invalid.
+///   threshold number are valid, and some extra signatures included are
+///   invalid.
 pub async fn verify_account_signature(
     mut client: v2::Client,
     signer: AccountAddress,
@@ -280,10 +284,16 @@ pub async fn verify_account_signature(
     let signer_account_credentials = signer_account_info.response.account_credentials;
     let credential_signatures_threshold = signer_account_info.response.account_threshold;
 
-    assert_signature_map_key_indexes_on_chain(signatures, &signer_account_credentials)?;
+    // Ensure that all key indices in the signatures map exist on chain but not vice
+    // versa. This allows us to iterate through the `signer_account_credentials` map
+    // to get the public keys and thresholds from the on-chain information
+    // further down while still knowing that each signature in the signatures map
+    // has a corresponding entry on chain.
+    assert_signature_map_key_indices_on_chain(signatures, &signer_account_credentials)?;
 
     let mut valid_credential_signatures_count = 0u8;
     for (credential_index, credential) in signer_account_credentials {
+        // Retrieve the public key and threshold from the on-chain information.
         let (keys, signatures_threshold) = match credential.value {
             AccountCredentialWithoutProofs::Initial { icdv } => {
                 (icdv.cred_account.keys, icdv.cred_account.threshold)
@@ -312,7 +322,7 @@ pub async fn verify_account_signature(
         }
 
         // Check if the number of valid signatures meets the required threshold
-        // so that this credential counts has having a valid credential signature.
+        // so that this credential counts as having a valid credential signature.
         if valid_signatures_count >= signatures_threshold.into() {
             valid_credential_signatures_count += 1;
         }
@@ -323,6 +333,8 @@ pub async fn verify_account_signature(
     Ok(valid_credential_signatures_count >= credential_signatures_threshold.into())
 }
 
+/// Wrapper around the [`verify_account_signature`] function to simplify the
+/// verification for single-signer accounts.
 pub async fn verify_single_account_signature(
     client: v2::Client,
     signer: AccountAddress,
@@ -340,8 +352,14 @@ pub async fn verify_single_account_signature(
     .await
 }
 
-// No check is done if that account exists on chain or if the thresholds on
-// chain are followed.
+/// Verifies account signatures similarly to the [`verify_account_signature`]
+/// function but does not perform any checks against the on-chain data such as:
+/// - if the signer account exists on chain.
+/// - if the credential or key indices from the `signature_data` map exist on
+///   chain.
+/// - if the thresholds on chain are followed.
+/// - if the public keys in the `signature_data` map match the public keys on
+///   chain.
 pub fn verify_account_signature_unchecked(
     signer: AccountAddress,
     signature_data: AccountSignaturesVerificationData,
@@ -367,6 +385,8 @@ pub fn verify_account_signature_unchecked(
     Ok(true)
 }
 
+/// Wrapper around the [`verify_account_signature_unchecked`] function to
+/// simplify the verification for single-signer accounts.
 pub fn verify_single_account_signature_unchecked(
     signer: AccountAddress,
     signature: Signature,
@@ -380,6 +400,16 @@ pub fn verify_single_account_signature_unchecked(
     )
 }
 
+/// Generate [`AccountSignatures`] for a signer account with the given
+/// `account_keys`. The function does perform checks against the on-chain data
+/// such as:
+/// - if the signer account exists on chain.
+/// - if the credential or key indices from the `account_keys` map exist on
+///   chain.
+/// - if the public keys in the `account_keys` map match the public keys on
+///   chain.
+/// - if the public keys in the `account_keys` map match the private keys in the
+///   `account_keys` map.
 pub async fn sign_as_account(
     mut client: v2::Client,
     signer: AccountAddress,
@@ -389,6 +419,7 @@ pub async fn sign_as_account(
 ) -> Result<AccountSignatures, SignatureError> {
     let message_hash = calculate_message_hash(message, signer);
 
+    // Generate the return type.
     let mut account_signatures = AccountSignatures {
         sigs: BTreeMap::new(),
     };
@@ -399,11 +430,12 @@ pub async fn sign_as_account(
 
     let signer_account_credentials = signer_account_info.response.account_credentials;
 
+    // Iterate through the `account_keys` map.
     for (credential_index, credential) in account_keys.keys {
         for (key_index, signing_key) in credential.keys {
             let on_chain_credential = &signer_account_credentials
                 .get(&credential_index)
-                .ok_or(SignatureError::MissingKeyIndexesOnChain {
+                .ok_or(SignatureError::MissingIndicesOnChain {
                     credential_index: credential_index.index,
                     key_index:        key_index.0,
                 })?
@@ -417,13 +449,15 @@ pub async fn sign_as_account(
             let on_chain_public_key =
                 on_chain_keys
                     .get(&key_index)
-                    .ok_or(SignatureError::MissingKeyIndexesOnChain {
+                    .ok_or(SignatureError::MissingIndicesOnChain {
                         credential_index: credential_index.index,
                         key_index:        key_index.0,
                     })?;
 
             let VerifyKey::Ed25519VerifyKey(public_key) = *on_chain_public_key;
 
+            // Check that the public key in the `account_keys` map matches the public key on
+            // chain.
             if signing_key.public() != public_key {
                 return Err(SignatureError::MismatchPublicKeyOnChain {
                     credential_index:    credential_index.index,
@@ -433,10 +467,11 @@ pub async fn sign_as_account(
                 });
             };
 
+            // Generate the signature.
             let signature = signing_key.sign(&message_hash);
 
-            // Check that the signatures are valid to ensure
-            // that public and private keys in the `account_keys` map match.
+            // Check that the signature is valid to ensure
+            // that the public and private keys in the `account_keys` map match.
             if !VerifyKey::from(public_key).verify(message_hash, &Signature::from(signature)) {
                 return Err(SignatureError::MismatchPublicPrivateKeys {
                     credential_index: credential_index.index,
@@ -444,6 +479,7 @@ pub async fn sign_as_account(
                 });
             }
 
+            // Insert the generated signature into the return map.
             account_signatures
                 .sigs
                 .entry(credential_index.index)
@@ -458,6 +494,8 @@ pub async fn sign_as_account(
     Ok(account_signatures)
 }
 
+/// Wrapper around the [`sign_as_account`] function to simplify the signature
+/// generation for single-signer accounts.
 pub async fn sign_as_single_signer_account(
     client: v2::Client,
     signer: AccountAddress,
@@ -472,11 +510,20 @@ pub async fn sign_as_single_signer_account(
         threshold: SignatureThreshold::ONE,
     });
     let signature = sign_as_account(client, signer, keypairs, message, bi).await?;
-    // Accessing the maps at index 0 is safe because we generated an
+    // Accessing the maps at indices 0 is safe because we generated an
     // AccountSignature with a keypair at index 0 at both maps.
     Ok(signature.sigs[&0].sigs[&0].clone())
 }
 
+/// Generates account signatures similarly to the [`sign_as_account`] function
+/// but does not perform any checks against the on-chain data such as:
+/// - if the signer account exists on chain.
+/// - if the credential or key indices from the `account_keys` map exist on
+///   chain.
+/// - if the public keys in the `account_keys` map match the public keys on
+///   chain.
+/// - if the public keys in the `account_keys` map match the private keys in the
+///   `account_keys` map.
 pub fn sign_as_account_unchecked(
     signer: AccountAddress,
     account_keys: &AccountKeys,
@@ -484,6 +531,7 @@ pub fn sign_as_account_unchecked(
 ) -> AccountSignatures {
     let message_hash = calculate_message_hash(message, signer);
 
+    // Generate the return type.
     let mut account_signatures = AccountSignatures {
         sigs: BTreeMap::new(),
     };
@@ -506,6 +554,8 @@ pub fn sign_as_account_unchecked(
     account_signatures
 }
 
+/// Wrapper around the [`sign_as_account_unchecked`] function to simplify the
+/// signature generation for single-signer accounts.
 pub fn sign_as_single_signer_account_unchecked(
     signer: AccountAddress,
     signing_key: SigningKey,
@@ -518,7 +568,7 @@ pub fn sign_as_single_signer_account_unchecked(
         threshold: SignatureThreshold::ONE,
     });
     let signature = sign_as_account_unchecked(signer, &keypairs, message);
-    // Accessing the maps at index 0 is safe because we generated an
+    // Accessing the maps at indices 0 is safe because we generated an
     // AccountSignature with a keypair at index 0 at both maps.
     Ok(signature.sigs[&0].sigs[&0].clone())
 }
@@ -537,7 +587,7 @@ mod tests {
 
         // Generate account keys that have one keypair at index 0 in both maps.
         let keypairs = AccountKeys::singleton(rng);
-        // Get public key from map.
+        // Get the public key from the map.
         let credential_keys = &keypairs.keys[&CredentialIndex { index: 0 }];
         let key_pair = &credential_keys.keys[&KeyIndex(0)];
         let public_key = key_pair.public().into();
@@ -545,11 +595,11 @@ mod tests {
         // Generate a signature.
         let signature = Signature::from(ed25519_dalek::Signature::from_bytes(&[0u8; 64]));
 
-        // Create AccountSignaturesVerificationData type.
+        // Create an AccountSignaturesVerificationData type.
         let account_signatures_verification_data =
             AccountSignaturesVerificationData::singleton(signature, public_key);
 
-        // Check that the serialization and deserialization works.
+        // Check that the serialization and deserialization work.
         let serialized = serde_json::to_string(&account_signatures_verification_data)
             .expect("Failed to serialize account_signatures_verification_data");
         let deserialized: AccountSignaturesVerificationData = serde_json::from_str(&serialized)
@@ -559,11 +609,11 @@ mod tests {
 
     #[test]
     fn test_serde_account_signatures() {
-        // Create AccountSignatures type.
+        // Create an AccountSignatures type.
         let ed25519_signature = ed25519_dalek::Signature::from_bytes(&[0u8; 64]);
         let account_signatures = AccountSignatures::singleton(Signature::from(ed25519_signature));
 
-        // Check that the serialization and deserialization works.
+        // Check that the serialization and deserialization work.
         let serialized = serde_json::to_string(&account_signatures)
             .expect("Failed to serialize account_signatures");
         let deserialized: AccountSignatures =
@@ -571,7 +621,7 @@ mod tests {
         assert_eq!(account_signatures, deserialized);
     }
 
-    // We test signing and verifying of a text messages here. We use the `unchecked`
+    // We test signing and verifying a text message here. We use the `unchecked`
     // version of the functions.
     #[test]
     fn test_sign_and_verify_text_message_unchecked() {
@@ -587,7 +637,7 @@ mod tests {
         // Create an account address.
         let account_address = AccountAddress([0u8; 32]);
 
-        // Generate signature.
+        // Generate a signature.
         let account_signature = sign_as_account_unchecked(account_address, &keypairs, text_message);
 
         assert_eq!(account_signature.sigs.len(), 1);
@@ -611,8 +661,8 @@ mod tests {
         assert_eq!(is_valid, true);
     }
 
-    // We test signing and verifying of a text messages here. We use the `unchecked`
-    // and `single` version of the functions.
+    // We test signing and verifying a text message here. We use the `unchecked`
+    // and `single` versions of the functions.
     #[test]
     fn test_sign_and_verify_text_message_unchecked_single() {
         // Create a message to sign.
@@ -625,7 +675,7 @@ mod tests {
         let keypairs = AccountKeys::singleton(rng);
         let single_key = keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)].clone();
 
-        // Get public key from map.
+        // Get the public key from the map.
         let credential_keys = &keypairs.keys[&CredentialIndex { index: 0 }];
         let key_pair = &credential_keys.keys[&KeyIndex(0)];
         let public_key = key_pair.public();
@@ -633,7 +683,7 @@ mod tests {
         // Create an account address.
         let account_address = AccountAddress([0u8; 32]);
 
-        // Generate signature.
+        // Generate a signature.
         let single_account_signature = sign_as_single_signer_account_unchecked(
             account_address,
             single_key.into(),
@@ -652,7 +702,7 @@ mod tests {
         assert_eq!(is_valid, true);
     }
 
-    // We test signing and verifying of a text messages here. We use the `checked`
+    // We test signing and verifying a text message here. We use the `checked`
     // version of the functions.
     #[tokio::test]
     async fn test_sign_and_verify_text_message_checked() {
@@ -663,7 +713,6 @@ mod tests {
         // Create a keypair from a private key.
         let private_key = "f74e3188e4766841600f6fd0095a0ac1c30e4c2e97b9797d7e05a28a48f5c37c";
         let bytes = hex::decode(private_key).expect("Invalid hex string for private key.");
-
         let signing_key = SigningKey::from_bytes(
             bytes
                 .as_slice()
@@ -671,13 +720,14 @@ mod tests {
                 .expect("Invalid private key size"),
         );
         let keypair: KeyPair = KeyPair::from(signing_key);
+
         // Generate account keys that have one keypair at index 0 in both maps.
         let keypairs = AccountKeys::from(InitialAccountData {
             keys:      [(KeyIndex(0), keypair)].into_iter().collect(),
             threshold: SignatureThreshold::ONE,
         });
 
-        // Add the corresponding account address from testnet associated with above
+        // Add the corresponding account address from testnet associated with the above
         // private key.
         let account_address =
             AccountAddress::from_str("47b6Qe2XtZANHetanWKP1PbApLKtS3AyiCtcXaqLMbypKjCaRw")
@@ -690,7 +740,7 @@ mod tests {
         .await
         .expect("Expect generating node client successfully");
 
-        // Generate signature.
+        // Generate a signature.
         let account_signature = sign_as_account(
             client.clone(),
             account_address,
@@ -716,8 +766,8 @@ mod tests {
         assert_eq!(is_valid, true);
     }
 
-    // We test signing and verifying of a text messages here. We use the `checked`
-    // and `single` version of the functions.
+    // We test signing and verifying a text message here. We use the `checked`
+    // and `single` versions of the functions.
     #[tokio::test]
     async fn test_sign_and_verify_text_message_checked_single() {
         // Create a message to sign.
@@ -727,7 +777,6 @@ mod tests {
         // Create a keypair from a private key.
         let private_key = "f74e3188e4766841600f6fd0095a0ac1c30e4c2e97b9797d7e05a28a48f5c37c";
         let bytes = hex::decode(private_key).expect("Invalid hex string for private key.");
-
         let signing_key = SigningKey::from_bytes(
             bytes
                 .as_slice()
@@ -735,6 +784,7 @@ mod tests {
                 .expect("Invalid private key size"),
         );
         let keypair: KeyPair = KeyPair::from(signing_key);
+
         // Generate account keys that have one keypair at index 0 in both maps.
         let keypairs = AccountKeys::from(InitialAccountData {
             keys:      [(KeyIndex(0), keypair)].into_iter().collect(),
@@ -742,7 +792,7 @@ mod tests {
         });
         let single_key = keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)].clone();
 
-        // Add the corresponding account address from testnet associated with above
+        // Add the corresponding account address from testnet associated with the above
         // private key.
         let account_address =
             AccountAddress::from_str("47b6Qe2XtZANHetanWKP1PbApLKtS3AyiCtcXaqLMbypKjCaRw")
@@ -755,7 +805,7 @@ mod tests {
         .await
         .expect("Expect generating node client successfully");
 
-        // Generate signature.
+        // Generate a signature.
         let single_account_signature = sign_as_single_signer_account(
             client.clone(),
             account_address,
@@ -779,7 +829,7 @@ mod tests {
         assert_eq!(is_valid, true);
     }
 
-    // We test signing and verifying of a binary messages here. We use the
+    // We test signing and verifying a binary message here. We use the
     // `unchecked` version of the functions.
     #[test]
     fn test_sign_and_verify_binary_message_unchecked() {
@@ -795,7 +845,7 @@ mod tests {
         // Create an account address.
         let account_address = AccountAddress([0u8; 32]);
 
-        // Generate signature.
+        // Generate a signature.
         let account_signature =
             sign_as_account_unchecked(account_address, &keypairs, binary_message);
 
@@ -820,8 +870,8 @@ mod tests {
         assert_eq!(is_valid, true);
     }
 
-    // We test signing and verifying of a binary messages here. We use the
-    // `unchecked` and `single` version of the functions.
+    // We test signing and verifying a binary message here. We use the
+    // `unchecked` and `single` versions of the functions.
     #[test]
     fn test_sign_and_verify_binary_message_unchecked_single() {
         // Create a message to sign.
@@ -837,7 +887,7 @@ mod tests {
         // Create an account address.
         let account_address = AccountAddress([0u8; 32]);
 
-        // Generate signature.
+        // Generate a signature.
         let single_account_signature = sign_as_single_signer_account_unchecked(
             account_address,
             single_key.clone().into(),
@@ -856,7 +906,7 @@ mod tests {
         assert_eq!(is_valid, true);
     }
 
-    // We test signing and verifying of a binary messages here. We use the `checked`
+    // We test signing and verifying a binary message here. We use the `checked`
     // version of the functions.
     #[tokio::test]
     async fn test_sign_and_verify_binary_message_checked() {
@@ -867,7 +917,6 @@ mod tests {
         // Create a keypair from a private key.
         let private_key = "f74e3188e4766841600f6fd0095a0ac1c30e4c2e97b9797d7e05a28a48f5c37c";
         let bytes = hex::decode(private_key).expect("Invalid hex string for private key.");
-
         let signing_key = SigningKey::from_bytes(
             bytes
                 .as_slice()
@@ -875,13 +924,14 @@ mod tests {
                 .expect("Invalid private key size"),
         );
         let keypair: KeyPair = KeyPair::from(signing_key);
+
         // Generate account keys that have one keypair at index 0 in both maps.
         let keypairs = AccountKeys::from(InitialAccountData {
             keys:      [(KeyIndex(0), keypair)].into_iter().collect(),
             threshold: SignatureThreshold::ONE,
         });
 
-        // Add the corresponding account address from testnet associated with above
+        // Add the corresponding account address from testnet associated with the above
         // private key.
         let account_address =
             AccountAddress::from_str("47b6Qe2XtZANHetanWKP1PbApLKtS3AyiCtcXaqLMbypKjCaRw")
@@ -894,7 +944,7 @@ mod tests {
         .await
         .expect("Expect generating node client successfully");
 
-        // Generate signature.
+        // Generate a signature.
         let account_signature = sign_as_account(
             client.clone(),
             account_address,
@@ -920,8 +970,8 @@ mod tests {
         assert_eq!(is_valid, true);
     }
 
-    // We test signing and verifying of a binary messages here. We use the `checked`
-    // and `single` version of the functions.
+    // We test signing and verifying a binary message here. We use the `checked`
+    // and `single` versions of the functions.
     #[tokio::test]
     async fn test_sign_and_verify_binary_message_checked_single() {
         // Create a message to sign.
@@ -931,7 +981,6 @@ mod tests {
         // Create a keypair from a private key.
         let private_key = "f74e3188e4766841600f6fd0095a0ac1c30e4c2e97b9797d7e05a28a48f5c37c";
         let bytes = hex::decode(private_key).expect("Invalid hex string for private key.");
-
         let signing_key = SigningKey::from_bytes(
             bytes
                 .as_slice()
@@ -939,6 +988,7 @@ mod tests {
                 .expect("Invalid private key size"),
         );
         let keypair: KeyPair = KeyPair::from(signing_key);
+
         // Generate account keys that have one keypair at index 0 in both maps.
         let keypairs = AccountKeys::from(InitialAccountData {
             keys:      [(KeyIndex(0), keypair)].into_iter().collect(),
@@ -946,7 +996,7 @@ mod tests {
         });
         let single_key = keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)].clone();
 
-        // Add the corresponding account address from testnet associated with above
+        // Add the corresponding account address from testnet associated with the above
         // private key.
         let account_address =
             AccountAddress::from_str("47b6Qe2XtZANHetanWKP1PbApLKtS3AyiCtcXaqLMbypKjCaRw")
@@ -959,7 +1009,7 @@ mod tests {
         .await
         .expect("Expect generating node client successfully");
 
-        // Generate signature.
+        // Generate a signature.
         let single_account_signature = sign_as_single_signer_account(
             client.clone(),
             account_address,
@@ -983,7 +1033,7 @@ mod tests {
         assert_eq!(is_valid, true);
     }
 
-    // We test signing and verifying of a text messages here with a multi-sig
+    // We test signing and verifying a text message here with a multi-sig
     // account. We use the `unchecked` version of the functions.
     #[test]
     fn test_sign_and_verify_text_message_unchecked_multi_sig_account() {
@@ -1063,7 +1113,7 @@ mod tests {
         assert_eq!(account_signatures_verification_data.data[&0].data.len(), 2);
         assert_eq!(account_signatures_verification_data.data[&1].data.len(), 2);
 
-        // Check that the signature is valid.
+        // Check that the signatures are valid.
         let is_valid = verify_account_signature_unchecked(
             account_address,
             account_signatures_verification_data,
@@ -1073,7 +1123,7 @@ mod tests {
         assert_eq!(is_valid, true);
     }
 
-    // We test signing and verifying of a binary messages here with a multi-sig
+    // We test signing and verifying a binary message here with a multi-sig
     // account. We use the `checked` version of the functions.
     #[tokio::test]
     async fn test_sign_and_verify_binary_message_multi_sig_account() {
@@ -1114,7 +1164,7 @@ mod tests {
             threshold: SignatureThreshold::TWO,
         });
 
-        // Add the corresponding account address from testnet associated with above
+        // Add the corresponding account address from testnet associated with the above
         // private key.
         let account_address =
             AccountAddress::from_str("4jxvYasaPncfmCFCLZCvuL5cZuvR5HAQezCHZH7ZA7AGsRYpix")
@@ -1141,7 +1191,7 @@ mod tests {
         assert_eq!(account_signatures.sigs.len(), 1);
         assert_eq!(account_signatures.sigs[&0].sigs.len(), 2);
 
-        // Check that the signature is valid.
+        // Check that the signatures are valid.
         let is_valid = verify_account_signature(
             client,
             account_address,
