@@ -35,8 +35,14 @@ pub enum SignatureError {
     },
     #[error("The indexes in the maps do not match")]
     MismatchMapIndexes,
-    #[error("The public key and private key do not match")]
-    MismatchPublicPrivateKeys,
+    #[error(
+        "The public key on chain and the private key in the `account_keys` map do not match for \
+         credential index `{credential_index}` and key index `{key_index}`"
+    )]
+    MismatchPublicPrivateKeys {
+        credential_index: u8,
+        key_index:        u8,
+    },
     #[error(
         "The public key on chain `{expected_public_key:?}` and the public key \
          `{actual_public_key:?}` in the signature map do not match for credential index \
@@ -413,18 +419,27 @@ pub async fn sign_as_account(
                         key_index:        key_index.0,
                     })?;
 
-            let VerifyKey::Ed25519VerifyKey(verifying_key) = *on_chain_public_key;
+            let VerifyKey::Ed25519VerifyKey(public_key) = *on_chain_public_key;
 
-            if signing_key.public() != verifying_key {
+            if signing_key.public() != public_key {
                 return Err(SignatureError::MismatchPublicKeyOnChain {
                     credential_index:    credential_index.index,
                     key_index:           key_index.0,
-                    expected_public_key: Box::new(verifying_key),
+                    expected_public_key: Box::new(public_key),
                     actual_public_key:   Box::new(signing_key.public()),
                 });
             };
 
             let signature = signing_key.sign(&message_hash);
+
+            // Check that the signatures are valid to ensure
+            // that public and private keys in the `account_keys` map match.
+            if !VerifyKey::from(public_key).verify(message_hash, &Signature::from(signature)) {
+                return Err(SignatureError::MismatchPublicPrivateKeys {
+                    credential_index: credential_index.index,
+                    key_index:        key_index.0,
+                });
+            }
 
             account_signatures
                 .sigs
@@ -437,17 +452,7 @@ pub async fn sign_as_account(
         }
     }
 
-    // Check that the signatures are valid to ensure
-    // that public and private keys in the `account_keys` map match.
-    let is_valid = verify_account_signature(client, signer, &account_signatures, message, bi)
-        .await
-        .map_err(|_| SignatureError::MismatchPublicPrivateKeys)?;
-
-    if is_valid {
-        Ok(account_signatures)
-    } else {
-        Err(SignatureError::MismatchPublicPrivateKeys)
-    }
+    Ok(account_signatures)
 }
 
 pub async fn sign_as_single_signer_account(
