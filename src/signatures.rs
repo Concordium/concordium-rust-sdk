@@ -1,6 +1,4 @@
 //! Functionality for generating, and verifying account signatures.
-// TODO: test for binary and string signing with external repo.
-// TODO: test for binary and string signing checked with external repo.
 // TODO: add comments
 use crate::v2::{self, AccountIdentifier, BlockIdentifier, QueryError};
 use concordium_base::{
@@ -8,7 +6,7 @@ use concordium_base::{
         types::{CredentialIndex, KeyIndex, KeyPair, Signature},
         Versioned,
     },
-    contracts_common::{to_bytes, AccountAddress, SignatureThreshold},
+    contracts_common::{AccountAddress, SignatureThreshold},
     curve_arithmetic::Curve,
     id::types::{
         AccountCredentialWithoutProofs, AccountKeys, Attribute, InitialAccountData,
@@ -56,7 +54,7 @@ pub enum SignatureError {
     },
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Message<'a> {
     BinaryMessage(&'a [u8]),
     TextMessage(&'a str),
@@ -178,13 +176,9 @@ impl AccountSignaturesVerificationData {
 }
 
 pub fn calculate_message_hash(message: &Message<'_>, signer: AccountAddress) -> [u8; 32] {
-    let message_bytes;
-    let message_signed_in_wallet: &[u8] = match message {
+    let message_signed_in_wallet = match message {
         Message::BinaryMessage(message) => message,
-        Message::TextMessage(message) => {
-            message_bytes = to_bytes(&message);
-            &message_bytes
-        }
+        Message::TextMessage(message) => (**message).as_bytes(),
     };
 
     // A message signed in a Concordium wallet is prepended with the
@@ -199,7 +193,7 @@ pub fn calculate_message_hash(message: &Message<'_>, signer: AccountAddress) -> 
         [
             &signer.as_ref() as &[u8],
             &[0u8; 8],
-            message_signed_in_wallet,
+            &message_signed_in_wallet,
         ]
         .concat(),
     )
