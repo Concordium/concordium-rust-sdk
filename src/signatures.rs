@@ -658,7 +658,7 @@ mod tests {
             text_message,
         )
         .expect("Expect verification to succeed");
-        assert_eq!(is_valid, true);
+        assert!(is_valid);
     }
 
     // We test signing and verifying a text message here. We use the `unchecked`
@@ -699,7 +699,7 @@ mod tests {
             text_message,
         )
         .expect("Expect verification to succeed");
-        assert_eq!(is_valid, true);
+        assert!(is_valid);
     }
 
     // We test signing and verifying a text message here. We use the `checked`
@@ -763,7 +763,7 @@ mod tests {
         )
         .await
         .expect("Expect verification to succeed");
-        assert_eq!(is_valid, true);
+        assert!(is_valid);
     }
 
     // We test signing and verifying a text message here. We use the `checked`
@@ -826,7 +826,7 @@ mod tests {
         )
         .await
         .expect("Expect verification to succeed");
-        assert_eq!(is_valid, true);
+        assert!(is_valid);
     }
 
     // We test signing and verifying a binary message here. We use the
@@ -867,7 +867,7 @@ mod tests {
             binary_message,
         )
         .expect("Expect verification to succeed");
-        assert_eq!(is_valid, true);
+        assert!(is_valid);
     }
 
     // We test signing and verifying a binary message here. We use the
@@ -903,7 +903,7 @@ mod tests {
             binary_message,
         )
         .expect("Expect verification to succeed");
-        assert_eq!(is_valid, true);
+        assert!(is_valid);
     }
 
     // We test signing and verifying a binary message here. We use the `checked`
@@ -967,7 +967,7 @@ mod tests {
         )
         .await
         .expect("Expect verification to succeed");
-        assert_eq!(is_valid, true);
+        assert!(is_valid);
     }
 
     // We test signing and verifying a binary message here. We use the `checked`
@@ -1030,7 +1030,7 @@ mod tests {
         )
         .await
         .expect("Expect verification to succeed");
-        assert_eq!(is_valid, true);
+        assert!(is_valid);
     }
 
     // We test signing and verifying a text message here with a multi-sig
@@ -1120,7 +1120,7 @@ mod tests {
             text_message,
         )
         .expect("Expect verification to succeed");
-        assert_eq!(is_valid, true);
+        assert!(is_valid);
     }
 
     // We test signing and verifying a binary message here with a multi-sig
@@ -1201,6 +1201,6 @@ mod tests {
         )
         .await
         .expect("Expect verification to succeed");
-        assert_eq!(is_valid, true);
+        assert!(is_valid);
     }
 }
