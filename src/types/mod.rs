@@ -1,3 +1,4 @@
+//! Type definitions used throughout the rest of the SDK.
 use anyhow::Context;
 pub use concordium_base::hashes;
 // re-export to maintain backwards compatibility.

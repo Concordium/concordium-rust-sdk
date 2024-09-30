@@ -47,17 +47,10 @@ pub enum SignatureError {
     MismatchPublicKeyOnChain {
         credential_index:    u8,
         key_index:           u8,
+        // Because of a clippy warning that this enum variant is quite large, `Box` is used.
         expected_public_key: Box<VerifyingKey>,
         actual_public_key:   Box<VerifyingKey>,
     },
-}
-
-/// Message types that can be signed and verified. The Concordium wallets can
-/// either sign binary or text messages.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Message<'a> {
-    BinaryMessage(&'a [u8]),
-    TextMessage(&'a str),
 }
 
 /// Account signatures are constructed similarly to transaction signatures. The
@@ -83,14 +76,17 @@ pub struct CredentialSignatures {
 
 impl AccountSignatures {
     /// Create the account signature type from a single signature at credential
-    /// and key indices 0.
+    /// and key indices 0. This is a helper function to create the type when
+    /// dealing with a single-signer account (in contrast to a multi-sig
+    /// account). The naming `singleton` is used in Concordium's code base
+    /// to indicate that there is only one element in the maps.
     pub fn singleton(signature: Signature) -> Self {
         let credential_map = CredentialSignatures {
-            sigs: [(0, signature)].into_iter().collect(),
+            sigs: [(0, signature)].into(),
         };
 
         AccountSignatures {
-            sigs: [(0, credential_map)].into_iter().collect(),
+            sigs: [(0, credential_map)].into(),
         }
     }
 }
@@ -121,19 +117,22 @@ pub struct AccountSignaturesVerificationEntry {
 
 impl AccountSignaturesVerificationData {
     /// Create the account signatures verification data type from a single
-    /// signature and public key at credential and key indices 0.
+    /// signature and public key at credential and key indices 0. This is a
+    /// helper function to create the type when dealing with a single-signer
+    /// account (in contrast to a multi-sig account). The naming `singleton`
+    /// is used in Concordium's code base to indicate that there is only one
+    /// element in the maps.
     pub fn singleton(signature: Signature, public_key: VerifyKey) -> Self {
         let credential_map = CredentialSignaturesVerificationData {
             data: [(0, AccountSignaturesVerificationEntry {
                 signature,
                 public_key,
             })]
-            .into_iter()
-            .collect(),
+            .into(),
         };
 
         AccountSignaturesVerificationData {
-            data: [(0, credential_map)].into_iter().collect(),
+            data: [(0, credential_map)].into(),
         }
     }
 
@@ -153,42 +152,43 @@ impl AccountSignaturesVerificationData {
 
         for (&outer_key, credential_sigs) in &account_signatures.sigs {
             // Check if corresponding account key exists.
-            if let Some(account_key_pair) =
+
+            let Some(account_key_pair) =
                 account_keys.keys.get(&CredentialIndex { index: outer_key })
-            {
-                let public_keys = account_key_pair.get_public_keys();
+            else {
+                return Err(SignatureError::MismatchMapIndices);
+            };
 
-                // Check that the length of the inner map matches.
-                if credential_sigs.sigs.len() != public_keys.len() {
-                    return Err(SignatureError::MismatchMapIndices);
-                }
+            let public_keys = account_key_pair.get_public_keys();
 
-                // Create the zipped inner map.
-                let inner_map: Result<
-                    BTreeMap<u8, AccountSignaturesVerificationEntry>,
-                    SignatureError,
-                > = credential_sigs
-                    .sigs
-                    .iter()
-                    .zip(public_keys.iter())
-                    .map(|((&inner_key, signature), (key_index, public_key))| {
-                        // Ensure that inner_key and key_index matches.
-                        if inner_key != key_index.0 {
-                            return Err(SignatureError::MismatchMapIndices);
-                        }
-                        Ok((inner_key, AccountSignaturesVerificationEntry {
-                            signature:  signature.clone(),
-                            public_key: public_key.clone(),
-                        }))
-                    })
-                    .collect();
-
-                outer_map.insert(outer_key, CredentialSignaturesVerificationData {
-                    data: inner_map?,
-                });
-            } else {
+            // Check that the length of the inner map matches.
+            if credential_sigs.sigs.len() != public_keys.len() {
                 return Err(SignatureError::MismatchMapIndices);
             }
+
+            // Create the zipped inner map.
+            let inner_map: Result<
+                BTreeMap<u8, AccountSignaturesVerificationEntry>,
+                SignatureError,
+            > = credential_sigs
+                .sigs
+                .iter()
+                .zip(public_keys.iter())
+                .map(|((&inner_key, signature), (key_index, public_key))| {
+                    // Ensure that inner_key and key_index matches.
+                    if inner_key != key_index.0 {
+                        return Err(SignatureError::MismatchMapIndices);
+                    }
+                    Ok((inner_key, AccountSignaturesVerificationEntry {
+                        signature:  signature.clone(),
+                        public_key: public_key.clone(),
+                    }))
+                })
+                .collect();
+
+            outer_map.insert(outer_key, CredentialSignaturesVerificationData {
+                data: inner_map?,
+            });
         }
 
         Ok(AccountSignaturesVerificationData { data: outer_map })
@@ -196,12 +196,7 @@ impl AccountSignaturesVerificationData {
 }
 
 /// Calculate the message hash that is signed in Concordium wallets.
-pub fn calculate_message_hash(message: &Message<'_>, signer: AccountAddress) -> [u8; 32] {
-    let message_signed_in_wallet = match message {
-        Message::BinaryMessage(message) => message,
-        Message::TextMessage(message) => (**message).as_bytes(),
-    };
-
+pub fn calculate_message_hash(message: impl AsRef<[u8]>, signer: AccountAddress) -> [u8; 32] {
     // A message signed in a Concordium wallet is prepended with the
     // `account` address (signer) and 8 zero bytes. Accounts in a Concordium
     // wallet can either sign a regular transaction (in that case the
@@ -210,20 +205,16 @@ pub fn calculate_message_hash(message: &Message<'_>, signer: AccountAddress) -> 
     // address and 8 zero bytes). Hence, the 8 zero bytes ensure that the user
     // does not accidentally sign a transaction. The account nonce is of type
     // u64 (8 bytes).
-    sha2::Sha256::digest(
-        [
-            &signer.as_ref() as &[u8],
-            &[0u8; 8],
-            &message_signed_in_wallet,
-        ]
-        .concat(),
-    )
-    .into()
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(signer);
+    hasher.update([0u8; 8]);
+    hasher.update(message);
+    hasher.finalize().into()
 }
 
 /// Check that all key indices in the signatures map exist on chain but not vice
 /// versa.
-fn assert_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C::Scalar>>(
+fn check_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C::Scalar>>(
     signatures: &AccountSignatures,
     on_chain_credentials: &BTreeMap<
         CredentialIndex,
@@ -232,7 +223,7 @@ fn assert_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<
 ) -> Result<(), SignatureError> {
     // Ensure all outer-level keys in the signatures map exist in the
     // on_chain_credentials map.
-    for outer_key in signatures.sigs.keys() {
+    for (outer_key, inner_map) in &signatures.sigs {
         // Check if the outer_key exists in the on_chain_credentials map.
         let on_chain_cred = on_chain_credentials
             .get(&CredentialIndex { index: *outer_key })
@@ -244,7 +235,7 @@ fn assert_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<
 
         // Ensure that the inner-level keys in the signatures map exist in the
         // on_chain_credentials map.
-        for inner_key in signatures.sigs[outer_key].sigs.keys() {
+        for inner_key in inner_map.sigs.keys() {
             let map = match &on_chain_cred.value {
                 AccountCredentialWithoutProofs::Initial { icdv } => &icdv.cred_account.keys,
                 AccountCredentialWithoutProofs::Normal { cdv, .. } => &cdv.cred_key_info.keys,
@@ -272,7 +263,7 @@ pub async fn verify_account_signature(
     mut client: v2::Client,
     signer: AccountAddress,
     signatures: &AccountSignatures,
-    message: &Message<'_>,
+    message: impl AsRef<[u8]>,
     bi: BlockIdentifier,
 ) -> Result<bool, SignatureError> {
     let message_hash = calculate_message_hash(message, signer);
@@ -289,7 +280,7 @@ pub async fn verify_account_signature(
     // to get the public keys and thresholds from the on-chain information
     // further down while still knowing that each signature in the signatures map
     // has a corresponding entry on chain.
-    assert_signature_map_key_indices_on_chain(signatures, &signer_account_credentials)?;
+    check_signature_map_key_indices_on_chain(signatures, &signer_account_credentials)?;
 
     let mut valid_credential_signatures_count = 0u8;
     for (credential_index, credential) in signer_account_credentials {
@@ -308,16 +299,20 @@ pub async fn verify_account_signature(
         for (key_index, public_key) in keys {
             // If a signature exists for the given credential and key index, verify it and
             // increase the `valid_signatures_count`.
-            if let Some(cred_sigs) = signatures.sigs.get(&credential_index.index) {
-                if let Some(signature) = cred_sigs.sigs.get(&key_index.0) {
-                    if public_key.verify(message_hash, signature) {
-                        // If the signature is valid, increase the `valid_signatures_count`.
-                        valid_signatures_count += 1;
-                    } else {
-                        // If any signature is invalid, return `false`.
-                        return Ok(false);
-                    }
-                }
+            let Some(cred_sigs) = signatures.sigs.get(&credential_index.index) else {
+                continue;
+            };
+
+            let Some(signature) = cred_sigs.sigs.get(&key_index.0) else {
+                continue;
+            };
+
+            if public_key.verify(message_hash, signature) {
+                // If the signature is valid, increase the `valid_signatures_count`.
+                valid_signatures_count += 1;
+            } else {
+                // If any signature is invalid, return `false`.
+                return Ok(false);
             }
         }
 
@@ -339,7 +334,7 @@ pub async fn verify_single_account_signature(
     client: v2::Client,
     signer: AccountAddress,
     signature: Signature,
-    message: &Message<'_>,
+    message: impl AsRef<[u8]>,
     bi: BlockIdentifier,
 ) -> Result<bool, SignatureError> {
     verify_account_signature(
@@ -363,18 +358,15 @@ pub async fn verify_single_account_signature(
 pub fn verify_account_signature_unchecked(
     signer: AccountAddress,
     signature_data: AccountSignaturesVerificationData,
-    message: &Message<'_>,
+    message: impl AsRef<[u8]>,
 ) -> Result<bool, SignatureError> {
     let message_hash = calculate_message_hash(message, signer);
 
-    for (_, credential) in signature_data.data {
-        for (
-            _,
-            AccountSignaturesVerificationEntry {
-                signature,
-                public_key,
-            },
-        ) in credential.data
+    for credential in signature_data.data.values() {
+        for AccountSignaturesVerificationEntry {
+            signature,
+            public_key,
+        } in credential.data.values()
         {
             if !public_key.verify(message_hash, &signature) {
                 return Ok(false);
@@ -391,7 +383,7 @@ pub fn verify_single_account_signature_unchecked(
     signer: AccountAddress,
     signature: Signature,
     public_key: VerifyKey,
-    message: &Message<'_>,
+    message: impl AsRef<[u8]>,
 ) -> Result<bool, SignatureError> {
     verify_account_signature_unchecked(
         signer,
@@ -414,7 +406,7 @@ pub async fn sign_as_account(
     mut client: v2::Client,
     signer: AccountAddress,
     account_keys: AccountKeys,
-    message: &Message<'_>,
+    message: impl AsRef<[u8]>,
     bi: BlockIdentifier,
 ) -> Result<AccountSignatures, SignatureError> {
     let message_hash = calculate_message_hash(message, signer);
@@ -500,19 +492,19 @@ pub async fn sign_as_single_signer_account(
     client: v2::Client,
     signer: AccountAddress,
     signing_key: SigningKey,
-    message: &Message<'_>,
+    message: impl AsRef<[u8]>,
     bi: BlockIdentifier,
 ) -> Result<Signature, SignatureError> {
     let keypair: KeyPair = KeyPair::from(signing_key);
     // Generate account keys that have one keypair at index 0 in both maps.
     let keypairs = AccountKeys::from(InitialAccountData {
-        keys:      [(KeyIndex(0), keypair)].into_iter().collect(),
+        keys:      [(KeyIndex(0), keypair)].into(),
         threshold: SignatureThreshold::ONE,
     });
-    let signature = sign_as_account(client, signer, keypairs, message, bi).await?;
-    // Accessing the maps at indices 0 is safe because we generated an
-    // AccountSignature with a keypair at index 0 at both maps.
-    Ok(signature.sigs[&0].sigs[&0].clone())
+    let mut signature = sign_as_account(client, signer, keypairs, message, bi).await?;
+    // Accessing the maps at indices 0 and unwrapping is safe because we generated
+    // an AccountSignature with a keypair at index 0 at both maps.
+    Ok(signature.sigs.get_mut(&0).unwrap().sigs.remove(&0).unwrap())
 }
 
 /// Generates account signatures similarly to the [`sign_as_account`] function
@@ -527,7 +519,7 @@ pub async fn sign_as_single_signer_account(
 pub fn sign_as_account_unchecked(
     signer: AccountAddress,
     account_keys: &AccountKeys,
-    message: &Message<'_>,
+    message: impl AsRef<[u8]>,
 ) -> AccountSignatures {
     let message_hash = calculate_message_hash(message, signer);
 
@@ -559,12 +551,12 @@ pub fn sign_as_account_unchecked(
 pub fn sign_as_single_signer_account_unchecked(
     signer: AccountAddress,
     signing_key: SigningKey,
-    message: &Message<'_>,
+    message: impl AsRef<[u8]>,
 ) -> Result<Signature, SignatureError> {
     let keypair: KeyPair = KeyPair::from(signing_key);
     // Generate account keys that have one keypair at index 0 in both maps.
     let keypairs = AccountKeys::from(InitialAccountData {
-        keys:      [(KeyIndex(0), keypair)].into_iter().collect(),
+        keys:      [(KeyIndex(0), keypair)].into(),
         threshold: SignatureThreshold::ONE,
     });
     let signature = sign_as_account_unchecked(signer, &keypairs, message);
@@ -627,7 +619,7 @@ mod tests {
     fn test_sign_and_verify_text_message_unchecked() {
         // Create a message to sign.
         let message: &str = "test";
-        let text_message = &Message::TextMessage(message);
+        let text_message = message.as_bytes();
 
         let rng = &mut rand::thread_rng();
 
@@ -667,7 +659,7 @@ mod tests {
     fn test_sign_and_verify_text_message_unchecked_single() {
         // Create a message to sign.
         let message: &str = "test";
-        let text_message = &Message::TextMessage(message);
+        let text_message = message.as_bytes();
 
         let rng = &mut rand::thread_rng();
 
@@ -708,7 +700,7 @@ mod tests {
     async fn test_sign_and_verify_text_message_checked() {
         // Create a message to sign.
         let message: &str = "test";
-        let text_message = &Message::TextMessage(message);
+        let text_message = message.as_bytes();
 
         // Create a keypair from a private key.
         let private_key = "f74e3188e4766841600f6fd0095a0ac1c30e4c2e97b9797d7e05a28a48f5c37c";
@@ -723,7 +715,7 @@ mod tests {
 
         // Generate account keys that have one keypair at index 0 in both maps.
         let keypairs = AccountKeys::from(InitialAccountData {
-            keys:      [(KeyIndex(0), keypair)].into_iter().collect(),
+            keys:      [(KeyIndex(0), keypair)].into(),
             threshold: SignatureThreshold::ONE,
         });
 
@@ -772,7 +764,7 @@ mod tests {
     async fn test_sign_and_verify_text_message_checked_single() {
         // Create a message to sign.
         let message: &str = "test";
-        let text_message = &Message::TextMessage(message);
+        let text_message = message.as_bytes();
 
         // Create a keypair from a private key.
         let private_key = "f74e3188e4766841600f6fd0095a0ac1c30e4c2e97b9797d7e05a28a48f5c37c";
@@ -787,7 +779,7 @@ mod tests {
 
         // Generate account keys that have one keypair at index 0 in both maps.
         let keypairs = AccountKeys::from(InitialAccountData {
-            keys:      [(KeyIndex(0), keypair)].into_iter().collect(),
+            keys:      [(KeyIndex(0), keypair)].into(),
             threshold: SignatureThreshold::ONE,
         });
         let single_key = keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)].clone();
@@ -834,8 +826,7 @@ mod tests {
     #[test]
     fn test_sign_and_verify_binary_message_unchecked() {
         // Create a message to sign.
-        let message: &[u8] = b"test";
-        let binary_message = &Message::BinaryMessage(message);
+        let binary_message: &[u8] = b"test";
 
         let rng = &mut rand::thread_rng();
 
@@ -875,8 +866,7 @@ mod tests {
     #[test]
     fn test_sign_and_verify_binary_message_unchecked_single() {
         // Create a message to sign.
-        let message: &[u8] = b"test";
-        let binary_message = &Message::BinaryMessage(message);
+        let binary_message: &[u8] = b"test";
 
         let rng = &mut rand::thread_rng();
 
@@ -911,8 +901,7 @@ mod tests {
     #[tokio::test]
     async fn test_sign_and_verify_binary_message_checked() {
         // Create a message to sign.
-        let message: &[u8] = b"test";
-        let binary_message = &Message::BinaryMessage(message);
+        let binary_message: &[u8] = b"test";
 
         // Create a keypair from a private key.
         let private_key = "f74e3188e4766841600f6fd0095a0ac1c30e4c2e97b9797d7e05a28a48f5c37c";
@@ -927,7 +916,7 @@ mod tests {
 
         // Generate account keys that have one keypair at index 0 in both maps.
         let keypairs = AccountKeys::from(InitialAccountData {
-            keys:      [(KeyIndex(0), keypair)].into_iter().collect(),
+            keys:      [(KeyIndex(0), keypair)].into(),
             threshold: SignatureThreshold::ONE,
         });
 
@@ -975,8 +964,7 @@ mod tests {
     #[tokio::test]
     async fn test_sign_and_verify_binary_message_checked_single() {
         // Create a message to sign.
-        let message: &[u8] = b"test";
-        let binary_message = &Message::BinaryMessage(message);
+        let binary_message: &[u8] = b"test";
 
         // Create a keypair from a private key.
         let private_key = "f74e3188e4766841600f6fd0095a0ac1c30e4c2e97b9797d7e05a28a48f5c37c";
@@ -991,7 +979,7 @@ mod tests {
 
         // Generate account keys that have one keypair at index 0 in both maps.
         let keypairs = AccountKeys::from(InitialAccountData {
-            keys:      [(KeyIndex(0), keypair)].into_iter().collect(),
+            keys:      [(KeyIndex(0), keypair)].into(),
             threshold: SignatureThreshold::ONE,
         });
         let single_key = keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)].clone();
@@ -1039,7 +1027,7 @@ mod tests {
     fn test_sign_and_verify_text_message_unchecked_multi_sig_account() {
         // Create a message to sign.
         let message: &str = "test";
-        let text_message = &Message::TextMessage(message);
+        let text_message = message.as_bytes();
 
         let rng = &mut rand::thread_rng();
 
@@ -1061,8 +1049,7 @@ mod tests {
                             .clone(),
                     ),
                 ]
-                .into_iter()
-                .collect(),
+                .into(),
                 threshold: SignatureThreshold::TWO,
             }),
             (CredentialIndex { index: 1 }, CredentialData {
@@ -1078,13 +1065,11 @@ mod tests {
                             .clone(),
                     ),
                 ]
-                .into_iter()
-                .collect(),
+                .into(),
                 threshold: SignatureThreshold::TWO,
             }),
         ]
-        .into_iter()
-        .collect();
+        .into();
 
         let keypairs_multi_sig_account = AccountKeys {
             keys:      credential_map,
@@ -1128,8 +1113,7 @@ mod tests {
     #[tokio::test]
     async fn test_sign_and_verify_binary_message_multi_sig_account() {
         // Create a message to sign.
-        let message: &[u8] = b"test";
-        let binary_message = &Message::BinaryMessage(message);
+        let binary_message: &[u8] = b"test";
 
         // Create first keypair from a private key.
         let private_key = "bbabcd59e5ca2edb2073e1936f4df84fbe352fb03c4e55061957f5099b94f562";
@@ -1159,8 +1143,7 @@ mod tests {
                 (KeyIndex(0), keypair1.clone()),
                 (KeyIndex(1), keypair2.clone()),
             ]
-            .into_iter()
-            .collect(),
+            .into(),
             threshold: SignatureThreshold::TWO,
         });
 
