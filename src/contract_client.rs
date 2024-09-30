@@ -3,9 +3,9 @@
 //! ones.
 //!
 //! The key types in this module are
-//! [`ContractClient`](contract_client::ContractClient),
-//! [`ContractInitBuilder`](contract_client::ContractInitBuilder)
-//! and [`ModuleDeployBuilder`](contract_client::ModuleDeployBuilder).
+//! [`ContractClient`],
+//! [`ContractInitBuilder`]
+//! and [`ModuleDeployBuilder`].
 use crate::{
     indexer::ContractUpdateInfo,
     types::{

@@ -137,8 +137,8 @@ impl AccountSignaturesVerificationData {
     }
 
     /// Zip an [`AccountSignatures`] and an [`AccountKeys`] into
-    /// an [`AccountSignaturesVerificationData`] type. The function reverts if
-    /// the indices in the maps do not match.
+    /// an [`AccountSignaturesVerificationData`] type. The function returns an
+    /// error if the indices in the maps do not match.
     pub fn zip_signatures_and_keys(
         account_signatures: &AccountSignatures,
         account_keys: &AccountKeys,
@@ -368,7 +368,7 @@ pub fn verify_account_signature_unchecked(
             public_key,
         } in credential.data.values()
         {
-            if !public_key.verify(message_hash, &signature) {
+            if !public_key.verify(message_hash, signature) {
                 return Ok(false);
             }
         }

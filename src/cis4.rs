@@ -1,7 +1,7 @@
 //! This module contains types and functions for interacting with smart
 //! contracts following the [CIS-4](https://proposals.concordium.software/CIS/cis-4.html) specification.
 //!
-//! The type [`Cis4Contract`](crate::cis4::Cis4Contract) acts as a wrapper
+//! The type [`Cis4Contract`] acts as a wrapper
 //! around the [Client](crate::v2::Client) and a contract address providing
 //! functions for querying and making transactions to smart contract.
 

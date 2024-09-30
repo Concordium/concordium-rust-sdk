@@ -1,7 +1,6 @@
-//! This module exposes [Client](v2::Client) which is a wrapper around the
+//! This module exposes [Client] which is a wrapper around the
 //! generated gRPC rust client, providing a more ergonomic interface than the
-//! generated client. See [Client](v2::Client) for documentation of how to use.
-
+//! generated client. See [Client] for documentation of how to use.
 use crate::{
     endpoints, id,
     id::types::AccountCredentialMessage,

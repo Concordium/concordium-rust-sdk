@@ -1,7 +1,7 @@
 //! This module contains types and functions for interacting with smart
 //! contracts following the [CIS-2](https://proposals.concordium.software/CIS/cis-2.html) specification.
 //!
-//! The type [`Cis2Contract`](crate::cis2::Cis2Contract) act as a wrapper around
+//! The type [`Cis2Contract`] act as a wrapper around
 //! the [Client](crate::v2::Client) and a contract address providing
 //! functions for querying and making transactions to smart contract.
 mod types;
