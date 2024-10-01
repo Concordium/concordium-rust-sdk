@@ -1,3 +1,5 @@
+//! This module contains types and functions for interacting with smart
+//! contracts following the [CIS-3](https://proposals.concordium.software/CIS/cis-3.html) specification.
 use crate::{
     contract_client::{ContractClient, ContractTransactionMetadata},
     types as sdk_types,

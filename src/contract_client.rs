@@ -3,9 +3,9 @@
 //! ones.
 //!
 //! The key types in this module are
-//! [`ContractClient`](contract_client::ContractClient),
-//! [`ContractInitBuilder`](contract_client::ContractInitBuilder)
-//! and [`ModuleDeployBuilder`](contract_client::ModuleDeployBuilder).
+//! [`ContractClient`],
+//! [`ContractInitBuilder`]
+//! and [`ModuleDeployBuilder`].
 use crate::{
     indexer::ContractUpdateInfo,
     types::{
@@ -1103,15 +1103,16 @@ pub fn decode_smart_contract_revert(
 
             let (Some(error_schema), Some(return_value)) = (
                 schema
-                .get_receive_error_schema(
-                    receive_name.contract_name(),
-                    receive_name.entrypoint_name().into(),
-                )
-                .ok(), return_value,
+                    .get_receive_error_schema(
+                        receive_name.contract_name(),
+                        receive_name.entrypoint_name().into(),
+                    )
+                    .ok(),
+                return_value,
             ) else {
                 // If no `error_schema` and/or `return_value` is provided, the
                 // `reject_reason` can not be decoded further.
-                return None
+                return None;
             };
 
             let mut cursor = Cursor::new(&return_value.value);

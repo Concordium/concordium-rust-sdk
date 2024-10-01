@@ -1,5 +1,4 @@
 //! Types related to smart contracts.
-
 use super::{Address, ContractAddress, Energy, RejectReason};
 pub use concordium_base::smart_contracts::*;
 use concordium_base::{

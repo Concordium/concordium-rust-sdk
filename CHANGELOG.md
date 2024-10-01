@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+- Add functionality for generating, and verifying account signatures.
+
 ## 5.0.0
 
 - Update the `ContractClient` to optionally include a schema.

@@ -55,7 +55,7 @@ impl indexer::ProcessEvent for StoreTransfers {
         self.db_conn.execute("BEGIN")?;
         for tx in txs {
             let BlockItemSummaryDetails::AccountTransaction(at) = &tx.details else {
-                continue
+                continue;
             };
             // we only look at transfers or transfers with memo.
             let (amount, to) = match at.effects {
