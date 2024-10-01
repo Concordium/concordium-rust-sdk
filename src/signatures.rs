@@ -140,8 +140,8 @@ impl AccountSignaturesVerificationData {
     /// an [`AccountSignaturesVerificationData`] type. The function returns an
     /// error if the indices in the maps do not match.
     pub fn zip_signatures_and_keys(
-        account_signatures: &AccountSignatures,
-        account_keys: &AccountKeys,
+        account_signatures: AccountSignatures,
+        account_keys: AccountKeys,
     ) -> Result<Self, SignatureError> {
         let mut outer_map = BTreeMap::new();
 
@@ -150,7 +150,7 @@ impl AccountSignaturesVerificationData {
             return Err(SignatureError::MismatchMapIndices);
         }
 
-        for (&outer_key, credential_sigs) in &account_signatures.sigs {
+        for (outer_key, credential_sigs) in account_signatures.sigs {
             // Check if corresponding account key exists.
 
             let Some(account_key_pair) =
@@ -172,16 +172,16 @@ impl AccountSignaturesVerificationData {
                 SignatureError,
             > = credential_sigs
                 .sigs
-                .iter()
-                .zip(public_keys.iter())
-                .map(|((&inner_key, signature), (key_index, public_key))| {
+                .into_iter()
+                .zip(public_keys.into_iter())
+                .map(|((inner_key, signature), (key_index, public_key))| {
                     // Ensure that inner_key and key_index matches.
                     if inner_key != key_index.0 {
                         return Err(SignatureError::MismatchMapIndices);
                     }
                     Ok((inner_key, AccountSignaturesVerificationEntry {
-                        signature:  signature.clone(),
-                        public_key: public_key.clone(),
+                        signature,
+                        public_key,
                     }))
                 })
                 .collect();
@@ -635,11 +635,8 @@ mod tests {
         assert_eq!(account_signature.sigs.len(), 1);
 
         let account_signatures_verification_data =
-            AccountSignaturesVerificationData::zip_signatures_and_keys(
-                &account_signature,
-                &keypairs,
-            )
-            .expect("Expect zipping of maps to succeed");
+            AccountSignaturesVerificationData::zip_signatures_and_keys(account_signature, keypairs)
+                .expect("Expect zipping of maps to succeed");
 
         assert_eq!(account_signatures_verification_data.data.len(), 1);
 
@@ -843,11 +840,8 @@ mod tests {
         assert_eq!(account_signature.sigs.len(), 1);
 
         let account_signatures_verification_data =
-            AccountSignaturesVerificationData::zip_signatures_and_keys(
-                &account_signature,
-                &keypairs,
-            )
-            .expect("Expect zipping of maps to succeed");
+            AccountSignaturesVerificationData::zip_signatures_and_keys(account_signature, keypairs)
+                .expect("Expect zipping of maps to succeed");
 
         assert_eq!(account_signatures_verification_data.data.len(), 1);
 
@@ -1089,8 +1083,8 @@ mod tests {
 
         let account_signatures_verification_data =
             AccountSignaturesVerificationData::zip_signatures_and_keys(
-                &account_signatures,
-                &keypairs_multi_sig_account,
+                account_signatures,
+                keypairs_multi_sig_account,
             )
             .expect("Expect zipping of maps to succeed");
 
