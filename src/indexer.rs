@@ -824,7 +824,11 @@ impl ProcessorConfig {
                         // Wait before calling on_failure with the idea that whatever caused the
                         // failure is more likely to be fixed if we try
                         // after a bit of time rather than immediately.
-                        tokio::time::sleep(self.wait_after_fail).await;
+                        tokio::select! {
+                            biased;
+                            _ = &mut self.stop => {break 'outer},
+                            _ = tokio::time::sleep(self.wait_after_fail) => {}
+                        }
                         match process.on_failure(e, try_number + 1).await {
                             Ok(true) => {
                                 // do nothing, continue.

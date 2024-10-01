@@ -2,6 +2,7 @@
 
 - `ProcessorConfig` now requires the future for signaling graceful shutdown is marked `Send` effectively marking `ProcessorConfig` as `Send`. This is a minor breaking change, but expected to be the case for most if not all use cases.
 - Introduce `ProcessorConfig::process_event_stream` which is equivalent to `ProcessorConfig::process_events` but the `events` argument is generalized to be some implementation of `Stream`.
+- Fix issue in `ProcessorConfig::process_event_stream` and `ProcessorConfig::process_events` where it did not check the stop signal while retrying, preventing a graceful shutdown.
 
 ## 5.0.0
 
