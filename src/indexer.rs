@@ -281,63 +281,72 @@ impl TraverseConfig {
                 }
             };
 
+            let mut preprocessors = FuturesOrdered::new();
+            let mut finalized_blocks_error = false;
             'node_loop: loop {
-                let last_height = height;
-                let (has_error, chunks) = match finalized_blocks
-                    .next_chunk_timeout(max_parallel, max_behind)
-                    .await
-                {
-                    Ok(v) => v,
-                    Err(e) => {
-                        successive_failures += 1;
-                        let should_stop = indexer
-                            .on_failure(node_ep, successive_failures, e.into())
-                            .await;
-                        if should_stop {
+                tokio::select! {
+                    biased;
+                    // First check if anything is done preprocessing.
+                    // If there is nothing being preprocessing this branch is disabled until next loop.
+                    Some(data) = preprocessors.next() => {
+                        let data = match data {
+                            Ok(v) => v,
+                            Err(e) => {
+                                drop(preprocessors);
+                                successive_failures += 1;
+                                let should_stop = indexer
+                                    .on_failure(node_ep, successive_failures, TraverseError::Query(e))
+                                    .await;
+                                if should_stop {
+                                    return Ok(());
+                                } else {
+                                    break 'node_loop;
+                                }
+                            }
+                        };
+                        if sender.send(data).await.is_err() {
+                            // the listener ended the stream, meaning we should stop.
                             return Ok(());
-                        } else {
+                        }
+                        height = height.next();
+                        successive_failures = 0;
+                        if finalized_blocks_error {
+                            // we have processed the blocks we can, but further queries on the same stream
+                            // will fail since the stream signalled an error.
                             break 'node_loop;
                         }
+                    },
+                    // If there is nothing immediately ready from preprocessing, we check if we have
+                    // available slots for preprocessors and fill them.
+                    // If no space this branch gets disabled until next loop.
+                    _ = async {}, if preprocessors.len() < max_parallel => {
+                        let space = max_parallel - preprocessors.len();
+                        match finalized_blocks
+                            .next_chunk_timeout(space, max_behind)
+                            .await
+                        {
+                            Ok((has_error, chunks)) => {
+                                finalized_blocks_error = has_error;
+                                for fb in chunks {
+                                    preprocessors.push_back(indexer.on_finalized(node.clone(), &context, fb));
+                                }
+                            },
+                            Err(e) => {
+                                drop(preprocessors);
+                                successive_failures += 1;
+                                let should_stop = indexer
+                                    .on_failure(node_ep, successive_failures, TraverseError::Elapsed(e))
+                                    .await;
+                                if should_stop {
+                                    return Ok(());
+                                } else {
+                                    break 'node_loop;
+                                }
+                            }
+                        };
+
                     }
                 };
-
-                let mut futs = FuturesOrdered::new();
-                for fb in chunks {
-                    futs.push_back(indexer.on_finalized(node.clone(), &context, fb));
-                }
-                while let Some(data) = futs.next().await {
-                    let data = match data {
-                        Ok(v) => v,
-                        Err(e) => {
-                            drop(futs);
-                            successive_failures += 1;
-                            let should_stop = indexer
-                                .on_failure(node_ep, successive_failures, e.into())
-                                .await;
-                            if should_stop {
-                                return Ok(());
-                            } else {
-                                break 'node_loop;
-                            }
-                        }
-                    };
-                    if sender.send(data).await.is_err() {
-                        return Ok(()); // the listener ended the stream, meaning
-                                       // we
-                                       // should stop.
-                    }
-                    height = height.next();
-                }
-
-                if height > last_height {
-                    successive_failures = 0;
-                }
-
-                if has_error {
-                    // we have processed the blocks we can, but further queries on the same stream
-                    // will fail since the stream signalled an error.
-                    break 'node_loop;
-                }
             }
         }
         Ok(()) // unreachable
