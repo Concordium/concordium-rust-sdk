@@ -515,6 +515,16 @@ pub enum RewardsOverview {
     },
 }
 
+impl RewardsOverview {
+    /// Get reward data common across RewardsOverview version 0 and version 1.
+    pub fn common_reward_data(&self) -> &CommonRewardData {
+        match self {
+            RewardsOverview::V0 { data } => data,
+            RewardsOverview::V1 { common, .. } => common,
+        }
+    }
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 /// Reward data common to both V0 and V1 rewards.
@@ -1501,7 +1511,7 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
                         Worker::Partial(mut partial) => {
                             if partial.resumed {
                                 // terminate it.
-                                let  ExecutionTree::V1(mut tree) = tree else {
+                                let ExecutionTree::V1(mut tree) = tree else {
                                     return None;
                                 };
                                 std::mem::swap(&mut tree.events, &mut partial.events);
