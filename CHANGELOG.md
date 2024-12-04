@@ -10,6 +10,8 @@
     suspended.
   - New `UpdatePayload` type `ValidatorScoreParametersCPV3`, which updates the maximum number of
     consecutive failures a validator can have before it faces suspension.
+- `ContractInitializedEvent` adds the `parameter` used to initialize the contract (supported from
+  node version >= 8).
 
 ## 5.0.0
 

@@ -1655,6 +1655,7 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                         amount:           cie.amount.require()?.into(),
                         init_name:        cie.init_name.require()?.try_into()?,
                         events:           cie.events.into_iter().map(Into::into).collect(),
+                        parameter:        cie.parameter.map(TryInto::try_into).transpose()?,
                     },
                 })
             }
