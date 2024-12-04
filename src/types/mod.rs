@@ -891,6 +891,23 @@ pub enum SpecialTransactionOutcome {
         /// Accrued finalization rewards for pool.
         finalization_reward: Amount,
     },
+    /// A validator was suspended due to too many missed rounds.
+    #[serde(rename_all = "camelCase")]
+    ValidatorSuspended {
+        /// The validator that was suspended.
+        baker_id: BakerId,
+        /// The account address of the validator.
+        account:  AccountAddress,
+    },
+    /// A validator was primed to be suspended at the next snapshot epoch due to
+    /// too many missed rounds.
+    #[serde(rename_all = "camelCase")]
+    ValidatorPrimedForSuspension {
+        /// The validator that was primed for suspension.
+        baker_id: BakerId,
+        /// The account address of the validator.
+        account:  AccountAddress,
+    },
 }
 
 impl SpecialTransactionOutcome {
@@ -923,6 +940,12 @@ impl SpecialTransactionOutcome {
             SpecialTransactionOutcome::PaydayAccountReward { account, .. } => vec![*account],
             SpecialTransactionOutcome::BlockAccrueReward { .. } => Vec::new(),
             SpecialTransactionOutcome::PaydayPoolReward { .. } => Vec::new(),
+            SpecialTransactionOutcome::ValidatorSuspended { account, .. } => {
+                vec![*account]
+            }
+            SpecialTransactionOutcome::ValidatorPrimedForSuspension { account, .. } => {
+                vec![*account]
+            }
         }
     }
 }
@@ -2110,6 +2133,16 @@ pub enum BakerEvent {
         /// next payday, although the delegation record will be removed
         /// from the account immediately.
         delegator_id: DelegatorId,
+    },
+    /// The baker was suspended.
+    BakerSuspended {
+        // Baker's id
+        baker_id: BakerId,
+    },
+    /// The baker was suspended.
+    BakerResumed {
+        // Baker's id
+        baker_id: BakerId,
     },
 }
 

@@ -447,6 +447,7 @@ impl From<ProtocolVersion> for super::types::ProtocolVersion {
             ProtocolVersion::ProtocolVersion5 => super::types::ProtocolVersion::P5,
             ProtocolVersion::ProtocolVersion6 => super::types::ProtocolVersion::P6,
             ProtocolVersion::ProtocolVersion7 => super::types::ProtocolVersion::P7,
+            ProtocolVersion::ProtocolVersion8 => super::types::ProtocolVersion::P8,
         }
     }
 }
@@ -461,6 +462,7 @@ impl From<super::types::ProtocolVersion> for ProtocolVersion {
             super::types::ProtocolVersion::P5 => ProtocolVersion::ProtocolVersion5,
             super::types::ProtocolVersion::P6 => ProtocolVersion::ProtocolVersion6,
             super::types::ProtocolVersion::P7 => ProtocolVersion::ProtocolVersion7,
+            super::types::ProtocolVersion::P8 => ProtocolVersion::ProtocolVersion8,
         }
     }
 }
@@ -1417,6 +1419,9 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
             update_payload::Payload::FinalizationCommitteeParametersUpdate(v) => {
                 Self::FinalizationCommitteeParametersCPV2(v.try_into()?)
             }
+            update_payload::Payload::ValidatorScoreParametersUpdate(v) => {
+                Self::ValidatorScoreParametersCPV3(v.try_into()?)
+            }
         })
     }
 }
@@ -1940,6 +1945,12 @@ impl TryFrom<BakerEvent> for super::types::BakerEvent {
             }
             baker_event::Event::DelegationRemoved(v) => Self::DelegationRemoved {
                 delegator_id: v.delegator_id.require()?.try_into()?,
+            },
+            baker_event::Event::BakerSuspended(v) => Self::BakerSuspended {
+                baker_id: v.baker_id.require()?.into(),
+            },
+            baker_event::Event::BakerResumed(v) => Self::BakerResumed {
+                baker_id: v.baker_id.require()?.into(),
             },
         })
     }
@@ -2864,6 +2875,18 @@ impl TryFrom<BlockSpecialEvent> for super::types::SpecialTransactionOutcome {
                 baker_reward:        event.baker_reward.require()?.into(),
                 finalization_reward: event.finalization_reward.require()?.into(),
             },
+            block_special_event::Event::ValidatorSuspended(event) => Self::ValidatorSuspended {
+                baker_id: event.baker_id.require()?.into(),
+                // FIXME: Handle this
+                account:  event.account.require()?.try_into()?,
+            },
+            block_special_event::Event::ValidatorPrimedForSuspension(event) => {
+                Self::ValidatorPrimedForSuspension {
+                    baker_id: event.baker_id.require()?.into(),
+                    // FIXME: Handle this
+                    account:  event.account.require()?.try_into()?,
+                }
+            }
         };
         Ok(event)
     }
@@ -3002,6 +3025,16 @@ impl TryFrom<FinalizationCommitteeParameters> for updates::FinalizationCommittee
                 .finalizer_relative_stake_threshold
                 .require()?
                 .into(),
+        })
+    }
+}
+
+impl TryFrom<ValidatorScoreParameters> for updates::ValidatorScoreParameters {
+    type Error = tonic::Status;
+
+    fn try_from(value: ValidatorScoreParameters) -> Result<Self, Self::Error> {
+        Ok(Self {
+            max_missed_rounds: value.maximum_missed_rounds,
         })
     }
 }
@@ -3212,6 +3245,10 @@ impl TryFrom<PendingUpdate> for super::types::queries::PendingUpdate {
             pending_update::Effect::FinalizationCommitteeParameters(update) => Ok(Self {
                 effective_time,
                 effect: PendingUpdateEffect::FinalizationCommitteeParameters(update.try_into()?),
+            }),
+            pending_update::Effect::ValidatorScoreParameters(update) => Ok(Self {
+                effective_time,
+                effect: PendingUpdateEffect::ValidatorScoreParameters(update.try_into()?),
             }),
         }
     }
