@@ -2877,13 +2877,11 @@ impl TryFrom<BlockSpecialEvent> for super::types::SpecialTransactionOutcome {
             },
             block_special_event::Event::ValidatorSuspended(event) => Self::ValidatorSuspended {
                 baker_id: event.baker_id.require()?.into(),
-                // FIXME: Handle this
                 account:  event.account.require()?.try_into()?,
             },
             block_special_event::Event::ValidatorPrimedForSuspension(event) => {
                 Self::ValidatorPrimedForSuspension {
                     baker_id: event.baker_id.require()?.into(),
-                    // FIXME: Handle this
                     account:  event.account.require()?.try_into()?,
                 }
             }
