@@ -1,6 +1,15 @@
 ## Unreleased changes
 
 - Add functionality for generating, and verifying account signatures.
+- Support for protocol version 8 functionality:
+  - `ConfigureBakerPayload` supports the optional `suspend` flag.
+  - `BakerEvent` has new cases for `BakerSuspended` and `BakerResumed` when the flag is set in a
+    `ConfigureBaker` transaction.
+  - `SpecialTransactionOutcome` has new cases for `ValidatorSuspended` and
+    `ValidatorPrimedForSuspension`, which occur when a validator is (or potentially will be)
+    suspended.
+  - New `UpdatePayload` type `ValidatorScoreParametersCPV3`, which updates the maximum number of
+    consecutive failures a validator can have before it faces suspension.
 
 ## 5.0.0
 
