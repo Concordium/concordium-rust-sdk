@@ -2810,6 +2810,15 @@ pub struct WinningBaker {
     pub present: bool,
 }
 
+/// An account that is pending either a scheduled release or a cooldown.
+#[derive(Debug)]
+pub struct AccountPending {
+    /// The account that is pending.
+    pub account_index:   AccountIndex,
+    /// The timestamp at which the first pending event is set to occur.
+    pub first_timestamp: Timestamp,
+}
+
 /// Information of a baker for a certain reward period.
 #[derive(Debug)]
 pub struct BakerRewardPeriodInfo {

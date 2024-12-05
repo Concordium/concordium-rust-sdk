@@ -11,16 +11,17 @@ use crate::{
             ContractContext, InstanceInfo, InvokeContractResult, ModuleReference, WasmModule,
         },
         transactions::{self, InitContractPayload, UpdateContractPayload, UpdateInstruction},
-        AbsoluteBlockHeight, AccountInfo, BlockItemSummary, CredentialRegistrationID, Energy, Memo,
-        Nonce, RegisteredData, SpecialTransactionOutcome, TransactionStatus, UpdateSequenceNumber,
+        AbsoluteBlockHeight, AccountInfo, AccountPending, BlockItemSummary,
+        CredentialRegistrationID, Energy, Memo, Nonce, RegisteredData, SpecialTransactionOutcome,
+        TransactionStatus, UpdateSequenceNumber,
     },
 };
 use anyhow::Context;
 use concordium_base::{
     base::{
-        BlockHeight, ChainParameterVersion0, ChainParameterVersion1, CredentialsPerBlockLimit,
-        ElectionDifficulty, Epoch, ExchangeRate, GenesisIndex, MintDistributionV0,
-        MintDistributionV1,
+        AccountIndex, BlockHeight, ChainParameterVersion0, ChainParameterVersion1,
+        CredentialsPerBlockLimit, ElectionDifficulty, Epoch, ExchangeRate, GenesisIndex,
+        MintDistributionV0, MintDistributionV1,
     },
     common::{
         self,
@@ -2433,6 +2434,105 @@ impl Client {
         Ok(QueryResponse {
             block_hash,
             response,
+        })
+    }
+
+    /// Get all accounts that have scheduled releases, with the timestamp of the
+    /// first pending scheduled release for that account. (Note, this only
+    /// identifies accounts by index, and only indicates the first pending
+    /// release for each account.)
+    pub async fn get_scheduled_release_accounts(
+        &mut self,
+        block_id: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<AccountPending, tonic::Status>>>,
+    > {
+        let response = self
+            .client
+            .get_scheduled_release_accounts(&block_id.into_block_identifier())
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(pending) => pending.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    /// Get all accounts that have stake in cooldown, with the timestamp of the
+    /// first pending cooldown expiry for each account. (Note, this only
+    /// identifies accounts by index, and only indicates the first pending
+    /// cooldown for each account.) Prior to protocol version 7, the
+    /// resulting stream will always be empty.
+    pub async fn get_cooldown_accounts(
+        &mut self,
+        block_id: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<AccountPending, tonic::Status>>>,
+    > {
+        let response = self
+            .client
+            .get_cooldown_accounts(&block_id.into_block_identifier())
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(pending) => pending.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    /// Get all accounts that have stake in pre-cooldown.
+    /// (This only identifies accounts by index.)
+    /// Prior to protocol version 7, the resulting stream will always be empty.
+    pub async fn get_pre_cooldown_accounts(
+        &mut self,
+        block_id: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<AccountIndex, tonic::Status>>>,
+    > {
+        let response = self
+            .client
+            .get_pre_cooldown_accounts(&block_id.into_block_identifier())
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(account) => Ok(account.into()),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    /// Get all accounts that have stake in pre-pre-cooldown.
+    /// (This only identifies accounts by index.)
+    /// Prior to protocol version 7, the resulting stream will always be empty.
+    pub async fn get_pre_pre_cooldown_accounts(
+        &mut self,
+        block_id: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<AccountIndex, tonic::Status>>>,
+    > {
+        let response = self
+            .client
+            .get_pre_pre_cooldown_accounts(&block_id.into_block_identifier())
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(account) => Ok(account.into()),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
         })
     }
 

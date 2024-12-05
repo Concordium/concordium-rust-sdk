@@ -3430,6 +3430,17 @@ impl TryFrom<WinningBaker> for super::types::WinningBaker {
     }
 }
 
+impl TryFrom<AccountPending> for super::types::AccountPending {
+    type Error = tonic::Status;
+
+    fn try_from(pending: AccountPending) -> Result<Self, Self::Error> {
+        Ok(Self {
+            account_index:   pending.account_index.require()?.into(),
+            first_timestamp: pending.first_timestamp.require()?.into(),
+        })
+    }
+}
+
 impl TryFrom<BakerRewardPeriodInfo> for super::types::BakerRewardPeriodInfo {
     type Error = tonic::Status;
 
