@@ -111,11 +111,11 @@ impl Cis3Contract {
     /// # Arguments
     ///
     /// * `bi` - The block to query. The query will be executed in the state of
-    ///  the chain at the end of the block.
+    ///   the chain at the end of the block.
     /// * `sender` - The (sponsor) address that is invoking the entrypoint.
     /// * `params` - The parameters for the permit invocation. Includes the
-    ///  signature of the sponsoree, the address of the sponsoree, and the
-    ///  signed message.
+    ///   signature of the sponsoree, the address of the sponsoree, and the
+    ///   signed message.
     pub async fn permit_dry_run(
         &mut self,
         bi: impl IntoBlockIdentifier,
@@ -150,8 +150,8 @@ impl Cis3Contract {
     ///   smart contract update transaction.
     /// * `metadata` - Metadata for constructing the transaction.
     /// * `params` - The parameters for the permit invocation. Includes the
-    ///  signature of the sponsoree, the address of the sponsoree, and the
-    ///  signed message.
+    ///   signature of the sponsoree, the address of the sponsoree, and the
+    ///   signed message.
     pub async fn permit(
         &mut self,
         signer: &impl transactions::ExactSizeTransactionSigner,
@@ -174,8 +174,8 @@ impl Cis3Contract {
     ///   smart contract update transaction.
     /// * `metadata` - Metadata for constructing the transaction.
     /// * `params` - The parameters for the permit invocation. Includes the
-    ///  signature of the sponsoree, the address of the sponsoree, and the
-    ///  signed message.
+    ///   signature of the sponsoree, the address of the sponsoree, and the
+    ///   signed message.
     pub fn make_permit(
         &mut self,
         signer: &impl transactions::ExactSizeTransactionSigner,
