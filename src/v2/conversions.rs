@@ -447,6 +447,7 @@ impl From<ProtocolVersion> for super::types::ProtocolVersion {
             ProtocolVersion::ProtocolVersion5 => super::types::ProtocolVersion::P5,
             ProtocolVersion::ProtocolVersion6 => super::types::ProtocolVersion::P6,
             ProtocolVersion::ProtocolVersion7 => super::types::ProtocolVersion::P7,
+            ProtocolVersion::ProtocolVersion8 => super::types::ProtocolVersion::P8,
         }
     }
 }
@@ -461,6 +462,7 @@ impl From<super::types::ProtocolVersion> for ProtocolVersion {
             super::types::ProtocolVersion::P5 => ProtocolVersion::ProtocolVersion5,
             super::types::ProtocolVersion::P6 => ProtocolVersion::ProtocolVersion6,
             super::types::ProtocolVersion::P7 => ProtocolVersion::ProtocolVersion7,
+            super::types::ProtocolVersion::P8 => ProtocolVersion::ProtocolVersion8,
         }
     }
 }
@@ -560,12 +562,14 @@ impl TryFrom<AccountStakingInfo> for super::types::AccountStakingInfo {
                     None => None,
                     Some(bi) => Some(bi.try_into()?),
                 };
+                let is_suspended = bsi.is_suspended;
                 Ok(Self::Baker {
                     staked_amount,
                     restake_earnings,
                     baker_info: Box::new(baker_info),
                     pending_change,
                     pool_info,
+                    is_suspended,
                 })
             }
             account_staking_info::StakingInfo::Delegator(dsi) => {
@@ -1417,6 +1421,9 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
             update_payload::Payload::FinalizationCommitteeParametersUpdate(v) => {
                 Self::FinalizationCommitteeParametersCPV2(v.try_into()?)
             }
+            update_payload::Payload::ValidatorScoreParametersUpdate(v) => {
+                Self::ValidatorScoreParametersCPV3(v.try_into()?)
+            }
         })
     }
 }
@@ -1941,6 +1948,12 @@ impl TryFrom<BakerEvent> for super::types::BakerEvent {
             baker_event::Event::DelegationRemoved(v) => Self::DelegationRemoved {
                 delegator_id: v.delegator_id.require()?.try_into()?,
             },
+            baker_event::Event::BakerSuspended(v) => Self::BakerSuspended {
+                baker_id: v.baker_id.require()?.into(),
+            },
+            baker_event::Event::BakerResumed(v) => Self::BakerResumed {
+                baker_id: v.baker_id.require()?.into(),
+            },
         })
     }
 }
@@ -2445,6 +2458,46 @@ impl TryFrom<ChainParametersV2> for super::ChainParametersV2 {
     }
 }
 
+impl TryFrom<ChainParametersV3> for super::ChainParametersV3 {
+    type Error = tonic::Status;
+
+    fn try_from(value: ChainParametersV3) -> Result<Self, Self::Error> {
+        let consensus_parameters = value.consensus_parameters.require()?;
+
+        Ok(Self {
+            timeout_parameters: consensus_parameters
+                .timeout_parameters
+                .require()?
+                .try_into()?,
+            min_block_time: consensus_parameters.min_block_time.require()?.into(),
+            block_energy_limit: consensus_parameters.block_energy_limit.require()?.into(),
+            euro_per_energy: value.euro_per_energy.require()?.try_into()?,
+            micro_ccd_per_euro: value.micro_ccd_per_euro.require()?.try_into()?,
+            pool_parameters: value.pool_parameters.require()?.try_into()?,
+            account_creation_limit: value.account_creation_limit.require()?.try_into()?,
+            mint_distribution: value.mint_distribution.require()?.try_into()?,
+            transaction_fee_distribution: value
+                .transaction_fee_distribution
+                .require()?
+                .try_into()?,
+            gas_rewards: value.gas_rewards.require()?.try_into()?,
+            foundation_account: value.foundation_account.require()?.try_into()?,
+            time_parameters: value.time_parameters.require()?.try_into()?,
+            cooldown_parameters: value.cooldown_parameters.require()?.try_into()?,
+            finalization_committee_parameters: value
+                .finalization_committee_parameters
+                .require()?
+                .try_into()?,
+            validator_score_parameters: value.validator_score_parameters.require()?.try_into()?,
+            keys: UpdateKeysCollectionSkeleton {
+                root_keys:    value.root_keys.require()?.try_into()?,
+                level_1_keys: value.level1_keys.require()?.try_into()?,
+                level_2_keys: value.level2_keys.require()?.try_into()?,
+            },
+        })
+    }
+}
+
 impl TryFrom<ChainParameters> for super::ChainParameters {
     type Error = tonic::Status;
 
@@ -2453,6 +2506,7 @@ impl TryFrom<ChainParameters> for super::ChainParameters {
             chain_parameters::Parameters::V0(v0) => Ok(Self::V0(v0.try_into()?)),
             chain_parameters::Parameters::V1(v1) => Ok(Self::V1(v1.try_into()?)),
             chain_parameters::Parameters::V2(v2) => Ok(Self::V2(v2.try_into()?)),
+            chain_parameters::Parameters::V3(v3) => Ok(Self::V3(v3.try_into()?)),
         }
     }
 }
@@ -2864,6 +2918,16 @@ impl TryFrom<BlockSpecialEvent> for super::types::SpecialTransactionOutcome {
                 baker_reward:        event.baker_reward.require()?.into(),
                 finalization_reward: event.finalization_reward.require()?.into(),
             },
+            block_special_event::Event::ValidatorSuspended(event) => Self::ValidatorSuspended {
+                baker_id: event.baker_id.require()?.into(),
+                account:  event.account.require()?.try_into()?,
+            },
+            block_special_event::Event::ValidatorPrimedForSuspension(event) => {
+                Self::ValidatorPrimedForSuspension {
+                    baker_id: event.baker_id.require()?.into(),
+                    account:  event.account.require()?.try_into()?,
+                }
+            }
         };
         Ok(event)
     }
@@ -3002,6 +3066,16 @@ impl TryFrom<FinalizationCommitteeParameters> for updates::FinalizationCommittee
                 .finalizer_relative_stake_threshold
                 .require()?
                 .into(),
+        })
+    }
+}
+
+impl TryFrom<ValidatorScoreParameters> for updates::ValidatorScoreParameters {
+    type Error = tonic::Status;
+
+    fn try_from(value: ValidatorScoreParameters) -> Result<Self, Self::Error> {
+        Ok(Self {
+            max_missed_rounds: value.maximum_missed_rounds,
         })
     }
 }
@@ -3212,6 +3286,10 @@ impl TryFrom<PendingUpdate> for super::types::queries::PendingUpdate {
             pending_update::Effect::FinalizationCommitteeParameters(update) => Ok(Self {
                 effective_time,
                 effect: PendingUpdateEffect::FinalizationCommitteeParameters(update.try_into()?),
+            }),
+            pending_update::Effect::ValidatorScoreParameters(update) => Ok(Self {
+                effective_time,
+                effect: PendingUpdateEffect::ValidatorScoreParameters(update.try_into()?),
             }),
         }
     }

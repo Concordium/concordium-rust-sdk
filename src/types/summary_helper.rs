@@ -354,6 +354,20 @@ pub(crate) enum Event {
         /// The new module reference that is in effect after the upgrade.
         to:      smart_contracts::ModuleReference,
     },
+    #[serde(rename_all = "camelCase")]
+    BakerSuspended {
+        /// Baker's id
+        baker_id: BakerId,
+        /// Baker account
+        account:  AccountAddress,
+    },
+    #[serde(rename_all = "camelCase")]
+    BakerResumed {
+        /// Baker's id
+        baker_id: BakerId,
+        /// Baker account
+        account:  AccountAddress,
+    },
 }
 
 impl From<super::ContractTraceElement> for Event {
@@ -690,6 +704,18 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                                 super::BakerEvent::DelegationRemoved { delegator_id } => {
                                     Event::DelegationRemoved {
                                         delegator_id,
+                                        account: sender,
+                                    }
+                                }
+                                super::BakerEvent::BakerSuspended { baker_id } => {
+                                    Event::BakerSuspended {
+                                        baker_id,
+                                        account: sender,
+                                    }
+                                }
+                                super::BakerEvent::BakerResumed { baker_id } => {
+                                    Event::BakerResumed {
+                                        baker_id,
                                         account: sender,
                                     }
                                 }
