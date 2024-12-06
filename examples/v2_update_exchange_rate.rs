@@ -73,6 +73,7 @@ async fn main() -> anyhow::Result<()> {
         v2::ChainParameters::V0(v0) => v0.micro_ccd_per_euro,
         v2::ChainParameters::V1(v1) => v1.micro_ccd_per_euro,
         v2::ChainParameters::V2(v2) => v2.micro_ccd_per_euro,
+        v2::ChainParameters::V3(v3) => v3.micro_ccd_per_euro,
     };
 
     let effective_time = 0.into(); // immediate effect
