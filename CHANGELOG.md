@@ -12,6 +12,14 @@
     consecutive failures a validator can have before it faces suspension.
 - `ContractInitializedEvent` adds the `parameter` used to initialize the contract (supported from
   node version >= 8).
+- New functionality for querying which accounts have scheduled releases or cooldowns (supported
+  from node version >= 8):
+  - `get_scheduled_release_accounts`: Get the accounts (by index) with scheduled releases, and the
+    timestamp of the first release.
+  - `get_cooldown_accounts`: Get the accounts (by index) with stake in cooldown, and the timestamp
+    at which the first cooldown expires.
+  - `get_pre_cooldown_accounts`: Get the accounts (by index) with stake in pre-cooldown.
+  - `get_pre_pre_cooldown_accounts`: Get the accounts (by index) with stake in pre-pre-cooldown.
 
 ## 5.0.0
 
