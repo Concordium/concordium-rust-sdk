@@ -562,12 +562,14 @@ impl TryFrom<AccountStakingInfo> for super::types::AccountStakingInfo {
                     None => None,
                     Some(bi) => Some(bi.try_into()?),
                 };
+                let is_suspended = bsi.is_suspended;
                 Ok(Self::Baker {
                     staked_amount,
                     restake_earnings,
                     baker_info: Box::new(baker_info),
                     pending_change,
                     pool_info,
+                    is_suspended,
                 })
             }
             account_staking_info::StakingInfo::Delegator(dsi) => {
@@ -2457,6 +2459,46 @@ impl TryFrom<ChainParametersV2> for super::ChainParametersV2 {
     }
 }
 
+impl TryFrom<ChainParametersV3> for super::ChainParametersV3 {
+    type Error = tonic::Status;
+
+    fn try_from(value: ChainParametersV3) -> Result<Self, Self::Error> {
+        let consensus_parameters = value.consensus_parameters.require()?;
+
+        Ok(Self {
+            timeout_parameters: consensus_parameters
+                .timeout_parameters
+                .require()?
+                .try_into()?,
+            min_block_time: consensus_parameters.min_block_time.require()?.into(),
+            block_energy_limit: consensus_parameters.block_energy_limit.require()?.into(),
+            euro_per_energy: value.euro_per_energy.require()?.try_into()?,
+            micro_ccd_per_euro: value.micro_ccd_per_euro.require()?.try_into()?,
+            pool_parameters: value.pool_parameters.require()?.try_into()?,
+            account_creation_limit: value.account_creation_limit.require()?.try_into()?,
+            mint_distribution: value.mint_distribution.require()?.try_into()?,
+            transaction_fee_distribution: value
+                .transaction_fee_distribution
+                .require()?
+                .try_into()?,
+            gas_rewards: value.gas_rewards.require()?.try_into()?,
+            foundation_account: value.foundation_account.require()?.try_into()?,
+            time_parameters: value.time_parameters.require()?.try_into()?,
+            cooldown_parameters: value.cooldown_parameters.require()?.try_into()?,
+            finalization_committee_parameters: value
+                .finalization_committee_parameters
+                .require()?
+                .try_into()?,
+            validator_score_parameters: value.validator_score_parameters.require()?.try_into()?,
+            keys: UpdateKeysCollectionSkeleton {
+                root_keys:    value.root_keys.require()?.try_into()?,
+                level_1_keys: value.level1_keys.require()?.try_into()?,
+                level_2_keys: value.level2_keys.require()?.try_into()?,
+            },
+        })
+    }
+}
+
 impl TryFrom<ChainParameters> for super::ChainParameters {
     type Error = tonic::Status;
 
@@ -2465,6 +2507,7 @@ impl TryFrom<ChainParameters> for super::ChainParameters {
             chain_parameters::Parameters::V0(v0) => Ok(Self::V0(v0.try_into()?)),
             chain_parameters::Parameters::V1(v1) => Ok(Self::V1(v1.try_into()?)),
             chain_parameters::Parameters::V2(v2) => Ok(Self::V2(v2.try_into()?)),
+            chain_parameters::Parameters::V3(v3) => Ok(Self::V3(v3.try_into()?)),
         }
     }
 }
