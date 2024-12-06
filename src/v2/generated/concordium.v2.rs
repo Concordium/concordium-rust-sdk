@@ -4819,7 +4819,7 @@ pub struct ChainParametersV3 {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ChainParameters {
-    #[prost(oneof = "chain_parameters::Parameters", tags = "1, 2, 3")]
+    #[prost(oneof = "chain_parameters::Parameters", tags = "1, 2, 3, 4")]
     pub parameters: ::core::option::Option<chain_parameters::Parameters>,
 }
 /// Nested message and enum types in `ChainParameters`.
@@ -4835,10 +4835,14 @@ pub mod chain_parameters {
         /// block.
         #[prost(message, tag = "2")]
         V1(super::ChainParametersV1),
-        /// Chain parameters that apply when the block is a protocol version 6-
+        /// Chain parameters that apply when the block is a protocol version 6-7
         /// block.
         #[prost(message, tag = "3")]
         V2(super::ChainParametersV2),
+        /// Chain parameters that apply when the block is a protocol version 8-
+        /// block.
+        #[prost(message, tag = "4")]
+        V3(super::ChainParametersV3),
     }
 }
 /// Details about a finalizer for the finalization round.
