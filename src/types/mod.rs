@@ -268,6 +268,11 @@ pub enum AccountStakingInfo {
         baker_info:       Box<BakerInfo>,
         pending_change:   Option<StakePendingChange>,
         pool_info:        Option<BakerPoolInfo>,
+        /// A flag indicating whether the baker is currently suspended or not.
+        /// The flag will always be `false` for protocol versions before version
+        /// 8. A suspended validator will not be included in the validator
+        /// committee the next time it is calculated.
+        is_suspended:     bool,
     },
     /// The account is delegating stake to a baker.
     #[serde(rename_all = "camelCase")]

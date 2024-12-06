@@ -562,12 +562,14 @@ impl TryFrom<AccountStakingInfo> for super::types::AccountStakingInfo {
                     None => None,
                     Some(bi) => Some(bi.try_into()?),
                 };
+                let is_suspended = bsi.is_suspended;
                 Ok(Self::Baker {
                     staked_amount,
                     restake_earnings,
                     baker_info: Box::new(baker_info),
                     pending_change,
                     pool_info,
+                    is_suspended,
                 })
             }
             account_staking_info::StakingInfo::Delegator(dsi) => {
