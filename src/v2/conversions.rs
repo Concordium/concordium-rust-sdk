@@ -1657,6 +1657,7 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                         amount:           cie.amount.require()?.into(),
                         init_name:        cie.init_name.require()?.try_into()?,
                         events:           cie.events.into_iter().map(Into::into).collect(),
+                        parameter:        cie.parameter.map(TryInto::try_into).transpose()?,
                     },
                 })
             }
@@ -3468,6 +3469,17 @@ impl TryFrom<WinningBaker> for super::types::WinningBaker {
                 id: wb.winner.require()?.value.into(),
             },
             present: wb.present,
+        })
+    }
+}
+
+impl TryFrom<AccountPending> for super::types::AccountPending {
+    type Error = tonic::Status;
+
+    fn try_from(pending: AccountPending) -> Result<Self, Self::Error> {
+        Ok(Self {
+            account_index:   pending.account_index.require()?.into(),
+            first_timestamp: pending.first_timestamp.require()?.into(),
         })
     }
 }

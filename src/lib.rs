@@ -2,14 +2,14 @@
 //! structured around multiple modules.
 //!
 //! - [`v2`] contains the main entrypoint to the library. In particular it
-//!   contains the [`Client`](v2::Client) struct
-//! which maintains a connection to the node, and supports queries and node
-//! manipulation. This client uses gRPC API version 2 of the Concordium node.
+//!   contains the [`Client`](v2::Client) struct which maintains a connection to
+//!   the node, and supports queries and node manipulation. This client uses
+//!   gRPC API version 2 of the Concordium node.
 //! - [`constants`] contains a number of constants and type definitions that are
 //!   relevant when using the chain.
 //! - [`types`] contains most type definitions to model responses as well as
-//!   types defining transactions.
-//! The latter are in a submodule [`types::transactions`].
+//!   types defining transactions. The latter are in a submodule
+//!   [`types::transactions`].
 //!
 //! In addition to these, the library re-exports a number of core crates that
 //! implement the core cryptographic protocols of the Concordium blockchain.

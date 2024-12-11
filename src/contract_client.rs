@@ -908,14 +908,15 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 /// How is the `return_value` and `error_code` assigned in rejected
 /// transactions:
 /// - If the transaction reverts due to an error in the `concordium-std` crate,
-/// the `return_value` is None and the `error_code` is assigned as defined in
-/// the `concordium-std` crate.
+///   the `return_value` is None and the `error_code` is assigned as defined in
+///   the `concordium-std` crate.
 /// - If the transaction reverts due to an error in the smart contract logic:
-/// A smart contract V1 needs to implement a conversion to `Reject` for its
-/// smart contract errors.
-/// `<https://docs.rs/concordium-std/latest/concordium_std/struct.Reject.html>`
+///   A smart contract V1 needs to implement a conversion to `Reject` for its
+///   smart contract errors.
+///   `<https://docs.rs/concordium-std/latest/concordium_std/struct.Reject.html>`
 ///
 /// 1. Example: Deriving `Reject` in the smart contract.
+///
 /// The simplest way to implement `Reject` in the smart contract is by deriving
 /// it.
 ///
@@ -940,6 +941,7 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 /// ```
 ///
 /// 2. Example: Deriving `Reject` in the smart contract with nested errors.
+///
 /// Nested errors are often used to inherit the errors from a smart
 /// contract library such as the cis2-library.
 /// `<https://github.com/Concordium/concordium-rust-smart-contracts/blob/dde42fa62254a55b46a4c9c52c32bbe661127001/concordium-cis2/src/lib.rs#L1093>`
@@ -996,6 +998,7 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 /// ```
 ///
 /// 3. Example: `Reject::default()`.
+///
 /// The historical `Reject::default()` can be used by implementing the
 /// conversion to `Reject` manually.
 ///
@@ -1025,6 +1028,7 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
 /// ```
 ///
 /// 4. Example: Implementing the conversion to `Reject` manually.
+///
 /// A smart contract can implement the conversion to `Reject` manually and
 /// define custom error codes. The convention for the `return_value` is to set
 /// the value to the serialization of the enum variants so that decoding of the
@@ -1636,8 +1640,10 @@ impl ContractUpdateHandle {
             crate::types::BlockItemSummaryDetails::AccountTransaction(at) => match at.effects {
                 AccountTransactionEffects::ContractUpdateIssued { effects } => {
                     let Some(execution_tree) = crate::types::execution_tree(effects) else {
-                            return mk_error("Expected smart contract update, but received invalid execution tree.");
-                        };
+                        return mk_error(
+                            "Expected smart contract update, but received invalid execution tree.",
+                        );
+                    };
                     Ok(ContractUpdateInfo {
                         execution_tree,
                         energy_cost: result.energy_cost,
