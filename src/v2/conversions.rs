@@ -461,6 +461,8 @@ impl From<super::types::ProtocolVersion> for ProtocolVersion {
             super::types::ProtocolVersion::P5 => ProtocolVersion::ProtocolVersion5,
             super::types::ProtocolVersion::P6 => ProtocolVersion::ProtocolVersion6,
             super::types::ProtocolVersion::P7 => ProtocolVersion::ProtocolVersion7,
+            // TODO: rust-sdk needs to be updated to support protocolVersion 8.
+            super::types::ProtocolVersion::P8 => ProtocolVersion::ProtocolVersion1,
         }
     }
 }
