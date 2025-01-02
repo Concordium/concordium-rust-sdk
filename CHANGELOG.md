@@ -1,6 +1,10 @@
 ## Unreleased changes
 
 - Introduce `RewardsOverview::common_reward_data` for getting the common reward data across `RewardsOverview` version 0 and version 1.
+- Add constructor `TokenAddress::new` for CIS2 type `TokenAddress`.
+- `ProcessorConfig` now requires the future for signaling graceful shutdown is marked `Send` effectively marking `ProcessorConfig` as `Send`. This is a minor breaking change, but expected to be the case for most if not all use cases.
+- Introduce `ProcessorConfig::process_event_stream` which is equivalent to `ProcessorConfig::process_events` but the `events` argument is generalized to be some implementation of `Stream`.
+- Fix issue in `ProcessorConfig::process_event_stream` and `ProcessorConfig::process_events` where it did not check the stop signal while retrying, preventing a graceful shutdown.
 - Change behavior of `TraverseConfig::traverse` to continuously start up new `Indexer::on_finalized` tasks up to `max_parallel` as the output channel takes the results of prior tasks.
   The prior behavior was to start preparing `max_parallel` tasks, then wait for everything to be consumed before starting another round of `max_parallel` tasks.
 - Fix issue in `ProcessorConfig::process_event_stream` and `ProcessorConfig::process_events` where it did not check the stop signal while retrying, preventing a graceful shutdown.
