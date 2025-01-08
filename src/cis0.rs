@@ -1,6 +1,5 @@
 //! This module contains types and functions for interacting with smart
 //! contracts following the [CIS-0](https://proposals.concordium.software/CIS/cis-0.html) specification.
-
 use crate::{
     types::{self as sdk_types, smart_contracts::ContractContext},
     v2::{BlockIdentifier, QueryResponse},

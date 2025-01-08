@@ -1,3 +1,5 @@
+//! Wrapper for the node's GRPC API. The return values are parsed and wrapped in
+//! structured values.
 use crate::types;
 use derive_more::From;
 use thiserror::Error;

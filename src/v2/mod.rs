@@ -1,7 +1,6 @@
-//! This module exposes [Client](v2::Client) which is a wrapper around the
+//! This module exposes [Client] which is a wrapper around the
 //! generated gRPC rust client, providing a more ergonomic interface than the
-//! generated client. See [Client](v2::Client) for documentation of how to use.
-
+//! generated client. See [Client] for documentation of how to use.
 use crate::{
     endpoints, id,
     id::types::AccountCredentialMessage,
@@ -12,16 +11,17 @@ use crate::{
             ContractContext, InstanceInfo, InvokeContractResult, ModuleReference, WasmModule,
         },
         transactions::{self, InitContractPayload, UpdateContractPayload, UpdateInstruction},
-        AbsoluteBlockHeight, AccountInfo, BlockItemSummary, CredentialRegistrationID, Energy, Memo,
-        Nonce, RegisteredData, SpecialTransactionOutcome, TransactionStatus, UpdateSequenceNumber,
+        AbsoluteBlockHeight, AccountInfo, AccountPending, BlockItemSummary,
+        CredentialRegistrationID, Energy, Memo, Nonce, RegisteredData, SpecialTransactionOutcome,
+        TransactionStatus, UpdateSequenceNumber,
     },
 };
 use anyhow::Context;
 use concordium_base::{
     base::{
-        BlockHeight, ChainParameterVersion0, ChainParameterVersion1, CredentialsPerBlockLimit,
-        ElectionDifficulty, Epoch, ExchangeRate, GenesisIndex, MintDistributionV0,
-        MintDistributionV1,
+        AccountIndex, BlockHeight, ChainParameterVersion0, ChainParameterVersion1,
+        CredentialsPerBlockLimit, ElectionDifficulty, Epoch, ExchangeRate, GenesisIndex,
+        MintDistributionV0, MintDistributionV1,
     },
     common::{
         self,
@@ -36,7 +36,7 @@ use concordium_base::{
     updates::{
         AuthorizationsV0, CooldownParameters, FinalizationCommitteeParameters, GASRewards,
         GASRewardsV1, PoolParameters, TimeParameters, TimeoutParameters,
-        TransactionFeeDistribution,
+        TransactionFeeDistribution, ValidatorScoreParameters,
     },
 };
 pub use endpoints::{QueryError, QueryResult, RPCError, RPCResult};
@@ -424,7 +424,7 @@ pub struct ChainParametersV1 {
 
 #[derive(Debug, Clone)]
 /// Values of chain parameters that can be updated via chain updates.
-/// This applies to protocol version 6 and up.
+/// This applies to protocol version 6 and 7.
 pub struct ChainParametersV2 {
     /// Consensus protocol version 2 timeout parameters.
     pub timeout_parameters: TimeoutParameters,
@@ -458,6 +458,44 @@ pub struct ChainParametersV2 {
     pub keys: types::UpdateKeysCollection<ChainParameterVersion1>,
 }
 
+#[derive(Debug, Clone)]
+/// Values of chain parameters that can be updated via chain updates.
+/// This applies to protocol version 8 and up.
+pub struct ChainParametersV3 {
+    /// Consensus protocol version 2 timeout parameters.
+    pub timeout_parameters: TimeoutParameters,
+    /// Minimum time interval between blocks.
+    pub min_block_time: Duration,
+    /// Maximum energy allowed per block.
+    pub block_energy_limit: Energy,
+    /// Euro per energy exchange rate.
+    pub euro_per_energy: ExchangeRate,
+    /// Micro ccd per euro exchange rate.
+    pub micro_ccd_per_euro: ExchangeRate,
+    /// Parameters related to cooldowns when staking.
+    pub cooldown_parameters: CooldownParameters,
+    /// Parameters related mint rate and reward period.
+    pub time_parameters: TimeParameters,
+    /// The limit for the number of account creations in a block.
+    pub account_creation_limit: CredentialsPerBlockLimit,
+    /// Parameters related to the distribution of newly minted CCD.
+    pub mint_distribution: MintDistributionV1,
+    /// Parameters related to the distribution of transaction fees.
+    pub transaction_fee_distribution: TransactionFeeDistribution,
+    /// Parameters related to the distribution from the GAS account.
+    pub gas_rewards: GASRewardsV1,
+    /// Address of the foundation account.
+    pub foundation_account: AccountAddress,
+    /// Parameters for baker pools.
+    pub pool_parameters: PoolParameters,
+    /// The finalization committee parameters.
+    pub finalization_committee_parameters: FinalizationCommitteeParameters,
+    /// Validator score parameters.
+    pub validator_score_parameters: ValidatorScoreParameters,
+    /// Keys allowed to do updates.
+    pub keys: types::UpdateKeysCollection<ChainParameterVersion1>,
+}
+
 /// Chain parameters. See [`ChainParametersV0`] and [`ChainParametersV1`] for
 /// details. `V0` parameters apply to protocol version `1..=3`, and `V1`
 /// parameters apply to protocol versions `4` and up.
@@ -466,6 +504,7 @@ pub enum ChainParameters {
     V0(ChainParametersV0),
     V1(ChainParametersV1),
     V2(ChainParametersV2),
+    V3(ChainParametersV3),
 }
 
 impl ChainParameters {
@@ -475,6 +514,7 @@ impl ChainParameters {
             Self::V0(data) => &data.keys.level_2_keys,
             Self::V1(data) => &data.keys.level_2_keys.v0,
             Self::V2(data) => &data.keys.level_2_keys.v0,
+            Self::V3(data) => &data.keys.level_2_keys.v0,
         }
     }
 }
@@ -507,6 +547,14 @@ impl ChainParameters {
                     u128::from(x.denominator()) * u128::from(y.denominator()),
                 )
             }
+            ChainParameters::V3(v3) => {
+                let x = v3.micro_ccd_per_euro;
+                let y = v3.euro_per_energy;
+                (
+                    u128::from(x.numerator()) * u128::from(y.numerator()),
+                    u128::from(x.denominator()) * u128::from(y.denominator()),
+                )
+            }
         };
         num::rational::Ratio::new(num, denom)
     }
@@ -534,6 +582,7 @@ impl ChainParameters {
             ChainParameters::V0(v0) => v0.foundation_account,
             ChainParameters::V1(v1) => v1.foundation_account,
             ChainParameters::V2(v2) => v2.foundation_account,
+            ChainParameters::V3(v3) => v3.foundation_account,
         }
     }
 }
@@ -2434,6 +2483,105 @@ impl Client {
         Ok(QueryResponse {
             block_hash,
             response,
+        })
+    }
+
+    /// Get all accounts that have scheduled releases, with the timestamp of the
+    /// first pending scheduled release for that account. (Note, this only
+    /// identifies accounts by index, and only indicates the first pending
+    /// release for each account.)
+    pub async fn get_scheduled_release_accounts(
+        &mut self,
+        block_id: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<AccountPending, tonic::Status>>>,
+    > {
+        let response = self
+            .client
+            .get_scheduled_release_accounts(&block_id.into_block_identifier())
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(pending) => pending.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    /// Get all accounts that have stake in cooldown, with the timestamp of the
+    /// first pending cooldown expiry for each account. (Note, this only
+    /// identifies accounts by index, and only indicates the first pending
+    /// cooldown for each account.) Prior to protocol version 7, the
+    /// resulting stream will always be empty.
+    pub async fn get_cooldown_accounts(
+        &mut self,
+        block_id: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<AccountPending, tonic::Status>>>,
+    > {
+        let response = self
+            .client
+            .get_cooldown_accounts(&block_id.into_block_identifier())
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(pending) => pending.try_into(),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    /// Get all accounts that have stake in pre-cooldown.
+    /// (This only identifies accounts by index.)
+    /// Prior to protocol version 7, the resulting stream will always be empty.
+    pub async fn get_pre_cooldown_accounts(
+        &mut self,
+        block_id: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<AccountIndex, tonic::Status>>>,
+    > {
+        let response = self
+            .client
+            .get_pre_cooldown_accounts(&block_id.into_block_identifier())
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(account) => Ok(account.into()),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    /// Get all accounts that have stake in pre-pre-cooldown.
+    /// (This only identifies accounts by index.)
+    /// Prior to protocol version 7, the resulting stream will always be empty.
+    pub async fn get_pre_pre_cooldown_accounts(
+        &mut self,
+        block_id: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<AccountIndex, tonic::Status>>>,
+    > {
+        let response = self
+            .client
+            .get_pre_pre_cooldown_accounts(&block_id.into_block_identifier())
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(account) => Ok(account.into()),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
         })
     }
 

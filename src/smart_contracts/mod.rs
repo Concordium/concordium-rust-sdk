@@ -1,4 +1,4 @@
-/// Types related to smart contracts.
+//! Functions and types related to smart contracts.
 pub use super::types::smart_contracts as types;
 
 /// Access to the execution engine of smart contracts.

@@ -322,6 +322,8 @@ pub enum PendingUpdateEffect {
     BlockEnergyLimit(Energy),
     #[serde(rename = "finalizationCommitteeParameters")]
     FinalizationCommitteeParameters(FinalizationCommitteeParameters),
+    #[serde(rename = "validatorScoreParameters")]
+    ValidatorScoreParameters(ValidatorScoreParameters),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

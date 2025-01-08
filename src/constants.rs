@@ -1,3 +1,4 @@
+//! Various constants and types that apply to the chain.
 pub use concordium_base::constants::*;
 
 /// Identifier of the default network over which messages are transmitted.
