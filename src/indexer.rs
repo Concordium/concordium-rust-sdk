@@ -281,63 +281,72 @@ impl TraverseConfig {
                 }
             };
 
+            let mut preprocessors = FuturesOrdered::new();
+            let mut finalized_blocks_error = false;
             'node_loop: loop {
-                let last_height = height;
-                let (has_error, chunks) = match finalized_blocks
-                    .next_chunk_timeout(max_parallel, max_behind)
-                    .await
-                {
-                    Ok(v) => v,
-                    Err(e) => {
-                        successive_failures += 1;
-                        let should_stop = indexer
-                            .on_failure(node_ep, successive_failures, e.into())
-                            .await;
-                        if should_stop {
+                tokio::select! {
+                    biased;
+                    // First check if anything is done preprocessing.
+                    // If there is nothing being preprocessing this branch is disabled until next loop.
+                    Some(data) = preprocessors.next() => {
+                        let data = match data {
+                            Ok(v) => v,
+                            Err(e) => {
+                                drop(preprocessors);
+                                successive_failures += 1;
+                                let should_stop = indexer
+                                    .on_failure(node_ep, successive_failures, TraverseError::Query(e))
+                                    .await;
+                                if should_stop {
+                                    return Ok(());
+                                } else {
+                                    break 'node_loop;
+                                }
+                            }
+                        };
+                        if sender.send(data).await.is_err() {
+                            // the listener ended the stream, meaning we should stop.
                             return Ok(());
-                        } else {
+                        }
+                        height = height.next();
+                        successive_failures = 0;
+                        if finalized_blocks_error {
+                            // we have processed the blocks we can, but further queries on the same stream
+                            // will fail since the stream signalled an error.
                             break 'node_loop;
                         }
+                    },
+                    // If there is nothing immediately ready from preprocessing, we check if we have
+                    // available slots for preprocessors and fill them.
+                    // If no space this branch gets disabled until next loop.
+                    _ = async {}, if preprocessors.len() < max_parallel => {
+                        let space = max_parallel - preprocessors.len();
+                        match finalized_blocks
+                            .next_chunk_timeout(space, max_behind)
+                            .await
+                        {
+                            Ok((has_error, chunks)) => {
+                                finalized_blocks_error = has_error;
+                                for fb in chunks {
+                                    preprocessors.push_back(indexer.on_finalized(node.clone(), &context, fb));
+                                }
+                            },
+                            Err(e) => {
+                                drop(preprocessors);
+                                successive_failures += 1;
+                                let should_stop = indexer
+                                    .on_failure(node_ep, successive_failures, TraverseError::Elapsed(e))
+                                    .await;
+                                if should_stop {
+                                    return Ok(());
+                                } else {
+                                    break 'node_loop;
+                                }
+                            }
+                        };
+
                     }
                 };
-
-                let mut futs = FuturesOrdered::new();
-                for fb in chunks {
-                    futs.push_back(indexer.on_finalized(node.clone(), &context, fb));
-                }
-                while let Some(data) = futs.next().await {
-                    let data = match data {
-                        Ok(v) => v,
-                        Err(e) => {
-                            drop(futs);
-                            successive_failures += 1;
-                            let should_stop = indexer
-                                .on_failure(node_ep, successive_failures, e.into())
-                                .await;
-                            if should_stop {
-                                return Ok(());
-                            } else {
-                                break 'node_loop;
-                            }
-                        }
-                    };
-                    if sender.send(data).await.is_err() {
-                        return Ok(()); // the listener ended the stream, meaning
-                                       // we
-                                       // should stop.
-                    }
-                    height = height.next();
-                }
-
-                if height > last_height {
-                    successive_failures = 0;
-                }
-
-                if has_error {
-                    // we have processed the blocks we can, but further queries on the same stream
-                    // will fail since the stream signalled an error.
-                    break 'node_loop;
-                }
             }
         }
         Ok(()) // unreachable
@@ -713,7 +722,7 @@ pub struct ProcessorConfig {
     /// The amount of time to wait after a failure to process an event.
     wait_after_fail: std::time::Duration,
     /// A future to be signalled to stop processing.
-    stop:            std::pin::Pin<Box<dyn std::future::Future<Output = ()>>>,
+    stop:            std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>,
 }
 
 /// The default implementation behaves the same as
@@ -738,7 +747,10 @@ impl ProcessorConfig {
     ///
     /// An example of such a future would be the `Receiver` end of a oneshot
     /// channel.
-    pub fn set_stop_signal(self, stop: impl std::future::Future<Output = ()> + 'static) -> Self {
+    pub fn set_stop_signal(
+        self,
+        stop: impl std::future::Future<Output = ()> + Send + 'static,
+    ) -> Self {
         Self {
             stop: Box::pin(stop),
             ..self
@@ -766,14 +778,33 @@ impl ProcessorConfig {
     /// The function will log progress using the `tracing` library with the
     /// target set to `ccd_event_processor`.
     pub async fn process_events<P: ProcessEvent>(
-        mut self,
-        mut process: P,
-        mut events: tokio::sync::mpsc::Receiver<P::Data>,
+        self,
+        process: P,
+        events: tokio::sync::mpsc::Receiver<P::Data>,
     ) {
+        let stream = tokio_stream::wrappers::ReceiverStream::new(events);
+        self.process_event_stream(process, stream).await
+    }
+
+    /// Process events that are coming in on the provided stream.
+    ///
+    /// This handler will only terminate in the case of
+    ///
+    /// - the [`on_failure`](ProcessEvent::on_failure) method indicates so.
+    /// - the sender part of the `events` channel has been dropped
+    /// - the [`ProcessorConfig`] was configured with a termination signal that
+    ///   was triggered.
+    ///
+    /// The function will log progress using the `tracing` library with the
+    /// target set to `ccd_event_processor`.
+    pub async fn process_event_stream<P, E>(mut self, mut process: P, mut events: E)
+    where
+        P: ProcessEvent,
+        E: futures::Stream<Item = P::Data> + Unpin, {
         while let Some(event) = tokio::select! {
             biased;
             _ = &mut self.stop => None,
-            r = events.recv() => r,
+            r = events.next() => r,
         } {
             let mut try_number: u32 = 0;
             'outer: loop {
@@ -802,7 +833,11 @@ impl ProcessorConfig {
                         // Wait before calling on_failure with the idea that whatever caused the
                         // failure is more likely to be fixed if we try
                         // after a bit of time rather than immediately.
-                        tokio::time::sleep(self.wait_after_fail).await;
+                        tokio::select! {
+                            biased;
+                            _ = &mut self.stop => {break 'outer},
+                            _ = tokio::time::sleep(self.wait_after_fail) => {}
+                        }
                         match process.on_failure(e, try_number + 1).await {
                             Ok(true) => {
                                 // do nothing, continue.

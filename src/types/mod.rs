@@ -521,6 +521,16 @@ pub enum RewardsOverview {
     },
 }
 
+impl RewardsOverview {
+    /// Get reward data common across RewardsOverview version 0 and version 1.
+    pub fn common_reward_data(&self) -> &CommonRewardData {
+        match self {
+            RewardsOverview::V0 { data } => data,
+            RewardsOverview::V1 { common, .. } => common,
+        }
+    }
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 /// Reward data common to both V0 and V1 rewards.
