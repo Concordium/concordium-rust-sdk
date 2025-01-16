@@ -3332,6 +3332,10 @@ impl TryFrom<NextUpdateSequenceNumbers> for super::types::queries::NextUpdateSeq
                 .finalization_committee_parameters
                 .require()?
                 .into(),
+            validator_score_parameters: message
+                .validator_score_parameters
+                .map(Into::into)
+                .unwrap_or_default(),
         })
     }
 }
