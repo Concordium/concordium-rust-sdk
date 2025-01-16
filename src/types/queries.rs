@@ -368,4 +368,7 @@ pub struct NextUpdateSequenceNumbers {
     pub block_energy_limit: UpdateSequenceNumber,
     /// Updates to the consensus version 2 finalization committee parameters
     pub finalization_committee_parameters: UpdateSequenceNumber,
+    /// Updates to the validator score parameters for chain parameters version 3
+    /// onwards.
+    pub validator_score_parameters: UpdateSequenceNumber,
 }
