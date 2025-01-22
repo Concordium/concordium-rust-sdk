@@ -1,5 +1,6 @@
 ## Unreleased changes
 
+- Add getter function `reward_period_epochs` to access the field in the struct `RewardPeriodLength`.
 - Add constructor `TokenAddress::new` for CIS2 type `TokenAddress`.
 - `ProcessorConfig` now requires the future for signaling graceful shutdown is marked `Send` effectively marking `ProcessorConfig` as `Send`. This is a minor breaking change, but expected to be the case for most if not all use cases.
 - Introduce `ProcessorConfig::process_event_stream` which is equivalent to `ProcessorConfig::process_events` but the `events` argument is generalized to be some implementation of `Stream`.
