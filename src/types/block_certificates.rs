@@ -173,9 +173,9 @@ pub mod raw {
         pub signatories:         Vec<FinalizerIndex>,
     }
 
-    /// A (non-aggregate) signature of a validator. This is used the validator's
-    /// signature on blocks it produces, as well as for some finalization
-    /// messages.
+    /// A (non-aggregate) signature of a validator. This is used for the
+    /// validator's signature on blocks it produces, as well as for some
+    /// finalization messages.
     #[derive(concordium_base::common::Serialize, Clone, Copy, Debug, Eq, PartialEq)]
     pub struct BlockSignature(pub ed25519_dalek::Signature);
 
