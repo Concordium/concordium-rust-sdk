@@ -21,6 +21,8 @@
     at which the first cooldown expires.
   - `get_pre_cooldown_accounts`: Get the accounts (by index) with stake in pre-cooldown.
   - `get_pre_pre_cooldown_accounts`: Get the accounts (by index) with stake in pre-pre-cooldown.
+- New `get_consensus_detailed_status` query for getting internal state information from the
+  consensus. Supported from node version >= 8.
 
 ## 5.0.0
 
