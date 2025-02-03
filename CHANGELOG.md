@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+## 6.0.0
+
 - Add functionality for generating, and verifying account signatures.
 - Support for protocol version 8 functionality:
   - `ConfigureBakerPayload` supports the optional `suspend` flag.
