@@ -8,6 +8,7 @@
 - Change behavior of `TraverseConfig::traverse` to continuously start up new `Indexer::on_finalized` tasks up to `max_parallel` as the output channel takes the results of prior tasks.
   The prior behavior was to start preparing `max_parallel` tasks, then wait for everything to be consumed before starting another round of `max_parallel` tasks.
 - Introduce `RewardsOverview::common_reward_data` for getting the common reward data across `RewardsOverview` version 0 and version 1.
+
 ## 6.0.0
 
 - Add functionality for generating, and verifying account signatures.
