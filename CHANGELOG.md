@@ -8,6 +8,8 @@
 - Change behavior of `TraverseConfig::traverse` to continuously start up new `Indexer::on_finalized` tasks up to `max_parallel` as the output channel takes the results of prior tasks.
   The prior behavior was to start preparing `max_parallel` tasks, then wait for everything to be consumed before starting another round of `max_parallel` tasks.
 - Introduce `RewardsOverview::common_reward_data` for getting the common reward data across `RewardsOverview` version 0 and version 1.
+## 6.0.0
+
 - Add functionality for generating, and verifying account signatures.
 - Support for protocol version 8 functionality:
   - `ConfigureBakerPayload` supports the optional `suspend` flag.
@@ -18,6 +20,7 @@
     suspended.
   - New `UpdatePayload` type `ValidatorScoreParametersCPV3`, which updates the maximum number of
     consecutive failures a validator can have before it faces suspension.
+  - `NextUpdateSequenceNumbers`: add `validator_score_parameters`.
 - `ContractInitializedEvent` adds the `parameter` used to initialize the contract (supported from
   node version >= 8).
 - New functionality for querying which accounts have scheduled releases or cooldowns (supported
@@ -28,6 +31,8 @@
     at which the first cooldown expires.
   - `get_pre_cooldown_accounts`: Get the accounts (by index) with stake in pre-cooldown.
   - `get_pre_pre_cooldown_accounts`: Get the accounts (by index) with stake in pre-pre-cooldown.
+- New `get_consensus_detailed_status` query for getting internal state information from the
+  consensus. Supported from node version >= 8.
 
 ## 5.0.0
 

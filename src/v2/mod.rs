@@ -2,11 +2,12 @@
 //! generated gRPC rust client, providing a more ergonomic interface than the
 //! generated client. See [Client] for documentation of how to use.
 use crate::{
-    endpoints, id,
-    id::types::AccountCredentialMessage,
+    endpoints,
+    id::{self, types::AccountCredentialMessage},
     types::{
-        self, block_certificates, hashes,
-        hashes::{BlockHash, TransactionHash, TransactionSignHash},
+        self, block_certificates,
+        hashes::{self, BlockHash, TransactionHash, TransactionSignHash},
+        queries::ConsensusDetailedStatus,
         smart_contracts::{
             ContractContext, InstanceInfo, InvokeContractResult, ModuleReference, WasmModule,
         },
@@ -2464,6 +2465,20 @@ impl Client {
         ei: impl Into<EpochIdentifier>,
     ) -> endpoints::QueryResult<BlockHash> {
         let response = self.client.get_first_block_epoch(&ei.into()).await?;
+        Ok(response.into_inner().try_into()?)
+    }
+
+    /// Get the detailed status of the consensus. This is only available for
+    /// consensus version 1. If the genesis index is not specified, the
+    /// status for the current genesis index is returned.
+    pub async fn get_consensus_detailed_status(
+        &mut self,
+        genesis_index: Option<GenesisIndex>,
+    ) -> endpoints::RPCResult<ConsensusDetailedStatus> {
+        let query = generated::ConsensusDetailedStatusQuery {
+            genesis_index: genesis_index.map(Into::into),
+        };
+        let response = self.client.get_consensus_detailed_status(query).await?;
         Ok(response.into_inner().try_into()?)
     }
 

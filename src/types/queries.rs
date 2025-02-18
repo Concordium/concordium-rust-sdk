@@ -2,6 +2,7 @@
 
 use super::{hashes::*, network::RemotePeerId, *};
 use crate::id;
+use block_certificates::raw;
 use concordium_base::{
     base::*,
     common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize},
@@ -368,4 +369,208 @@ pub struct NextUpdateSequenceNumbers {
     pub block_energy_limit: UpdateSequenceNumber,
     /// Updates to the consensus version 2 finalization committee parameters
     pub finalization_committee_parameters: UpdateSequenceNumber,
+    /// Updates to the validator score parameters for chain parameters version 3
+    /// onwards.
+    pub validator_score_parameters: UpdateSequenceNumber,
+}
+
+/// The status of the node with respect to its participation in the consensus
+/// protocol. The node persists this information to its local storage to ensure
+/// that it does not roll back and violate the consensus protocol in the event
+/// of a restart.
+#[derive(Debug, Clone)]
+pub struct PersistentRoundStatus {
+    /// The last signed quorum message by the node.
+    pub last_signed_quorum_message:  Option<raw::QuorumMessage>,
+    /// The last signed timeout message by the node.
+    pub last_signed_timeout_message: Option<raw::TimeoutMessage>,
+    /// The last round the node baked in.
+    pub last_baked_round:            Round,
+    /// The latest timeout certificate seen by the node. May be absent if the
+    /// node has seen a quorum certificate for a more recent round.
+    pub latest_timeout:              Option<raw::TimeoutCertificate>,
+}
+
+/// Details of a round timeout.
+#[derive(Debug, Clone)]
+pub struct RoundTimeout {
+    /// Timeout certificate for the round that timed out.
+    pub timeout_certificate: raw::TimeoutCertificate,
+    /// The highest known quorum certificate when the round timed out.
+    pub quorum_certificate:  raw::QuorumCertificate,
+}
+
+/// The current round status.
+#[derive(Debug, Clone)]
+pub struct RoundStatus {
+    /// The current round from the perspective of the node.
+    /// This should always be higher than the round of the highest certified
+    /// block. If the previous round did not timeout, it should be one more
+    /// than the round of the `highest_certified_block`. Otherwise, it
+    /// should be one more than the round of the `previous_round_timeout`.
+    pub current_round:                 Round,
+    /// The quorum certificate for the highest certified block.
+    pub highest_certified_block:       raw::QuorumCertificate,
+    /// If the last round timed out, this is the timeout certificate for that
+    /// round and the highest quorum certificate at the time the round timed
+    /// out.
+    pub previous_round_timeout:        Option<RoundTimeout>,
+    /// Flag indicating whether the node should attempt to bake in the current
+    /// round. This is set to `true` when the round is advanced, and set to
+    /// `false` once the node has attempted to bake for the round.
+    pub round_eligible_to_bake:        bool,
+    /// The current epoch. This should either be the same as the epoch of the
+    /// last finalized block (if its timestamp is before the trigger block
+    /// time) or the next epoch from the last finalized block (if its
+    /// timestamp is at least the trigger block time).
+    pub current_epoch:                 Epoch,
+    /// If present, an epoch finalization entry for the epoch before
+    /// `current_epoch`. An entry must be present if the current epoch is
+    /// greater than the epoch of the last finalized block.
+    pub last_epoch_finalization_entry: Option<raw::FinalizationEntry>,
+    /// The current duration the node will wait before a round times out.
+    pub current_timeout:               Duration,
+}
+
+/// Summary of the block table in the node.
+#[derive(Debug, Clone)]
+pub struct BlockTableSummary {
+    /// The number of blocks in the dead block cache.
+    pub dead_block_cache_size: u64,
+    /// The blocks that are currently live (not dead and not finalized).
+    pub live_blocks:           Vec<BlockHash>,
+}
+
+/// Details of a round for which a node has seen a block.
+#[derive(Debug, Clone, Copy)]
+pub struct RoundExistingBlock {
+    /// The round for which the node saw a block.
+    pub round: Round,
+    /// The baker that baked the block.
+    pub baker: BakerId,
+    /// The hash of the block.
+    pub block: BlockHash,
+}
+
+/// Details of a round for which a node has seen a quorum certificate.
+#[derive(Debug, Clone, Copy)]
+pub struct RoundExistingQC {
+    /// The round for which a QC was seen.
+    pub round: Round,
+    /// The epoch of the QC.
+    pub epoch: Epoch,
+}
+
+/// The public keys and stake of a specific validator.
+#[derive(Debug, Clone)]
+pub struct FullBakerInfo {
+    /// The validator's identity.
+    pub baker_identity:         BakerId,
+    /// The validator's election verify key.
+    pub election_verify_key:    BakerElectionVerifyKey,
+    /// The validator's signature verify key.
+    pub signature_verify_key:   BakerSignatureVerifyKey,
+    /// The validator's aggregation verify key.
+    pub aggregation_verify_key: BakerAggregationVerifyKey,
+    /// The stake of the validator.
+    pub stake:                  Amount,
+}
+
+/// The validator committee for a particular epoch.
+#[derive(Debug, Clone)]
+pub struct BakersAndFinalizers {
+    /// The set of validators.
+    pub bakers: Vec<FullBakerInfo>,
+    /// The IDs of the validator that are finalizers.
+    /// The order determines the finalizer index.
+    pub finalizers: Vec<BakerId>,
+    /// The total effective stake of the validators.
+    pub baker_total_stake: Amount,
+    /// The total effective stake of the finalizers.
+    pub finalizer_total_stake: Amount,
+    /// The hash of the finalization committee.
+    pub finalization_committee_hash: FinalizationCommitteeHash,
+}
+
+/// The validator committees for the previous, current and next epoch.
+#[derive(Debug, Clone)]
+pub struct EpochBakers {
+    /// The bakers and finalizers for the previous epoch.
+    /// If the current epoch is 0, then this is the same as the bakers for the
+    /// current epoch.
+    pub previous_epoch_bakers: BakersAndFinalizers,
+    /// The bakers and finalizers for the current epoch.
+    /// If this is absent, it should be treated as the same as the bakers for
+    /// the previous epoch.
+    pub current_epoch_bakers:  Option<BakersAndFinalizers>,
+    /// The bakers and finalizers for the next epoch.
+    /// If this is absent, it should be treated as the same as the bakers for
+    /// the current epoch.
+    pub next_epoch_bakers:     Option<BakersAndFinalizers>,
+    /// The first epoch of the next payday.
+    pub next_payday:           Epoch,
+}
+
+impl EpochBakers {
+    /// Get the bakers and finalizers for the previous epoch.
+    pub fn previous_epoch_bakers(&self) -> &BakersAndFinalizers { &self.previous_epoch_bakers }
+
+    /// Get the bakers and finalizers for the current epoch.
+    pub fn current_epoch_bakers(&self) -> &BakersAndFinalizers {
+        self.current_epoch_bakers
+            .as_ref()
+            .unwrap_or(&self.previous_epoch_bakers)
+    }
+
+    /// Get the bakers and finalizers for the next epoch.
+    pub fn next_epoch_bakers(&self) -> &BakersAndFinalizers {
+        self.next_epoch_bakers
+            .as_ref()
+            .unwrap_or_else(|| self.current_epoch_bakers())
+    }
+}
+
+/// Details of the consensus state of a node. This is primarily useful for
+/// diagnostic purposes.
+#[derive(Debug, Clone)]
+pub struct ConsensusDetailedStatus {
+    /// The hash of the genesis block.
+    pub genesis_block: BlockHash,
+    /// The persisted elements of the round status.
+    pub persistent_round_status: PersistentRoundStatus,
+    /// The status of the current round.
+    pub round_status: RoundStatus,
+    /// The number of non-finalized transactions.
+    pub non_finalized_transaction_count: u64,
+    /// The purge counter for the transaction table.
+    pub transaction_table_purge_counter: i64,
+    /// Summary of the block table.
+    pub block_table: BlockTableSummary,
+    /// The live blocks organized by height after the last finalized block.
+    pub branches: Vec<Vec<BlockHash>>,
+    /// Which bakers the node has seen legally-signed blocks with live parents
+    /// from in non-finalized rounds.
+    pub round_existing_blocks: Vec<RoundExistingBlock>,
+    /// Which non-finalized rounds the node has seen quorum certificates for.
+    pub round_existing_qcs: Vec<RoundExistingQC>,
+    /// The absolute block height of the genesis block of the era.
+    pub genesis_block_height: AbsoluteBlockHeight,
+    /// The hash of the last finalized block.
+    pub last_finalized_block: BlockHash,
+    /// The height of the last finalized block.
+    pub last_finalized_block_height: BlockHeight,
+    /// Unless the last finalized block is the genesis block, this should be a
+    /// finalization entry for the last finalized block.
+    /// As this includes a quorum certificate for the last finalized block, that
+    /// can be used to determine the epoch and round of the last finalized
+    /// block.
+    pub latest_finalization_entry: Option<raw::FinalizationEntry>,
+    /// The bakers and finalizers for the previous, current and next epoch,
+    /// relative to the last finalized block.
+    pub epoch_bakers: EpochBakers,
+    /// The timeout messages collected by the node for the current round.
+    pub timeout_messages: Option<raw::TimeoutMessages>,
+    /// If a protocol update has occurred, this is the hash of the terminal
+    /// block.
+    pub terminal_block: Option<BlockHash>,
 }
