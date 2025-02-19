@@ -3332,6 +3332,10 @@ impl TryFrom<NextUpdateSequenceNumbers> for super::types::queries::NextUpdateSeq
                 .finalization_committee_parameters
                 .require()?
                 .into(),
+            validator_score_parameters: message
+                .validator_score_parameters
+                .map(Into::into)
+                .unwrap_or_default(),
         })
     }
 }
@@ -3495,6 +3499,327 @@ impl TryFrom<BakerRewardPeriodInfo> for super::types::BakerRewardPeriodInfo {
             equity_capital:    message.equity_capital.require()?.into(),
             delegated_capital: message.delegated_capital.require()?.into(),
             is_finalizer:      message.is_finalizer,
+        })
+    }
+}
+
+impl From<FinalizerIndex> for super::types::block_certificates::raw::FinalizerIndex {
+    fn from(value: FinalizerIndex) -> Self { Self { index: value.value } }
+}
+
+impl TryFrom<QuorumMessage> for super::types::block_certificates::raw::QuorumMessage {
+    type Error = tonic::Status;
+
+    fn try_from(message: QuorumMessage) -> Result<Self, Self::Error> {
+        Ok(Self {
+            signature: message.signature.require()?.try_into()?,
+            block:     message.block.require()?.try_into()?,
+            finalizer: message.finalizer.require()?.into(),
+            round:     message.round.require()?.into(),
+            epoch:     message.epoch.require()?.into(),
+        })
+    }
+}
+
+impl TryFrom<RawQuorumCertificate> for super::types::block_certificates::raw::QuorumCertificate {
+    type Error = tonic::Status;
+
+    fn try_from(value: RawQuorumCertificate) -> Result<Self, Self::Error> {
+        Ok(Self {
+            block_hash:          value.block_hash.require()?.try_into()?,
+            round:               value.round.require()?.into(),
+            epoch:               value.epoch.require()?.into(),
+            aggregate_signature: value.aggregate_signature.require()?.try_into()?,
+            signatories:         value.signatories.into_iter().map(From::from).collect(),
+        })
+    }
+}
+
+impl TryFrom<RawTimeoutCertificate> for super::types::block_certificates::raw::TimeoutCertificate {
+    type Error = tonic::Status;
+
+    fn try_from(value: RawTimeoutCertificate) -> Result<Self, Self::Error> {
+        Ok(Self {
+            round:                  value.round.require()?.into(),
+            min_epoch:              value.min_epoch.require()?.into(),
+            qc_rounds_first_epoch:  value
+                .qc_rounds_first_epoch
+                .into_iter()
+                .map(TryFrom::try_from)
+                .collect::<Result<_, _>>()?,
+            qc_rounds_second_epoch: value
+                .qc_rounds_second_epoch
+                .into_iter()
+                .map(TryFrom::try_from)
+                .collect::<Result<_, _>>()?,
+            aggregate_signature:    value.aggregate_signature.require()?.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<RawFinalizerRound> for super::types::block_certificates::raw::FinalizerRound {
+    type Error = tonic::Status;
+
+    fn try_from(value: RawFinalizerRound) -> Result<Self, Self::Error> {
+        Ok(Self {
+            round:      value.round.require()?.into(),
+            finalizers: value.finalizers.into_iter().map(From::from).collect(),
+        })
+    }
+}
+
+impl TryFrom<BlockSignature> for super::types::block_certificates::raw::BlockSignature {
+    type Error = tonic::Status;
+
+    fn try_from(message: BlockSignature) -> Result<Self, Self::Error> { consume(&message.value) }
+}
+
+impl TryFrom<TimeoutMessage> for super::types::block_certificates::raw::TimeoutMessage {
+    type Error = tonic::Status;
+
+    fn try_from(value: TimeoutMessage) -> Result<Self, Self::Error> {
+        Ok(Self {
+            finalizer:          value.finalizer.require()?.into(),
+            round:              value.round.require()?.into(),
+            epoch:              value.epoch.require()?.into(),
+            quorum_certificate: value.quorum_certificate.require()?.try_into()?,
+            signature:          value.signature.require()?.try_into()?,
+            message_signature:  value.message_signature.require()?.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<RawFinalizationEntry> for super::types::block_certificates::raw::FinalizationEntry {
+    type Error = tonic::Status;
+
+    fn try_from(value: RawFinalizationEntry) -> Result<Self, Self::Error> {
+        Ok(Self {
+            finalized_qc:    value.finalized_qc.require()?.try_into()?,
+            successor_qc:    value.successor_qc.require()?.try_into()?,
+            successor_proof: value.successor_proof.require()?.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<TimeoutMessages> for super::types::block_certificates::raw::TimeoutMessages {
+    type Error = tonic::Status;
+
+    fn try_from(value: TimeoutMessages) -> Result<Self, Self::Error> {
+        Ok(Self {
+            first_epoch:           value.first_epoch.require()?.into(),
+            first_epoch_timeouts:  value
+                .first_epoch_timeouts
+                .into_iter()
+                .map(TryFrom::try_from)
+                .collect::<Result<_, _>>()?,
+            second_epoch_timeouts: value
+                .second_epoch_timeouts
+                .into_iter()
+                .map(TryFrom::try_from)
+                .collect::<Result<_, _>>()?,
+        })
+    }
+}
+
+impl TryFrom<PersistentRoundStatus> for super::types::queries::PersistentRoundStatus {
+    type Error = tonic::Status;
+
+    fn try_from(value: PersistentRoundStatus) -> Result<Self, Self::Error> {
+        Ok(Self {
+            last_signed_quorum_message:  value
+                .last_signed_quorum_message
+                .map(TryFrom::try_from)
+                .transpose()?,
+            last_signed_timeout_message: value
+                .last_signed_timeout_message
+                .map(TryFrom::try_from)
+                .transpose()?,
+            last_baked_round:            value.last_baked_round.require()?.into(),
+            latest_timeout:              value.latest_timeout.map(TryFrom::try_from).transpose()?,
+        })
+    }
+}
+
+impl TryFrom<RoundTimeout> for super::types::queries::RoundTimeout {
+    type Error = tonic::Status;
+
+    fn try_from(value: RoundTimeout) -> Result<Self, Self::Error> {
+        Ok(Self {
+            timeout_certificate: value.timeout_certificate.require()?.try_into()?,
+            quorum_certificate:  value.quorum_certificate.require()?.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<RoundStatus> for super::types::queries::RoundStatus {
+    type Error = tonic::Status;
+
+    fn try_from(value: RoundStatus) -> Result<Self, Self::Error> {
+        Ok(Self {
+            current_round:                 value.current_round.require()?.into(),
+            highest_certified_block:       value.highest_certified_block.require()?.try_into()?,
+            previous_round_timeout:        value
+                .previous_round_timeout
+                .map(TryFrom::try_from)
+                .transpose()?,
+            round_eligible_to_bake:        value.round_eligible_to_bake,
+            current_epoch:                 value.current_epoch.require()?.into(),
+            last_epoch_finalization_entry: value
+                .last_epoch_finalization_entry
+                .map(TryFrom::try_from)
+                .transpose()?,
+            current_timeout:               value.current_timeout.require()?.into(),
+        })
+    }
+}
+
+impl TryFrom<BlockTableSummary> for super::types::queries::BlockTableSummary {
+    type Error = tonic::Status;
+
+    fn try_from(value: BlockTableSummary) -> Result<Self, Self::Error> {
+        Ok(Self {
+            dead_block_cache_size: value.dead_block_cache_size,
+            live_blocks:           value
+                .live_blocks
+                .into_iter()
+                .map(TryFrom::try_from)
+                .collect::<Result<_, _>>()?,
+        })
+    }
+}
+
+impl TryFrom<RoundExistingBlock> for super::types::queries::RoundExistingBlock {
+    type Error = tonic::Status;
+
+    fn try_from(value: RoundExistingBlock) -> Result<Self, Self::Error> {
+        Ok(Self {
+            round: value.round.require()?.into(),
+            baker: value.baker.require()?.into(),
+            block: value.block.require()?.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<RoundExistingQc> for super::types::queries::RoundExistingQC {
+    type Error = tonic::Status;
+
+    fn try_from(value: RoundExistingQc) -> Result<Self, Self::Error> {
+        Ok(Self {
+            round: value.round.require()?.into(),
+            epoch: value.epoch.require()?.into(),
+        })
+    }
+}
+
+impl TryFrom<FullBakerInfo> for super::types::queries::FullBakerInfo {
+    type Error = tonic::Status;
+
+    fn try_from(value: FullBakerInfo) -> Result<Self, Self::Error> {
+        Ok(Self {
+            baker_identity:         value.baker_identity.require()?.into(),
+            election_verify_key:    value.election_verify_key.require()?.try_into()?,
+            signature_verify_key:   value.signature_verify_key.require()?.try_into()?,
+            aggregation_verify_key: value.aggregation_verify_key.require()?.try_into()?,
+            stake:                  value.stake.require()?.into(),
+        })
+    }
+}
+
+impl TryFrom<FinalizationCommitteeHash> for concordium_base::hashes::FinalizationCommitteeHash {
+    type Error = tonic::Status;
+
+    fn try_from(value: FinalizationCommitteeHash) -> Result<Self, Self::Error> {
+        match value.value.try_into() {
+            Ok(hash) => Ok(Self::new(hash)),
+            Err(_) => Err(tonic::Status::internal(
+                "Unexpected finalization committee hash format.",
+            )),
+        }
+    }
+}
+
+impl TryFrom<BakersAndFinalizers> for super::types::queries::BakersAndFinalizers {
+    type Error = tonic::Status;
+
+    fn try_from(value: BakersAndFinalizers) -> Result<Self, Self::Error> {
+        Ok(Self {
+            bakers: value
+                .bakers
+                .into_iter()
+                .map(TryFrom::try_from)
+                .collect::<Result<_, _>>()?,
+            finalizers: value.finalizers.into_iter().map(From::from).collect(),
+            baker_total_stake: value.baker_total_stake.require()?.into(),
+            finalizer_total_stake: value.finalizer_total_stake.require()?.into(),
+            finalization_committee_hash: value.finalization_committee_hash.require()?.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<EpochBakers> for super::types::queries::EpochBakers {
+    type Error = tonic::Status;
+
+    fn try_from(value: EpochBakers) -> Result<Self, Self::Error> {
+        Ok(Self {
+            previous_epoch_bakers: value.previous_epoch_bakers.require()?.try_into()?,
+            current_epoch_bakers:  value
+                .current_epoch_bakers
+                .map(TryFrom::try_from)
+                .transpose()?,
+            next_epoch_bakers:     value.next_epoch_bakers.map(TryFrom::try_from).transpose()?,
+            next_payday:           value.next_payday.require()?.into(),
+        })
+    }
+}
+
+impl TryFrom<BranchBlocks> for Vec<super::BlockHash> {
+    type Error = tonic::Status;
+
+    fn try_from(value: BranchBlocks) -> Result<Self, Self::Error> {
+        value
+            .blocks_at_branch_height
+            .into_iter()
+            .map(TryFrom::try_from)
+            .collect()
+    }
+}
+
+impl TryFrom<ConsensusDetailedStatus> for super::types::queries::ConsensusDetailedStatus {
+    type Error = tonic::Status;
+
+    fn try_from(value: ConsensusDetailedStatus) -> Result<Self, Self::Error> {
+        Ok(Self {
+            genesis_block: value.genesis_block.require()?.try_into()?,
+            persistent_round_status: value.persistent_round_status.require()?.try_into()?,
+            round_status: value.round_status.require()?.try_into()?,
+            non_finalized_transaction_count: value.non_finalized_transaction_count,
+            transaction_table_purge_counter: value.transaction_table_purge_counter,
+            block_table: value.block_table.require()?.try_into()?,
+            branches: value
+                .branches
+                .into_iter()
+                .map(TryFrom::try_from)
+                .collect::<Result<_, _>>()?,
+            round_existing_blocks: value
+                .round_existing_blocks
+                .into_iter()
+                .map(TryFrom::try_from)
+                .collect::<Result<_, _>>()?,
+            round_existing_qcs: value
+                .round_existing_qcs
+                .into_iter()
+                .map(TryFrom::try_from)
+                .collect::<Result<_, _>>()?,
+            genesis_block_height: value.genesis_block_height.require()?.into(),
+            last_finalized_block: value.last_finalized_block.require()?.try_into()?,
+            last_finalized_block_height: value.last_finalized_block_height.require()?.into(),
+            latest_finalization_entry: value
+                .latest_finalization_entry
+                .map(TryFrom::try_from)
+                .transpose()?,
+            epoch_bakers: value.epoch_bakers.require()?.try_into()?,
+            timeout_messages: value.timeout_messages.map(TryFrom::try_from).transpose()?,
+            terminal_block: value.terminal_block.map(TryFrom::try_from).transpose()?,
         })
     }
 }

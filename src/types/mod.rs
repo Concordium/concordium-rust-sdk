@@ -2397,6 +2397,35 @@ pub struct ChainParametersV2 {
     pub finalization_committee_parameters: FinalizationCommitteeParameters,
 }
 
+#[derive(common::Serialize, Debug)]
+/// Values of chain parameters that can be updated via chain updates.
+pub struct ChainParametersV3 {
+    /// Consensus protocol version 2 timeout parameters.
+    pub timeout_parameters:                TimeoutParameters,
+    /// Minimum time interval between blocks.
+    pub min_block_time:                    Duration,
+    /// Maximum energy allowed per block.
+    pub block_energy_limit:                Energy,
+    /// Euro per energy exchange rate.
+    pub euro_per_energy:                   ExchangeRate,
+    /// Micro ccd per euro exchange rate.
+    pub micro_ccd_per_euro:                ExchangeRate,
+    pub cooldown_parameters:               CooldownParameters,
+    pub time_parameters:                   TimeParameters,
+    /// The limit for the number of account creations in a block.
+    pub account_creation_limit:            CredentialsPerBlockLimit,
+    /// Current reward parameters.
+    pub reward_parameters:                 RewardParameters<ChainParameterVersion2>,
+    /// Index of the foundation account.
+    pub foundation_account_index:          AccountIndex,
+    /// Parameters for baker pools.
+    pub pool_parameters:                   PoolParameters,
+    /// The finalization committee parameters.
+    pub finalization_committee_parameters: FinalizationCommitteeParameters,
+    /// Parameter for determining when a validator is considered inactive.
+    pub validator_score_parameters:        ValidatorScoreParameters,
+}
+
 pub trait ChainParametersFamily {
     type Output: std::fmt::Debug;
 }
@@ -2411,6 +2440,10 @@ impl ChainParametersFamily for ChainParameterVersion1 {
 
 impl ChainParametersFamily for ChainParameterVersion2 {
     type Output = ChainParametersV2;
+}
+
+impl ChainParametersFamily for ChainParameterVersion3 {
+    type Output = ChainParametersV3;
 }
 
 pub type ChainParameters<CPV> = <CPV as ChainParametersFamily>::Output;
