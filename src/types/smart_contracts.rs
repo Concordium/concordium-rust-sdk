@@ -12,6 +12,7 @@ pub use concordium_contracts_common::{
     self, ContractName, ModuleReference, OwnedContractName, OwnedParameter, OwnedReceiveName,
     ReceiveName,
 };
+use concordium_contracts_common::{Cursor, Deserial, Get, ParseError, ParseResult};
 use derive_more::*;
 use std::convert::TryFrom;
 
@@ -233,6 +234,17 @@ fn return_zero_amount() -> Amount { Amount::from_micro_ccd(0) }
 pub struct ReturnValue {
     #[serde(with = "crate::internal::byte_array_hex")]
     pub value: Vec<u8>,
+}
+
+impl ReturnValue {
+    pub fn parse<T: Deserial>(&self) -> ParseResult<T> {
+        let mut cursor = Cursor::new(&self.value);
+        let res = cursor.get()?;
+        if cursor.offset != self.value.len() {
+            return Err(ParseError::default());
+        }
+        Ok(res)
+    }
 }
 
 #[derive(Debug, Clone, SerdeDeserialize)]
