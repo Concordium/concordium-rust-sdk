@@ -37,7 +37,7 @@ num-traits = "0.2"
 http = "0.2"
 tokio-stream = "0.1"
 
-concordium_base = { version = "6.0", path = "./concordium-base/rust-src/concordium_base/", features = ["encryption"] }
+concordium_base = { version = "7.0", path = "./concordium-base/rust-src/concordium_base/", features = ["encryption"] }
 concordium-smart-contract-engine = { version = "6.0", path = "./concordium-base/smart-contracts/wasm-chain-integration/", default-features = false, features = ["async"]}
 aes-gcm = { version = "0.10", features = ["std"] }
 tracing = "0.1"
