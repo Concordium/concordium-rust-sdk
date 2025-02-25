@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+- Add `parse` method to `ReturnValue` to simplify deserialization of values returned by contract invocations.
+
 ## 6.0.0
 
 - Add functionality for generating, and verifying account signatures.
