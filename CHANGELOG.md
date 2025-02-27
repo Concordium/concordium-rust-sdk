@@ -1,6 +1,7 @@
 ## Unreleased changes
 
 - Add `parse` method to `ReturnValue` to simplify deserialization of values returned by contract invocations.
+- Add genesis block hash for testnet/mainnet to constants.
 
 ## 6.0.0
 
