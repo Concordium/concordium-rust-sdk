@@ -41,6 +41,7 @@ concordium_base = { version = "7.0", path = "./concordium-base/rust-src/concordi
 concordium-smart-contract-engine = { version = "6.0", path = "./concordium-base/smart-contracts/wasm-chain-integration/", default-features = false, features = ["async"]}
 aes-gcm = { version = "0.10", features = ["std"] }
 tracing = "0.1"
+base64ct = "=1.6.0" # Remove this direct dependency, when minimum supported rust version is 1.81 or above.
 
 [features]
 generate-protos = ["tonic-build", "git2"]
