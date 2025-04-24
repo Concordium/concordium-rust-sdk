@@ -713,7 +713,7 @@ pub struct ProcessorConfig {
     /// The amount of time to wait after a failure to process an event.
     wait_after_fail: std::time::Duration,
     /// A future to be signalled to stop processing.
-    stop:            std::pin::Pin<Box<dyn std::future::Future<Output = ()>>>,
+    stop:            std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>,
 }
 
 /// The default implementation behaves the same as
@@ -738,7 +738,10 @@ impl ProcessorConfig {
     ///
     /// An example of such a future would be the `Receiver` end of a oneshot
     /// channel.
-    pub fn set_stop_signal(self, stop: impl std::future::Future<Output = ()> + 'static) -> Self {
+    pub fn set_stop_signal(
+        self,
+        stop: impl std::future::Future<Output = ()> + Send + 'static,
+    ) -> Self {
         Self {
             stop: Box::pin(stop),
             ..self
