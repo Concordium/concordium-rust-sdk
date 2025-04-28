@@ -54,5 +54,3 @@ pub mod signatures;
 pub mod indexer;
 
 pub use concordium_base as base;
-
-pub mod protocol_level_tokens;

@@ -22,7 +22,7 @@ use concordium_base::{
             InitialCredentialDeploymentValues,
         },
     },
-    updates,
+    protocol_level_tokens, updates,
 };
 use cooldown::CooldownStatus;
 use std::collections::{BTreeMap, BTreeSet};
@@ -1032,7 +1032,7 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
     }
 }
 
-impl TryFrom<generated::plt::TokenId> for crate::protocol_level_tokens::TokenId {
+impl TryFrom<generated::plt::TokenId> for protocol_level_tokens::TokenId {
     type Error = tonic::Status;
 
     fn try_from(value: generated::plt::TokenId) -> Result<Self, Self::Error> {
@@ -1041,7 +1041,7 @@ impl TryFrom<generated::plt::TokenId> for crate::protocol_level_tokens::TokenId 
     }
 }
 
-impl TryFrom<generated::plt::TokenAmount> for crate::protocol_level_tokens::TokenAmount {
+impl TryFrom<generated::plt::TokenAmount> for protocol_level_tokens::TokenAmount {
     type Error = tonic::Status;
 
     fn try_from(value: generated::plt::TokenAmount) -> Result<Self, Self::Error> {
@@ -1477,6 +1477,7 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
             update_payload::Payload::ValidatorScoreParametersUpdate(v) => {
                 Self::ValidatorScoreParametersCPV3(v.try_into()?)
             }
+            update_payload::Payload::CreatePltUpdate(create_plt) => Self::CreatePlt(todo!()),
         })
     }
 }
@@ -1861,7 +1862,7 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
     }
 }
 
-impl TryFrom<generated::plt::TokenHolderEvent> for crate::protocol_level_tokens::TokenHolderEvent {
+impl TryFrom<generated::plt::TokenHolderEvent> for protocol_level_tokens::TokenHolderEvent {
     type Error = tonic::Status;
 
     fn try_from(value: generated::plt::TokenHolderEvent) -> Result<Self, Self::Error> {
@@ -1873,9 +1874,7 @@ impl TryFrom<generated::plt::TokenHolderEvent> for crate::protocol_level_tokens:
     }
 }
 
-impl TryFrom<generated::plt::TokenGovernanceEvent>
-    for crate::protocol_level_tokens::TokenGovernanceEvent
-{
+impl TryFrom<generated::plt::TokenGovernanceEvent> for protocol_level_tokens::TokenGovernanceEvent {
     type Error = tonic::Status;
 
     fn try_from(value: generated::plt::TokenGovernanceEvent) -> Result<Self, Self::Error> {
@@ -1887,7 +1886,7 @@ impl TryFrom<generated::plt::TokenGovernanceEvent>
     }
 }
 
-impl From<generated::plt::CBor> for crate::protocol_level_tokens::RawCbor {
+impl From<generated::plt::CBor> for protocol_level_tokens::RawCbor {
     fn from(wrapper: generated::plt::CBor) -> Self { wrapper.value.into() }
 }
 

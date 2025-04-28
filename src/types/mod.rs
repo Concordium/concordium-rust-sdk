@@ -2,8 +2,10 @@
 use anyhow::Context;
 pub use concordium_base::hashes;
 // re-export to maintain backwards compatibility.
-use crate::protocol_level_tokens::{TokenAmount, TokenGovernanceEvent, TokenHolderEvent, TokenId};
 pub use concordium_base::id::types::CredentialType;
+use concordium_base::protocol_level_tokens::{
+    TokenAmount, TokenGovernanceEvent, TokenHolderEvent, TokenId,
+};
 pub mod block_certificates;
 pub mod network;
 pub mod queries;

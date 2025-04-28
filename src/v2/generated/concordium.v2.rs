@@ -2717,7 +2717,7 @@ pub mod level1_update {
 pub struct UpdatePayload {
     #[prost(
         oneof = "update_payload::Payload",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23"
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24"
     )]
     pub payload: ::core::option::Option<update_payload::Payload>,
 }
@@ -2795,6 +2795,9 @@ pub mod update_payload {
         /// Validator score parameters (chain parameters version 3)
         #[prost(message, tag = "23")]
         ValidatorScoreParametersUpdate(super::ValidatorScoreParameters),
+        /// Create a new protocol-level token.
+        #[prost(message, tag = "24")]
+        CreatePltUpdate(super::plt::CreatePlt),
     }
 }
 /// Details about an account transaction.
@@ -2834,7 +2837,7 @@ pub struct TransactionTime {
     #[prost(uint64, tag = "1")]
     pub value: u64,
 }
-/// Details of an update instruction. These are free, and we only ever get a
+/// Details of an successful update instruction. These are free, and we only ever get a
 /// response for them if the update is successfully enqueued, hence no failure
 /// cases.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -2843,7 +2846,7 @@ pub struct UpdateDetails {
     /// The time at which the update will be effective.
     #[prost(message, optional, tag = "1")]
     pub effective_time: ::core::option::Option<TransactionTime>,
-    /// The paylaod for the update.
+    /// The payload for the update.
     #[prost(message, optional, tag = "2")]
     pub payload: ::core::option::Option<UpdatePayload>,
 }
@@ -2883,7 +2886,7 @@ pub mod block_item_summary {
         /// Details about an account creation.
         #[prost(message, tag = "5")]
         AccountCreation(super::AccountCreationDetails),
-        /// Details about a chain update.
+        /// Details about a successful chain update.
         #[prost(message, tag = "6")]
         Update(super::UpdateDetails),
     }

@@ -118,3 +118,39 @@ pub struct TokenHolderEffect {
     #[prost(message, repeated, tag = "1")]
     pub events: ::prost::alloc::vec::Vec<TokenHolderEvent>,
 }
+/// Details provided by the token module in the event of rejecting a transaction.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TokenModuleRejectReason {
+    /// The token symbol.
+    #[prost(message, optional, tag = "1")]
+    pub token_symbol: ::core::option::Option<TokenId>,
+    /// The type of the reject reason.
+    #[prost(string, tag = "2")]
+    pub r#type: ::prost::alloc::string::String,
+    /// (Optional) CBOR-encoded details.
+    #[prost(message, optional, tag = "3")]
+    pub details: ::core::option::Option<CBor>,
+}
+/// Update payload for creating a new protocol-level token
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CreatePlt {
+    /// The token symbol.
+    #[prost(message, optional, tag = "1")]
+    pub token_symbol: ::core::option::Option<TokenId>,
+    /// The hash that identifies the token module implementation.
+    #[prost(message, optional, tag = "2")]
+    pub token_module: ::core::option::Option<TokenModuleRef>,
+    /// The address of the account that will govern the token.
+    #[prost(message, optional, tag = "3")]
+    pub governance_account: ::core::option::Option<super::AccountAddress>,
+    /// The number of decimal places used in the representation of amounts of this token.
+    /// This determines the smallest representable fraction of the token.
+    /// This can be at most 255.
+    #[prost(uint32, tag = "4")]
+    pub decimals: u32,
+    /// The initialization parameters of the token, encoded in CBOR.
+    #[prost(message, optional, tag = "5")]
+    pub initialization_parameters: ::core::option::Option<CBor>,
+}

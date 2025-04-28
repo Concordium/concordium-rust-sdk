@@ -14,16 +14,15 @@ use super::{
     Energy, InstanceUpdatedEvent, Memo, NewEncryptedAmountEvent, OpenStatus, RegisteredData,
     RejectReason, TransactionIndex, TransactionType, UpdatePayload, UrlText,
 };
-use crate::{
-    protocol_level_tokens::{TokenGovernanceEvent, TokenHolderEvent},
-    types::Address,
-};
+
+use crate::types::Address;
 use concordium_base::{
     common::{
         types::{Amount, Timestamp, TransactionTime},
         SerdeDeserialize, SerdeSerialize,
     },
     id::types::AccountAddress,
+    protocol_level_tokens::{TokenGovernanceEvent, TokenHolderEvent},
 };
 use std::convert::{TryFrom, TryInto};
 use thiserror::Error;
@@ -1316,8 +1315,24 @@ fn convert_account_transaction(
                 .collect::<Result<_, ConversionError>>()?;
             mk_success(super::AccountTransactionEffects::DelegationConfigured { data })
         }
-        TransactionType::TokenHolder => todo!(),
-        TransactionType::TokenGovernance => todo!(),
+        TransactionType::TokenHolder => {
+            let effects = with_singleton(events, |e| match e {
+                Event::TokenHolder { events } => {
+                    Some(super::AccountTransactionEffects::TokenHolder { events })
+                }
+                _ => None,
+            })?;
+            mk_success(effects)
+        }
+        TransactionType::TokenGovernance => {
+            let effects = with_singleton(events, |e| match e {
+                Event::TokenGovernance { events } => {
+                    Some(super::AccountTransactionEffects::TokenGovernance { events })
+                }
+                _ => None,
+            })?;
+            mk_success(effects)
+        }
     }
 }
 
