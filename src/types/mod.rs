@@ -2,6 +2,7 @@
 use anyhow::Context;
 pub use concordium_base::hashes;
 // re-export to maintain backwards compatibility.
+use crate::protocol_level_tokens::{TokenAmount, TokenGovernanceEvent, TokenHolderEvent, TokenId};
 pub use concordium_base::id::types::CredentialType;
 pub mod block_certificates;
 pub mod network;
@@ -334,6 +335,28 @@ pub struct Cooldown {
     pub status: CooldownStatus,
 }
 
+/// State of a protocol level token associated with some account.
+#[derive(Debug, PartialEq, SerdeSerialize, SerdeDeserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountToken {
+    /// The unique identifier/symbol for the protocol level token.
+    pub token_id: TokenId,
+    /// The state of the token associated with the account.
+    pub state:    TokenAccountState,
+}
+
+/// State of a protocol level token associated with some account.
+#[derive(Debug, PartialEq, SerdeSerialize, SerdeDeserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TokenAccountState {
+    /// The token balance of the account.
+    pub balance:           TokenAmount,
+    /// Whether the account is a member of the allow list.
+    pub member_allow_list: bool,
+    /// Whether the account is a member of the deny list.
+    pub member_deny_list:  bool,
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// Account information exposed via the node's API. This is always the state of
@@ -389,6 +412,8 @@ pub struct AccountInfo {
     /// amount in the release schedule and the total amount that is actively
     /// staked or in cooldown (inactive stake).
     pub available_balance: Amount,
+
+    pub tokens: Vec<AccountToken>,
 }
 
 impl From<&AccountInfo> for AccountAccessStructure {
@@ -1302,6 +1327,8 @@ impl BlockItemSummary {
                 AccountTransactionEffects::DataRegistered { .. } => vec![at.sender],
                 AccountTransactionEffects::BakerConfigured { .. } => vec![at.sender],
                 AccountTransactionEffects::DelegationConfigured { .. } => vec![at.sender],
+                AccountTransactionEffects::TokenHolder { .. } => vec![at.sender],
+                AccountTransactionEffects::TokenGovernance { .. } => vec![at.sender],
             }
         } else {
             Vec::new()
@@ -1843,6 +1870,8 @@ impl AccountTransactionEffects {
             AccountTransactionEffects::DataRegistered { .. } => Some(RegisterData),
             AccountTransactionEffects::BakerConfigured { .. } => Some(ConfigureBaker),
             AccountTransactionEffects::DelegationConfigured { .. } => Some(ConfigureDelegation),
+            AccountTransactionEffects::TokenHolder { .. } => Some(TokenHolder),
+            AccountTransactionEffects::TokenGovernance { .. } => Some(TokenGovernance),
         }
     }
 }
@@ -1860,10 +1889,10 @@ pub struct BakerStakeUpdatedData {
     pub increased: bool,
 }
 
-#[derive(Debug, Clone)]
 /// Effects of an account transactions. All variants apart from
 /// [AccountTransactionEffects::None] correspond to a unique transaction that
 /// was successful.
+#[derive(Debug, Clone)]
 pub enum AccountTransactionEffects {
     /// No effects other than payment from this transaction.
     /// The rejection reason indicates why the transaction failed.
@@ -2021,6 +2050,16 @@ pub enum AccountTransactionEffects {
     /// An account configured delegation. The details of what happened are
     /// contained in the list of [delegation events](DelegationEvent).
     DelegationConfigured { data: Vec<DelegationEvent> },
+    /// Effect of a successful token holder transaction.
+    TokenHolder {
+        /// Events produced by the token.
+        events: Vec<TokenHolderEvent>,
+    },
+    /// Effect of a successful token governance transaction.
+    TokenGovernance {
+        /// Events produced by the token.
+        events: Vec<TokenGovernanceEvent>,
+    },
 }
 
 impl AccountTransactionEffects {
@@ -2758,6 +2797,8 @@ pub enum RejectReason {
     PoolWouldBecomeOverDelegated,
     /// The pool is not open to delegators.
     PoolClosed,
+    /// The provided identifier does not match a token currently on chain.
+    NonExistentTokenId { token_id: TokenId },
 }
 
 /// The network information of a node.

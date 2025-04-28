@@ -5,6 +5,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .build_client(true)
             .build_server(false)
             .out_dir("./src/v2/generated")
+            .include_file("mod.rs")
             .compile(
                 &["concordium-base/concordium-grpc-api/v2/concordium/service.proto"],
                 &["concordium-base/concordium-grpc-api/"],

@@ -1,7 +1,7 @@
 //! Helpers and trait implementations to convert from proto generated types to
 //! their Rust equivalents.
 
-use super::generated::*;
+use super::{generated, generated::*};
 
 use super::Require;
 use crate::{
@@ -448,6 +448,7 @@ impl From<ProtocolVersion> for super::types::ProtocolVersion {
             ProtocolVersion::ProtocolVersion6 => super::types::ProtocolVersion::P6,
             ProtocolVersion::ProtocolVersion7 => super::types::ProtocolVersion::P7,
             ProtocolVersion::ProtocolVersion8 => super::types::ProtocolVersion::P8,
+            ProtocolVersion::ProtocolVersion9 => super::types::ProtocolVersion::P9,
         }
     }
 }
@@ -463,6 +464,7 @@ impl From<super::types::ProtocolVersion> for ProtocolVersion {
             super::types::ProtocolVersion::P6 => ProtocolVersion::ProtocolVersion6,
             super::types::ProtocolVersion::P7 => ProtocolVersion::ProtocolVersion7,
             super::types::ProtocolVersion::P8 => ProtocolVersion::ProtocolVersion8,
+            super::types::ProtocolVersion::P9 => ProtocolVersion::ProtocolVersion9,
         }
     }
 }
@@ -953,6 +955,7 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             address,
             cooldowns,
             available_balance,
+            tokens,
         } = value;
         let account_nonce = sequence_number.require()?.into();
         let account_amount = amount.require()?.into();
@@ -998,7 +1001,10 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             // locked amount.
             account_amount - locked_amount
         });
-
+        let tokens = tokens
+            .into_iter()
+            .map(|token| token.try_into())
+            .collect::<Result<_, _>>()?;
         Ok(Self {
             account_nonce,
             account_amount,
@@ -1021,6 +1027,53 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             account_address,
             cooldowns,
             available_balance,
+            tokens,
+        })
+    }
+}
+
+impl TryFrom<generated::plt::TokenId> for crate::protocol_level_tokens::TokenId {
+    type Error = tonic::Status;
+
+    fn try_from(value: generated::plt::TokenId) -> Result<Self, Self::Error> {
+        Self::try_from(value.symbol)
+            .map_err(|err| tonic::Status::internal(format!("Unexpected token identifier: {}", err)))
+    }
+}
+
+impl TryFrom<generated::plt::TokenAmount> for crate::protocol_level_tokens::TokenAmount {
+    type Error = tonic::Status;
+
+    fn try_from(value: generated::plt::TokenAmount) -> Result<Self, Self::Error> {
+        Ok(Self {
+            value:    value.digits,
+            decimals: value
+                .nr_of_decimals
+                .try_into()
+                .map_err(|_| tonic::Status::internal("Unexpected token decimals"))?,
+        })
+    }
+}
+
+impl TryFrom<generated::account_info::Token> for crate::types::AccountToken {
+    type Error = tonic::Status;
+
+    fn try_from(value: generated::account_info::Token) -> Result<Self, Self::Error> {
+        Ok(Self {
+            token_id: value.token_id.require()?.try_into()?,
+            state:    value.token_account_state.require()?.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<generated::plt::TokenAccountState> for crate::types::TokenAccountState {
+    type Error = tonic::Status;
+
+    fn try_from(value: generated::plt::TokenAccountState) -> Result<Self, Self::Error> {
+        Ok(Self {
+            balance:           value.balance.require()?.try_into()?,
+            member_allow_list: value.member_allow_list.require()?,
+            member_deny_list:  value.member_deny_list.require()?,
         })
     }
 }
@@ -1786,8 +1839,56 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                         .collect::<Result<_, tonic::Status>>()?,
                 })
             }
+            account_transaction_effects::Effect::TokenHolderEffect(token_holder_effect) => {
+                Ok(Self::TokenHolder {
+                    events: token_holder_effect
+                        .events
+                        .into_iter()
+                        .map(TryInto::try_into)
+                        .collect::<Result<_, tonic::Status>>()?,
+                })
+            }
+            account_transaction_effects::Effect::TokenGovernanceEffect(token_governance_effect) => {
+                Ok(Self::TokenGovernance {
+                    events: token_governance_effect
+                        .events
+                        .into_iter()
+                        .map(TryInto::try_into)
+                        .collect::<Result<_, tonic::Status>>()?,
+                })
+            }
         }
     }
+}
+
+impl TryFrom<generated::plt::TokenHolderEvent> for crate::protocol_level_tokens::TokenHolderEvent {
+    type Error = tonic::Status;
+
+    fn try_from(value: generated::plt::TokenHolderEvent) -> Result<Self, Self::Error> {
+        Ok(Self {
+            token_id:   value.token_symbol.require()?.try_into()?,
+            event_type: value.r#type,
+            details:    value.details.require()?.into(),
+        })
+    }
+}
+
+impl TryFrom<generated::plt::TokenGovernanceEvent>
+    for crate::protocol_level_tokens::TokenGovernanceEvent
+{
+    type Error = tonic::Status;
+
+    fn try_from(value: generated::plt::TokenGovernanceEvent) -> Result<Self, Self::Error> {
+        Ok(Self {
+            token_id:   value.token_symbol.require()?.try_into()?,
+            event_type: value.r#type,
+            details:    value.details.require()?.into(),
+        })
+    }
+}
+
+impl From<generated::plt::CBor> for crate::protocol_level_tokens::RawCbor {
+    fn from(wrapper: generated::plt::CBor) -> Self { wrapper.value.into() }
 }
 
 impl TryFrom<ContractTraceElement> for super::types::ContractTraceElement {
@@ -2218,6 +2319,9 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
                 Self::PoolWouldBecomeOverDelegated
             }
             reject_reason::Reason::PoolClosed(_) => Self::PoolClosed,
+            reject_reason::Reason::NonExistentTokenId(token_id) => Self::NonExistentTokenId {
+                token_id: token_id.try_into()?,
+            },
         })
     }
 }
