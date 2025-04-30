@@ -1477,9 +1477,17 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
             update_payload::Payload::ValidatorScoreParametersUpdate(v) => {
                 Self::ValidatorScoreParametersCPV3(v.try_into()?)
             }
-            update_payload::Payload::CreatePltUpdate(create_plt) => Self::CreatePlt(todo!()),
+            update_payload::Payload::CreatePltUpdate(create_plt) => {
+                Self::CreatePlt(create_plt.try_into()?)
+            }
         })
     }
+}
+
+impl TryFrom<super::generated::plt::CreatePlt> for concordium_base::updates::CreatePlt {
+    type Error = tonic::Status;
+
+    fn try_from(_value: super::generated::plt::CreatePlt) -> Result<Self, Self::Error> { todo!() }
 }
 
 impl TryFrom<CapitalBound> for super::types::CapitalBound {

@@ -56,6 +56,11 @@ use self::dry_run::WithRemainingQuota;
 mod conversions;
 pub mod dry_run;
 #[path = "generated/mod.rs"]
+#[allow(
+    clippy::large_enum_variant,
+    clippy::enum_variant_names,
+    clippy::derive_partial_eq_without_eq
+)]
 mod gen;
 pub use gen::concordium::v2 as generated;
 pub mod proto_schema_version;
