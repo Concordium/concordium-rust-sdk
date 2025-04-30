@@ -5,7 +5,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .build_client(true)
             .build_server(false)
             .out_dir("./src/v2/generated")
-            .compile(
+            .compile_protos(
                 &["concordium-base/concordium-grpc-api/v2/concordium/service.proto"],
                 &["concordium-base/concordium-grpc-api/"],
             )?;
