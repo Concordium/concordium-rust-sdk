@@ -1487,7 +1487,29 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
 impl TryFrom<super::generated::plt::CreatePlt> for concordium_base::updates::CreatePlt {
     type Error = tonic::Status;
 
-    fn try_from(_value: super::generated::plt::CreatePlt) -> Result<Self, Self::Error> { todo!() }
+    fn try_from(value: super::generated::plt::CreatePlt) -> Result<Self, Self::Error> {
+        Ok(Self {
+            token_symbol:              value.token_symbol.require()?.try_into()?,
+            token_module:              value.token_module.require()?.try_into()?,
+            governance_account:        value.governance_account.require()?.try_into()?,
+            decimals:                  value.decimals.try_into().map_err(|_| {
+                tonic::Status::internal("Unexpected integer size for token decimals.")
+            })?,
+            initialization_parameters: value.initialization_parameters.require()?.into(),
+        })
+    }
+}
+
+impl TryFrom<super::generated::plt::TokenModuleRef> for protocol_level_tokens::TokenModuleRef {
+    type Error = tonic::Status;
+
+    fn try_from(value: super::generated::plt::TokenModuleRef) -> Result<Self, Self::Error> {
+        let bytes = value
+            .value
+            .try_into()
+            .map_err(|_| tonic::Status::internal("Unexpected module reference format."))?;
+        Ok(Self::new(bytes))
+    }
 }
 
 impl TryFrom<CapitalBound> for super::types::CapitalBound {
@@ -1876,7 +1898,8 @@ impl TryFrom<generated::plt::TokenHolderEvent> for protocol_level_tokens::TokenH
     fn try_from(value: generated::plt::TokenHolderEvent) -> Result<Self, Self::Error> {
         Ok(Self {
             token_id:   value.token_symbol.require()?.try_into()?,
-            event_type: value.r#type,
+            event_type: protocol_level_tokens::TokenEventType::try_from(value.r#type)
+                .map_err(|err| tonic::Status::internal(err.to_string()))?,
             details:    value.details.require()?.into(),
         })
     }
@@ -1888,7 +1911,8 @@ impl TryFrom<generated::plt::TokenGovernanceEvent> for protocol_level_tokens::To
     fn try_from(value: generated::plt::TokenGovernanceEvent) -> Result<Self, Self::Error> {
         Ok(Self {
             token_id:   value.token_symbol.require()?.try_into()?,
-            event_type: value.r#type,
+            event_type: protocol_level_tokens::TokenEventType::try_from(value.r#type)
+                .map_err(|err| tonic::Status::internal(err.to_string()))?,
             details:    value.details.require()?.into(),
         })
     }
