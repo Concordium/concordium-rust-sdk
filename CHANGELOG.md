@@ -6,6 +6,9 @@
   - `RawCbor`, `TokenId`, `TokenAmount`, `TokenModuleRef`.
   - Extend `UpdatePayload` with `CreatePlt` variant.
   - Extend `RejectReason` with `TokenHolderTransactionFailed` and `NonExistentTokenId` variants.
+  - Add `tokens` field to `AccountInfo` with PLTs held by the account.
+  - Extend `AccountTransactionEffects` with `TokenHolder` and `TokenGovernance` variants.
+  - Extend `TransactionType` with `TokenHolder` and `TokenGovernance` variants.
 - Add getter function `reward_period_epochs` to access the field in the struct `RewardPeriodLength`.
 - Introduce `RewardsOverview::common_reward_data` for getting the common reward data across `RewardsOverview` version 0 and version 1.
 - Add constructor `TokenAddress::new` for CIS2 type `TokenAddress`.

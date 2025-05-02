@@ -412,8 +412,8 @@ pub struct AccountInfo {
     /// amount in the release schedule and the total amount that is actively
     /// staked or in cooldown (inactive stake).
     pub available_balance: Amount,
-
-    pub tokens: Vec<AccountToken>,
+    /// The protocol level tokens (PLT) held by the account.
+    pub tokens:            Vec<AccountToken>,
 }
 
 impl From<&AccountInfo> for AccountAccessStructure {
