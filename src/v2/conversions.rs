@@ -2353,6 +2353,24 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
             reject_reason::Reason::NonExistentTokenId(token_id) => Self::NonExistentTokenId {
                 token_id: token_id.try_into()?,
             },
+            reject_reason::Reason::TokenHolderTransactionFailed(token_module_reject_reason) => {
+                Self::TokenHolderTransactionFailed(token_module_reject_reason.try_into()?)
+            }
+        })
+    }
+}
+
+impl TryFrom<generated::plt::TokenModuleRejectReason>
+    for protocol_level_tokens::TokenModuleRejectReason
+{
+    type Error = tonic::Status;
+
+    fn try_from(value: generated::plt::TokenModuleRejectReason) -> Result<Self, Self::Error> {
+        Ok(Self {
+            token_id:   value.token_symbol.require()?.try_into()?,
+            event_type: protocol_level_tokens::TokenEventType::try_from(value.r#type)
+                .map_err(|err| tonic::Status::internal(err.to_string()))?,
+            details:    value.details.map(|d| d.into()),
         })
     }
 }
