@@ -1,5 +1,11 @@
 ## Unreleased changes
 
+- Publish `get_canonical_address` on `AccountAddress`.
+- Introduce protocol version 9 `ProtocolVersion::P9`.
+- Introduce basic types related to protocol level tokens (PLT):
+  - `RawCbor`, `TokenId`, `TokenAmount`, `TokenModuleRef`.
+  - Extend `UpdatePayload` with `CreatePlt` variant.
+  - Extend `RejectReason` with `TokenHolderTransactionFailed` and `NonExistentTokenId` variants.
 - Add getter function `reward_period_epochs` to access the field in the struct `RewardPeriodLength`.
 - Introduce `RewardsOverview::common_reward_data` for getting the common reward data across `RewardsOverview` version 0 and version 1.
 - Add constructor `TokenAddress::new` for CIS2 type `TokenAddress`.
