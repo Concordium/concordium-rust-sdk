@@ -19,6 +19,8 @@ pkg
 *.state-*
 *.state
 
+.idea/
+
 Cargo.lock
 # We do not compile google.protobuf.* types, so this generated file is not
 # committed.
