@@ -64,7 +64,7 @@ jobs:
       - name: Clippy
         run: |
           rustup default $RUST_VERSION
-          cargo check
+          cargo check --all-targets --all-features --locked
 
   "lint_clippy_test":
     name: lint:clippy
@@ -80,7 +80,7 @@ jobs:
         run: |
           rustup default $RUST_VERSION
           rustup component add clippy
-          cargo clippy --color=always --tests --benches --examples -- -D warnings
+          cargo clippy --color=always --all-targets --all-features --locked -- -D warnings
           # Examples can be large with a lot of debug info due to tokio. So we
           # disable debug info generation.
-          RUSTFLAGS="-C debuginfo=0" cargo test
+          RUSTFLAGS="-C debuginfo=0" cargo test --all-targets --all-features --locked
