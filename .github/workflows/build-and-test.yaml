@@ -64,7 +64,7 @@ jobs:
       - name: Check
         run: |
           rustup default $RUST_VERSION
-          cargo check --all-targets  
+          cargo check --all-targets --locked 
           git diff Cargo.lock
 
   "lint_clippy_test":
