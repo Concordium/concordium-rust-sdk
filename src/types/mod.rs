@@ -3,9 +3,7 @@ use anyhow::Context;
 pub use concordium_base::hashes;
 // re-export to maintain backwards compatibility.
 pub use concordium_base::id::types::CredentialType;
-use concordium_base::protocol_level_tokens::{
-    TokenAmount, TokenGovernanceEvent, TokenHolderEvent, TokenId,
-};
+use concordium_base::protocol_level_tokens;
 pub mod block_certificates;
 pub mod network;
 pub mod queries;
@@ -342,7 +340,7 @@ pub struct Cooldown {
 #[serde(rename_all = "camelCase")]
 pub struct AccountToken {
     /// The unique identifier/symbol for the protocol level token.
-    pub token_id: TokenId,
+    pub token_id: protocol_level_tokens::TokenId,
     /// The state of the token associated with the account.
     pub state:    TokenAccountState,
 }
@@ -352,7 +350,7 @@ pub struct AccountToken {
 #[serde(rename_all = "camelCase")]
 pub struct TokenAccountState {
     /// The token balance of the account.
-    pub balance:           TokenAmount,
+    pub balance:           protocol_level_tokens::TokenAmount,
     /// Whether the account is a member of the allow list.
     pub member_allow_list: bool,
     /// Whether the account is a member of the deny list.
@@ -414,8 +412,8 @@ pub struct AccountInfo {
     /// amount in the release schedule and the total amount that is actively
     /// staked or in cooldown (inactive stake).
     pub available_balance: Amount,
-
-    pub tokens: Vec<AccountToken>,
+    /// The protocol level tokens (PLT) held by the account.
+    pub tokens:            Vec<AccountToken>,
 }
 
 impl From<&AccountInfo> for AccountAccessStructure {
@@ -2055,12 +2053,12 @@ pub enum AccountTransactionEffects {
     /// Effect of a successful token holder transaction.
     TokenHolder {
         /// Events produced by the token.
-        events: Vec<TokenHolderEvent>,
+        events: Vec<protocol_level_tokens::TokenHolderEvent>,
     },
     /// Effect of a successful token governance transaction.
     TokenGovernance {
         /// Events produced by the token.
-        events: Vec<TokenGovernanceEvent>,
+        events: Vec<protocol_level_tokens::TokenGovernanceEvent>,
     },
 }
 
@@ -2800,7 +2798,13 @@ pub enum RejectReason {
     /// The pool is not open to delegators.
     PoolClosed,
     /// The provided identifier does not match a token currently on chain.
-    NonExistentTokenId { token_id: TokenId },
+    /// Introduced in protocol version 9.
+    NonExistentTokenId {
+        token_id: protocol_level_tokens::TokenId,
+    },
+    /// The token-holder transaction failed.
+    /// Introduced in protocol version 9.
+    TokenHolderTransactionFailed(protocol_level_tokens::TokenModuleRejectReason),
 }
 
 /// The network information of a node.

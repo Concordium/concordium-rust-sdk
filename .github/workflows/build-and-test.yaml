@@ -7,16 +7,21 @@ name: Build and test
 
 on:
   push:
-    branches: main
+    branches:
+     - main
+     - plt
 
   pull_request:
-    branches: main
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+    branches:
+     - main
+     - plt
 
   workflow_dispatch: # allows manual trigger
 
 env:
   RUST_FMT: nightly-2023-04-01-x86_64-unknown-linux-gnu
-  RUST_VERSION: "1.73"
+  RUST_VERSION: "1.81"
 
 jobs:
   "lint_fmt":

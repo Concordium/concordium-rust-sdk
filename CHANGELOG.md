@@ -1,5 +1,14 @@
 ## Unreleased changes
 
+- Publish `get_canonical_address` on `AccountAddress`.
+- Introduce protocol version 9 `ProtocolVersion::P9`.
+- Introduce basic types related to protocol level tokens (PLT):
+  - `RawCbor`, `TokenId`, `TokenAmount`, `TokenModuleRef`.
+  - Extend `UpdatePayload` with `CreatePlt` variant.
+  - Extend `RejectReason` with `TokenHolderTransactionFailed` and `NonExistentTokenId` variants.
+  - Add `tokens` field to `AccountInfo` with PLTs held by the account.
+  - Extend `AccountTransactionEffects` with `TokenHolder` and `TokenGovernance` variants.
+  - Extend `TransactionType` with `TokenHolder` and `TokenGovernance` variants.
 - Add getter function `reward_period_epochs` to access the field in the struct `RewardPeriodLength`.
 - Introduce `RewardsOverview::common_reward_data` for getting the common reward data across `RewardsOverview` version 0 and version 1.
 - Add constructor `TokenAddress::new` for CIS2 type `TokenAddress`.
@@ -10,6 +19,8 @@
 - `ProcessorConfig` now requires the future for signaling graceful shutdown is marked `Send` effectively marking `ProcessorConfig` as `Send`. This is a minor breaking change, but expected to be the case for most if not all use cases.
 - Add `parse` method to `ReturnValue` to simplify deserialization of values returned by contract invocations.
 - Add genesis block hash for testnet/mainnet to constants.
+- **Breaking change**: Updated dependencies: tonic = 0.10 -> 0.12, prost = 0.12 -> 0.13, http = 0.2 -> 1.2
+- **Breaking change**: MSRV updated: 1.73 -> 1.81
 
 ## 6.0.0
 
