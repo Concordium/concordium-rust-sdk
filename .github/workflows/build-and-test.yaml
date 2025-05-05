@@ -65,6 +65,7 @@ jobs:
         run: |
           rustup default $RUST_VERSION
           cargo check --all-targets --all-features 
+          git status
           git diff
 
   "lint_clippy_test":
