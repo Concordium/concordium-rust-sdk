@@ -52,7 +52,7 @@ jobs:
   # Check compilation of just the crate without tests and examples. This is to
   # make sure that the features are correctly set for the normal dependencies.
   "check_pure_compilation":
-    name: lint:clippy
+    name: lint:check
     # Don't run on draft pull requests
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
