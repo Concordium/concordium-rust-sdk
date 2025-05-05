@@ -61,6 +61,7 @@ pub mod dry_run;
     clippy::enum_variant_names,
     clippy::derive_partial_eq_without_eq
 )]
+#[rustfmt::skip]
 mod generated;
 pub mod proto_schema_version;
 
