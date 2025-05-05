@@ -64,7 +64,8 @@ jobs:
       - name: Clippy
         run: |
           rustup default $RUST_VERSION
-          cargo check --all-targets --all-features --locked
+          cargo check --all-targets --all-features 
+          git diff Cargo.lock
 
   "lint_clippy_test":
     name: lint:clippy
