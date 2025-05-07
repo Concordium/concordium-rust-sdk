@@ -118,11 +118,11 @@ These files are committed to the repository so that users of the SDK do not have
 protobuf compiler installed in order to use the SDK.
 
 Occasionally there is a need to update the generated files, if the schemas
-change. This can be done by compiling the SDK using the `generate-protos`
-feature, i.e.,
+change. This can be done by running the binary in `proto-generate`,
 
 ```
-cargo build --features=generate-protos
+cd proto-generate
+cargo run
 ```
 
 Updating these files should only be done when the node's API, determined by the

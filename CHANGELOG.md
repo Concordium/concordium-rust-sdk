@@ -21,6 +21,7 @@
 - Add genesis block hash for testnet/mainnet to constants.
 - **Breaking change**: Updated dependencies: tonic = 0.10 -> 0.12, prost = 0.12 -> 0.13, http = 0.2 -> 1.2
 - **Breaking change**: MSRV updated: 1.73 -> 1.81
+- The feature `generate-protos` has been removed (it was for internal usage and should not be used by any consumers)
 
 ## 6.0.0
 
