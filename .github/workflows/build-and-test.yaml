@@ -57,7 +57,7 @@ jobs:
   # Check compilation of just the crate without tests and examples. This is to
   # make sure that the features are correctly set for the normal dependencies.
   "check_pure_compilation":
-    name: lint:clippy
+    name: lint:check
     # Don't run on draft pull requests
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
@@ -66,10 +66,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Clippy
+      - name: Check
         run: |
           rustup default $RUST_VERSION
-          cargo check
+          cargo check --all-targets --all-features
 
   "lint_clippy_test":
     name: lint:clippy
@@ -85,7 +85,7 @@ jobs:
         run: |
           rustup default $RUST_VERSION
           rustup component add clippy
-          cargo clippy --color=always --tests --benches --examples -- -D warnings
+          cargo clippy --color=always --all-targets --all-features -- -D warnings
           # Examples can be large with a lot of debug info due to tokio. So we
           # disable debug info generation.
-          RUSTFLAGS="-C debuginfo=0" cargo test
+          RUSTFLAGS="-C debuginfo=0" cargo test --all-targets --all-features

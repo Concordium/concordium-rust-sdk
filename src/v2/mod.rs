@@ -61,6 +61,7 @@ pub mod dry_run;
     clippy::enum_variant_names,
     clippy::derive_partial_eq_without_eq
 )]
+#[rustfmt::skip]
 mod gen;
 pub use gen::concordium::v2 as generated;
 pub mod proto_schema_version;
