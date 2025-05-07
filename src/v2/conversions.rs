@@ -1045,13 +1045,13 @@ impl TryFrom<generated::plt::TokenAmount> for protocol_level_tokens::TokenAmount
     type Error = tonic::Status;
 
     fn try_from(value: generated::plt::TokenAmount) -> Result<Self, Self::Error> {
-        Ok(Self {
-            value:    value.digits,
-            decimals: value
+        Ok(Self::from_raw(
+            value.digits,
+            value
                 .nr_of_decimals
                 .try_into()
                 .map_err(|_| tonic::Status::internal("Unexpected token decimals"))?,
-        })
+        ))
     }
 }
 
