@@ -2356,6 +2356,8 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
             reject_reason::Reason::TokenHolderTransactionFailed(token_module_reject_reason) => {
                 Self::TokenHolderTransactionFailed(token_module_reject_reason.try_into()?)
             }
+            reject_reason::Reason::TokenGovernanceTransactionFailed(_) => {todo!()} /// todo ar
+            reject_reason::Reason::UnauthorizedTokenGovernance(_) => {todo!()} // todo ar
         })
     }
 }
@@ -3979,7 +3981,6 @@ impl TryFrom<ConsensusDetailedStatus> for super::types::queries::ConsensusDetail
 
 #[cfg(test)]
 mod test {
-
     use super::*;
 
     #[test]
