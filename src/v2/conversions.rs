@@ -1,9 +1,7 @@
 //! Helpers and trait implementations to convert from proto generated types to
 //! their Rust equivalents.
 
-use super::{generated, generated::*};
-
-use super::Require;
+use super::{generated::*, Require};
 use crate::{
     types::{
         queries::ConcordiumBFTDetails, AccountReleaseSchedule, ActiveBakerPoolStatus,
@@ -22,7 +20,7 @@ use concordium_base::{
             InitialCredentialDeploymentValues,
         },
     },
-    protocol_level_tokens, updates,
+    updates,
 };
 use cooldown::CooldownStatus;
 use std::collections::{BTreeMap, BTreeSet};
@@ -1032,52 +1030,6 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
     }
 }
 
-impl TryFrom<generated::plt::TokenId> for protocol_level_tokens::TokenId {
-    type Error = tonic::Status;
-
-    fn try_from(value: generated::plt::TokenId) -> Result<Self, Self::Error> {
-        Self::try_from(value.symbol)
-            .map_err(|err| tonic::Status::internal(format!("Unexpected token identifier: {}", err)))
-    }
-}
-
-impl TryFrom<generated::plt::TokenAmount> for protocol_level_tokens::TokenAmount {
-    type Error = tonic::Status;
-
-    fn try_from(value: generated::plt::TokenAmount) -> Result<Self, Self::Error> {
-        Ok(Self::from_raw(
-            value.digits,
-            value
-                .nr_of_decimals
-                .try_into()
-                .map_err(|_| tonic::Status::internal("Unexpected token decimals"))?,
-        ))
-    }
-}
-
-impl TryFrom<generated::account_info::Token> for crate::types::AccountToken {
-    type Error = tonic::Status;
-
-    fn try_from(value: generated::account_info::Token) -> Result<Self, Self::Error> {
-        Ok(Self {
-            token_id: value.token_id.require()?.try_into()?,
-            state:    value.token_account_state.require()?.try_into()?,
-        })
-    }
-}
-
-impl TryFrom<generated::plt::TokenAccountState> for crate::types::TokenAccountState {
-    type Error = tonic::Status;
-
-    fn try_from(value: generated::plt::TokenAccountState) -> Result<Self, Self::Error> {
-        Ok(Self {
-            balance:           value.balance.require()?.try_into()?,
-            member_allow_list: value.member_allow_list.require()?,
-            member_deny_list:  value.member_deny_list.require()?,
-        })
-    }
-}
-
 impl TryFrom<BlockItemStatus> for super::types::TransactionStatus {
     type Error = tonic::Status;
 
@@ -1500,18 +1452,6 @@ impl TryFrom<super::generated::plt::CreatePlt> for concordium_base::updates::Cre
     }
 }
 
-impl TryFrom<super::generated::plt::TokenModuleRef> for protocol_level_tokens::TokenModuleRef {
-    type Error = tonic::Status;
-
-    fn try_from(value: super::generated::plt::TokenModuleRef) -> Result<Self, Self::Error> {
-        let bytes = value
-            .value
-            .try_into()
-            .map_err(|_| tonic::Status::internal("Unexpected module reference format."))?;
-        Ok(Self::new(bytes))
-    }
-}
-
 impl TryFrom<CapitalBound> for super::types::CapitalBound {
     type Error = tonic::Status;
 
@@ -1890,36 +1830,6 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
             }
         }
     }
-}
-
-impl TryFrom<generated::plt::TokenHolderEvent> for protocol_level_tokens::TokenHolderEvent {
-    type Error = tonic::Status;
-
-    fn try_from(value: generated::plt::TokenHolderEvent) -> Result<Self, Self::Error> {
-        Ok(Self {
-            token_id:   value.token_symbol.require()?.try_into()?,
-            event_type: protocol_level_tokens::TokenEventType::try_from(value.r#type)
-                .map_err(|err| tonic::Status::internal(err.to_string()))?,
-            details:    value.details.require()?.into(),
-        })
-    }
-}
-
-impl TryFrom<generated::plt::TokenGovernanceEvent> for protocol_level_tokens::TokenGovernanceEvent {
-    type Error = tonic::Status;
-
-    fn try_from(value: generated::plt::TokenGovernanceEvent) -> Result<Self, Self::Error> {
-        Ok(Self {
-            token_id:   value.token_symbol.require()?.try_into()?,
-            event_type: protocol_level_tokens::TokenEventType::try_from(value.r#type)
-                .map_err(|err| tonic::Status::internal(err.to_string()))?,
-            details:    value.details.require()?.into(),
-        })
-    }
-}
-
-impl From<generated::plt::CBor> for protocol_level_tokens::RawCbor {
-    fn from(wrapper: generated::plt::CBor) -> Self { wrapper.value.into() }
 }
 
 impl TryFrom<ContractTraceElement> for super::types::ContractTraceElement {
@@ -2356,21 +2266,6 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
             reject_reason::Reason::TokenHolderTransactionFailed(token_module_reject_reason) => {
                 Self::TokenHolderTransactionFailed(token_module_reject_reason.try_into()?)
             }
-        })
-    }
-}
-
-impl TryFrom<generated::plt::TokenModuleRejectReason>
-    for protocol_level_tokens::TokenModuleRejectReason
-{
-    type Error = tonic::Status;
-
-    fn try_from(value: generated::plt::TokenModuleRejectReason) -> Result<Self, Self::Error> {
-        Ok(Self {
-            token_id:   value.token_symbol.require()?.try_into()?,
-            event_type: protocol_level_tokens::TokenEventType::try_from(value.r#type)
-                .map_err(|err| tonic::Status::internal(err.to_string()))?,
-            details:    value.details.map(|d| d.into()),
         })
     }
 }
