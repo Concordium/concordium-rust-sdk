@@ -1441,7 +1441,7 @@ impl TryFrom<super::generated::plt::CreatePlt> for concordium_base::updates::Cre
 
     fn try_from(value: super::generated::plt::CreatePlt) -> Result<Self, Self::Error> {
         Ok(Self {
-            token_symbol:              value.token_symbol.require()?.try_into()?,
+            token_id:                  value.token_id.require()?.try_into()?,
             token_module:              value.token_module.require()?.try_into()?,
             governance_account:        value.governance_account.require()?.try_into()?,
             decimals:                  value.decimals.try_into().map_err(|_| {

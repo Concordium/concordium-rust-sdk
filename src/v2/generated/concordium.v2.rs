@@ -2010,10 +2010,10 @@ pub mod account_transaction_effects {
         DelegationConfigured(DelegationConfigured),
         /// Token holder transaction effect.
         #[prost(message, tag = "20")]
-        TokenHolderEffect(super::plt::TokenHolderEffect),
+        TokenHolderEffect(super::plt::TokenEffect),
         /// Token governance transaction effect.
         #[prost(message, tag = "21")]
-        TokenGovernanceEffect(super::plt::TokenGovernanceEffect),
+        TokenGovernanceEffect(super::plt::TokenEffect),
     }
 }
 /// Election difficulty parameter.

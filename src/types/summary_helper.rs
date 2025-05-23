@@ -22,7 +22,7 @@ use concordium_base::{
         SerdeDeserialize, SerdeSerialize,
     },
     id::types::AccountAddress,
-    protocol_level_tokens::{TokenGovernanceEvent, TokenHolderEvent},
+    protocol_level_tokens::TokenEvent,
 };
 use std::convert::{TryFrom, TryInto};
 use thiserror::Error;
@@ -379,10 +379,10 @@ pub(crate) enum Event {
         account:  AccountAddress,
     },
     TokenHolder {
-        events: Vec<TokenHolderEvent>,
+        events: Vec<TokenEvent>,
     },
     TokenGovernance {
-        events: Vec<TokenGovernanceEvent>,
+        events: Vec<TokenEvent>,
     },
 }
 
