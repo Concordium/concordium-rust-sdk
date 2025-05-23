@@ -1838,6 +1838,45 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
     }
 }
 
+<<<<<<< HEAD
+impl TryFrom<generated::plt::TokenHolderEvent> for protocol_level_tokens::TokenHolderEvent {
+    type Error = tonic::Status;
+
+    fn try_from(_value: generated::plt::TokenHolderEvent) -> Result<Self, Self::Error> {
+        todo!() // todo implement as part of COR-1362
+                // Ok(Self {
+                //     token_id:   value.token_symbol.require()?.try_into()?,
+                //     event_type:
+                // protocol_level_tokens::TokenEventType::try_from(value.r#type)
+                //         .map_err(|err|
+                // tonic::Status::internal(err.to_string()))?,
+                //     details:    value.details.require()?.into(),
+                // })
+    }
+}
+
+impl TryFrom<generated::plt::TokenGovernanceEvent> for protocol_level_tokens::TokenGovernanceEvent {
+    type Error = tonic::Status;
+
+    fn try_from(_value: generated::plt::TokenGovernanceEvent) -> Result<Self, Self::Error> {
+        todo!() // todo implement as part of COR-1362
+                // Ok(Self {
+                //     token_id:   value.token_symbol.require()?.try_into()?,
+                //     event_type:
+                // protocol_level_tokens::TokenEventType::try_from(value.r#type)
+                //         .map_err(|err|
+                // tonic::Status::internal(err.to_string()))?,
+                //     details:    value.details.require()?.into(),
+                // })
+    }
+}
+
+impl From<generated::plt::CBor> for protocol_level_tokens::RawCbor {
+    fn from(wrapper: generated::plt::CBor) -> Self { wrapper.value.into() }
+}
+
+=======
+>>>>>>> 99edf4032d69a32c75a5e35e5f04697e122e1102
 impl TryFrom<ContractTraceElement> for super::types::ContractTraceElement {
     type Error = tonic::Status;
 

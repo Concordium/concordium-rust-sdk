@@ -4,6 +4,7 @@
 use crate::{
     endpoints,
     id::{self, types::AccountCredentialMessage},
+    protocol_level_tokens,
     types::{
         self, block_certificates,
         hashes::{self, BlockHash, TransactionHash, TransactionSignHash},
@@ -2929,6 +2930,55 @@ impl Client {
             response: stream,
         })
     }
+
+    /// Retrieve the list of protocol level tokens that exist at the end of the
+    /// given block.
+    ///
+    /// This endpoint is only relevant starting from Concordium Protocol Version
+    /// 9 and onwards.
+    pub async fn get_token_list(
+        &mut self,
+        bi: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<protocol_level_tokens::TokenId, tonic::Status>>>,
+    > {
+        let response = self
+            .client
+            .get_token_list(&bi.into_block_identifier())
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(token_id) => protocol_level_tokens::TokenId::try_from(token_id),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
+    /// Retrieve the information about the given protocol level token in the
+    /// given block.
+    ///
+    /// This endpoint is only relevant starting from Concordium Protocol Version
+    /// 9 and onwards.
+    pub async fn get_token_info(
+        &mut self,
+        token_id: protocol_level_tokens::TokenId,
+        bi: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<protocol_level_tokens::TokenInfo>> {
+        let request = generated::TokenInfoRequest {
+            block_hash: Some((&bi.into_block_identifier()).into()),
+            token_id:   Some(token_id.into()),
+        };
+        let response = self.client.get_token_info(request).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = protocol_level_tokens::TokenInfo::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
 }
 
 /// A stream of finalized blocks. This contains a background task that polls
@@ -3061,7 +3111,7 @@ fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<Bl
 ///
 /// The main reason for needing this is that in proto3 all fields are optional,
 /// so it is up to the application to validate inputs if they are required.
-trait Require<E> {
+pub(crate) trait Require<E> {
     type A;
     fn require(self) -> Result<Self::A, E>;
 }

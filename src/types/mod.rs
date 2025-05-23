@@ -3,7 +3,6 @@ use anyhow::Context;
 pub use concordium_base::hashes;
 // re-export to maintain backwards compatibility.
 pub use concordium_base::id::types::CredentialType;
-use concordium_base::protocol_level_tokens;
 pub mod block_certificates;
 pub mod network;
 pub mod queries;
@@ -11,7 +10,7 @@ pub mod smart_contracts;
 mod summary_helper;
 pub mod transactions;
 
-use crate::constants::*;
+use crate::{constants::*, protocol_level_tokens};
 pub use concordium_base::{
     base::*,
     smart_contracts::{ContractTraceElement, InstanceUpdatedEvent},
@@ -335,28 +334,6 @@ pub struct Cooldown {
     pub status: CooldownStatus,
 }
 
-/// State of a protocol level token associated with some account.
-#[derive(Debug, PartialEq, SerdeSerialize, SerdeDeserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AccountToken {
-    /// The unique identifier/symbol for the protocol level token.
-    pub token_id: protocol_level_tokens::TokenId,
-    /// The state of the token associated with the account.
-    pub state:    TokenAccountState,
-}
-
-/// State of a protocol level token associated with some account.
-#[derive(Debug, PartialEq, SerdeSerialize, SerdeDeserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TokenAccountState {
-    /// The token balance of the account.
-    pub balance:           protocol_level_tokens::TokenAmount,
-    /// Whether the account is a member of the allow list.
-    pub member_allow_list: bool,
-    /// Whether the account is a member of the deny list.
-    pub member_deny_list:  bool,
-}
-
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// Account information exposed via the node's API. This is always the state of
@@ -413,7 +390,7 @@ pub struct AccountInfo {
     /// staked or in cooldown (inactive stake).
     pub available_balance: Amount,
     /// The protocol level tokens (PLT) held by the account.
-    pub tokens:            Vec<AccountToken>,
+    pub tokens:            Vec<protocol_level_tokens::AccountToken>,
 }
 
 impl From<&AccountInfo> for AccountAccessStructure {

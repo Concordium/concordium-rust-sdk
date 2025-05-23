@@ -40,6 +40,7 @@ pub mod cis0;
 pub mod cis2;
 pub mod cis3;
 pub mod cis4;
+pub mod protocol_level_tokens;
 
 pub mod web3id;
 
