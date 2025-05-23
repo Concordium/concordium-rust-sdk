@@ -9,7 +9,7 @@ use crate::{
         queries::ConcordiumBFTDetails, AccountReleaseSchedule, ActiveBakerPoolStatus,
         UpdateKeysCollectionSkeleton,
     },
-    v2::generated::BlockCertificates,
+    v2::generated::{plt::TokenModuleRejectReason, BlockCertificates},
 };
 use chrono::TimeZone;
 use concordium_base::{
@@ -1872,20 +1872,24 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
             }
             account_transaction_effects::Effect::TokenHolderEffect(token_holder_effect) => {
                 Ok(Self::TokenHolder {
-                    events: token_holder_effect
-                        .events
-                        .into_iter()
-                        .map(TryInto::try_into)
-                        .collect::<Result<_, tonic::Status>>()?,
+                    // todo implement as part of COR-1362
+                    events: vec![],
+                    // events: token_holder_effect
+                    //     .events
+                    //     .into_iter()
+                    //     .map(TryInto::try_into)
+                    //     .collect::<Result<_, tonic::Status>>()?,
                 })
             }
             account_transaction_effects::Effect::TokenGovernanceEffect(token_governance_effect) => {
                 Ok(Self::TokenGovernance {
-                    events: token_governance_effect
-                        .events
-                        .into_iter()
-                        .map(TryInto::try_into)
-                        .collect::<Result<_, tonic::Status>>()?,
+                    // todo implement as part of COR-1362
+                    events: vec![],
+                    // events: token_governance_effect
+                    //     .events
+                    //     .into_iter()
+                    //     .map(TryInto::try_into)
+                    //     .collect::<Result<_, tonic::Status>>()?,
                 })
             }
         }
@@ -1896,12 +1900,15 @@ impl TryFrom<generated::plt::TokenHolderEvent> for protocol_level_tokens::TokenH
     type Error = tonic::Status;
 
     fn try_from(value: generated::plt::TokenHolderEvent) -> Result<Self, Self::Error> {
-        Ok(Self {
-            token_id:   value.token_symbol.require()?.try_into()?,
-            event_type: protocol_level_tokens::TokenEventType::try_from(value.r#type)
-                .map_err(|err| tonic::Status::internal(err.to_string()))?,
-            details:    value.details.require()?.into(),
-        })
+        todo!() // todo implement as part of COR-1362
+                // Ok(Self {
+                //     token_id:   value.token_symbol.require()?.try_into()?,
+                //     event_type:
+                // protocol_level_tokens::TokenEventType::try_from(value.r#type)
+                //         .map_err(|err|
+                // tonic::Status::internal(err.to_string()))?,
+                //     details:    value.details.require()?.into(),
+                // })
     }
 }
 
@@ -1909,12 +1916,15 @@ impl TryFrom<generated::plt::TokenGovernanceEvent> for protocol_level_tokens::To
     type Error = tonic::Status;
 
     fn try_from(value: generated::plt::TokenGovernanceEvent) -> Result<Self, Self::Error> {
-        Ok(Self {
-            token_id:   value.token_symbol.require()?.try_into()?,
-            event_type: protocol_level_tokens::TokenEventType::try_from(value.r#type)
-                .map_err(|err| tonic::Status::internal(err.to_string()))?,
-            details:    value.details.require()?.into(),
-        })
+        todo!() // todo implement as part of COR-1362
+                // Ok(Self {
+                //     token_id:   value.token_symbol.require()?.try_into()?,
+                //     event_type:
+                // protocol_level_tokens::TokenEventType::try_from(value.r#type)
+                //         .map_err(|err|
+                // tonic::Status::internal(err.to_string()))?,
+                //     details:    value.details.require()?.into(),
+                // })
     }
 }
 
@@ -2354,25 +2364,45 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
                 token_id: token_id.try_into()?,
             },
             reject_reason::Reason::TokenHolderTransactionFailed(token_module_reject_reason) => {
-                Self::TokenHolderTransactionFailed(token_module_reject_reason.try_into()?)
+                Self::TokenModule(token_module_reject_reason.try_into()?)
             }
-            reject_reason::Reason::TokenGovernanceTransactionFailed(_) => {todo!()} /// todo ar
-            reject_reason::Reason::UnauthorizedTokenGovernance(_) => {todo!()} // todo ar
+            reject_reason::Reason::TokenGovernanceTransactionFailed(token_module_reject_reason) => {
+                Self::TokenModule(token_module_reject_reason.try_into()?)
+            }
+            reject_reason::Reason::UnauthorizedTokenGovernance(token_id) => {
+                Self::UnauthorizedTokenGovernance {
+                    token_id: token_id.try_into()?,
+                }
+            }
         })
     }
 }
 
-impl TryFrom<generated::plt::TokenModuleRejectReason>
-    for protocol_level_tokens::TokenModuleRejectReason
-{
+impl TryFrom<TokenModuleRejectReason> for protocol_level_tokens::TokenModuleRejectReason {
     type Error = tonic::Status;
 
-    fn try_from(value: generated::plt::TokenModuleRejectReason) -> Result<Self, Self::Error> {
-        Ok(Self {
-            token_id:   value.token_symbol.require()?.try_into()?,
-            event_type: protocol_level_tokens::TokenEventType::try_from(value.r#type)
+    fn try_from(value: TokenModuleRejectReason) -> Result<Self, Self::Error> {
+        use protocol_level_tokens::TokenModuleRejectReasonType::*;
+
+        let reason_type = match value.r#type.as_str() {
+            // "addressNotFound" => todo!(),
+            // "tokenBalanceInsufficient" => todo!(),
+            // "deserializationFailure" => todo!(),
+            // "unsupportedOperation" => todo!(),
+            // "operationNotPermitted" => todo!(),
+            // "mintWouldOverflow" => todo!(),
+            _ => Other(protocol_level_tokens::RawTokenModuleRejectReason {
+                reason_type: protocol_level_tokens::TokenModuleRejectReasonTypeString::try_from(
+                    value.r#type,
+                )
                 .map_err(|err| tonic::Status::internal(err.to_string()))?,
-            details:    value.details.map(|d| d.into()),
+                details:     value.details.map(|d| d.into()),
+            }),
+        };
+
+        Ok(Self {
+            token_id: value.token_symbol.require()?.try_into()?,
+            reason_type,
         })
     }
 }
