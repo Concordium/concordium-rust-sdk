@@ -98,7 +98,7 @@ impl TryFrom<generated::plt::TokenModuleRejectReason> for TokenModuleRejectReaso
     fn try_from(value: generated::plt::TokenModuleRejectReason) -> Result<Self, Self::Error> {
         Ok(Self {
             token_id: value.token_symbol.require()?.try_into()?,
-            reason_type: protocol_level_tokens::TokenModuleTypeDiscriminator::try_from(
+            reason_type: protocol_level_tokens::TokenModuleCborTypeDiscriminator::try_from(
                 value.r#type,
             )
             .map_err(|err| tonic::Status::internal(err.to_string()))?,
