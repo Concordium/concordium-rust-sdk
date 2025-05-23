@@ -57,7 +57,9 @@ impl TryFrom<generated::plt::TokenModuleRef> for TokenModuleRef {
 }
 
 impl From<generated::plt::CBor> for RawCbor {
-    fn from(wrapper: generated::plt::CBor) -> Self { wrapper.value.into() }
+    fn from(wrapper: generated::plt::CBor) -> Self {
+        wrapper.value.into()
+    }
 }
 
 impl TryFrom<generated::plt::TokenHolderEvent> for TokenHolderEvent {
@@ -90,17 +92,17 @@ impl TryFrom<generated::plt::TokenGovernanceEvent> for TokenGovernanceEvent {
     }
 }
 
-impl TryFrom<generated::plt::TokenModuleRejectReason>
-    for protocol_level_tokens::TokenModuleRejectReason
-{
+impl TryFrom<generated::plt::TokenModuleRejectReason> for TokenModuleRejectReason {
     type Error = tonic::Status;
 
     fn try_from(value: generated::plt::TokenModuleRejectReason) -> Result<Self, Self::Error> {
         Ok(Self {
-            token_id:   value.token_symbol.require()?.try_into()?,
-            event_type: protocol_level_tokens::TokenEventType::try_from(value.r#type)
-                .map_err(|err| tonic::Status::internal(err.to_string()))?,
-            details:    value.details.map(|d| d.into()),
+            token_id: value.token_symbol.require()?.try_into()?,
+            reason_type: protocol_level_tokens::TokenModuleTypeDiscriminator::try_from(
+                value.r#type,
+            )
+            .map_err(|err| tonic::Status::internal(err.to_string()))?,
+            details: value.details.map(|d| d.into()),
         })
     }
 }
