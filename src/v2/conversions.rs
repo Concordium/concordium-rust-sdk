@@ -1810,22 +1810,28 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                         .collect::<Result<_, tonic::Status>>()?,
                 })
             }
-            account_transaction_effects::Effect::TokenHolderEffect(token_holder_effect) => {
+            account_transaction_effects::Effect::TokenHolderEffect(_token_holder_effect) => {
                 Ok(Self::TokenHolder {
-                    events: token_holder_effect
-                        .events
-                        .into_iter()
-                        .map(TryInto::try_into)
-                        .collect::<Result<_, tonic::Status>>()?,
+                    // todo implement as part of COR-1362
+                    events: vec![],
+                    // events: token_holder_effect
+                    //     .events
+                    //     .into_iter()
+                    //     .map(TryInto::try_into)
+                    //     .collect::<Result<_, tonic::Status>>()?,
                 })
             }
-            account_transaction_effects::Effect::TokenGovernanceEffect(token_governance_effect) => {
+            account_transaction_effects::Effect::TokenGovernanceEffect(
+                _token_governance_effect,
+            ) => {
                 Ok(Self::TokenGovernance {
-                    events: token_governance_effect
-                        .events
-                        .into_iter()
-                        .map(TryInto::try_into)
-                        .collect::<Result<_, tonic::Status>>()?,
+                    // todo implement as part of COR-1362
+                    events: vec![],
+                    // events: token_governance_effect
+                    //     .events
+                    //     .into_iter()
+                    //     .map(TryInto::try_into)
+                    //     .collect::<Result<_, tonic::Status>>()?,
                 })
             }
         }
@@ -2264,7 +2270,15 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
                 token_id: token_id.try_into()?,
             },
             reject_reason::Reason::TokenHolderTransactionFailed(token_module_reject_reason) => {
-                Self::TokenHolderTransactionFailed(token_module_reject_reason.try_into()?)
+                Self::TokenModule(token_module_reject_reason.try_into()?)
+            }
+            reject_reason::Reason::TokenGovernanceTransactionFailed(token_module_reject_reason) => {
+                Self::TokenModule(token_module_reject_reason.try_into()?)
+            }
+            reject_reason::Reason::UnauthorizedTokenGovernance(token_id) => {
+                Self::UnauthorizedTokenGovernance {
+                    token_id: token_id.try_into()?,
+                }
             }
         })
     }
@@ -3874,7 +3888,6 @@ impl TryFrom<ConsensusDetailedStatus> for super::types::queries::ConsensusDetail
 
 #[cfg(test)]
 mod test {
-
     use super::*;
 
     #[test]

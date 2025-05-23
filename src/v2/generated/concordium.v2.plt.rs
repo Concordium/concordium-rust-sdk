@@ -68,18 +68,116 @@ pub struct TokenAccountState {
     #[prost(bool, optional, tag = "3")]
     pub member_deny_list: ::core::option::Option<bool>,
 }
-/// Single token event originating as part of a token governance transaction.
+/// Single token event originating from a token module as part of a token
+/// transaction.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TokenModuleEvent {
+    /// The type of the event.
+    #[prost(string, tag = "1")]
+    pub r#type: ::prost::alloc::string::String,
+    /// The CBOR encoded event details.
+    #[prost(message, optional, tag = "2")]
+    pub details: ::core::option::Option<CBor>,
+}
+/// A token holder is an entity that can hold tokens. Currently, this is limited
+/// to accounts, but in the future it may be extended to other entities.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TokenHolder {
+    /// The holder address
+    #[prost(oneof = "token_holder::Address", tags = "1")]
+    pub address: ::core::option::Option<token_holder::Address>,
+}
+/// Nested message and enum types in `TokenHolder`.
+pub mod token_holder {
+    /// The holder address
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Address {
+        /// The account address of the holder.
+        #[prost(message, tag = "1")]
+        Account(super::super::AccountAddress),
+    }
+}
+/// An event emitted when a transfer of tokens from `from` to `to` is performed.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TokenTransferEvent {
+    /// The token holder from which the tokens are transferred.
+    #[prost(message, optional, tag = "1")]
+    pub from: ::core::option::Option<TokenHolder>,
+    /// The token holder to which the tokens are transferred.
+    #[prost(message, optional, tag = "2")]
+    pub to: ::core::option::Option<TokenHolder>,
+    /// The amount of tokens transferred.
+    #[prost(message, optional, tag = "3")]
+    pub amount: ::core::option::Option<TokenAmount>,
+    /// An optional memo field that can be used to attach a message to the token
+    /// transfer.
+    #[prost(message, optional, tag = "4")]
+    pub memo: ::core::option::Option<super::Memo>,
+}
+/// An event emitted when the token supply is updated, i.e. by minting/burning
+/// tokens to/from the balance of the `target`.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TokenSupplyUpdateEvent {
+    /// The token holder the balance update is performed on.
+    #[prost(message, optional, tag = "1")]
+    pub target: ::core::option::Option<TokenHolder>,
+    /// The balance difference to be applied to the target.
+    #[prost(message, optional, tag = "2")]
+    pub amount: ::core::option::Option<TokenAmount>,
+}
+/// Token events originating from token holder transactions.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TokenHolderEvent {
+    /// The unique token symbol.
+    #[prost(message, optional, tag = "1")]
+    pub token_symbol: ::core::option::Option<TokenId>,
+    /// The type of the event.
+    #[prost(oneof = "token_holder_event::Event", tags = "2, 3")]
+    pub event: ::core::option::Option<token_holder_event::Event>,
+}
+/// Nested message and enum types in `TokenHolderEvent`.
+pub mod token_holder_event {
+    /// The type of the event.
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Event {
+        /// An event emitted by the token module.
+        #[prost(message, tag = "2")]
+        ModuleEvent(super::TokenModuleEvent),
+        /// An event emitted when a transfer of tokens is performed.
+        #[prost(message, tag = "3")]
+        TransferEvent(super::TokenTransferEvent),
+    }
+}
+/// Token events originating from token governance transactions.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TokenGovernanceEvent {
     /// The unique token symbol.
     #[prost(message, optional, tag = "1")]
     pub token_symbol: ::core::option::Option<TokenId>,
     /// The type of the event.
-    #[prost(string, tag = "2")]
-    pub r#type: ::prost::alloc::string::String,
-    /// The CBOR encoded event details.
-    #[prost(message, optional, tag = "3")]
-    pub details: ::core::option::Option<CBor>,
+    #[prost(oneof = "token_governance_event::Event", tags = "2, 3, 4, 5")]
+    pub event: ::core::option::Option<token_governance_event::Event>,
+}
+/// Nested message and enum types in `TokenGovernanceEvent`.
+pub mod token_governance_event {
+    /// The type of the event.
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Event {
+        /// An event emitted by the token module.
+        #[prost(message, tag = "2")]
+        ModuleEvent(super::TokenModuleEvent),
+        /// An event emitted when a transfer of tokens is performed.
+        #[prost(message, tag = "3")]
+        TransferEvent(super::TokenTransferEvent),
+        /// An event emitted when the token supply is updated by minting tokens to a
+        /// token holder.
+        #[prost(message, tag = "4")]
+        MintEvent(super::TokenSupplyUpdateEvent),
+        /// An event emitted when the token supply is updated by burning tokens from
+        /// the balance of a token holder.
+        #[prost(message, tag = "5")]
+        BurnEvent(super::TokenSupplyUpdateEvent),
+    }
 }
 /// Token events originating from token governance transactions.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -87,19 +185,6 @@ pub struct TokenGovernanceEffect {
     /// Events emitted by the token.
     #[prost(message, repeated, tag = "1")]
     pub events: ::prost::alloc::vec::Vec<TokenGovernanceEvent>,
-}
-/// Single token event originating as part of a token holder transaction.
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TokenHolderEvent {
-    /// The unique token symbol.
-    #[prost(message, optional, tag = "1")]
-    pub token_symbol: ::core::option::Option<TokenId>,
-    /// The type of the event.
-    #[prost(string, tag = "2")]
-    pub r#type: ::prost::alloc::string::String,
-    /// The CBOR encoded event details.
-    #[prost(message, optional, tag = "3")]
-    pub details: ::core::option::Option<CBor>,
 }
 /// Token events originating from token holder transactions.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -133,8 +218,8 @@ pub struct CreatePlt {
     /// The address of the account that will govern the token.
     #[prost(message, optional, tag = "3")]
     pub governance_account: ::core::option::Option<super::AccountAddress>,
-    /// The number of decimal places used in the representation of amounts of this token.
-    /// This determines the smallest representable fraction of the token.
+    /// The number of decimal places used in the representation of amounts of this
+    /// token. This determines the smallest representable fraction of the token.
     /// This can be at most 255.
     #[prost(uint32, tag = "4")]
     pub decimals: u32,

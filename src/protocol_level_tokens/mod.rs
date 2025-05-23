@@ -63,26 +63,30 @@ impl From<generated::plt::CBor> for RawCbor {
 impl TryFrom<generated::plt::TokenHolderEvent> for TokenHolderEvent {
     type Error = tonic::Status;
 
-    fn try_from(value: generated::plt::TokenHolderEvent) -> Result<Self, Self::Error> {
-        Ok(Self {
-            token_id:   value.token_symbol.require()?.try_into()?,
-            event_type: TokenEventType::try_from(value.r#type)
-                .map_err(|err| tonic::Status::internal(err.to_string()))?,
-            details:    value.details.require()?.into(),
-        })
+    fn try_from(_value: generated::plt::TokenHolderEvent) -> Result<Self, Self::Error> {
+        todo!() // todo implement as part of COR-1362
+                // Ok(Self {
+                //     token_id:   value.token_symbol.require()?.try_into()?,
+                //     event_type: TokenEventType::try_from(value.r#type)
+                //         .map_err(|err|
+                // tonic::Status::internal(err.to_string()))?,
+                //     details:    value.details.require()?.into(),
+                // })
     }
 }
 
 impl TryFrom<generated::plt::TokenGovernanceEvent> for TokenGovernanceEvent {
     type Error = tonic::Status;
 
-    fn try_from(value: generated::plt::TokenGovernanceEvent) -> Result<Self, Self::Error> {
-        Ok(Self {
-            token_id:   value.token_symbol.require()?.try_into()?,
-            event_type: TokenEventType::try_from(value.r#type)
-                .map_err(|err| tonic::Status::internal(err.to_string()))?,
-            details:    value.details.require()?.into(),
-        })
+    fn try_from(_value: generated::plt::TokenGovernanceEvent) -> Result<Self, Self::Error> {
+        todo!() // todo implement as part of COR-1362
+                // Ok(Self {
+                //     token_id:   value.token_symbol.require()?.try_into()?,
+                //     event_type: TokenEventType::try_from(value.r#type)
+                //         .map_err(|err|
+                // tonic::Status::internal(err.to_string()))?,
+                //     details:    value.details.require()?.into(),
+                // })
     }
 }
 
