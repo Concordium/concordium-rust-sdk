@@ -71,23 +71,23 @@ impl TryFrom<generated::plt::TokenEvent> for TokenEvent {
     }
 }
 
-impl TryFrom<generated::plt::token_event::Event> for Event {
+impl TryFrom<generated::plt::token_event::Event> for TokenEventDetails {
     type Error = tonic::Status;
 
     fn try_from(event: generated::plt::token_event::Event) -> Result<Self, Self::Error> {
         use generated::plt::token_event::Event as GenEvent;
         let out = match event {
             GenEvent::ModuleEvent(token_module_event) => {
-                Event::Module(token_module_event.try_into()?)
+                TokenEventDetails::Module(token_module_event.try_into()?)
             }
             GenEvent::TransferEvent(token_transfer_event) => {
-                Event::Transfer(token_transfer_event.try_into()?)
+                TokenEventDetails::Transfer(token_transfer_event.try_into()?)
             }
             GenEvent::MintEvent(token_supply_update_event) => {
-                Event::Mint(token_supply_update_event.try_into()?)
+                TokenEventDetails::Mint(token_supply_update_event.try_into()?)
             }
             GenEvent::BurnEvent(token_supply_update_event) => {
-                Event::Burn(token_supply_update_event.try_into()?)
+                TokenEventDetails::Burn(token_supply_update_event.try_into()?)
             }
         };
         Ok(out)
