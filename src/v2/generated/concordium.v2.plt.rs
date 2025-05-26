@@ -12,7 +12,7 @@ pub struct TokenId {
     /// Unique identifier for the token, guaranteed to be distinct across the
     /// entire concordium blockchain.
     #[prost(string, tag = "1")]
-    pub symbol: ::prost::alloc::string::String,
+    pub value: ::prost::alloc::string::String,
 }
 /// A token module reference. This is always 32 bytes long.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -125,41 +125,18 @@ pub struct TokenSupplyUpdateEvent {
     #[prost(message, optional, tag = "2")]
     pub amount: ::core::option::Option<TokenAmount>,
 }
-/// Token events originating from token holder transactions.
+/// Token event originating from token transactions.
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TokenHolderEvent {
+pub struct TokenEvent {
     /// The unique token symbol.
     #[prost(message, optional, tag = "1")]
-    pub token_symbol: ::core::option::Option<TokenId>,
+    pub token_id: ::core::option::Option<TokenId>,
     /// The type of the event.
-    #[prost(oneof = "token_holder_event::Event", tags = "2, 3")]
-    pub event: ::core::option::Option<token_holder_event::Event>,
+    #[prost(oneof = "token_event::Event", tags = "2, 3, 4, 5")]
+    pub event: ::core::option::Option<token_event::Event>,
 }
-/// Nested message and enum types in `TokenHolderEvent`.
-pub mod token_holder_event {
-    /// The type of the event.
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
-    pub enum Event {
-        /// An event emitted by the token module.
-        #[prost(message, tag = "2")]
-        ModuleEvent(super::TokenModuleEvent),
-        /// An event emitted when a transfer of tokens is performed.
-        #[prost(message, tag = "3")]
-        TransferEvent(super::TokenTransferEvent),
-    }
-}
-/// Token events originating from token governance transactions.
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TokenGovernanceEvent {
-    /// The unique token symbol.
-    #[prost(message, optional, tag = "1")]
-    pub token_symbol: ::core::option::Option<TokenId>,
-    /// The type of the event.
-    #[prost(oneof = "token_governance_event::Event", tags = "2, 3, 4, 5")]
-    pub event: ::core::option::Option<token_governance_event::Event>,
-}
-/// Nested message and enum types in `TokenGovernanceEvent`.
-pub mod token_governance_event {
+/// Nested message and enum types in `TokenEvent`.
+pub mod token_event {
     /// The type of the event.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Event {
@@ -179,26 +156,19 @@ pub mod token_governance_event {
         BurnEvent(super::TokenSupplyUpdateEvent),
     }
 }
-/// Token events originating from token governance transactions.
+/// Token events originating from token transactions.
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TokenGovernanceEffect {
+pub struct TokenEffect {
     /// Events emitted by the token.
     #[prost(message, repeated, tag = "1")]
-    pub events: ::prost::alloc::vec::Vec<TokenGovernanceEvent>,
-}
-/// Token events originating from token holder transactions.
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TokenHolderEffect {
-    /// Events emitted by the token.
-    #[prost(message, repeated, tag = "1")]
-    pub events: ::prost::alloc::vec::Vec<TokenHolderEvent>,
+    pub events: ::prost::alloc::vec::Vec<TokenEvent>,
 }
 /// Details provided by the token module in the event of rejecting a transaction.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TokenModuleRejectReason {
-    /// The token symbol.
+    /// The identifier of the protocol-level token.
     #[prost(message, optional, tag = "1")]
-    pub token_symbol: ::core::option::Option<TokenId>,
+    pub token_id: ::core::option::Option<TokenId>,
     /// The type of the reject reason.
     #[prost(string, tag = "2")]
     pub r#type: ::prost::alloc::string::String,
@@ -209,9 +179,9 @@ pub struct TokenModuleRejectReason {
 /// Update payload for creating a new protocol-level token
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CreatePlt {
-    /// The token symbol.
+    /// The identifier of the protocol-level token.
     #[prost(message, optional, tag = "1")]
-    pub token_symbol: ::core::option::Option<TokenId>,
+    pub token_id: ::core::option::Option<TokenId>,
     /// The hash that identifies the token module implementation.
     #[prost(message, optional, tag = "2")]
     pub token_module: ::core::option::Option<TokenModuleRef>,
