@@ -1819,9 +1819,7 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                         .collect::<Result<_, tonic::Status>>()?,
                 })
             }
-            account_transaction_effects::Effect::TokenGovernanceEffect(
-                token_effect,
-            ) => {
+            account_transaction_effects::Effect::TokenGovernanceEffect(token_effect) => {
                 Ok(Self::TokenGovernance {
                     events: token_effect
                         .events
