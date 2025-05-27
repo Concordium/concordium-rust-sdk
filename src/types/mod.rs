@@ -2030,12 +2030,12 @@ pub enum AccountTransactionEffects {
     /// Effect of a successful token holder transaction.
     TokenHolder {
         /// Events produced by the token.
-        events: Vec<protocol_level_tokens::TokenHolderEvent>,
+        events: Vec<protocol_level_tokens::TokenEvent>,
     },
     /// Effect of a successful token governance transaction.
     TokenGovernance {
         /// Events produced by the token.
-        events: Vec<protocol_level_tokens::TokenGovernanceEvent>,
+        events: Vec<protocol_level_tokens::TokenEvent>,
     },
 }
 
