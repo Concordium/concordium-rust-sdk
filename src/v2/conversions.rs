@@ -1810,28 +1810,24 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                         .collect::<Result<_, tonic::Status>>()?,
                 })
             }
-            account_transaction_effects::Effect::TokenHolderEffect(_token_holder_effect) => {
+            account_transaction_effects::Effect::TokenHolderEffect(token_effect) => {
                 Ok(Self::TokenHolder {
-                    // todo implement as part of COR-1362
-                    events: vec![],
-                    // events: token_holder_effect
-                    //     .events
-                    //     .into_iter()
-                    //     .map(TryInto::try_into)
-                    //     .collect::<Result<_, tonic::Status>>()?,
+                    events: token_effect
+                        .events
+                        .into_iter()
+                        .map(TryInto::try_into)
+                        .collect::<Result<_, tonic::Status>>()?,
                 })
             }
             account_transaction_effects::Effect::TokenGovernanceEffect(
-                _token_governance_effect,
+                token_effect,
             ) => {
                 Ok(Self::TokenGovernance {
-                    // todo implement as part of COR-1362
-                    events: vec![],
-                    // events: token_governance_effect
-                    //     .events
-                    //     .into_iter()
-                    //     .map(TryInto::try_into)
-                    //     .collect::<Result<_, tonic::Status>>()?,
+                    events: token_effect
+                        .events
+                        .into_iter()
+                        .map(TryInto::try_into)
+                        .collect::<Result<_, tonic::Status>>()?,
                 })
             }
         }
