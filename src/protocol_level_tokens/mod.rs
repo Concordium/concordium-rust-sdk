@@ -99,8 +99,10 @@ impl TryFrom<generated::plt::TokenModuleEvent> for TokenModuleEvent {
 
     fn try_from(event: generated::plt::TokenModuleEvent) -> Result<Self, Self::Error> {
         Ok(Self {
-            event_type: protocol_level_tokens::TokenEventType::try_from(event.r#type)
-                .map_err(|err| tonic::Status::internal(err.to_string()))?,
+            event_type: protocol_level_tokens::TokenModuleCborTypeDiscriminator::try_from(
+                event.r#type,
+            )
+            .map_err(|err| tonic::Status::internal(err.to_string()))?,
             details:    event.details.require()?.into(),
         })
     }
@@ -140,7 +142,10 @@ impl TryFrom<generated::plt::TokenHolder> for TokenHolder {
         use generated::plt::token_holder::Address as HolderAddress;
         match holder.address.require()? {
             HolderAddress::Account(account_address) => {
-                Ok(TokenHolder::Account(account_address.try_into()?))
+                Ok(TokenHolder::HolderAccount(HolderAccount {
+                    coin_info: None,
+                    address:   account_address.try_into()?,
+                }))
             }
         }
     }
@@ -154,8 +159,10 @@ impl TryFrom<generated::plt::TokenModuleRejectReason>
     fn try_from(value: generated::plt::TokenModuleRejectReason) -> Result<Self, Self::Error> {
         Ok(Self {
             token_id:   value.token_id.require()?.try_into()?,
-            event_type: protocol_level_tokens::TokenEventType::try_from(value.r#type)
-                .map_err(|err| tonic::Status::internal(err.to_string()))?,
+            event_type: protocol_level_tokens::TokenModuleCborTypeDiscriminator::try_from(
+                value.r#type,
+            )
+            .map_err(|err| tonic::Status::internal(err.to_string()))?,
             details:    value.details.map(|d| d.into()),
         })
     }
