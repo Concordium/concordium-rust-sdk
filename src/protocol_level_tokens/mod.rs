@@ -151,19 +151,17 @@ impl TryFrom<generated::plt::TokenHolder> for TokenHolder {
     }
 }
 
-impl TryFrom<generated::plt::TokenModuleRejectReason>
-    for protocol_level_tokens::TokenModuleRejectReason
-{
+impl TryFrom<generated::plt::TokenModuleRejectReason> for TokenModuleRejectReason {
     type Error = tonic::Status;
 
     fn try_from(value: generated::plt::TokenModuleRejectReason) -> Result<Self, Self::Error> {
         Ok(Self {
-            token_id:   value.token_id.require()?.try_into()?,
-            event_type: protocol_level_tokens::TokenModuleCborTypeDiscriminator::try_from(
+            token_id:    value.token_id.require()?.try_into()?,
+            reason_type: protocol_level_tokens::TokenModuleCborTypeDiscriminator::try_from(
                 value.r#type,
             )
             .map_err(|err| tonic::Status::internal(err.to_string()))?,
-            details:    value.details.map(|d| d.into()),
+            details:     value.details.map(|d| d.into()),
         })
     }
 }
