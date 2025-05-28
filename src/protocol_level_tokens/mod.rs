@@ -156,12 +156,21 @@ impl TryFrom<generated::plt::TokenModuleRejectReason> for TokenModuleRejectReaso
 
     fn try_from(value: generated::plt::TokenModuleRejectReason) -> Result<Self, Self::Error> {
         Ok(Self {
+<<<<<<< HEAD
             token_id:    value.token_id.require()?.try_into()?,
             reason_type: protocol_level_tokens::TokenModuleCborTypeDiscriminator::try_from(
                 value.r#type,
             )
             .map_err(|err| tonic::Status::internal(err.to_string()))?,
             details:     value.details.map(|d| d.into()),
+=======
+            token_id:   value.token_id.require()?.try_into()?,
+            event_type: protocol_level_tokens::TokenModuleCborTypeDiscriminator::try_from(
+                value.r#type,
+            )
+            .map_err(|err| tonic::Status::internal(err.to_string()))?,
+            details:    value.details.map(|d| d.into()),
+>>>>>>> 8bb11cad2c69148cc0bef7af0d4bcffb045a5644
         })
     }
 }
