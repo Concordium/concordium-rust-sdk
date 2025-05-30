@@ -23,9 +23,11 @@ use concordium_base::{
         Versioned,
     },
     contracts_common::{Duration, EntrypointName, Parameter},
-    encrypted_transfers,
-    encrypted_transfers::types::{
-        AggregatedDecryptedAmount, EncryptedAmountTransferData, SecToPubAmountTransferData,
+    encrypted_transfers::{
+        self,
+        types::{
+            AggregatedDecryptedAmount, EncryptedAmountTransferData, SecToPubAmountTransferData,
+        },
     },
     id::{
         constants::{ArCurve, AttributeKind},
@@ -34,6 +36,7 @@ use concordium_base::{
             AccountAddress, AccountCredentialWithoutProofs, AccountKeys, CredentialPublicKeys,
         },
     },
+    protocol_level_tokens::TokenId,
     smart_contracts::{
         ContractEvent, ModuleReference, OwnedParameter, OwnedReceiveName, WasmVersion,
     },
@@ -1175,6 +1178,27 @@ impl BlockItemSummary {
         }
     }
 
+    pub fn affected_plt_tokens(&self) -> Vec<TokenId> {
+        match &self.details {
+            BlockItemSummaryDetails::AccountTransaction(at) => match &at.effects {
+                AccountTransactionEffects::TokenHolder { events } => {
+                    events.iter().map(|event| event.token_id.clone()).collect()
+                }
+                AccountTransactionEffects::TokenGovernance { events } => {
+                    events.iter().map(|event| event.token_id.clone()).collect()
+                }
+                _ => vec![],
+            },
+            BlockItemSummaryDetails::AccountCreation(_) => vec![],
+            BlockItemSummaryDetails::Update(update) => match &update.payload {
+                UpdatePayload::CreatePlt(CreatePlt { token_symbol, .. }) => {
+                    vec![token_symbol.clone()]
+                }
+                _ => vec![],
+            },
+        }
+    }
+
     /// If the block item is a smart contract update transaction then return the
     /// execution tree.
     pub fn contract_update(self) -> Option<ExecutionTree> {
@@ -1238,77 +1262,100 @@ impl BlockItemSummary {
 
     /// Return the list of addresses affected by the block summary.
     pub fn affected_addresses(&self) -> Vec<AccountAddress> {
-        if let BlockItemSummaryDetails::AccountTransaction(at) = &self.details {
-            match &at.effects {
-                AccountTransactionEffects::None { .. } => vec![at.sender],
-                AccountTransactionEffects::ModuleDeployed { .. } => vec![at.sender],
-                AccountTransactionEffects::ContractInitialized { .. } => vec![at.sender],
-                AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                    let mut seen = BTreeSet::new();
-                    seen.insert(at.sender);
-                    let mut addresses = vec![at.sender];
-                    for effect in effects {
-                        match effect {
-                            ContractTraceElement::Updated { .. } => (),
-                            ContractTraceElement::Transferred { to, .. } => {
-                                if seen.insert(*to) {
-                                    addresses.push(*to);
+        match &self.details {
+            BlockItemSummaryDetails::AccountTransaction(at) => {
+                match &at.effects {
+                    AccountTransactionEffects::None { .. } => vec![at.sender],
+                    AccountTransactionEffects::ModuleDeployed { .. } => vec![at.sender],
+                    AccountTransactionEffects::ContractInitialized { .. } => vec![at.sender],
+                    AccountTransactionEffects::ContractUpdateIssued { effects } => {
+                        let mut seen = BTreeSet::new();
+                        seen.insert(at.sender);
+                        let mut addresses = vec![at.sender];
+                        for effect in effects {
+                            match effect {
+                                ContractTraceElement::Updated { .. } => (),
+                                ContractTraceElement::Transferred { to, .. } => {
+                                    if seen.insert(*to) {
+                                        addresses.push(*to);
+                                    }
                                 }
+                                ContractTraceElement::Interrupted { .. } => (),
+                                ContractTraceElement::Resumed { .. } => (),
+                                ContractTraceElement::Upgraded { .. } => (),
                             }
-                            ContractTraceElement::Interrupted { .. } => (),
-                            ContractTraceElement::Resumed { .. } => (),
-                            ContractTraceElement::Upgraded { .. } => (),
+                        }
+                        addresses
+                    }
+                    AccountTransactionEffects::AccountTransfer { to, .. } => {
+                        if *to == at.sender {
+                            vec![at.sender]
+                        } else {
+                            vec![at.sender, *to]
                         }
                     }
-                    addresses
-                }
-                AccountTransactionEffects::AccountTransfer { to, .. } => {
-                    if *to == at.sender {
+                    AccountTransactionEffects::AccountTransferWithMemo { to, .. } => {
+                        if *to == at.sender {
+                            vec![at.sender]
+                        } else {
+                            vec![at.sender, *to]
+                        }
+                    }
+                    AccountTransactionEffects::BakerAdded { .. } => vec![at.sender],
+                    AccountTransactionEffects::BakerRemoved { .. } => vec![at.sender],
+                    AccountTransactionEffects::BakerStakeUpdated { .. } => vec![at.sender],
+                    AccountTransactionEffects::BakerRestakeEarningsUpdated { .. } => {
                         vec![at.sender]
-                    } else {
+                    }
+                    AccountTransactionEffects::BakerKeysUpdated { .. } => vec![at.sender],
+                    AccountTransactionEffects::EncryptedAmountTransferred { removed, added } => {
+                        vec![removed.account, added.receiver]
+                    }
+                    AccountTransactionEffects::EncryptedAmountTransferredWithMemo {
+                        removed,
+                        added,
+                        ..
+                    } => vec![removed.account, added.receiver],
+                    AccountTransactionEffects::TransferredToEncrypted { data } => {
+                        vec![data.account]
+                    }
+                    AccountTransactionEffects::TransferredToPublic { removed, .. } => {
+                        vec![removed.account]
+                    }
+                    AccountTransactionEffects::TransferredWithSchedule { to, .. } => {
                         vec![at.sender, *to]
                     }
-                }
-                AccountTransactionEffects::AccountTransferWithMemo { to, .. } => {
-                    if *to == at.sender {
-                        vec![at.sender]
-                    } else {
+                    AccountTransactionEffects::TransferredWithScheduleAndMemo { to, .. } => {
                         vec![at.sender, *to]
                     }
+                    AccountTransactionEffects::CredentialKeysUpdated { .. } => vec![at.sender],
+                    AccountTransactionEffects::CredentialsUpdated { .. } => vec![at.sender],
+                    AccountTransactionEffects::DataRegistered { .. } => vec![at.sender],
+                    AccountTransactionEffects::BakerConfigured { .. } => vec![at.sender],
+                    AccountTransactionEffects::DelegationConfigured { .. } => vec![at.sender],
+                    AccountTransactionEffects::TokenHolder { .. } => {
+                        // TODO: add the `from` and `to` address of the `TokenTransferEvent` to the
+                        // vector.
+                        vec![at.sender]
+                    }
+                    AccountTransactionEffects::TokenGovernance { .. } => {
+                        // TODO: add the `target` address (minted to/ burned from) of the
+                        // `TokenSupplyUpdateEvent` to the vector.
+                        vec![at.sender]
+                    }
                 }
-                AccountTransactionEffects::BakerAdded { .. } => vec![at.sender],
-                AccountTransactionEffects::BakerRemoved { .. } => vec![at.sender],
-                AccountTransactionEffects::BakerStakeUpdated { .. } => vec![at.sender],
-                AccountTransactionEffects::BakerRestakeEarningsUpdated { .. } => vec![at.sender],
-                AccountTransactionEffects::BakerKeysUpdated { .. } => vec![at.sender],
-                AccountTransactionEffects::EncryptedAmountTransferred { removed, added } => {
-                    vec![removed.account, added.receiver]
-                }
-                AccountTransactionEffects::EncryptedAmountTransferredWithMemo {
-                    removed,
-                    added,
-                    ..
-                } => vec![removed.account, added.receiver],
-                AccountTransactionEffects::TransferredToEncrypted { data } => vec![data.account],
-                AccountTransactionEffects::TransferredToPublic { removed, .. } => {
-                    vec![removed.account]
-                }
-                AccountTransactionEffects::TransferredWithSchedule { to, .. } => {
-                    vec![at.sender, *to]
-                }
-                AccountTransactionEffects::TransferredWithScheduleAndMemo { to, .. } => {
-                    vec![at.sender, *to]
-                }
-                AccountTransactionEffects::CredentialKeysUpdated { .. } => vec![at.sender],
-                AccountTransactionEffects::CredentialsUpdated { .. } => vec![at.sender],
-                AccountTransactionEffects::DataRegistered { .. } => vec![at.sender],
-                AccountTransactionEffects::BakerConfigured { .. } => vec![at.sender],
-                AccountTransactionEffects::DelegationConfigured { .. } => vec![at.sender],
-                AccountTransactionEffects::TokenHolder { .. } => vec![at.sender],
-                AccountTransactionEffects::TokenGovernance { .. } => vec![at.sender],
             }
-        } else {
-            Vec::new()
+
+            // Consider removing or keeping?
+            BlockItemSummaryDetails::Update(update) => match &update.payload {
+                UpdatePayload::CreatePlt(CreatePlt {
+                    governance_account, ..
+                }) => {
+                    vec![*governance_account]
+                }
+                _ => vec![],
+            },
+            _ => Vec::new(),
         }
     }
 }
