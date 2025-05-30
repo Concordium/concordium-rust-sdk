@@ -4,7 +4,7 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_base::{
     contracts_common::AccountAddress,
-    protocol_level_tokens::{TokenAmount, TokenId},
+    protocol_level_tokens::{operations, TokenAmount, TokenId},
 };
 use concordium_rust_sdk::{
     common::types::TransactionTime,
@@ -76,36 +76,24 @@ async fn main() -> anyhow::Result<()> {
     let expiry: TransactionTime =
         TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
 
-    // Create mint/burn tokens transaction
-    let txn = match app.cmd {
-        AddRemoveAllowDeny::AddAllow => send::add_token_allow_list(
-            &keys,
-            keys.address,
-            nonce,
-            expiry,
-            token_id,
-            target_address,
-        )?,
-        AddRemoveAllowDeny::RemoveAllow => send::remove_token_allow_list(
-            &keys,
-            keys.address,
-            nonce,
-            expiry,
-            token_id,
-            target_address,
-        )?,
-        AddRemoveAllowDeny::AddDeny => {
-            send::add_token_deny_list(&keys, keys.address, nonce, expiry, token_id, target_address)?
-        }
-        AddRemoveAllowDeny::RemoveDeny => send::remove_token_deny_list(
-            &keys,
-            keys.address,
-            nonce,
-            expiry,
-            token_id,
-            target_address,
-        )?,
+    // Create token list operation
+    let operation = match app.cmd {
+        AddRemoveAllowDeny::AddAllow => operations::add_token_allow_list(target_address),
+        AddRemoveAllowDeny::RemoveAllow => operations::remove_token_allow_list(target_address),
+        AddRemoveAllowDeny::AddDeny => operations::add_token_deny_list(target_address),
+        AddRemoveAllowDeny::RemoveDeny => operations::remove_token_deny_list(target_address),
     };
+
+    // Compose operation to transaction
+    let txn = send::token_governance_operations(
+        &keys,
+        keys.address,
+        nonce,
+        expiry,
+        token_id,
+        [operation].into_iter().collect(),
+    )?;
+
     let item = BlockItem::AccountTransaction(txn);
 
     // Submit the transaction to the chain

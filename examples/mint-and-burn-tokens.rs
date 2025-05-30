@@ -1,10 +1,7 @@
 //! Example that shows how to mint and burn (PLT) tokens.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_base::{
-    contracts_common::AccountAddress,
-    protocol_level_tokens::{TokenAmount, TokenId},
-};
+use concordium_base::protocol_level_tokens::{operations, TokenAmount, TokenId};
 use concordium_rust_sdk::{
     common::types::TransactionTime,
     types::{
@@ -83,15 +80,22 @@ async fn main() -> anyhow::Result<()> {
     let expiry: TransactionTime =
         TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
 
-    // Create mint/burn tokens transaction
-    let txn = match app.cmd {
-        MintOrBurn::Mint => {
-            send::mint_tokens(&keys, keys.address, nonce, expiry, token_id, token_amount)?
-        }
-        MintOrBurn::Burn => {
-            send::burn_tokens(&keys, keys.address, nonce, expiry, token_id, token_amount)?
-        }
+    // Create mint/burn tokens operation
+    let operation = match app.cmd {
+        MintOrBurn::Mint => operations::mint_tokens(token_amount),
+        MintOrBurn::Burn => operations::burn_tokens(token_amount),
     };
+
+    // Compose operation to transaction
+    let txn = send::token_governance_operations(
+        &keys,
+        keys.address,
+        nonce,
+        expiry,
+        token_id,
+        [operation].into_iter().collect(),
+    )?;
+
     let item = BlockItem::AccountTransaction(txn);
 
     // Submit the transaction to the chain
