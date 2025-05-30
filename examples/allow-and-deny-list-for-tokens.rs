@@ -1,4 +1,5 @@
-//! Example that shows how to transfer (PLT) tokens.
+//! Example that shows how to administrate allow and deny lists for (PLT)
+//! tokens.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_base::{
@@ -27,14 +28,23 @@ struct App {
         default_value = "http://localhost:20000"
     )]
     endpoint: v2::Endpoint,
-    #[structopt(long = "sender", help = "Account keys of the sender.")]
+    #[structopt(long = "account", help = "Account keys of the governance account.")]
     account:  PathBuf,
-    #[structopt(long = "receiver", help = "Receiver address.")]
-    receiver: String,
-    #[structopt(long = "token", help = "Token to send.")]
+    #[structopt(long = "token", help = "Token to mint or burn.")]
     token_id: String,
-    #[structopt(long = "amount", help = "Amount to send.", default_value = "100.0")]
-    amount:   Decimal,
+    #[structopt(subcommand)]
+    cmd:      AddRemoveAllowDeny,
+    #[structopt(long = "target", help = "Target address.")]
+    target:   String,
+}
+
+/// Token allow/deny list operation
+#[derive(StructOpt)]
+enum AddRemoveAllowDeny {
+    AddAllow,
+    RemoveAllow,
+    AddDeny,
+    RemoveDeny,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -49,22 +59,8 @@ async fn main() -> anyhow::Result<()> {
     // Token id of the fungible PLT token to transfer
     let token_id = TokenId::try_from(app.token_id.clone())?;
 
-    // Token info, we need the number of decimals in the token amount representation
-    let token_info = client
-        .get_token_info(token_id.clone(), BlockIdentifier::LastFinal)
-        .await?
-        .response;
-
-    // Amount of tokens to send. The number of decimals in the TokenAmount
-    // must be the same as the number of decimals in the TokenInfo
-    let mut amount = app.amount;
-    amount.rescale(token_info.token_state.nr_of_decimals as u32);
-    let token_amount =
-        TokenAmount::from_raw(amount.mantissa().try_into()?, amount.scale().try_into()?);
-    println!("Token amount: {}", token_amount,);
-
-    // Receiver of the tokens
-    let receiver_address = AccountAddress::from_str(&app.receiver)?;
+    // Target for list operation
+    let target_address = AccountAddress::from_str(&app.target)?;
 
     // Load account keys and sender address from a file
     let keys: WalletAccount = WalletAccount::from_json_file(app.account)
@@ -80,11 +76,16 @@ async fn main() -> anyhow::Result<()> {
     let expiry: TransactionTime =
         TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
 
-    // Create transfer tokens transaction
-    let operation = operations::transfer_tokens(receiver_address, token_amount);
+    // Create token list operation
+    let operation = match app.cmd {
+        AddRemoveAllowDeny::AddAllow => operations::add_token_allow_list(target_address),
+        AddRemoveAllowDeny::RemoveAllow => operations::remove_token_allow_list(target_address),
+        AddRemoveAllowDeny::AddDeny => operations::add_token_deny_list(target_address),
+        AddRemoveAllowDeny::RemoveDeny => operations::remove_token_deny_list(target_address),
+    };
 
     // Compose operation to transaction
-    let txn = send::token_holder_operations(
+    let txn = send::token_governance_operations(
         &keys,
         keys.address,
         nonce,

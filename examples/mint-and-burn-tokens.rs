@@ -1,10 +1,7 @@
-//! Example that shows how to transfer (PLT) tokens.
+//! Example that shows how to mint and burn (PLT) tokens.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_base::{
-    contracts_common::AccountAddress,
-    protocol_level_tokens::{operations, TokenAmount, TokenId},
-};
+use concordium_base::protocol_level_tokens::{operations, TokenAmount, TokenId};
 use concordium_rust_sdk::{
     common::types::TransactionTime,
     types::{
@@ -27,14 +24,20 @@ struct App {
         default_value = "http://localhost:20000"
     )]
     endpoint: v2::Endpoint,
-    #[structopt(long = "sender", help = "Account keys of the sender.")]
+    #[structopt(long = "account", help = "Account keys of the governance account.")]
     account:  PathBuf,
-    #[structopt(long = "receiver", help = "Receiver address.")]
-    receiver: String,
-    #[structopt(long = "token", help = "Token to send.")]
+    #[structopt(long = "token", help = "Token to mint or burn.")]
     token_id: String,
+    #[structopt(subcommand)]
+    cmd:      MintOrBurn,
     #[structopt(long = "amount", help = "Amount to send.", default_value = "100.0")]
     amount:   Decimal,
+}
+
+#[derive(StructOpt)]
+enum MintOrBurn {
+    Mint,
+    Burn,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -55,16 +58,13 @@ async fn main() -> anyhow::Result<()> {
         .await?
         .response;
 
-    // Amount of tokens to send. The number of decimals in the TokenAmount
+    // Amount of tokens to mint or burn. The number of decimals in the TokenAmount
     // must be the same as the number of decimals in the TokenInfo
     let mut amount = app.amount;
     amount.rescale(token_info.token_state.nr_of_decimals as u32);
     let token_amount =
         TokenAmount::from_raw(amount.mantissa().try_into()?, amount.scale().try_into()?);
     println!("Token amount: {}", token_amount,);
-
-    // Receiver of the tokens
-    let receiver_address = AccountAddress::from_str(&app.receiver)?;
 
     // Load account keys and sender address from a file
     let keys: WalletAccount = WalletAccount::from_json_file(app.account)
@@ -80,11 +80,14 @@ async fn main() -> anyhow::Result<()> {
     let expiry: TransactionTime =
         TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
 
-    // Create transfer tokens transaction
-    let operation = operations::transfer_tokens(receiver_address, token_amount);
+    // Create mint/burn tokens operation
+    let operation = match app.cmd {
+        MintOrBurn::Mint => operations::mint_tokens(token_amount),
+        MintOrBurn::Burn => operations::burn_tokens(token_amount),
+    };
 
     // Compose operation to transaction
-    let txn = send::token_holder_operations(
+    let txn = send::token_governance_operations(
         &keys,
         keys.address,
         nonce,
