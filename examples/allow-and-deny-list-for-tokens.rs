@@ -1,4 +1,5 @@
-//! Example that shows how to administrate allow and deny lists for (PLT) tokens.
+//! Example that shows how to administrate allow and deny lists for (PLT)
+//! tokens.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_base::{
@@ -32,11 +33,10 @@ struct App {
     #[structopt(long = "token", help = "Token to mint or burn.")]
     token_id: String,
     #[structopt(subcommand)]
-    cmd: AddRemoveAllowDeny,
+    cmd:      AddRemoveAllowDeny,
     #[structopt(long = "target", help = "Target address.")]
-    target: String,
+    target:   String,
 }
-
 
 /// Token allow/deny list operation
 #[derive(StructOpt)]
@@ -78,46 +78,33 @@ async fn main() -> anyhow::Result<()> {
 
     // Create mint/burn tokens transaction
     let txn = match app.cmd {
-        AddRemoveAllowDeny::AddAllow => {
-            send::add_token_allow_list(
-                &keys,
-                keys.address,
-                nonce,
-                expiry,
-                token_id,
-                target_address,
-            )?
-        }
-        AddRemoveAllowDeny::RemoveAllow => {
-            send::remove_token_allow_list(
-                &keys,
-                keys.address,
-                nonce,
-                expiry,
-                token_id,
-                target_address,
-            )?
-        }
+        AddRemoveAllowDeny::AddAllow => send::add_token_allow_list(
+            &keys,
+            keys.address,
+            nonce,
+            expiry,
+            token_id,
+            target_address,
+        )?,
+        AddRemoveAllowDeny::RemoveAllow => send::remove_token_allow_list(
+            &keys,
+            keys.address,
+            nonce,
+            expiry,
+            token_id,
+            target_address,
+        )?,
         AddRemoveAllowDeny::AddDeny => {
-            send::add_token_deny_list(
-                &keys,
-                keys.address,
-                nonce,
-                expiry,
-                token_id,
-                target_address,
-            )?
+            send::add_token_deny_list(&keys, keys.address, nonce, expiry, token_id, target_address)?
         }
-        AddRemoveAllowDeny::RemoveDeny => {
-            send::remove_token_deny_list(
-                &keys,
-                keys.address,
-                nonce,
-                expiry,
-                token_id,
-                target_address,
-            )?
-        }
+        AddRemoveAllowDeny::RemoveDeny => send::remove_token_deny_list(
+            &keys,
+            keys.address,
+            nonce,
+            expiry,
+            token_id,
+            target_address,
+        )?,
     };
     let item = BlockItem::AccountTransaction(txn);
 

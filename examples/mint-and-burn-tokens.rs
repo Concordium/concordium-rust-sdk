@@ -32,7 +32,7 @@ struct App {
     #[structopt(long = "token", help = "Token to mint or burn.")]
     token_id: String,
     #[structopt(subcommand)]
-    cmd: MintOrBurn,
+    cmd:      MintOrBurn,
     #[structopt(long = "amount", help = "Amount to send.", default_value = "100.0")]
     amount:   Decimal,
 }
@@ -86,24 +86,10 @@ async fn main() -> anyhow::Result<()> {
     // Create mint/burn tokens transaction
     let txn = match app.cmd {
         MintOrBurn::Mint => {
-            send::mint_tokens(
-                &keys,
-                keys.address,
-                nonce,
-                expiry,
-                token_id,
-                token_amount,
-            )?
+            send::mint_tokens(&keys, keys.address, nonce, expiry, token_id, token_amount)?
         }
         MintOrBurn::Burn => {
-            send::burn_tokens(
-                &keys,
-                keys.address,
-                nonce,
-                expiry,
-                token_id,
-                token_amount,
-            )?
+            send::burn_tokens(&keys, keys.address, nonce, expiry, token_id, token_amount)?
         }
     };
     let item = BlockItem::AccountTransaction(txn);
