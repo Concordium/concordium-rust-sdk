@@ -23,9 +23,11 @@ use concordium_base::{
         Versioned,
     },
     contracts_common::{Duration, EntrypointName, Parameter},
-    encrypted_transfers,
-    encrypted_transfers::types::{
-        AggregatedDecryptedAmount, EncryptedAmountTransferData, SecToPubAmountTransferData,
+    encrypted_transfers::{
+        self,
+        types::{
+            AggregatedDecryptedAmount, EncryptedAmountTransferData, SecToPubAmountTransferData,
+        },
     },
     id::{
         constants::{ArCurve, AttributeKind},
@@ -34,6 +36,7 @@ use concordium_base::{
             AccountAddress, AccountCredentialWithoutProofs, AccountKeys, CredentialPublicKeys,
         },
     },
+    protocol_level_tokens::{TokenEventDetails, TokenHolder, TokenId},
     smart_contracts::{
         ContractEvent, ModuleReference, OwnedParameter, OwnedReceiveName, WasmVersion,
     },
@@ -1175,6 +1178,28 @@ impl BlockItemSummary {
         }
     }
 
+    /// Return the list of token ids affected by the block summary.
+    pub fn affected_plt_tokens(&self) -> Vec<TokenId> {
+        match &self.details {
+            BlockItemSummaryDetails::AccountTransaction(at) => match &at.effects {
+                AccountTransactionEffects::TokenHolder { events } => {
+                    events.iter().map(|event| event.token_id.clone()).collect()
+                }
+                AccountTransactionEffects::TokenGovernance { events } => {
+                    events.iter().map(|event| event.token_id.clone()).collect()
+                }
+                _ => vec![],
+            },
+            BlockItemSummaryDetails::AccountCreation(_) => vec![],
+            BlockItemSummaryDetails::Update(update) => match &update.payload {
+                UpdatePayload::CreatePlt(CreatePlt { token_id, .. }) => {
+                    vec![token_id.clone()]
+                }
+                _ => vec![],
+            },
+        }
+    }
+
     /// If the block item is a smart contract update transaction then return the
     /// execution tree.
     pub fn contract_update(self) -> Option<ExecutionTree> {
@@ -1237,6 +1262,8 @@ impl BlockItemSummary {
     }
 
     /// Return the list of addresses affected by the block summary.
+    /// These are addresses that have their CCD balance or plt token balance
+    /// changed as part of the block summary.
     pub fn affected_addresses(&self) -> Vec<AccountAddress> {
         if let BlockItemSummaryDetails::AccountTransaction(at) = &self.details {
             match &at.effects {
@@ -1304,8 +1331,35 @@ impl BlockItemSummary {
                 AccountTransactionEffects::DataRegistered { .. } => vec![at.sender],
                 AccountTransactionEffects::BakerConfigured { .. } => vec![at.sender],
                 AccountTransactionEffects::DelegationConfigured { .. } => vec![at.sender],
-                AccountTransactionEffects::TokenHolder { .. } => vec![at.sender],
-                AccountTransactionEffects::TokenGovernance { .. } => vec![at.sender],
+                AccountTransactionEffects::TokenHolder { events }
+                | AccountTransactionEffects::TokenGovernance { events } => {
+                    let mut seen_addresses = BTreeSet::new();
+                    seen_addresses.insert(at.sender);
+
+                    for token_event in events {
+                        match &token_event.event {
+                            TokenEventDetails::Module(_) => {
+                                // An `address` added/removed from an allow/deny
+                                // list is NOT considered affected.
+                            }
+
+                            TokenEventDetails::Transfer(event) => {
+                                let TokenHolder::HolderAccount(from) = &event.from;
+                                seen_addresses.insert(from.address);
+
+                                let TokenHolder::HolderAccount(to) = &event.to;
+                                seen_addresses.insert(to.address);
+                            }
+
+                            TokenEventDetails::Mint(event) | TokenEventDetails::Burn(event) => {
+                                let TokenHolder::HolderAccount(to) = &event.target;
+                                seen_addresses.insert(to.address);
+                            }
+                        }
+                    }
+
+                    seen_addresses.into_iter().collect()
+                }
             }
         } else {
             Vec::new()
