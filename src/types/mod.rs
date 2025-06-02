@@ -1178,6 +1178,7 @@ impl BlockItemSummary {
         }
     }
 
+    /// Return the list of token ids affected by the block summary.
     pub fn affected_plt_tokens(&self) -> Vec<TokenId> {
         match &self.details {
             BlockItemSummaryDetails::AccountTransaction(at) => match &at.effects {
@@ -1262,7 +1263,7 @@ impl BlockItemSummary {
 
     /// Return the list of addresses affected by the block summary.
     /// These are addresses that have their CCD balance or plt token balance
-    /// changed as part of a transaction in the block.
+    /// changed as part of the block summary.
     pub fn affected_addresses(&self) -> Vec<AccountAddress> {
         if let BlockItemSummaryDetails::AccountTransaction(at) = &self.details {
             match &at.effects {
