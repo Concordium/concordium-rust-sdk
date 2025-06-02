@@ -1328,8 +1328,8 @@ impl BlockItemSummary {
                             | TokenEventDetails::Mint(update_event) => {
                                 addresses.extend(account_address(&update_event.target));
                             },
-                            TokenEventDetails::Module(_) => {
-
+                            TokenEventDetails::Module(module_event) => {
+                                // TODO implement as part of COR-1391
                             }
                         }
                     }
