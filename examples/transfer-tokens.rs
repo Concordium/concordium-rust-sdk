@@ -28,7 +28,7 @@ struct App {
         default_value = "http://localhost:20000"
     )]
     endpoint: v2::Endpoint,
-    #[structopt(long = "sender", help = "Account keys of the sender.")]
+    #[structopt(long = "sender", help = "Path to the sender account key file.")]
     account:  PathBuf,
     #[structopt(long = "receiver", help = "Receiver address.")]
     receiver: String,
