@@ -1,5 +1,7 @@
 ## 7.0.0-alpha
 
+- Added the `affected_plt_tokens` function to the `BlockItemSummary` implementation. This function returns a vector of PLT tokens that were affected by transactions in the block.
+- Expanded the `affected_addresses` function within the `BlockItemSummary` implementation to return a vector of addresses whose CCD or PLT token balances were impacted by transactions in the block.
 - Protocol level token events and reject reasons are now defined in `concordium_base::protocol_level_tokens`.
   Event and reject reasons CBOR can be decoded with `TokenModuleEvent::decode_token_module_event_type` or
   `TokenModuleRejectReason::decode_reject_reason_type`.
