@@ -1330,8 +1330,10 @@ impl BlockItemSummary {
                 AccountTransactionEffects::DataRegistered { .. } => vec![at.sender],
                 AccountTransactionEffects::BakerConfigured { .. } => vec![at.sender],
                 AccountTransactionEffects::DelegationConfigured { .. } => vec![at.sender],
-                AccountTransactionEffects::TokenHolder { events } => {
-                    let mut addresses = vec![at.sender];
+                AccountTransactionEffects::TokenHolder { events }
+                | AccountTransactionEffects::TokenGovernance { events } => {
+                    let mut seen_addresses = BTreeSet::new();
+                    seen_addresses.insert(at.sender);
 
                     for token_event in events {
                         match &token_event.event {
@@ -1342,57 +1344,20 @@ impl BlockItemSummary {
 
                             TokenEventDetails::Transfer(event) => {
                                 let TokenHolder::HolderAccount(from) = &event.from;
-                                addresses.push(from.address);
+                                seen_addresses.insert(from.address);
 
                                 let TokenHolder::HolderAccount(to) = &event.to;
-                                addresses.push(to.address);
+                                seen_addresses.insert(to.address);
                             }
 
-                            TokenEventDetails::Mint(event) => {
+                            TokenEventDetails::Mint(event) | TokenEventDetails::Burn(event) => {
                                 let TokenHolder::HolderAccount(to) = &event.target;
-                                addresses.push(to.address);
-                            }
-
-                            TokenEventDetails::Burn(event) => {
-                                let TokenHolder::HolderAccount(from) = &event.target;
-                                addresses.push(from.address);
+                                seen_addresses.insert(to.address);
                             }
                         }
                     }
 
-                    addresses
-                }
-                AccountTransactionEffects::TokenGovernance { events } => {
-                    let mut addresses = vec![at.sender];
-
-                    for token_event in events {
-                        match &token_event.event {
-                            TokenEventDetails::Module(_) => {
-                                // An `address` added/removed from an allow/deny
-                                // list is NOT considered affected.
-                            }
-
-                            TokenEventDetails::Transfer(event) => {
-                                let TokenHolder::HolderAccount(from) = &event.from;
-                                addresses.push(from.address);
-
-                                let TokenHolder::HolderAccount(to) = &event.to;
-                                addresses.push(to.address);
-                            }
-
-                            TokenEventDetails::Mint(event) => {
-                                let TokenHolder::HolderAccount(to) = &event.target;
-                                addresses.push(to.address);
-                            }
-
-                            TokenEventDetails::Burn(event) => {
-                                let TokenHolder::HolderAccount(from) = &event.target;
-                                addresses.push(from.address);
-                            }
-                        }
-                    }
-
-                    addresses
+                    seen_addresses.into_iter().collect()
                 }
             }
         } else {
