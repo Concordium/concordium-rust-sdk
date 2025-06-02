@@ -4,7 +4,7 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_base::{
     contracts_common::AccountAddress,
-    protocol_level_tokens::{operations, TokenAmount, TokenId},
+    protocol_level_tokens::{operations, TokenId},
 };
 use concordium_rust_sdk::{
     common::types::TransactionTime,
@@ -12,11 +12,8 @@ use concordium_rust_sdk::{
         transactions::{send, BlockItem},
         WalletAccount,
     },
-    v2::{
-        BlockIdentifier, {self},
-    },
+    v2::{self},
 };
-use rust_decimal::Decimal;
 use std::{path::PathBuf, str::FromStr};
 use structopt::*;
 
