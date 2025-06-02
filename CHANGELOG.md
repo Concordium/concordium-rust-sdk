@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+- Added the `affected_plt_tokens` function to the `BlockItemSummary` implementation. This function returns a vector of PLT tokens that were affected by transactions in the block.
+- Expanded the `affected_addresses` function within the `BlockItemSummary` implementation to return a vector of addresses whose CCD or PLT token balances were impacted by transactions in the block.
 - Publish `get_canonical_address` on `AccountAddress`.
 - Introduce protocol version 9 `ProtocolVersion::P9`.
 - Introduce basic types related to protocol level tokens (PLT):
