@@ -1,5 +1,9 @@
 ## Unreleased changes
 
+- Transaction `Payload` now supports `TokenHolder` payloads. Transactions can be created
+  with `send::transfer_tokens` and `construct::transfer_tokens`. The underlying model for
+  protocol level tokens is defined in `concordium_base::protocol_level_tokens`. A transfer example
+  can be found in `examples/transfer-tokens.rs`. 
 - Publish `get_canonical_address` on `AccountAddress`.
 - Introduce protocol version 9 `ProtocolVersion::P9`.
 - Introduce basic types related to protocol level tokens (PLT):
