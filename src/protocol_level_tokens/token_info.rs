@@ -3,8 +3,9 @@
 
 use crate::v2::{generated, Require};
 use concordium_base::{
+    common::cbor::CborSerializationResult,
     contracts_common::AccountAddress,
-    protocol_level_tokens::{RawCbor, TokenAmount, TokenId, TokenModuleRef},
+    protocol_level_tokens::{RawCbor, TokenAmount, TokenId, TokenModuleRef, TokenModuleState},
 };
 
 /// The token state at the block level.
@@ -37,6 +38,13 @@ pub struct TokenState {
     /// Token module specific state, such as token name, feature flags, meta
     /// data.
     pub module_state:     RawCbor,
+}
+
+impl TokenState {
+    /// Decode the token module state from CBOR
+    pub fn decode_module_state(&self) -> CborSerializationResult<TokenModuleState> {
+        TokenModuleState::try_from_cbor(&self.module_state)
+    }
 }
 
 impl TryFrom<generated::TokenInfo> for TokenInfo {
