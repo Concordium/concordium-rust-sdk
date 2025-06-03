@@ -28,11 +28,11 @@ struct App {
         default_value = "http://localhost:20000"
     )]
     endpoint: v2::Endpoint,
-    #[structopt(long = "sender", help = "Account keys of the sender.")]
+    #[structopt(long = "sender", help = "Path to the sender account key file.")]
     account:  PathBuf,
     #[structopt(long = "receiver", help = "Receiver address.")]
     receiver: String,
-    #[structopt(long = "token", help = "Token send.")]
+    #[structopt(long = "token", help = "Token id of token.")]
     token_id: String,
     #[structopt(long = "amount", help = "Amount to send.", default_value = "100.0")]
     amount:   Decimal,
