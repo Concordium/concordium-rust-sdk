@@ -25,7 +25,10 @@ struct App {
         default_value = "http://localhost:20000"
     )]
     endpoint: v2::Endpoint,
-    #[structopt(long = "account", help = "Path to the account key file of the governance account.")]
+    #[structopt(
+        long = "account",
+        help = "Path to the account key file of the governance account."
+    )]
     account:  PathBuf,
     #[structopt(long = "token", help = "Token to add/remove to/from allow/deny list.")]
     token_id: String,
