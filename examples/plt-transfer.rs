@@ -1,10 +1,9 @@
-//! Basic example that shows how to send a transaction, in this case a transfer
-//! from the account to itself.
+//! Example that shows how to transfer (PLT) tokens.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_base::{
     contracts_common::AccountAddress,
-    protocol_level_tokens::{TokenAmount, TokenId},
+    protocol_level_tokens::{operations, TokenAmount, TokenId},
 };
 use concordium_rust_sdk::{
     common::types::TransactionTime,
@@ -47,7 +46,7 @@ async fn main() -> anyhow::Result<()> {
     };
     let mut client = v2::Client::new(app.endpoint).await?;
 
-    // Token id of the fungible PLT token to transfer
+    // Token id of the PLT token to transfer
     let token_id = TokenId::try_from(app.token_id.clone())?;
 
     // Token info, we need the number of decimals in the token amount representation
@@ -82,15 +81,18 @@ async fn main() -> anyhow::Result<()> {
         TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
 
     // Create transfer tokens transaction
-    let txn = send::transfer_tokens(
+    let operation = operations::transfer_tokens(receiver_address, token_amount);
+
+    // Compose operation to transaction
+    let txn = send::token_holder_operations(
         &keys,
         keys.address,
         nonce,
         expiry,
-        receiver_address,
         token_id,
-        token_amount,
+        [operation].into_iter().collect(),
     )?;
+
     let item = BlockItem::AccountTransaction(txn);
 
     // Submit the transaction to the chain

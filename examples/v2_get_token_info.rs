@@ -30,6 +30,8 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Cannot connect.")?;
     let response = client.get_token_info(app.token, &block_ident).await?;
-    println!("{:#?}", response);
+    println!("{:#?}", response.response);
+    let module_state = response.response.token_state.decode_module_state()?;
+    println!("{:#?}", module_state);
     Ok(())
 }

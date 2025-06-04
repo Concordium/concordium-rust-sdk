@@ -13,9 +13,6 @@ on:
 
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, edited]
-    branches:
-     - main
-     - plt
 
   workflow_dispatch: # allows manual trigger
 
