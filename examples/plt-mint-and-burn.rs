@@ -30,7 +30,7 @@ struct App {
     token_id: String,
     #[structopt(subcommand)]
     cmd:      MintOrBurn,
-    #[structopt(long = "amount", help = "Amount to send.", default_value = "100.0")]
+    #[structopt(long = "amount", help = "Amount to mint/burn.", default_value = "100.0")]
     amount:   Decimal,
 }
 
