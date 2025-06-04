@@ -2296,7 +2296,6 @@ pub struct ContractInitializedEvent {
 }
 
 // re-export for backwards compatibility
-use concordium_base::protocol_level_tokens::{TokenEventDetails, TokenHolder};
 pub use concordium_base::{
     transactions::{Memo, RegisteredData, TransactionType},
     updates::*,
