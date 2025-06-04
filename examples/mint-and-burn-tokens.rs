@@ -13,7 +13,7 @@ use concordium_rust_sdk::{
     },
 };
 use rust_decimal::Decimal;
-use std::{path::PathBuf};
+use std::path::PathBuf;
 use structopt::*;
 
 #[derive(StructOpt)]
