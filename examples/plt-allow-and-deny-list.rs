@@ -56,7 +56,7 @@ async fn main() -> anyhow::Result<()> {
     };
     let mut client = v2::Client::new(app.endpoint).await?;
 
-    // Token id of the fungible PLT token to transfer
+    // Token id of the PLT token to transfer
     let token_id = TokenId::try_from(app.token_id.clone())?;
 
     // Target for list operation

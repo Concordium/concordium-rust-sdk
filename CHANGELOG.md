@@ -1,5 +1,6 @@
 ## Unreleased changes
 
+- **Breaking change**: MSRV updated: 1.81 -> 1.82
 - Protocol level token events and reject reasons are now defined in `concordium_base::protocol_level_tokens`.
   Event and reject reasons CBOR can be decoded with `TokenModuleEvent::decode_token_module_event_type` or
   `TokenModuleRejectReason::decode_reject_reason_type`.
