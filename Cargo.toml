@@ -3,13 +3,12 @@ name = "concordium-rust-sdk"
 version = "6.0.0"
 authors = ["Concordium <developers@concordium.com>"]
 edition = "2021"
-rust-version = "1.82"
+rust-version = "1.81"
 license-file = "LICENSE"
 readme = "README.md"
 include = ["src/", "examples/", "CHANGELOG.md"]
 description = "An SDK to use the Concordium blockchain."
 repository = "https://github.com/Concordium/concordium-rust-sdk"
-
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -41,6 +40,13 @@ concordium_base = { version = "7.0", path = "./concordium-base/rust-src/concordi
 concordium-smart-contract-engine = { version = "6.0", path = "./concordium-base/smart-contracts/wasm-chain-integration/", default-features = false, features = ["async"]}
 aes-gcm = { version = "0.10", features = ["std"] }
 tracing = "0.1"
+
+# Unused dependency, only here to pin to version < 1.8
+# Version 1.8 requires Rust edition 2024/Rust version 85 and the version 2 dependency resolver
+# fails on this Rust edition requirement. Version 3 resolver understands resolving dependencies taking
+# Rust edition into account, but is itself not default before edition 2024/Rust version 85 (https://doc.rust-lang.org/cargo/reference/resolver.html#resolver-versions).
+# Conclusion: We can remove this pin when we bump MSRV to 85.
+base64ct = "~1.7"
 
 [dev-dependencies]
 structopt = "0.3"
