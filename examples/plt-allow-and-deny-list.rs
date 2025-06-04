@@ -27,7 +27,7 @@ struct App {
     endpoint: v2::Endpoint,
     #[structopt(long = "account", help = "Account keys of the governance account.")]
     account:  PathBuf,
-    #[structopt(long = "token", help = "Token to mint or burn.")]
+    #[structopt(long = "token", help = "Token to add/remove to/from allow/deny list.")]
     token_id: String,
     #[structopt(subcommand)]
     cmd:      AddRemoveAllowDeny,
