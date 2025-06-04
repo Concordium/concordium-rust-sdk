@@ -6,11 +6,12 @@
 - Transaction `Payload` now supports `TokenGovernance` payloads.
   Operations can be created using functions in `concordium_base::protocol_level_tokens::operations`
   and composed to transactions with `send::token_governance_operations` and `construct::token_governance_operations`.
+  Governance operation examples can be found in `examples/plt-mint-and-burn.rs` and `examples/plt-allow-and-deny-list.rs`.
 - Transaction `Payload` now supports `TokenHolder` payloads. 
   Operations can be created using functions in `concordium_base::protocol_level_tokens::operations`
   and composed to transactions with `send::token_holder_operations` and `construct::token_holder_operations`.
   The underlying model for protocol level tokens is defined in `concordium_base::protocol_level_tokens`. A transfer example
-  can be found in `examples/transfer-tokens.rs`. 
+  can be found in `examples/plt-transfer.rs`. 
 - Publish `get_canonical_address` on `AccountAddress`.
 - Introduce protocol version 9 `ProtocolVersion::P9`.
 - Introduce basic types related to protocol level tokens (PLT):
