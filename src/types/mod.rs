@@ -1304,33 +1304,8 @@ impl BlockItemSummary {
                 AccountTransactionEffects::DataRegistered { .. } => vec![at.sender],
                 AccountTransactionEffects::BakerConfigured { .. } => vec![at.sender],
                 AccountTransactionEffects::DelegationConfigured { .. } => vec![at.sender],
-                AccountTransactionEffects::TokenHolder { events }
-                | AccountTransactionEffects::TokenGovernance { events } => {
-                    fn account_address(token_holder: &TokenHolder) -> Option<AccountAddress> {
-                        match token_holder {
-                            TokenHolder::HolderAccount(account) => Some(account.address),
-                        }
-                    }
-
-                    let mut addresses = HashSet::new();
-                    addresses.insert(at.sender);
-                    for event in events {
-                        match &event.event {
-                            TokenEventDetails::Transfer(transfer) => {
-                                addresses.extend(account_address(&transfer.from));
-                                addresses.extend(account_address(&transfer.to));
-                            }
-                            TokenEventDetails::Burn(update_event)
-                            | TokenEventDetails::Mint(update_event) => {
-                                addresses.extend(account_address(&update_event.target));
-                            }
-                            TokenEventDetails::Module(module_event) => {
-                                // TODO implement as part of COR-1391
-                            }
-                        }
-                    }
-                    addresses.into_iter().collect()
-                }
+                AccountTransactionEffects::TokenHolder { .. } => vec![at.sender],
+                AccountTransactionEffects::TokenGovernance { .. } => vec![at.sender],
             }
         } else {
             Vec::new()
