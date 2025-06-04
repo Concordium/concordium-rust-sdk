@@ -41,6 +41,7 @@ pub struct TokenState {
 }
 
 impl TokenState {
+    /// Decode the token module state from CBOR
     pub fn decode_module_state(&self) -> CborSerializationResult<TokenModuleState> {
         TokenModuleState::try_from_cbor(&self.module_state)
     }
