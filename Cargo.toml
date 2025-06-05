@@ -46,7 +46,7 @@ tracing = "0.1"
 # fails on this Rust edition requirement. Version 3 resolver understands resolving dependencies taking
 # Rust edition into account, but is itself not default before edition 2024/Rust version 85 (https://doc.rust-lang.org/cargo/reference/resolver.html#resolver-versions).
 # Conclusion: We can remove this pin when we bump MSRV to 85.
-base64ct = "~1.7"
+base64ct = "<1.8"
 
 [dev-dependencies]
 structopt = "0.3"
