@@ -1,6 +1,6 @@
 [package]
 name = "concordium-rust-sdk"
-version = "9.0.2-alpha"
+version = "7.0.0-alpha"
 authors = ["Concordium <developers@concordium.com>"]
 edition = "2021"
 rust-version = "1.85"
