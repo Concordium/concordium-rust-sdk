@@ -30,7 +30,7 @@ pub(crate) mod byte_array_hex {
         des: D,
     ) -> Result<R, D::Error> {
         struct HexVisitor;
-        impl<'de> serde::de::Visitor<'de> for HexVisitor {
+        impl serde::de::Visitor<'_> for HexVisitor {
             type Value = Vec<u8>;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
