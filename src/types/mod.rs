@@ -10,7 +10,7 @@ pub mod smart_contracts;
 mod summary_helper;
 pub mod transactions;
 
-use crate::constants::*;
+use crate::{constants::*, protocol_level_tokens};
 pub use concordium_base::{
     base::*,
     smart_contracts::{ContractTraceElement, InstanceUpdatedEvent},
@@ -389,6 +389,8 @@ pub struct AccountInfo {
     /// amount in the release schedule and the total amount that is actively
     /// staked or in cooldown (inactive stake).
     pub available_balance: Amount,
+    /// The protocol level tokens (PLT) held by the account.
+    pub tokens:            Vec<protocol_level_tokens::AccountToken>,
 }
 
 impl From<&AccountInfo> for AccountAccessStructure {
@@ -1302,6 +1304,8 @@ impl BlockItemSummary {
                 AccountTransactionEffects::DataRegistered { .. } => vec![at.sender],
                 AccountTransactionEffects::BakerConfigured { .. } => vec![at.sender],
                 AccountTransactionEffects::DelegationConfigured { .. } => vec![at.sender],
+                AccountTransactionEffects::TokenHolder { .. } => vec![at.sender],
+                AccountTransactionEffects::TokenGovernance { .. } => vec![at.sender],
             }
         } else {
             Vec::new()
@@ -1843,6 +1847,8 @@ impl AccountTransactionEffects {
             AccountTransactionEffects::DataRegistered { .. } => Some(RegisterData),
             AccountTransactionEffects::BakerConfigured { .. } => Some(ConfigureBaker),
             AccountTransactionEffects::DelegationConfigured { .. } => Some(ConfigureDelegation),
+            AccountTransactionEffects::TokenHolder { .. } => Some(TokenHolder),
+            AccountTransactionEffects::TokenGovernance { .. } => Some(TokenGovernance),
         }
     }
 }
@@ -1860,10 +1866,10 @@ pub struct BakerStakeUpdatedData {
     pub increased: bool,
 }
 
-#[derive(Debug, Clone)]
 /// Effects of an account transactions. All variants apart from
 /// [AccountTransactionEffects::None] correspond to a unique transaction that
 /// was successful.
+#[derive(Debug, Clone)]
 pub enum AccountTransactionEffects {
     /// No effects other than payment from this transaction.
     /// The rejection reason indicates why the transaction failed.
@@ -2021,6 +2027,16 @@ pub enum AccountTransactionEffects {
     /// An account configured delegation. The details of what happened are
     /// contained in the list of [delegation events](DelegationEvent).
     DelegationConfigured { data: Vec<DelegationEvent> },
+    /// Effect of a successful token holder transaction.
+    TokenHolder {
+        /// Events produced by the token.
+        events: Vec<protocol_level_tokens::TokenEvent>,
+    },
+    /// Effect of a successful token governance transaction.
+    TokenGovernance {
+        /// Events produced by the token.
+        events: Vec<protocol_level_tokens::TokenEvent>,
+    },
 }
 
 impl AccountTransactionEffects {
@@ -2758,6 +2774,18 @@ pub enum RejectReason {
     PoolWouldBecomeOverDelegated,
     /// The pool is not open to delegators.
     PoolClosed,
+    /// The provided identifier does not match a token currently on chain.
+    /// Introduced in protocol version 9.
+    NonExistentTokenId {
+        token_id: protocol_level_tokens::TokenId,
+    },
+    /// The token-holder transaction failed.
+    /// Introduced in protocol version 9.
+    TokenModule(protocol_level_tokens::TokenModuleRejectReason),
+    // Account sending the transaction is not authorized for governing the token.
+    UnauthorizedTokenGovernance {
+        token_id: protocol_level_tokens::TokenId,
+    },
 }
 
 /// The network information of a node.

@@ -14,6 +14,7 @@ use super::{
     Energy, InstanceUpdatedEvent, Memo, NewEncryptedAmountEvent, OpenStatus, RegisteredData,
     RejectReason, TransactionIndex, TransactionType, UpdatePayload, UrlText,
 };
+
 use crate::types::Address;
 use concordium_base::{
     common::{
@@ -21,6 +22,7 @@ use concordium_base::{
         SerdeDeserialize, SerdeSerialize,
     },
     id::types::AccountAddress,
+    protocol_level_tokens::TokenEvent,
 };
 use std::convert::{TryFrom, TryInto};
 use thiserror::Error;
@@ -113,7 +115,9 @@ pub(crate) enum Event {
         to:     Address,
     },
     /// An account with the given address was created.
-    AccountCreated { contents: AccountAddress },
+    AccountCreated {
+        contents: AccountAddress,
+    },
     #[serde(rename_all = "camelCase")]
     /// A new credential with the given ID was deployed onto an account.
     /// This is used only when a new account is created. See
@@ -166,7 +170,9 @@ pub(crate) enum Event {
     },
     #[serde(rename_all = "camelCase")]
     /// Keys of the given credential were updated.
-    CredentialKeysUpdated { cred_id: CredentialRegistrationID },
+    CredentialKeysUpdated {
+        cred_id: CredentialRegistrationID,
+    },
     #[serde(rename_all = "camelCase")]
     /// A new encrypted amount was added to the account.
     NewEncryptedAmount {
@@ -224,10 +230,14 @@ pub(crate) enum Event {
     },
     #[serde(rename_all = "camelCase")]
     /// Data was registered.
-    DataRegistered { data: RegisteredData },
+    DataRegistered {
+        data: RegisteredData,
+    },
     #[serde(rename_all = "camelCase")]
     /// Memo
-    TransferMemo { memo: Memo },
+    TransferMemo {
+        memo: Memo,
+    },
     /// A V1 contract was interrupted.
     #[serde(rename_all = "camelCase")]
     Interrupted {
@@ -367,6 +377,12 @@ pub(crate) enum Event {
         baker_id: BakerId,
         /// Baker account
         account:  AccountAddress,
+    },
+    TokenHolder {
+        events: Vec<TokenEvent>,
+    },
+    TokenGovernance {
+        events: Vec<TokenEvent>,
     },
 }
 
@@ -782,6 +798,18 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                             .collect();
                         (Some(ty), BlockItemResult::Success { events })
                     }
+                    super::AccountTransactionEffects::TokenHolder { events } => (
+                        Some(TransactionType::TokenHolder),
+                        BlockItemResult::Success {
+                            events: vec![Event::TokenHolder { events }],
+                        },
+                    ),
+                    super::AccountTransactionEffects::TokenGovernance { events } => (
+                        Some(TransactionType::TokenGovernance),
+                        BlockItemResult::Success {
+                            events: vec![Event::TokenGovernance { events }],
+                        },
+                    ),
                 };
                 BlockItemSummary {
                     sender: Some(sender),
@@ -1286,6 +1314,24 @@ fn convert_account_transaction(
                 })
                 .collect::<Result<_, ConversionError>>()?;
             mk_success(super::AccountTransactionEffects::DelegationConfigured { data })
+        }
+        TransactionType::TokenHolder => {
+            let effects = with_singleton(events, |e| match e {
+                Event::TokenHolder { events } => {
+                    Some(super::AccountTransactionEffects::TokenHolder { events })
+                }
+                _ => None,
+            })?;
+            mk_success(effects)
+        }
+        TransactionType::TokenGovernance => {
+            let effects = with_singleton(events, |e| match e {
+                Event::TokenGovernance { events } => {
+                    Some(super::AccountTransactionEffects::TokenGovernance { events })
+                }
+                _ => None,
+            })?;
+            mk_success(effects)
         }
     }
 }
