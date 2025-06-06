@@ -10,13 +10,12 @@ on:
     branches: main
 
   pull_request:
-    branches: main
 
   workflow_dispatch: # allows manual trigger
 
 env:
   RUST_FMT: nightly-2023-04-01-x86_64-unknown-linux-gnu
-  RUST_VERSION: "1.81"
+  RUST_VERSION: "1.85"
 
 jobs:
   "lint_fmt":
