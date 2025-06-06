@@ -18,7 +18,7 @@ on:
 
 env:
   RUST_FMT: nightly-2023-04-01-x86_64-unknown-linux-gnu
-  RUST_VERSION: "1.81"
+  RUST_VERSION: "1.85"
 
 jobs:
   "lint_fmt":
@@ -66,7 +66,7 @@ jobs:
       - name: Check
         run: |
           rustup default $RUST_VERSION
-          cargo check --all-targets --all-features
+          cargo check --all-targets --all-features 
 
   "lint_clippy_test":
     name: lint:clippy

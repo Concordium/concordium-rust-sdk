@@ -2666,7 +2666,7 @@ pub struct BlockItemSummary {
     #[prost(message, optional, tag = "3")]
     pub hash: ::core::option::Option<TransactionHash>,
     /// Details that are specific to different transaction types.
-    #[prost(oneof = "block_item_summary::Details", tags = "4, 5, 6")]
+    #[prost(oneof = "block_item_summary::Details", tags = "4, 5, 6, 7")]
     pub details: ::core::option::Option<block_item_summary::Details>,
 }
 /// Nested message and enum types in `BlockItemSummary`.
@@ -2688,6 +2688,9 @@ pub mod block_item_summary {
         /// Details about a successful chain update.
         #[prost(message, tag = "6")]
         Update(super::UpdateDetails),
+        /// Details about the creation of a protocol-level token.
+        #[prost(message, tag = "7")]
+        TokenCreation(super::plt::TokenCreationDetails),
     }
 }
 /// The number of chain restarts via a protocol update. An effected

@@ -83,11 +83,7 @@ async fn main() -> anyhow::Result<()> {
         }
         for bisummary in summary {
             if let BlockItemSummaryDetails::AccountTransaction(at) = &bisummary.details {
-                if types.is_empty()
-                    || at
-                        .transaction_type()
-                        .map_or(false, |tt| types.contains(&tt))
-                {
+                if types.is_empty() || at.transaction_type().is_some_and(|tt| types.contains(&tt)) {
                     let is_success = !matches!(&at.effects, AccountTransactionEffects::None { .. });
                     let type_string = at
                         .transaction_type()
