@@ -36,7 +36,7 @@ use concordium_base::{
             AccountAddress, AccountCredentialWithoutProofs, AccountKeys, CredentialPublicKeys,
         },
     },
-    protocol_level_tokens::{TokenEventDetails, TokenHolder, TokenId},
+    protocol_level_tokens::{TokenEventDetails, TokenHolder},
     smart_contracts::{
         ContractEvent, ModuleReference, OwnedParameter, OwnedReceiveName, WasmVersion,
     },
@@ -931,6 +931,12 @@ pub enum SpecialTransactionOutcome {
 }
 
 impl SpecialTransactionOutcome {
+    /// Return the list of addresses affected by the SpecialTransactionOutcome.
+    /// These are addresses that have their CCD balance balance
+    /// changed by rewards (validation_rewards, mint_rewards, block_rewards,
+    /// finalization_rewards and payday rewards). As well as validator addresses
+    /// that have been suspended/primed for suspension as part of the
+    /// SpecialTransactionOutcome.
     pub fn affected_addresses(&self) -> Vec<AccountAddress> {
         match self {
             SpecialTransactionOutcome::BakingRewards { baker_rewards, .. } => {
@@ -1175,28 +1181,6 @@ impl BlockItemSummary {
             }
         } else {
             Vec::new()
-        }
-    }
-
-    /// Return the list of token ids affected by the block summary.
-    pub fn affected_plt_tokens(&self) -> Vec<TokenId> {
-        match &self.details {
-            BlockItemSummaryDetails::AccountTransaction(at) => match &at.effects {
-                AccountTransactionEffects::TokenHolder { events } => {
-                    events.iter().map(|event| event.token_id.clone()).collect()
-                }
-                AccountTransactionEffects::TokenGovernance { events } => {
-                    events.iter().map(|event| event.token_id.clone()).collect()
-                }
-                _ => vec![],
-            },
-            BlockItemSummaryDetails::AccountCreation(_) => vec![],
-            BlockItemSummaryDetails::Update(update) => match &update.payload {
-                UpdatePayload::CreatePlt(CreatePlt { token_id, .. }) => {
-                    vec![token_id.clone()]
-                }
-                _ => vec![],
-            },
         }
     }
 
