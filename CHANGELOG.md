@@ -1,8 +1,11 @@
-## 7.0.0-alpha
+## Unreleased
 
 - Add `create plt` event.
 - Revise `plt events` to align them with the JSON serialization of the haskell code base.
 - Expanded the `affected_addresses` function within the `BlockItemSummary` implementation to return a vector of addresses whose CCD or PLT token balances were impacted by the transaction.
+
+## 7.0.0-alpha
+
 - Protocol level token events and reject reasons are now defined in `concordium_base::protocol_level_tokens`.
   Event and reject reasons CBOR can be decoded with `TokenModuleEvent::decode_token_module_event_type` or
   `TokenModuleRejectReason::decode_reject_reason_type`.

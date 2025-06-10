@@ -374,12 +374,12 @@ pub(crate) enum Event {
         /// Baker account
         account:  AccountAddress,
     },
-    /// An event emitted by an plt (protocol level token) module.
+    /// An event emitted by a plt (protocol level token) module.
     #[serde(rename_all = "camelCase")]
     #[allow(clippy::enum_variant_names)] // Note: The clippy warning is disabled to keep
     // the name `TokenModuleEvent` which has to align with the corresponding type in the haskell
     // code base in `concordium-base`. This is needed as the JSON representation of the event
-    // is tagged with this name.
+    // is tagged with this name in the haskell code base.
     TokenModuleEvent {
         /// The token id of the token.
         token_id: TokenId,
@@ -425,7 +425,7 @@ pub(crate) enum Event {
     #[serde(rename_all = "camelCase")]
     TokenCreated {
         /// The transaction payload when the token was created.
-        /// It includes the `token_id`, `token_mddule_reference`,
+        /// It includes the `token_id`, `token_module_reference`,
         /// `governance_account`, `decimal` and `initialization_parameters`.
         payload: CreatePlt,
     },
@@ -470,6 +470,32 @@ impl TryFrom<Event> for super::ContractTraceElement {
             _ => Err(ConversionError::InvalidTransactionResult),
         }
     }
+}
+
+/// Helper function to convert a vector of `TokenEvent` into the a vector of
+/// `Event` types.
+fn token_events_to_events(events: Vec<TokenEvent>) -> Vec<Event> {
+    events
+        .into_iter()
+        .map(|ev| match ev.event {
+            TokenEventDetails::Module(token_module_event) => Event::TokenModuleEvent {
+                token_id: ev.token_id,
+                event:    token_module_event,
+            },
+            TokenEventDetails::Transfer(token_transfer_event) => Event::TokenTransfer {
+                token_id: ev.token_id,
+                event:    token_transfer_event,
+            },
+            TokenEventDetails::Mint(token_supply_update_event) => Event::TokenMint {
+                token_id: ev.token_id,
+                event:    token_supply_update_event,
+            },
+            TokenEventDetails::Burn(token_supply_update_event) => Event::TokenBurn {
+                token_id: ev.token_id,
+                event:    token_supply_update_event,
+            },
+        })
+        .collect()
 }
 
 impl From<super::BlockItemSummary> for BlockItemSummary {
@@ -845,68 +871,12 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                     }
                     super::AccountTransactionEffects::TokenHolder { events } => {
                         let ty = TransactionType::TokenHolder;
-                        let events = events
-                            .into_iter()
-                            .map(|ev| match ev.event {
-                                TokenEventDetails::Module(token_module_event) => {
-                                    Event::TokenModuleEvent {
-                                        token_id: ev.token_id,
-                                        event:    token_module_event,
-                                    }
-                                }
-                                TokenEventDetails::Transfer(token_transfer_event) => {
-                                    Event::TokenTransfer {
-                                        token_id: ev.token_id,
-                                        event:    token_transfer_event,
-                                    }
-                                }
-                                TokenEventDetails::Mint(token_supply_update_event) => {
-                                    Event::TokenMint {
-                                        token_id: ev.token_id,
-                                        event:    token_supply_update_event,
-                                    }
-                                }
-                                TokenEventDetails::Burn(token_supply_update_event) => {
-                                    Event::TokenBurn {
-                                        token_id: ev.token_id,
-                                        event:    token_supply_update_event,
-                                    }
-                                }
-                            })
-                            .collect();
+                        let events = token_events_to_events(events);
                         (Some(ty), BlockItemResult::Success { events })
                     }
                     super::AccountTransactionEffects::TokenGovernance { events } => {
                         let ty = TransactionType::TokenGovernance;
-                        let events = events
-                            .into_iter()
-                            .map(|ev| match ev.event {
-                                TokenEventDetails::Module(token_module_event) => {
-                                    Event::TokenModuleEvent {
-                                        token_id: ev.token_id,
-                                        event:    token_module_event,
-                                    }
-                                }
-                                TokenEventDetails::Transfer(token_transfer_event) => {
-                                    Event::TokenTransfer {
-                                        token_id: ev.token_id,
-                                        event:    token_transfer_event,
-                                    }
-                                }
-                                TokenEventDetails::Mint(token_supply_update_event) => {
-                                    Event::TokenMint {
-                                        token_id: ev.token_id,
-                                        event:    token_supply_update_event,
-                                    }
-                                }
-                                TokenEventDetails::Burn(token_supply_update_event) => {
-                                    Event::TokenBurn {
-                                        token_id: ev.token_id,
-                                        event:    token_supply_update_event,
-                                    }
-                                }
-                            })
-                            .collect();
+                        let events = token_events_to_events(events);
                         (Some(ty), BlockItemResult::Success { events })
                     }
                 };
@@ -944,35 +914,37 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
             super::BlockItemSummaryDetails::Update(super::UpdateDetails {
                 effective_time,
                 payload,
-            }) => match payload {
-                UpdatePayload::CreatePlt(create_plt) => BlockItemSummary {
+            }) => BlockItemSummary {
+                sender:       None,
+                hash:         bi.hash,
+                cost:         Amount::zero(),
+                energy_cost:  bi.energy_cost,
+                summary_type: BlockItemType::Update(payload.update_type()),
+                result:       BlockItemResult::Success {
+                    events: vec![Event::UpdateEnqueued {
+                        effective_time,
+                        payload,
+                    }],
+                },
+                index:        bi.index,
+            },
+            super::BlockItemSummaryDetails::TokenCreationDetails(token_creation_details) => {
+                let mut events = vec![Event::TokenCreated {
+                    payload: token_creation_details.create_plt,
+                }];
+                let additional_events = token_events_to_events(token_creation_details.events);
+                events.extend(additional_events);
+
+                BlockItemSummary {
                     sender:       None,
                     hash:         bi.hash,
                     cost:         Amount::zero(),
                     energy_cost:  bi.energy_cost,
                     summary_type: BlockItemType::Update(UpdateType::CreatePlt),
-                    result:       BlockItemResult::Success {
-                        events: vec![Event::TokenCreated {
-                            payload: create_plt,
-                        }],
-                    },
+                    result:       BlockItemResult::Success { events },
                     index:        bi.index,
-                },
-                _ => BlockItemSummary {
-                    sender:       None,
-                    hash:         bi.hash,
-                    cost:         Amount::zero(),
-                    energy_cost:  bi.energy_cost,
-                    summary_type: BlockItemType::Update(payload.update_type()),
-                    result:       BlockItemResult::Success {
-                        events: vec![Event::UpdateEnqueued {
-                            effective_time,
-                            payload,
-                        }],
-                    },
-                    index:        bi.index,
-                },
-            },
+                }
+            }
         }
     }
 }
@@ -1537,31 +1509,34 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
             }
             BlockItemType::Update(_) => {
                 let ud = match value.result {
-                    BlockItemResult::Success { mut events } => {
-                        if events.len() == 1 {
-                            if let Event::UpdateEnqueued {
+                    BlockItemResult::Success { events } => {
+                        let Some(first_event) = events.first() else {
+                            return Err(ConversionError::InvalidUpdateResult);
+                        };
+
+                        match first_event {
+                            Event::UpdateEnqueued {
                                 effective_time,
                                 payload,
-                            } = events.remove(0)
-                            {
-                                super::UpdateDetails {
-                                    effective_time,
-                                    payload,
+                            } => {
+                                if events.len() != 1 {
+                                    return Err(ConversionError::InvalidUpdateResult);
                                 }
-                            } else if let Event::TokenCreated { payload } = events.remove(0) {
-                                super::UpdateDetails {
-                                    effective_time: TransactionTime { seconds: 0u64 },
-                                    payload:        UpdatePayload::CreatePlt(payload),
-                                }
-                            } else {
-                                return Err(ConversionError::InvalidUpdateResult);
+
+                                Ok(super::UpdateDetails {
+                                    effective_time: *effective_time,
+                                    payload:        payload.clone(),
+                                })
                             }
-                        } else {
-                            return Err(ConversionError::InvalidUpdateResult);
+                            Event::TokenCreated { payload } => Ok(super::UpdateDetails {
+                                effective_time: TransactionTime { seconds: 0 },
+                                payload:        UpdatePayload::CreatePlt(payload.clone()),
+                            }),
+                            _ => Err(ConversionError::InvalidUpdateResult),
                         }
                     }
                     BlockItemResult::Reject { .. } => return Err(ConversionError::FailedUpdate),
-                };
+                }?;
                 let details = super::BlockItemSummaryDetails::Update(ud);
                 Ok(super::BlockItemSummary {
                     index: value.index,
