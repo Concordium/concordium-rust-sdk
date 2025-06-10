@@ -1320,8 +1320,8 @@ impl BlockItemSummary {
                 AccountTransactionEffects::DelegationConfigured { .. } => vec![at.sender],
                 AccountTransactionEffects::TokenHolder { events }
                 | AccountTransactionEffects::TokenGovernance { events } => {
-                    let mut seen_addresses = BTreeSet::new();
-                    seen_addresses.insert(at.sender);
+                    let mut addresses = BTreeSet::new();
+                    addresses.insert(at.sender);
 
                     for token_event in events {
                         match &token_event.event {
@@ -1332,20 +1332,20 @@ impl BlockItemSummary {
 
                             TokenEventDetails::Transfer(event) => {
                                 let TokenHolder::HolderAccount(from) = &event.from;
-                                seen_addresses.insert(from.address);
+                                addresses.insert(from.address);
 
                                 let TokenHolder::HolderAccount(to) = &event.to;
-                                seen_addresses.insert(to.address);
+                                addresses.insert(to.address);
                             }
 
                             TokenEventDetails::Mint(event) | TokenEventDetails::Burn(event) => {
                                 let TokenHolder::HolderAccount(to) = &event.target;
-                                seen_addresses.insert(to.address);
+                                addresses.insert(to.address);
                             }
                         }
                     }
 
-                    seen_addresses.into_iter().collect()
+                    addresses.into_iter().collect()
                 }
             }
         } else {
