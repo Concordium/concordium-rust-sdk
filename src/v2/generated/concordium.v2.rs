@@ -7554,7 +7554,7 @@ pub mod queries_client {
         /// The following error cases are possible:
         ///  * `NOT_FOUND` if the query specifies an unknown block.
         ///  * `UNAVAILABLE` if the query is for an epoch that is not finalized in the current genesis
-        ///     index, or is for a future genesis index.
+        ///    index, or is for a future genesis index.
         ///  * `INVALID_ARGUMENT` if the query is for an epoch that is not finalized for a past genesis
         ///    index.
         ///  * `INVALID_ARGUMENT` if the query is for a genesis index at consensus version 0.
