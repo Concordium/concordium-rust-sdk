@@ -27,9 +27,9 @@ pub struct TokenAccountState {
     /// The token balance of the account.
     pub balance:           TokenAmount,
     /// Whether the account is a member of the allow list.
-    pub member_allow_list: bool,
+    pub member_allow_list: Option<bool>,
     /// Whether the account is a member of the deny list.
-    pub member_deny_list:  bool,
+    pub member_deny_list:  Option<bool>,
 }
 
 impl TryFrom<generated::account_info::Token> for AccountToken {
@@ -49,8 +49,8 @@ impl TryFrom<generated::plt::TokenAccountState> for TokenAccountState {
     fn try_from(value: generated::plt::TokenAccountState) -> Result<Self, Self::Error> {
         Ok(Self {
             balance:           value.balance.require()?.try_into()?,
-            member_allow_list: value.member_allow_list.require()?,
-            member_deny_list:  value.member_deny_list.require()?,
+            member_allow_list: value.member_allow_list,
+            member_deny_list:  value.member_deny_list,
         })
     }
 }
