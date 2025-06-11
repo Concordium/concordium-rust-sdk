@@ -35,9 +35,9 @@ impl TryFrom<generated::plt::TokenAmount> for TokenAmount {
 
     fn try_from(value: generated::plt::TokenAmount) -> Result<Self, Self::Error> {
         Ok(Self::from_raw(
-            value.digits,
+            value.value,
             value
-                .nr_of_decimals
+                .decimals
                 .try_into()
                 .map_err(|_| tonic::Status::internal("Unexpected token decimals"))?,
         ))

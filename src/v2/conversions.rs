@@ -7,7 +7,7 @@ use crate::{
         queries::ConcordiumBFTDetails, AccountReleaseSchedule, ActiveBakerPoolStatus,
         UpdateKeysCollectionSkeleton,
     },
-    v2::generated::BlockCertificates,
+    v2::generated::{block_item_summary::Details, BlockCertificates},
 };
 use chrono::TimeZone;
 use concordium_base::{
@@ -1326,6 +1326,18 @@ impl TryFrom<BlockItemSummary> for super::types::BlockItemSummary {
                         effective_time: v.effective_time.require()?.into(),
                         payload:        v.payload.require()?.try_into()?,
                     })
+                }
+                Details::TokenCreation(v) => {
+                    super::types::BlockItemSummaryDetails::TokenCreationDetails(
+                        super::types::TokenCreationDetails {
+                            create_plt: v.create_plt.require()?.try_into()?,
+                            events:     v
+                                .events
+                                .into_iter()
+                                .map(TryInto::try_into)
+                                .collect::<Result<_, tonic::Status>>()?,
+                        },
+                    )
                 }
             },
         })

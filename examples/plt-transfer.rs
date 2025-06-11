@@ -58,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
     // Amount of tokens to send. The number of decimals in the TokenAmount
     // must be the same as the number of decimals in the TokenInfo
     let mut amount = app.amount;
-    amount.rescale(token_info.token_state.nr_of_decimals as u32);
+    amount.rescale(token_info.token_state.decimals as u32);
     let token_amount =
         TokenAmount::from_raw(amount.mantissa().try_into()?, amount.scale().try_into()?);
     println!("Token amount: {}", token_amount,);

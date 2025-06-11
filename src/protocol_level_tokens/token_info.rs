@@ -32,7 +32,7 @@ pub struct TokenState {
     /// account which can perform token-governance operations.
     pub issuer:           AccountAddress,
     /// Number of decimals in the decimal number representation of amounts.
-    pub nr_of_decimals:   u8,
+    pub decimals:         u8,
     /// The total available token supply.
     pub total_supply:     TokenAmount,
     /// Token module specific state, such as token name, feature flags, meta
@@ -65,8 +65,8 @@ impl TryFrom<generated::plt::TokenState> for TokenState {
         Ok(Self {
             token_module_ref: value.token_module_ref.require()?.try_into()?,
             issuer:           value.issuer.require()?.try_into()?,
-            nr_of_decimals:   value
-                .nr_of_decimals
+            decimals:         value
+                .decimals
                 .try_into()
                 .map_err(|_| tonic::Status::internal("Unexpected token decimals"))?,
             total_supply:     value.total_supply.require()?.try_into()?,
