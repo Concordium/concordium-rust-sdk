@@ -1,6 +1,7 @@
 ## Unreleased
 
-- Extend `BlockItemSummaryDetails` with `TokenCreationDetails` variant and handle `create plt` event.
+- Extend `BlockItemSummaryDetails` with `TokenCreationDetails` variant including contained PLT events. `TokenCreationDetails` 
+  is the summary corresponding to `CreatePlt` updates. 
 - Change JSON serialization of PLT events to align them with Haskell code base.
 - Expanded the `affected_addresses` function within the `BlockItemSummary` implementation to return a vector of addresses whose CCD or PLT token balances were impacted by the transaction.
 
