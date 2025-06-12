@@ -1310,23 +1310,24 @@ impl TryFrom<BlockItemSummary> for super::types::BlockItemSummary {
             hash:        value.hash.require()?.try_into()?,
             details:     match value.details.require()? {
                 block_item_summary::Details::AccountTransaction(v) => {
-                    super::types::BlockItemSummaryDetails::AccountTransaction(v.try_into()?)
-                }
+                                super::types::BlockItemSummaryDetails::AccountTransaction(v.try_into()?)
+                            }
                 block_item_summary::Details::AccountCreation(v) => {
-                    super::types::BlockItemSummaryDetails::AccountCreation(
-                        super::types::AccountCreationDetails {
-                            credential_type: v.credential_type().into(),
-                            address:         v.address.require()?.try_into()?,
-                            reg_id:          v.reg_id.require()?.try_into()?,
-                        },
-                    )
-                }
+                                super::types::BlockItemSummaryDetails::AccountCreation(
+                                    super::types::AccountCreationDetails {
+                                        credential_type: v.credential_type().into(),
+                                        address:         v.address.require()?.try_into()?,
+                                        reg_id:          v.reg_id.require()?.try_into()?,
+                                    },
+                                )
+                            }
                 block_item_summary::Details::Update(v) => {
-                    super::types::BlockItemSummaryDetails::Update(super::types::UpdateDetails {
-                        effective_time: v.effective_time.require()?.into(),
-                        payload:        v.payload.require()?.try_into()?,
-                    })
-                }
+                                super::types::BlockItemSummaryDetails::Update(super::types::UpdateDetails {
+                                    effective_time: v.effective_time.require()?.into(),
+                                    payload:        v.payload.require()?.try_into()?,
+                                })
+                            }
+                block_item_summary::Details::TokenCreation(_) => todo!(),
             },
         })
     }
@@ -1561,6 +1562,7 @@ impl TryFrom<AuthorizationsV1> for super::types::AuthorizationsV1 {
             v0:                  value.v0.require()?.try_into()?,
             cooldown_parameters: value.parameter_cooldown.require()?.try_into()?,
             time_parameters:     value.parameter_time.require()?.try_into()?,
+            create_plt: value.create_plt.require()?.try_into()?,
         })
     }
 }
