@@ -1,4 +1,4 @@
-## Unreleased
+## 7.0.1-alpha
 
 - Make `member_allow_list` and `member_deny_list` optional on `TokenAccountState` to comply with protobuf definition.
 - Extend `BlockItemSummaryDetails` with `TokenCreationDetails` variant including contained PLT events. `TokenCreationDetails` 
