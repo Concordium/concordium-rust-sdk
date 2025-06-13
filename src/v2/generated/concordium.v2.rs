@@ -2185,7 +2185,8 @@ pub struct AuthorizationsV1 {
     /// Access structure for updating the length of the reward period.
     #[prost(message, optional, tag = "3")]
     pub parameter_time: ::core::option::Option<AccessStructure>,
-    /// Access structure for creating a protocol level token
+    /// Access structure for creating a protocol level token.
+    /// This is present from protocol version 9.
     #[prost(message, optional, tag = "4")]
     pub create_plt: ::core::option::Option<AccessStructure>,
 }
