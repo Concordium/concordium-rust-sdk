@@ -32,7 +32,7 @@ pub struct TokenState {
     /// account which can perform token-governance operations.
     pub issuer:           AccountAddress,
     /// Number of decimals in the decimal number representation of amounts.
-    pub nr_of_decimals:   u8,
+    pub decimals:         u8,
     /// The total available token supply.
     pub total_supply:     TokenAmount,
     /// Token module specific state, such as token name, feature flags, meta
