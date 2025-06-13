@@ -7,7 +7,7 @@ use crate::{
         queries::ConcordiumBFTDetails, AccountReleaseSchedule, ActiveBakerPoolStatus,
         UpdateKeysCollectionSkeleton,
     },
-    v2::generated::{block_item_summary::Details, BlockCertificates},
+    v2::generated::BlockCertificates,
 };
 use chrono::TimeZone;
 use concordium_base::{

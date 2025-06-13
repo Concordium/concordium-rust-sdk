@@ -65,7 +65,7 @@ impl TryFrom<generated::plt::TokenState> for TokenState {
         Ok(Self {
             token_module_ref: value.token_module_ref.require()?.try_into()?,
             issuer:           value.issuer.require()?.try_into()?,
-            nr_of_decimals:   value
+            decimals:   value
                 .decimals
                 .try_into()
                 .map_err(|_| tonic::Status::internal("Unexpected token decimals"))?,
