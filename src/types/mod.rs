@@ -10,7 +10,7 @@ pub mod smart_contracts;
 mod summary_helper;
 pub mod transactions;
 
-use crate::constants::*;
+use crate::{constants::*, protocol_level_tokens};
 pub use concordium_base::{
     base::*,
     smart_contracts::{ContractTraceElement, InstanceUpdatedEvent},
@@ -23,9 +23,11 @@ use concordium_base::{
         Versioned,
     },
     contracts_common::{Duration, EntrypointName, Parameter},
-    encrypted_transfers,
-    encrypted_transfers::types::{
-        AggregatedDecryptedAmount, EncryptedAmountTransferData, SecToPubAmountTransferData,
+    encrypted_transfers::{
+        self,
+        types::{
+            AggregatedDecryptedAmount, EncryptedAmountTransferData, SecToPubAmountTransferData,
+        },
     },
     id::{
         constants::{ArCurve, AttributeKind},
@@ -34,6 +36,7 @@ use concordium_base::{
             AccountAddress, AccountCredentialWithoutProofs, AccountKeys, CredentialPublicKeys,
         },
     },
+    protocol_level_tokens::{TokenEvent, TokenEventDetails, TokenHolder},
     smart_contracts::{
         ContractEvent, ModuleReference, OwnedParameter, OwnedReceiveName, WasmVersion,
     },
@@ -389,6 +392,8 @@ pub struct AccountInfo {
     /// amount in the release schedule and the total amount that is actively
     /// staked or in cooldown (inactive stake).
     pub available_balance: Amount,
+    /// The protocol level tokens (PLT) held by the account.
+    pub tokens:            Vec<protocol_level_tokens::AccountToken>,
 }
 
 impl From<&AccountInfo> for AccountAccessStructure {
@@ -926,6 +931,12 @@ pub enum SpecialTransactionOutcome {
 }
 
 impl SpecialTransactionOutcome {
+    /// Return the list of addresses affected by the SpecialTransactionOutcome.
+    /// These are addresses that have their CCD balance
+    /// changed by rewards (validation_rewards, mint_rewards, block_rewards,
+    /// finalization_rewards and payday rewards). As well as validator addresses
+    /// that have been suspended/primed for suspension as part of the
+    /// SpecialTransactionOutcome.
     pub fn affected_addresses(&self) -> Vec<AccountAddress> {
         match self {
             SpecialTransactionOutcome::BakingRewards { baker_rewards, .. } => {
@@ -1118,6 +1129,7 @@ impl BlockItemSummary {
             BlockItemSummaryDetails::AccountTransaction(ad) => ad.is_rejected().is_none(),
             BlockItemSummaryDetails::AccountCreation(_) => true,
             BlockItemSummaryDetails::Update(_) => true,
+            BlockItemSummaryDetails::TokenCreationDetails(_) => true,
         }
     }
 
@@ -1133,6 +1145,7 @@ impl BlockItemSummary {
             BlockItemSummaryDetails::AccountTransaction(ad) => ad.is_rejected(),
             BlockItemSummaryDetails::AccountCreation(_) => None,
             BlockItemSummaryDetails::Update(_) => None,
+            BlockItemSummaryDetails::TokenCreationDetails(_) => None,
         }
     }
 
@@ -1141,6 +1154,7 @@ impl BlockItemSummary {
             BlockItemSummaryDetails::AccountTransaction(at) => Some(at.sender),
             BlockItemSummaryDetails::AccountCreation(_) => None,
             BlockItemSummaryDetails::Update(_) => None,
+            BlockItemSummaryDetails::TokenCreationDetails(_) => None,
         }
     }
 
@@ -1235,6 +1249,8 @@ impl BlockItemSummary {
     }
 
     /// Return the list of addresses affected by the block summary.
+    /// These are addresses that have their CCD balance or plt token balance
+    /// changed as part of the block summary.
     pub fn affected_addresses(&self) -> Vec<AccountAddress> {
         if let BlockItemSummaryDetails::AccountTransaction(at) = &self.details {
             match &at.effects {
@@ -1302,6 +1318,35 @@ impl BlockItemSummary {
                 AccountTransactionEffects::DataRegistered { .. } => vec![at.sender],
                 AccountTransactionEffects::BakerConfigured { .. } => vec![at.sender],
                 AccountTransactionEffects::DelegationConfigured { .. } => vec![at.sender],
+                AccountTransactionEffects::TokenHolder { events }
+                | AccountTransactionEffects::TokenGovernance { events } => {
+                    let mut addresses = BTreeSet::new();
+                    addresses.insert(at.sender);
+
+                    for token_event in events {
+                        match &token_event.event {
+                            TokenEventDetails::Module(_) => {
+                                // An `address` added/removed from an allow/deny
+                                // list is NOT considered affected.
+                            }
+
+                            TokenEventDetails::Transfer(event) => {
+                                let TokenHolder::HolderAccount(from) = &event.from;
+                                addresses.insert(from.address);
+
+                                let TokenHolder::HolderAccount(to) = &event.to;
+                                addresses.insert(to.address);
+                            }
+
+                            TokenEventDetails::Mint(event) | TokenEventDetails::Burn(event) => {
+                                let TokenHolder::HolderAccount(to) = &event.target;
+                                addresses.insert(to.address);
+                            }
+                        }
+                    }
+
+                    addresses.into_iter().collect()
+                }
             }
         } else {
             Vec::new()
@@ -1767,6 +1812,8 @@ pub enum BlockItemSummaryDetails {
     /// The summary is of a chain update, and the outcome is as specified by the
     /// payload.
     Update(UpdateDetails),
+    /// The summary is of a token creation update.
+    TokenCreationDetails(TokenCreationDetails),
 }
 
 #[derive(Debug, Clone)]
@@ -1843,6 +1890,8 @@ impl AccountTransactionEffects {
             AccountTransactionEffects::DataRegistered { .. } => Some(RegisterData),
             AccountTransactionEffects::BakerConfigured { .. } => Some(ConfigureBaker),
             AccountTransactionEffects::DelegationConfigured { .. } => Some(ConfigureDelegation),
+            AccountTransactionEffects::TokenHolder { .. } => Some(TokenHolder),
+            AccountTransactionEffects::TokenGovernance { .. } => Some(TokenGovernance),
         }
     }
 }
@@ -1860,10 +1909,10 @@ pub struct BakerStakeUpdatedData {
     pub increased: bool,
 }
 
-#[derive(Debug, Clone)]
 /// Effects of an account transactions. All variants apart from
 /// [AccountTransactionEffects::None] correspond to a unique transaction that
 /// was successful.
+#[derive(Debug, Clone)]
 pub enum AccountTransactionEffects {
     /// No effects other than payment from this transaction.
     /// The rejection reason indicates why the transaction failed.
@@ -2021,6 +2070,16 @@ pub enum AccountTransactionEffects {
     /// An account configured delegation. The details of what happened are
     /// contained in the list of [delegation events](DelegationEvent).
     DelegationConfigured { data: Vec<DelegationEvent> },
+    /// Effect of a successful token holder transaction.
+    TokenHolder {
+        /// Events produced by the token.
+        events: Vec<protocol_level_tokens::TokenEvent>,
+    },
+    /// Effect of a successful token governance transaction.
+    TokenGovernance {
+        /// Events produced by the token.
+        events: Vec<protocol_level_tokens::TokenEvent>,
+    },
 }
 
 impl AccountTransactionEffects {
@@ -2185,6 +2244,15 @@ pub struct UpdateDetails {
 
 impl UpdateDetails {
     pub fn update_type(&self) -> UpdateType { self.payload.update_type() }
+}
+
+#[derive(Debug, Clone)]
+// Details about the creation of a protocol-level token.
+pub struct TokenCreationDetails {
+    // The update payload used to create the token.
+    pub create_plt: CreatePlt,
+    // The events generated by the token module during the creation of the token.
+    pub events:     Vec<TokenEvent>,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -2758,6 +2826,18 @@ pub enum RejectReason {
     PoolWouldBecomeOverDelegated,
     /// The pool is not open to delegators.
     PoolClosed,
+    /// The provided identifier does not match a token currently on chain.
+    /// Introduced in protocol version 9.
+    NonExistentTokenId {
+        token_id: protocol_level_tokens::TokenId,
+    },
+    /// The token-holder transaction failed.
+    /// Introduced in protocol version 9.
+    TokenModule(protocol_level_tokens::TokenModuleRejectReason),
+    // Account sending the transaction is not authorized for governing the token.
+    UnauthorizedTokenGovernance {
+        token_id: protocol_level_tokens::TokenId,
+    },
 }
 
 /// The network information of a node.

@@ -73,6 +73,7 @@ async fn main() -> anyhow::Result<()> {
                     );
                 }
                 BlockItemSummaryDetails::Update(_) => (),
+                BlockItemSummaryDetails::TokenCreationDetails(_) => (),
             }
         }
     }
