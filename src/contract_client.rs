@@ -1648,10 +1648,10 @@ impl ContractUpdateHandle {
             crate::types::BlockItemSummaryDetails::AccountTransaction(at) => match at.effects {
                 AccountTransactionEffects::ContractUpdateIssued { effects } => {
                     let Some(execution_tree) = crate::types::execution_tree(effects) else {
-                                return mk_error(
-                                    "Expected smart contract update, but received invalid execution tree.",
-                                );
-                            };
+                        return mk_error(
+                            "Expected smart contract update, but received invalid execution tree.",
+                        );
+                    };
                     Ok(ContractUpdateInfo {
                         execution_tree,
                         energy_cost: result.energy_cost,
