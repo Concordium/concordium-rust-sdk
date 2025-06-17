@@ -1573,6 +1573,7 @@ impl TryFrom<AuthorizationsV1> for super::types::AuthorizationsV1 {
             v0:                  value.v0.require()?.try_into()?,
             cooldown_parameters: value.parameter_cooldown.require()?.try_into()?,
             time_parameters:     value.parameter_time.require()?.try_into()?,
+            create_plt:          value.create_plt.map(|x| x.try_into()).transpose()?,
         })
     }
 }

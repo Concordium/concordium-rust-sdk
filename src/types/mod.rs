@@ -993,6 +993,7 @@ pub struct BlockSummaryData<Upd> {
 }
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 /// Summary of transactions, protocol generated transfers, and chain parameters
 /// in a given block.
 pub enum BlockSummary {
