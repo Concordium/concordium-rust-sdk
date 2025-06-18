@@ -3,7 +3,7 @@
 
 use crate::v2::{generated, Require};
 use concordium_base::{
-    common::cbor::CborSerializationError,
+    common::{cbor, cbor::CborSerializationResult},
     protocol_level_tokens::{RawCbor, TokenAmount, TokenId, TokenModuleAccountState},
 };
 
@@ -58,9 +58,9 @@ impl TryFrom<generated::plt::TokenAccountState> for TokenAccountState {
 impl TokenAccountState {
     /// Decode the token module state from CBOR. If the module state is `None`,
     /// it returns a default `TokenModuleAccountState`.
-    pub fn decode_module_state(&self) -> Result<TokenModuleAccountState, CborSerializationError> {
+    pub fn decode_module_state(&self) -> CborSerializationResult<TokenModuleAccountState> {
         match &self.module_state {
-            Some(cbor) => TokenModuleAccountState::try_from_cbor(cbor),
+            Some(cbor) => cbor::cbor_decode(cbor),
             None => Ok(TokenModuleAccountState::default()),
         }
     }
