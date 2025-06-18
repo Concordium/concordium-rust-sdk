@@ -2,6 +2,8 @@
 
 - Remove `member_allow_list` and `member_deny_list` from `TokenAccountState`, replaced with
   CBOR-encoded state.
+- There are no functions `TokenAmount::try_from_rust_decimal` and `TokenAmount::from_str` to help
+  construct token amount values.
 
 ## 7.0.0-alpha.1
 
