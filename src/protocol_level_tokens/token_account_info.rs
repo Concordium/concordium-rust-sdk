@@ -2,7 +2,10 @@
 //! response.
 
 use crate::v2::{generated, Require};
-use concordium_base::protocol_level_tokens::{TokenAmount, TokenId};
+use concordium_base::{
+    common::cbor::CborSerializationError,
+    protocol_level_tokens::{RawCbor, TokenAmount, TokenId, TokenModuleAccountState},
+};
 
 /// State of a protocol level token associated with some account.
 ///
@@ -25,11 +28,9 @@ pub struct AccountToken {
 #[serde(rename_all = "camelCase")]
 pub struct TokenAccountState {
     /// The token balance of the account.
-    pub balance:           TokenAmount,
-    /// Whether the account is a member of the allow list.
-    pub member_allow_list: Option<bool>,
-    /// Whether the account is a member of the deny list.
-    pub member_deny_list:  Option<bool>,
+    pub balance:      TokenAmount,
+    /// The token-module defined state of the account.
+    pub module_state: Option<RawCbor>,
 }
 
 impl TryFrom<generated::account_info::Token> for AccountToken {
@@ -48,9 +49,19 @@ impl TryFrom<generated::plt::TokenAccountState> for TokenAccountState {
 
     fn try_from(value: generated::plt::TokenAccountState) -> Result<Self, Self::Error> {
         Ok(Self {
-            balance:           value.balance.require()?.try_into()?,
-            member_allow_list: value.member_allow_list,
-            member_deny_list:  value.member_deny_list,
+            balance:      value.balance.require()?.try_into()?,
+            module_state: value.module_state.map(RawCbor::from),
         })
+    }
+}
+
+impl TokenAccountState {
+    /// Decode the token module state from CBOR. If the module state is `None`,
+    /// it returns a default `TokenModuleAccountState`.
+    pub fn decode_module_state(&self) -> Result<TokenModuleAccountState, CborSerializationError> {
+        match &self.module_state {
+            Some(cbor) => TokenModuleAccountState::try_from_cbor(cbor),
+            None => Ok(TokenModuleAccountState::default()),
+        }
     }
 }

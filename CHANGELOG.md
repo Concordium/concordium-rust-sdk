@@ -1,4 +1,9 @@
-## Unreleased
+## Unreleased changes
+
+- Remove `member_allow_list` and `member_deny_list` from `TokenAccountState`, replaced with
+  CBOR-encoded state.
+
+## 7.0.0-alpha.1
 
 - Make `member_allow_list` and `member_deny_list` optional on `TokenAccountState` to comply with protobuf definition.
 - Extend `BlockItemSummaryDetails` with `TokenCreationDetails` variant including contained PLT events. `TokenCreationDetails` 
