@@ -1006,15 +1006,15 @@ fn add_token_event_addresses(
             }
 
             TokenEventDetails::Transfer(event) => {
-                let TokenHolder::HolderAccount { address: from } = &event.from;
+                let TokenHolder::Account { address: from } = &event.from;
                 affected_addresses.insert(*from);
 
-                let TokenHolder::HolderAccount { address: to } = &event.to;
+                let TokenHolder::Account { address: to } = &event.to;
                 affected_addresses.insert(*to);
             }
 
             TokenEventDetails::Mint(event) | TokenEventDetails::Burn(event) => {
-                let TokenHolder::HolderAccount { address } = &event.target;
+                let TokenHolder::Account { address } = &event.target;
                 affected_addresses.insert(*address);
             }
         }
