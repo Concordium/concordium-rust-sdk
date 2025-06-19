@@ -141,12 +141,9 @@ impl TryFrom<generated::plt::TokenHolder> for TokenHolder {
     fn try_from(holder: generated::plt::TokenHolder) -> Result<Self, Self::Error> {
         use generated::plt::token_holder::Address as HolderAddress;
         match holder.address.require()? {
-            HolderAddress::Account(account_address) => {
-                Ok(TokenHolder::HolderAccount(HolderAccount {
-                    coin_info: None,
-                    address:   account_address.try_into()?,
-                }))
-            }
+            HolderAddress::Account(account_address) => Ok(TokenHolder::HolderAccount {
+                address: account_address.try_into()?,
+            }),
         }
     }
 }

@@ -943,7 +943,7 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                     hash:         bi.hash,
                     cost:         Amount::zero(),
                     energy_cost:  bi.energy_cost,
-                    summary_type: BlockItemType::Update(UpdateType::CreatePlt),
+                    summary_type: BlockItemType::Update(UpdateType::UpdateCreatePLT),
                     result:       BlockItemResult::Success { events },
                     index:        bi.index,
                 }
