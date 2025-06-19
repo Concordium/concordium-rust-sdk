@@ -52,21 +52,15 @@ pub struct TokenState {
     pub module_state: ::core::option::Option<CBor>,
 }
 /// Token state at the account level
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TokenAccountState {
     /// The available balance.
     #[prost(message, optional, tag = "1")]
     pub balance: ::core::option::Option<TokenAmount>,
-    /// Whether the account is a member of the allow list of the token.
-    /// If present, tokens can be transferred only, if both sender and receiver are
-    /// members of the allow list of the token.
-    #[prost(bool, optional, tag = "2")]
-    pub member_allow_list: ::core::option::Option<bool>,
-    /// Whether the account is a member of the deny list of the token.
-    /// If present, tokens can be transferred only, if neither sender or receiver
-    /// are members of the deny list.
-    #[prost(bool, optional, tag = "3")]
-    pub member_deny_list: ::core::option::Option<bool>,
+    /// Token module specific account state, such as whether the account is on
+    /// the allow or deny list.
+    #[prost(message, optional, tag = "4")]
+    pub module_state: ::core::option::Option<CBor>,
 }
 /// Single token event originating from a token module as part of a token
 /// transaction.
