@@ -3,7 +3,7 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_base::{
     contracts_common::AccountAddress,
-    protocol_level_tokens::{operations, TokenAmount, TokenId},
+    protocol_level_tokens::{operations, ConversionRule, TokenAmount, TokenId},
 };
 use concordium_rust_sdk::{
     common::types::TransactionTime,
@@ -57,10 +57,11 @@ async fn main() -> anyhow::Result<()> {
 
     // Amount of tokens to send. The number of decimals in the TokenAmount
     // must be the same as the number of decimals in the TokenInfo
-    let mut amount = app.amount;
-    amount.rescale(token_info.token_state.decimals as u32);
-    let token_amount =
-        TokenAmount::from_raw(amount.mantissa().try_into()?, amount.scale().try_into()?);
+    let token_amount = TokenAmount::try_from_rust_decimal(
+        app.amount,
+        token_info.token_state.decimals,
+        ConversionRule::AllowRounding,
+    )?;
     println!("Token amount: {}", token_amount,);
 
     // Receiver of the tokens
