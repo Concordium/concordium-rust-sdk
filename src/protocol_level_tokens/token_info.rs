@@ -3,7 +3,7 @@
 
 use crate::v2::{generated, Require};
 use concordium_base::{
-    common::cbor::CborSerializationResult,
+    common::{cbor, cbor::CborSerializationResult},
     contracts_common::AccountAddress,
     protocol_level_tokens::{RawCbor, TokenAmount, TokenId, TokenModuleRef, TokenModuleState},
 };
@@ -43,7 +43,7 @@ pub struct TokenState {
 impl TokenState {
     /// Decode the token module state from CBOR
     pub fn decode_module_state(&self) -> CborSerializationResult<TokenModuleState> {
-        TokenModuleState::try_from_cbor(&self.module_state)
+        cbor::cbor_decode(&self.module_state)
     }
 }
 
