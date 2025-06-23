@@ -872,13 +872,8 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                             .collect();
                         (Some(ty), BlockItemResult::Success { events })
                     }
-                    super::AccountTransactionEffects::TokenHolder { events } => {
-                        let ty = TransactionType::TokenHolder;
-                        let events = token_events_to_events(events);
-                        (Some(ty), BlockItemResult::Success { events })
-                    }
-                    super::AccountTransactionEffects::TokenGovernance { events } => {
-                        let ty = TransactionType::TokenGovernance;
+                    super::AccountTransactionEffects::TokenUpdate { events } => {
+                        let ty = TransactionType::TokenUpdate;
                         let events = token_events_to_events(events);
                         (Some(ty), BlockItemResult::Success { events })
                     }
@@ -1439,7 +1434,7 @@ fn convert_account_transaction(
                 .collect::<Result<_, ConversionError>>()?;
             mk_success(super::AccountTransactionEffects::DelegationConfigured { data })
         }
-        TransactionType::TokenHolder => {
+        TransactionType::TokenUpdate => {
             let events = events
                 .into_iter()
                 .map(|ev| match ev {
@@ -1460,40 +1455,12 @@ fn convert_account_transaction(
                         event: TokenEventDetails::Burn(event),
                     }),
                     other_event => Err(ConversionError::InvalidTransactionResult(format!(
-                        "Didn't expect event `{:?}` in transaction type `TokenHolder`",
+                        "Didn't expect event `{:?}` in transaction type `TokenUpdate`",
                         other_event
                     ))),
                 })
                 .collect::<Result<_, ConversionError>>()?;
-            mk_success(super::AccountTransactionEffects::TokenHolder { events })
-        }
-        TransactionType::TokenGovernance => {
-            let events = events
-                .into_iter()
-                .map(|ev| match ev {
-                    Event::TokenModuleEvent { token_id, event } => Ok(TokenEvent {
-                        token_id,
-                        event: TokenEventDetails::Module(event),
-                    }),
-                    Event::TokenTransfer { token_id, event } => Ok(TokenEvent {
-                        token_id,
-                        event: TokenEventDetails::Transfer(event),
-                    }),
-                    Event::TokenMint { token_id, event } => Ok(TokenEvent {
-                        token_id,
-                        event: TokenEventDetails::Mint(event),
-                    }),
-                    Event::TokenBurn { token_id, event } => Ok(TokenEvent {
-                        token_id,
-                        event: TokenEventDetails::Burn(event),
-                    }),
-                    other_event => Err(ConversionError::InvalidTransactionResult(format!(
-                        "Didn't expect event `{:?}` in transaction type `TokenGovernance`",
-                        other_event
-                    ))),
-                })
-                .collect::<Result<_, ConversionError>>()?;
-            mk_success(super::AccountTransactionEffects::TokenGovernance { events })
+            mk_success(super::AccountTransactionEffects::TokenUpdate { events })
         }
     }
 }

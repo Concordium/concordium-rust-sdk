@@ -1319,8 +1319,7 @@ impl BlockItemSummary {
                 AccountTransactionEffects::DataRegistered { .. } => vec![at.sender],
                 AccountTransactionEffects::BakerConfigured { .. } => vec![at.sender],
                 AccountTransactionEffects::DelegationConfigured { .. } => vec![at.sender],
-                AccountTransactionEffects::TokenHolder { events }
-                | AccountTransactionEffects::TokenGovernance { events } => {
+                AccountTransactionEffects::TokenUpdate { events } => {
                     let mut addresses = BTreeSet::new();
                     addresses.insert(at.sender);
 
@@ -1891,8 +1890,7 @@ impl AccountTransactionEffects {
             AccountTransactionEffects::DataRegistered { .. } => Some(RegisterData),
             AccountTransactionEffects::BakerConfigured { .. } => Some(ConfigureBaker),
             AccountTransactionEffects::DelegationConfigured { .. } => Some(ConfigureDelegation),
-            AccountTransactionEffects::TokenHolder { .. } => Some(TokenHolder),
-            AccountTransactionEffects::TokenGovernance { .. } => Some(TokenGovernance),
+            AccountTransactionEffects::TokenUpdate { .. } => Some(TokenUpdate),
         }
     }
 }
@@ -2071,14 +2069,9 @@ pub enum AccountTransactionEffects {
     /// An account configured delegation. The details of what happened are
     /// contained in the list of [delegation events](DelegationEvent).
     DelegationConfigured { data: Vec<DelegationEvent> },
-    /// Effect of a successful token holder transaction.
-    TokenHolder {
-        /// Events produced by the token.
-        events: Vec<protocol_level_tokens::TokenEvent>,
-    },
-    /// Effect of a successful token governance transaction.
-    TokenGovernance {
-        /// Events produced by the token.
+    /// Effect of a successful token update.
+    TokenUpdate {
+        /// Events produced by the update.
         events: Vec<protocol_level_tokens::TokenEvent>,
     },
 }

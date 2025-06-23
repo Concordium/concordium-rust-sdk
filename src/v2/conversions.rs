@@ -1455,7 +1455,6 @@ impl TryFrom<super::generated::plt::CreatePlt> for concordium_base::updates::Cre
         Ok(Self {
             token_id:                  value.token_id.require()?.try_into()?,
             token_module:              value.token_module.require()?.try_into()?,
-            governance_account:        value.governance_account.require()?.try_into()?,
             decimals:                  value.decimals.try_into().map_err(|_| {
                 tonic::Status::internal("Unexpected integer size for token decimals.")
             })?,
@@ -1823,17 +1822,8 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                         .collect::<Result<_, tonic::Status>>()?,
                 })
             }
-            account_transaction_effects::Effect::TokenHolderEffect(token_effect) => {
-                Ok(Self::TokenHolder {
-                    events: token_effect
-                        .events
-                        .into_iter()
-                        .map(TryInto::try_into)
-                        .collect::<Result<_, tonic::Status>>()?,
-                })
-            }
-            account_transaction_effects::Effect::TokenGovernanceEffect(token_effect) => {
-                Ok(Self::TokenGovernance {
+            account_transaction_effects::Effect::TokenUpdateEffect(token_effect) => {
+                Ok(Self::TokenUpdate {
                     events: token_effect
                         .events
                         .into_iter()
@@ -2276,16 +2266,8 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
             reject_reason::Reason::NonExistentTokenId(token_id) => Self::NonExistentTokenId {
                 token_id: token_id.try_into()?,
             },
-            reject_reason::Reason::TokenHolderTransactionFailed(token_module_reject_reason) => {
+            reject_reason::Reason::TokenUpdateTransactionFailed(token_module_reject_reason) => {
                 Self::TokenModule(token_module_reject_reason.try_into()?)
-            }
-            reject_reason::Reason::TokenGovernanceTransactionFailed(token_module_reject_reason) => {
-                Self::TokenModule(token_module_reject_reason.try_into()?)
-            }
-            reject_reason::Reason::UnauthorizedTokenGovernance(token_id) => {
-                Self::UnauthorizedTokenGovernance {
-                    token_id: token_id.try_into()?,
-                }
             }
         })
     }

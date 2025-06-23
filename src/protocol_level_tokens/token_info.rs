@@ -4,7 +4,6 @@
 use crate::v2::{generated, Require};
 use concordium_base::{
     common::{cbor, cbor::CborSerializationResult},
-    contracts_common::AccountAddress,
     protocol_level_tokens::{RawCbor, TokenAmount, TokenId, TokenModuleRef, TokenModuleState},
 };
 
@@ -28,9 +27,6 @@ pub struct TokenInfo {
 pub struct TokenState {
     /// The reference of the module implementing this token.
     pub token_module_ref: TokenModuleRef,
-    /// Account address of the issuer. The issuer is the holder of the nominated
-    /// account which can perform token-governance operations.
-    pub issuer:           AccountAddress,
     /// Number of decimals in the decimal number representation of amounts.
     pub decimals:         u8,
     /// The total available token supply.
@@ -64,7 +60,6 @@ impl TryFrom<generated::plt::TokenState> for TokenState {
     fn try_from(value: generated::plt::TokenState) -> Result<Self, Self::Error> {
         Ok(Self {
             token_module_ref: value.token_module_ref.require()?.try_into()?,
-            issuer:           value.issuer.require()?.try_into()?,
             decimals:         value
                 .decimals
                 .try_into()
