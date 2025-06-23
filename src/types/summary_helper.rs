@@ -431,6 +431,29 @@ pub(crate) enum Event {
     },
 }
 
+impl From<TokenEvent> for Event {
+    fn from(e: TokenEvent) -> Self {
+        match e.event {
+            TokenEventDetails::Module(token_module_event) => Event::TokenModuleEvent {
+                token_id: e.token_id,
+                event:    token_module_event,
+            },
+            TokenEventDetails::Transfer(token_transfer_event) => Event::TokenTransfer {
+                token_id: e.token_id,
+                event:    token_transfer_event,
+            },
+            TokenEventDetails::Mint(token_supply_update_event) => Event::TokenMint {
+                token_id: e.token_id,
+                event:    token_supply_update_event,
+            },
+            TokenEventDetails::Burn(token_supply_update_event) => Event::TokenBurn {
+                token_id: e.token_id,
+                event:    token_supply_update_event,
+            },
+        }
+    }
+}
+
 impl From<super::ContractTraceElement> for Event {
     fn from(e: super::ContractTraceElement) -> Self {
         match e {
@@ -473,32 +496,6 @@ impl TryFrom<Event> for super::ContractTraceElement {
             ))),
         }
     }
-}
-
-/// Helper function to convert a vector of `TokenEvent` into the a vector of
-/// `Event` types.
-fn token_events_to_events(events: Vec<TokenEvent>) -> Vec<Event> {
-    events
-        .into_iter()
-        .map(|ev| match ev.event {
-            TokenEventDetails::Module(token_module_event) => Event::TokenModuleEvent {
-                token_id: ev.token_id,
-                event:    token_module_event,
-            },
-            TokenEventDetails::Transfer(token_transfer_event) => Event::TokenTransfer {
-                token_id: ev.token_id,
-                event:    token_transfer_event,
-            },
-            TokenEventDetails::Mint(token_supply_update_event) => Event::TokenMint {
-                token_id: ev.token_id,
-                event:    token_supply_update_event,
-            },
-            TokenEventDetails::Burn(token_supply_update_event) => Event::TokenBurn {
-                token_id: ev.token_id,
-                event:    token_supply_update_event,
-            },
-        })
-        .collect()
 }
 
 impl From<super::BlockItemSummary> for BlockItemSummary {
@@ -874,12 +871,12 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                     }
                     super::AccountTransactionEffects::TokenHolder { events } => {
                         let ty = TransactionType::TokenHolder;
-                        let events = token_events_to_events(events);
+                        let events: Vec<Event> = events.into_iter().map(|x| x.into()).collect();
                         (Some(ty), BlockItemResult::Success { events })
                     }
                     super::AccountTransactionEffects::TokenGovernance { events } => {
                         let ty = TransactionType::TokenGovernance;
-                        let events = token_events_to_events(events);
+                        let events: Vec<Event> = events.into_iter().map(|x| x.into()).collect();
                         (Some(ty), BlockItemResult::Success { events })
                     }
                 };
@@ -935,7 +932,11 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                 let mut events = vec![Event::TokenCreated {
                     payload: token_creation_details.create_plt,
                 }];
-                let additional_events = token_events_to_events(token_creation_details.events);
+                let additional_events: Vec<Event> = token_creation_details
+                    .events
+                    .into_iter()
+                    .map(|x| x.into())
+                    .collect();
                 events.extend(additional_events);
 
                 BlockItemSummary {
@@ -943,7 +944,7 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                     hash:         bi.hash,
                     cost:         Amount::zero(),
                     energy_cost:  bi.energy_cost,
-                    summary_type: BlockItemType::Update(UpdateType::CreatePlt),
+                    summary_type: BlockItemType::Update(UpdateType::UpdateCreatePLT),
                     result:       BlockItemResult::Success { events },
                     index:        bi.index,
                 }
@@ -1575,8 +1576,9 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
                                 })
                             }
                             Event::TokenCreated { payload } => Ok(super::UpdateDetails {
-                                // `Effective_time is always 0 for plt token creation transactions.
-                                // Plt token creation transaction are not queued and instead take
+                                // `Effective_time` is always 0 for plt token creation
+                                // transactions. Plt token creation
+                                // transactions are not queued and instead take
                                 // effect immediately.
                                 effective_time: TransactionTime { seconds: 0 },
                                 payload:        UpdatePayload::CreatePlt(payload.clone()),
