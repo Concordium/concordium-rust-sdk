@@ -85,7 +85,7 @@ async fn main() -> anyhow::Result<()> {
     let operation = operations::transfer_tokens(receiver_address, token_amount);
 
     // Compose operation to transaction
-    let txn = send::token_holder_operations(
+    let txn = send::token_update_operations(
         &keys,
         keys.address,
         nonce,
