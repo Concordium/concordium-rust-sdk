@@ -2273,19 +2273,17 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
                 Self::PoolWouldBecomeOverDelegated
             }
             reject_reason::Reason::PoolClosed(_) => Self::PoolClosed,
-            reject_reason::Reason::NonExistentTokenId(token_id) => Self::NonExistentTokenId {
-                token_id: token_id.try_into()?,
-            },
+            reject_reason::Reason::NonExistentTokenId(token_id) => {
+                Self::NonExistentTokenId(token_id.try_into()?)
+            }
             reject_reason::Reason::TokenHolderTransactionFailed(token_module_reject_reason) => {
-                Self::TokenModule(token_module_reject_reason.try_into()?)
+                Self::TokenHolderTransactionFailed(token_module_reject_reason.try_into()?)
             }
             reject_reason::Reason::TokenGovernanceTransactionFailed(token_module_reject_reason) => {
-                Self::TokenModule(token_module_reject_reason.try_into()?)
+                Self::TokenGovernanceTransactionFailed(token_module_reject_reason.try_into()?)
             }
             reject_reason::Reason::UnauthorizedTokenGovernance(token_id) => {
-                Self::UnauthorizedTokenGovernance {
-                    token_id: token_id.try_into()?,
-                }
+                Self::UnauthorizedTokenGovernance(token_id.try_into()?)
             }
         })
     }
