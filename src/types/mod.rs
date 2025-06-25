@@ -2676,7 +2676,7 @@ pub type Updates<CPV> =
     UpdatesSkeleton<UpdateKeysCollection<CPV>, ChainParameters<CPV>, PendingUpdates<CPV>>;
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(tag = "tag")]
+#[serde(tag = "tag", content = "contents")]
 /// A reason for why a transaction was rejected. Rejected means included in a
 /// block, but the desired action was not achieved. The only effect of a
 /// rejected transaction is payment.
@@ -2691,7 +2691,9 @@ pub enum RejectReason {
         contents: smart_contracts::ModuleReference,
     },
     /// Account does not exist.
-    InvalidAccountReference { contents: AccountAddress },
+    InvalidAccountReference {
+        contents: AccountAddress,
+    },
     /// Reference to a non-existing contract init method.
     InvalidInitMethod {
         contents: (
@@ -2711,21 +2713,27 @@ pub enum RejectReason {
         contents: smart_contracts::ModuleReference,
     },
     /// Contract instance does not exist.
-    InvalidContractAddress { contents: ContractAddress },
+    InvalidContractAddress {
+        contents: ContractAddress,
+    },
     /// Runtime exception occurred when running either the init or receive
     /// method.
     RuntimeFailure,
     /// When one wishes to transfer an amount from A to B but there
     /// are not enough funds on account/contract A to make this
     /// possible. The data are the from address and the amount to transfer.
-    AmountTooLarge { contents: (Address, Amount) },
+    AmountTooLarge {
+        contents: (Address, Amount),
+    },
     /// Serialization of the body failed.
     SerializationFailure,
     /// We ran of out energy to process this transaction.
     OutOfEnergy,
     /// Rejected due to contract logic in init function of a contract.
     #[serde(rename_all = "camelCase")]
-    RejectedInit { reject_reason: i32 },
+    RejectedInit {
+        reject_reason: i32,
+    },
     #[serde(rename_all = "camelCase")]
     RejectedReceive {
         reject_reason:    i32,
@@ -2736,9 +2744,13 @@ pub enum RejectReason {
     /// Proof that the baker owns relevant private keys is not valid.
     InvalidProof,
     /// Tried to add baker for an account that already has a baker
-    AlreadyABaker { contents: BakerId },
+    AlreadyABaker {
+        contents: BakerId,
+    },
     /// Tried to remove a baker for an account that has no baker
-    NotABaker { contents: AccountAddress },
+    NotABaker {
+        contents: AccountAddress,
+    },
     /// The amount on the account was insufficient to cover the proposed stake
     InsufficientBalanceForBakerStake,
     /// The amount provided is under the threshold required for becoming a baker
@@ -2766,7 +2778,9 @@ pub enum RejectReason {
     InvalidTransferToPublicProof,
     /// Account tried to transfer an encrypted amount to itself, that's not
     /// allowed.
-    EncryptedAmountSelfTransfer { contents: AccountAddress },
+    EncryptedAmountSelfTransfer {
+        contents: AccountAddress,
+    },
     /// The provided index is below the start index or above `startIndex +
     /// length incomingAmounts`
     InvalidIndexOnEncryptedTransfer,
@@ -2778,7 +2792,9 @@ pub enum RejectReason {
     /// expired
     FirstScheduledReleaseExpired,
     /// Account tried to transfer with schedule to itself, that's not allowed.
-    ScheduledSelfTransfer { contents: AccountAddress },
+    ScheduledSelfTransfer {
+        contents: AccountAddress,
+    },
     /// At least one of the credentials was either malformed or its proof was
     /// incorrect.
     InvalidCredentials,
@@ -2845,16 +2861,15 @@ pub enum RejectReason {
     PoolClosed,
     /// The provided identifier does not match a token currently on chain.
     /// Introduced in protocol version 9.
-    NonExistentTokenId {
-        token_id: protocol_level_tokens::TokenId,
-    },
+    NonExistentTokenId(protocol_level_tokens::TokenId),
     /// The token-holder transaction failed.
     /// Introduced in protocol version 9.
-    TokenModule(protocol_level_tokens::TokenModuleRejectReason),
+    TokenHolderTransactionFailed(protocol_level_tokens::TokenModuleRejectReason),
+    /// The token-governance transaction failed.
+    /// Introduced in protocol version 9.
+    TokenGovernanceTransactionFailed(protocol_level_tokens::TokenModuleRejectReason),
     // Account sending the transaction is not authorized for governing the token.
-    UnauthorizedTokenGovernance {
-        token_id: protocol_level_tokens::TokenId,
-    },
+    UnauthorizedTokenGovernance(protocol_level_tokens::TokenId),
 }
 
 /// The network information of a node.
