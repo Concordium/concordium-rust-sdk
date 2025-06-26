@@ -2267,7 +2267,7 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
                 token_id: token_id.try_into()?,
             },
             reject_reason::Reason::TokenUpdateTransactionFailed(token_module_reject_reason) => {
-                Self::TokenModule(token_module_reject_reason.try_into()?)
+                Self::TokenUpdateTransactionFailed(token_module_reject_reason.try_into()?)
             }
         })
     }

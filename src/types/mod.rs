@@ -2843,11 +2843,7 @@ pub enum RejectReason {
     },
     /// The token-holder transaction failed.
     /// Introduced in protocol version 9.
-    TokenModule(protocol_level_tokens::TokenModuleRejectReason),
-    // Account sending the transaction is not authorized for governing the token.
-    UnauthorizedTokenGovernance {
-        token_id: protocol_level_tokens::TokenId,
-    },
+    TokenUpdateTransactionFailed(protocol_level_tokens::TokenModuleRejectReason),
 }
 
 /// The network information of a node.
