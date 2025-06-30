@@ -37,10 +37,6 @@ pub struct TokenState {
     /// The reference of the module implementing this token.
     #[prost(message, optional, tag = "1")]
     pub token_module_ref: ::core::option::Option<TokenModuleRef>,
-    /// Account address of the issuer. The issuer is the holder of the nominated
-    /// account which can perform token-governance operations.
-    #[prost(message, optional, tag = "2")]
-    pub issuer: ::core::option::Option<super::AccountAddress>,
     /// Number of decimals in the decimal number representation of amounts.
     #[prost(uint32, tag = "3")]
     pub decimals: u32,
@@ -179,9 +175,6 @@ pub struct CreatePlt {
     /// The hash that identifies the token module implementation.
     #[prost(message, optional, tag = "2")]
     pub token_module: ::core::option::Option<TokenModuleRef>,
-    /// The address of the account that will govern the token.
-    #[prost(message, optional, tag = "3")]
-    pub governance_account: ::core::option::Option<super::AccountAddress>,
     /// The number of decimal places used in the representation of amounts of this
     /// token. This determines the smallest representable fraction of the token.
     /// This can be at most 255.
