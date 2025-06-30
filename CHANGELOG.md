@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+## 7.0.0-alpha.2
+
 - Remove `member_allow_list` and `member_deny_list` from `TokenAccountState`, replaced with
   CBOR-encoded state.
 - Add functions `TokenAmount::try_from_rust_decimal` and `TokenAmount::from_str` to help
