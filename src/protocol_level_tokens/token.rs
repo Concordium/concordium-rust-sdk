@@ -292,7 +292,7 @@ impl Token {
 
         let operations = amounts
             .into_iter()
-            .map(|amount| operations::mint_tokens(amount))
+            .map(operations::mint_tokens)
             .collect();
 
         let transaction = send::token_update_operations(
@@ -367,7 +367,7 @@ impl Token {
 
         let operations = amounts
             .into_iter()
-            .map(|amount| operations::burn_tokens(amount))
+            .map(operations::burn_tokens)
             .collect();
         let transaction = send::token_update_operations(
             &signer,
@@ -416,7 +416,7 @@ impl Token {
 
         let operations = targets
             .into_iter()
-            .map(|target| operations::add_token_allow_list(target))
+            .map(operations::add_token_allow_list)
             .collect();
 
         let transaction = send::token_update_operations(
@@ -466,7 +466,7 @@ impl Token {
 
         let operations = targets
             .into_iter()
-            .map(|target| operations::remove_token_allow_list(target))
+            .map(operations::remove_token_allow_list)
             .collect();
 
         let transaction = send::token_update_operations(
@@ -516,7 +516,7 @@ impl Token {
 
         let operations = targets
             .into_iter()
-            .map(|target| operations::add_token_deny_list(target))
+            .map(operations::add_token_deny_list)
             .collect();
 
         let transaction = send::token_update_operations(
@@ -566,7 +566,7 @@ impl Token {
 
         let operations = targets
             .into_iter()
-            .map(|target| operations::remove_token_deny_list(target))
+            .map(operations::remove_token_deny_list)
             .collect();
 
         let transaction = send::token_update_operations(
@@ -662,8 +662,8 @@ impl Token {
 
         // Check if token has no allow and deny lists
         let module_state = self.info.token_state.decode_module_state()?;
-        if !module_state.allow_list.is_none_or(|val| !val)
-            && !module_state.deny_list.is_none_or(|val| !val)
+        if module_state.allow_list.is_none_or(|val| !val)
+            && module_state.deny_list.is_none_or(|val| !val)
         {
             return Ok(());
         }
@@ -699,12 +699,19 @@ impl Token {
                 None => return Err(TokenError::NotAllowed),
             };
 
-            let module_state = token_state.decode_module_state()?;
-            if module_state.allow_list.is_some_and(|val| !val)
+            let account_module_state = token_state.decode_module_state()?;
+            if module_state.deny_list.is_some_and(|val| val)
                 || module_state.deny_list.is_some_and(|val| val)
             {
                 return Err(TokenError::NotAllowed);
             }
+
+            if module_state.allow_list.is_some_and(|val| val)
+                && !account_module_state.allow_list.is_some_and(|val| val)
+            {
+                return Err(TokenError::NotAllowed);
+            }
+
         }
         Ok(())
     }
