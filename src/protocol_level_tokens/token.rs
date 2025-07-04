@@ -290,10 +290,7 @@ impl Token {
             .await?
             .nonce;
 
-        let operations = amounts
-            .into_iter()
-            .map(operations::mint_tokens)
-            .collect();
+        let operations = amounts.into_iter().map(operations::mint_tokens).collect();
 
         let transaction = send::token_update_operations(
             &signer,
@@ -365,10 +362,7 @@ impl Token {
             .await?
             .nonce;
 
-        let operations = amounts
-            .into_iter()
-            .map(operations::burn_tokens)
-            .collect();
+        let operations = amounts.into_iter().map(operations::burn_tokens).collect();
         let transaction = send::token_update_operations(
             &signer,
             signer.address,
@@ -711,7 +705,6 @@ impl Token {
             {
                 return Err(TokenError::NotAllowed);
             }
-
         }
         Ok(())
     }
