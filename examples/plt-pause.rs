@@ -63,8 +63,8 @@ async fn main() -> anyhow::Result<()> {
 
     // Create pause/unpause operation
     let operation = match app.cmd {
-        Status::Pause => operations::pause(true),
-        Status::Unpause => operations::pause(false),
+        Status::Pause => operations::pause(),
+        Status::Unpause => operations::unpause(),
     };
 
     // Compose operation to transaction
