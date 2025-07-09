@@ -21,9 +21,12 @@ struct App {
         default_value = "http://localhost:20000"
     )]
     endpoint: v2::Endpoint,
-    #[structopt(long = "account", help = "Account keys of the governance account.")]
+    #[structopt(
+        long = "account",
+        help = "Path to the account keys file of the governance account."
+    )]
     account:  PathBuf,
-    #[structopt(long = "token", help = "Token to mint or burn.")]
+    #[structopt(long = "token", help = "Token to pause or unpause.")]
     token_id: String,
     #[structopt(subcommand)]
     cmd:      Status,
@@ -44,7 +47,7 @@ async fn main() -> anyhow::Result<()> {
     };
     let mut client = v2::Client::new(app.endpoint).await?;
 
-    // Token id of the fungible PLT token to mint/burn
+    // Token id of the fungible PLT token to pause/unpause
     let token_id = TokenId::try_from(app.token_id.clone())?;
 
     // Load account keys and sender address from a file
