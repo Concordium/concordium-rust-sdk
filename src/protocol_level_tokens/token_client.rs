@@ -203,7 +203,6 @@ impl TokenClient {
                 self.validate_governance_operation(signer.address)?;
             }
         }
-        // git commit -m 'Added validation and docs'
         let operations = [operations::pause(false)].into_iter().collect();
         self.sign_and_send(signer, operations, expiry, nonce).await
     }
