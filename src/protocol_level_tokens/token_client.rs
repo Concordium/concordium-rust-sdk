@@ -144,6 +144,28 @@ impl TokenClient {
         })
     }
 
+    pub async fn pause(
+        &mut self,
+        signer: &WalletAccount,
+        meta: Option<TransactionMetadata>,
+    ) -> TokenResult<TransactionHash> {
+        let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
+
+        let operations = [operations::pause(true)].into_iter().collect();
+        self.sign_and_send(signer, operations, expiry, nonce).await
+    }
+
+    pub async fn unpause(
+        &mut self,
+        signer: &WalletAccount,
+        meta: Option<TransactionMetadata>,
+    ) -> TokenResult<TransactionHash> {
+        let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
+
+        let operations = [operations::pause(false)].into_iter().collect();
+        self.sign_and_send(signer, operations, expiry, nonce).await
+    }
+
     /// Transfers [`TokenAmount`]s from the sender to the specified recipients.
     ///
     /// # Arguments
