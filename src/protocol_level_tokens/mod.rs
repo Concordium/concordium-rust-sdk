@@ -4,6 +4,7 @@ use crate::v2::{generated, Require};
 use concordium_base::protocol_level_tokens;
 
 mod token_account_info;
+pub mod token_client;
 mod token_info;
 
 pub use protocol_level_tokens::*;

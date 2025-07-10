@@ -36,7 +36,7 @@ use concordium_base::{
             AccountAddress, AccountCredentialWithoutProofs, AccountKeys, CredentialPublicKeys,
         },
     },
-    protocol_level_tokens::{TokenEvent, TokenEventDetails, TokenHolder},
+    protocol_level_tokens::{TokenAmount, TokenEvent, TokenEventDetails, TokenHolder, TokenId},
     smart_contracts::{
         ContractEvent, ModuleReference, OwnedParameter, OwnedReceiveName, WasmVersion,
     },
@@ -394,6 +394,17 @@ pub struct AccountInfo {
     pub available_balance: Amount,
     /// The protocol level tokens (PLT) held by the account.
     pub tokens:            Vec<protocol_level_tokens::AccountToken>,
+}
+
+impl AccountInfo {
+    /// Helper method for retrieving the [`TokenAmount`] of specific [`TokenId`]
+    /// held by the account.
+    pub fn token_amount(&self, token_id: &TokenId) -> Option<TokenAmount> {
+        self.tokens
+            .iter()
+            .find(|at| at.token_id == *token_id)
+            .map(|at| at.state.balance.to_owned())
+    }
 }
 
 impl From<&AccountInfo> for AccountAccessStructure {
