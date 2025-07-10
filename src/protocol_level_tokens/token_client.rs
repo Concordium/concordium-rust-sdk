@@ -7,9 +7,7 @@ use concordium_base::{
     common::{cbor::CborSerializationError, types::TransactionTime},
     contracts_common::AccountAddress,
     hashes::TransactionHash,
-    protocol_level_tokens::{
-        operations, TokenAmount, TokenId, TokenOperations,
-    },
+    protocol_level_tokens::{operations, TokenAmount, TokenId, TokenOperations},
     transactions::{send, BlockItem},
 };
 use thiserror::Error;
@@ -638,16 +636,5 @@ impl TokenClient {
         )?;
         let block_item = BlockItem::AccountTransaction(transaction);
         Ok(self.client.send_block_item(&block_item).await?)
-    }
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn check_account_validation() {
-
     }
 }
