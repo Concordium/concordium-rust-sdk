@@ -154,7 +154,7 @@ impl TokenClient {
     /// * `meta` - The optional transaction metadata. Inclides optional
     ///   expiration, nonce, and validation. Check [Self::validate_transfer] for
     ///   the list of validations.
-    pub async fn transfer_token_amount(
+    pub async fn transfer(
         &mut self,
         signer: &WalletAccount,
         payload: Vec<TransferTokens>,
@@ -595,10 +595,6 @@ impl TokenClient {
         self.sign_and_send(signer, operations, expiry, nonce).await
     }
 
-    pub async fn send_raw(&mut self, _operations: RawCbor) -> TokenResult<TransactionHash> {
-        todo!()
-    }
-
     /// Helper method containing the common logic related to signing and sending
     /// PLT operations.
     ///
@@ -640,5 +636,16 @@ impl TokenClient {
         )?;
         let block_item = BlockItem::AccountTransaction(transaction);
         Ok(self.client.send_block_item(&block_item).await?)
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_account_validation() {
+
     }
 }
