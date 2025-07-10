@@ -1,17 +1,19 @@
-//! my super cool module level documentation
+//! Higher-level representation and a convinience wrapper for interactions with
+//! Protocol Level Tokens (PLT). Contains [`TokenClient`] that implements PLT
+//! operations as its methods. Provides limited flexibility.
 
 use concordium_base::{
     base::Nonce,
     common::{cbor::CborSerializationError, types::TransactionTime},
     contracts_common::AccountAddress,
     hashes::TransactionHash,
-    protocol_level_tokens::{operations, TokenAmount, TokenId, TokenOperations, TokenTransfer},
+    protocol_level_tokens::{operations, RawCbor, TokenAmount, TokenId, TokenOperations},
     transactions::{send, BlockItem},
 };
 use thiserror::Error;
 
 use crate::{
-    protocol_level_tokens::{CborTokenHolder, TokenInfo},
+    protocol_level_tokens::{CborMemo, CborTokenHolder, TokenInfo},
     types::{AccountInfo, WalletAccount},
     v2::{AccountIdentifier, BlockIdentifier, Client, IntoBlockIdentifier, QueryError, RPCError},
 };
@@ -21,7 +23,7 @@ use crate::{
 ///
 /// Note that cloning is cheap and is, therefore, the intended way of sharing
 /// this type between multiple tasks.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TokenClient {
     /// an actual gRPC client used for fetching data.
     client:         Client,
@@ -44,14 +46,15 @@ pub struct TransactionMetadata {
     validate: Option<bool>,
 }
 
-// TODO: get rid of this.
-/// Enum used to represent account info source, who's balance needs to be found.
-#[derive(derive_more::From)]
-pub enum Account {
-    /// An actual type used to find the account balance.
-    Info(AccountInfo),
-    /// Account identifier used to fetch the account info.
-    Address(AccountIdentifier),
+/// Higher-level representation of the PLT transfer
+#[derive(Debug, Clone)]
+pub struct Transfer {
+    /// The amount of tokens to transfer.
+    pub amount:    TokenAmount,
+    /// The recipient account.
+    pub recipient: AccountAddress,
+    /// An optional memo.
+    pub memo:      Option<CborMemo>,
 }
 
 /// Result of a Token operation.
@@ -94,8 +97,8 @@ pub enum TokenError {
     /// match with the client's token ID.
     #[error("Invalid token ID in the provided payload.")]
     InvalidTokenId,
-    /// Error that indicates there is insufficient total token supply to burn
-    /// the total amount in the payload.
+    /// Error that indicates insufficient token supply to burn the total amount
+    /// in the payload.
     #[error("Total token amount in the payload exceeds total token supply.")]
     InsufficientSupply,
 }
@@ -142,7 +145,7 @@ impl TokenClient {
         })
     }
 
-    /// Transfers tokens from the sender to the specified recipients.
+    /// Transfers [`TokenAmount`]s from the sender to the specified recipients.
     ///
     /// # Arguments
     ///
@@ -152,10 +155,10 @@ impl TokenClient {
     /// * `meta` - The optional transaction metadata. Inclides optional
     ///   expiration, nonce, and validation. Check [Self::validate_transfer] for
     ///   the list of validations.
-    pub async fn transfer(
+    pub async fn transfer_token_amount(
         &mut self,
         signer: &WalletAccount,
-        payload: Vec<TokenTransfer>,
+        payload: Vec<Transfer>,
         meta: Option<TransactionMetadata>,
     ) -> TokenResult<TransactionHash> {
         let TransactionMetadata {
@@ -174,12 +177,10 @@ impl TokenClient {
         let operations: TokenOperations = payload
             .into_iter()
             .map(|tr| {
-                let CborTokenHolder::Account(receiver) = tr.recipient;
+                let receiver = tr.recipient;
                 match tr.memo {
-                    Some(memo) => {
-                        operations::transfer_tokens_with_memo(receiver.address, tr.amount, memo)
-                    }
-                    None => operations::transfer_tokens(receiver.address, tr.amount),
+                    Some(memo) => operations::transfer_tokens_with_memo(receiver, tr.amount, memo),
+                    None => operations::transfer_tokens(receiver, tr.amount),
                 }
             })
             .collect();
@@ -270,7 +271,12 @@ impl TokenClient {
                         .ok_or(TokenError::InvalidTokenAmount)?,
                     self.info.token_state.decimals,
                 );
-                if self.info.token_state.total_supply.value() < payload_total.value() {
+                let governer_token_amount = self
+                    .balance_of(&signer.address.into(), None::<BlockIdentifier>)
+                    .await?
+                    .ok_or(TokenError::InsufficientSupply)?;
+
+                if governer_token_amount.value() < payload_total.value() {
                     return Err(TokenError::InsufficientSupply);
                 }
             }
@@ -436,20 +442,16 @@ impl TokenClient {
     ///   [`None`].
     pub async fn balance_of(
         &mut self,
-        acc: &Account,
+        acc: &AccountIdentifier,
         bi: Option<impl IntoBlockIdentifier>,
     ) -> TokenResult<Option<TokenAmount>> {
-        let info = match acc {
-            Account::Info(info) => info,
-            Account::Address(identifier) => {
-                let bi = match bi {
-                    Some(bi) => bi.into_block_identifier(),
-                    None => BlockIdentifier::LastFinal,
-                };
-                &self.client.get_account_info(identifier, bi).await?.response
-            }
+        let bi = match bi {
+            Some(bi) => bi.into_block_identifier(),
+            None => BlockIdentifier::LastFinal,
         };
-        Ok(self.ballance_from_account_info(info))
+
+        let info = &self.client.get_account_info(acc, bi).await?.response;
+        Ok(info.token_amount(&self.info.token_id))
     }
 
     /// Helper method for retrieving the balance of [Token] held by an account .
@@ -479,7 +481,7 @@ impl TokenClient {
     pub async fn validate_transfer(
         &mut self,
         sender: AccountAddress,
-        payload: Vec<TokenTransfer>,
+        payload: Vec<Transfer>,
     ) -> TokenResult<()> {
         let decimals = self.info.token_state.decimals;
 
@@ -527,11 +529,11 @@ impl TokenClient {
         accounts.push(sender_info);
 
         let futures = payload.into_iter().map(|transfer| {
-            let CborTokenHolder::Account(holder) = transfer.recipient;
+            let holder = transfer.recipient;
             let mut client = self.client.clone();
             async move {
                 client
-                    .get_account_info(&holder.address.into(), BlockIdentifier::LastFinal)
+                    .get_account_info(&holder.into(), BlockIdentifier::LastFinal)
                     .await
             }
         });
@@ -554,14 +556,14 @@ impl TokenClient {
             };
 
             let account_module_state = token_state.decode_module_state()?;
-            if module_state.deny_list.is_some_and(|val| val)
-                && account_module_state.deny_list.is_some_and(|val| val)
+            if module_state.deny_list.unwrap_or_default()
+                && account_module_state.deny_list.unwrap_or_default()
             {
                 return Err(TokenError::NotAllowed);
             }
 
-            if module_state.allow_list.is_some_and(|val| val)
-                && !account_module_state.allow_list.is_some_and(|val| val)
+            if module_state.allow_list.unwrap_or_default()
+                && !account_module_state.allow_list.unwrap_or_default()
             {
                 return Err(TokenError::NotAllowed);
             }
@@ -607,6 +609,10 @@ impl TokenClient {
     ) -> TokenResult<TransactionHash> {
         let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
         self.sign_and_send(signer, operations, expiry, nonce).await
+    }
+
+    pub async fn send_raw(&mut self, _operations: RawCbor) -> TokenResult<TransactionHash> {
+        todo!()
     }
 
     /// Helper method containing the common logic related to signing and sending
