@@ -100,6 +100,8 @@ pub enum TokenError {
     /// burn the total amount in the payload.
     #[error("Total token amount in the payload exceeds governance account balance.")]
     InsufficientSupply,
+    #[error("The token is paused")]
+    Paused,
 }
 
 impl TokenClient {
@@ -144,24 +146,64 @@ impl TokenClient {
         })
     }
 
+    /// Suspends execution of any operation involving balance changes for the
+    /// token.
+    ///
+    /// # Arguments
+    ///
+    /// * `signer` - A [`WalletAccount`] who's address is used as a sender and
+    ///   keys as a signer.
+    /// * `meta` - The optional transaction metadata. Inclides optional
+    ///   expiration, nonce, and validation.
     pub async fn pause(
         &mut self,
         signer: &WalletAccount,
         meta: Option<TransactionMetadata>,
     ) -> TokenResult<TransactionHash> {
-        let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
+        let TransactionMetadata {
+            expiry,
+            nonce,
+            validate,
+        } = meta.unwrap_or_default();
+
+        if let Some(validate) = validate {
+            if validate {
+                // check if the signer is authorized to pause token supply change operations.
+                self.validate_governance_operation(signer.address)?;
+            }
+        }
 
         let operations = [operations::pause(true)].into_iter().collect();
         self.sign_and_send(signer, operations, expiry, nonce).await
     }
 
+    /// Resumes execution of any operation involving balance changes for the
+    /// token.
+    ///
+    /// # Arguments
+    ///
+    /// * `signer` - A [`WalletAccount`] who's address is used as a sender and
+    ///   keys as a signer.
+    /// * `meta` - The optional transaction metadata. Inclides optional
+    ///   expiration, nonce, and validation.
     pub async fn unpause(
         &mut self,
         signer: &WalletAccount,
         meta: Option<TransactionMetadata>,
     ) -> TokenResult<TransactionHash> {
-        let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
+        let TransactionMetadata {
+            expiry,
+            nonce,
+            validate,
+        } = meta.unwrap_or_default();
 
+        if let Some(validate) = validate {
+            if validate {
+                // check if the signer is authorized to unpause token supply change operations.
+                self.validate_governance_operation(signer.address)?;
+            }
+        }
+        // git commit -m 'Added validation and docs'
         let operations = [operations::pause(false)].into_iter().collect();
         self.sign_and_send(signer, operations, expiry, nonce).await
     }
@@ -232,6 +274,11 @@ impl TokenClient {
 
         if let Some(validate) = validate {
             if validate {
+                // checks if the token is not paused
+                if self.info.token_state.decode_module_state()?.paused {
+                    return Err(TokenError::Paused);
+                }
+
                 // check if the signer is authorized to mint tokens.
                 self.validate_governance_operation(signer.address)?;
 
@@ -273,6 +320,11 @@ impl TokenClient {
 
         if let Some(validate) = validate {
             if validate {
+                // checks if the token is not paused
+                if self.info.token_state.decode_module_state()?.paused {
+                    return Err(TokenError::Paused);
+                }
+
                 // check if the signer is authorized to burn tokens.
                 self.validate_governance_operation(signer.address)?;
 
@@ -477,6 +529,7 @@ impl TokenClient {
 
     /// Validates a token transfer.
     /// The method checks for:
+    /// * The token is not in the paused state.
     /// * All [`TokenAmount`]s for the transfer have the same decimals as the
     ///   token.
     /// * The sender has sufficient funds for all transfers.
@@ -492,6 +545,10 @@ impl TokenClient {
         sender: AccountAddress,
         payload: Vec<TransferTokens>,
     ) -> TokenResult<()> {
+        if self.info.token_state.decode_module_state()?.paused {
+            return Err(TokenError::Paused);
+        }
+
         let decimals = self.info.token_state.decimals;
 
         // Validate all amounts
