@@ -154,7 +154,7 @@ impl TokenClient {
     /// * `meta` - The optional transaction metadata. Inclides optional
     ///   expiration, nonce, and validation. Check [Self::validate_transfer] for
     ///   the list of validations.
-    pub async fn transfer(
+    pub async fn transfer_token_amount(
         &mut self,
         signer: &WalletAccount,
         payload: Vec<TransferTokens>,
@@ -593,6 +593,10 @@ impl TokenClient {
     ) -> TokenResult<TransactionHash> {
         let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
         self.sign_and_send(signer, operations, expiry, nonce).await
+    }
+
+    pub async fn send_raw(&mut self, _operations: RawCbor) -> TokenResult<TransactionHash> {
+        todo!()
     }
 
     /// Helper method containing the common logic related to signing and sending
