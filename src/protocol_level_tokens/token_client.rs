@@ -638,14 +638,3 @@ impl TokenClient {
         Ok(self.client.send_block_item(&block_item).await?)
     }
 }
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn check_account_validation() {
-
-    }
-}
