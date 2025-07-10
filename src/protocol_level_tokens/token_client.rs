@@ -101,7 +101,7 @@ pub enum TokenError {
 }
 
 impl TokenClient {
-    /// Construct a [`Token`] from existing RPC client and [TokenInfo].
+    /// Construct a [`TokenClient`] from existing RPC client and [TokenInfo].
     /// Has a default transaction expiration time set to 5 minutes.
     ///
     /// # Arguments
@@ -120,7 +120,7 @@ impl TokenClient {
     /// A helper methods for fetching the token info.
     pub fn token_info(&self) -> &TokenInfo { &self.info }
 
-    /// Construct a [`Token`] by looking up metadata from the chain
+    /// Construct a [`TokenClient`] by looking up metadata from the chain
     /// (such as the token info). Has a default transaction expiration time set
     /// to 5 minutes.
     ///
