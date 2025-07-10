@@ -3,13 +3,11 @@
 use crate::v2::{generated, Require};
 use concordium_base::protocol_level_tokens;
 
-mod token;
 mod token_account_info;
 pub mod token_client;
 mod token_info;
 
 pub use protocol_level_tokens::*;
-pub use token::*;
 pub use token_account_info::*;
 pub use token_info::*;
 
