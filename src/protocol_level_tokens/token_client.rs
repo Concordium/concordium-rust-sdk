@@ -173,7 +173,7 @@ impl TokenClient {
             }
         }
 
-        let operations = [operations::pause(true)].into_iter().collect();
+        let operations = [operations::pause()].into_iter().collect();
         self.sign_and_send(signer, operations, expiry, nonce).await
     }
 
@@ -203,7 +203,7 @@ impl TokenClient {
                 self.validate_governance_operation(signer.address)?;
             }
         }
-        let operations = [operations::pause(false)].into_iter().collect();
+        let operations = [operations::unpause()].into_iter().collect();
         self.sign_and_send(signer, operations, expiry, nonce).await
     }
 
