@@ -100,7 +100,7 @@ pub enum TokenError {
     /// burn the total amount in the payload.
     #[error("Total token amount in the payload exceeds governance account balance.")]
     InsufficientSupply,
-    #[error("The token is paused")]
+    #[error("The token state is paused")]
     Paused,
 }
 
@@ -153,7 +153,7 @@ impl TokenClient {
     ///
     /// * `signer` - A [`WalletAccount`] who's address is used as a sender and
     ///   keys as a signer.
-    /// * `meta` - The optional transaction metadata. Inclides optional
+    /// * `meta` - The optional transaction metadata. Includes optional
     ///   expiration, nonce, and validation.
     pub async fn pause(
         &mut self,
@@ -184,7 +184,7 @@ impl TokenClient {
     ///
     /// * `signer` - A [`WalletAccount`] who's address is used as a sender and
     ///   keys as a signer.
-    /// * `meta` - The optional transaction metadata. Inclides optional
+    /// * `meta` - The optional transaction metadata. Includes optional
     ///   expiration, nonce, and validation.
     pub async fn unpause(
         &mut self,
@@ -214,7 +214,7 @@ impl TokenClient {
     /// * `signer` - A [`WalletAccount`] who's address is used as a sender and
     ///   keys as a signer.
     /// * `payload` - The transfer payload.
-    /// * `meta` - The optional transaction metadata. Inclides optional
+    /// * `meta` - The optional transaction metadata. Includes optional
     ///   expiration, nonce, and validation. Check [Self::validate_transfer] for
     ///   the list of validations.
     pub async fn transfer(
@@ -257,7 +257,7 @@ impl TokenClient {
     /// * `signer` - a [`WalletAccount`] who's address is used as a sender and
     ///   keys as a signer.
     /// * `amounts` - The amounts of tokens to mint.
-    /// * `meta` - The optional transaction metadata. Inclides optional
+    /// * `meta` - The optional transaction metadata. Includes optional
     ///   expiration, nonce, and validation.
     pub async fn mint(
         &mut self,
@@ -274,7 +274,13 @@ impl TokenClient {
         if let Some(validate) = validate {
             if validate {
                 // checks if the token is not paused
-                if self.info.token_state.decode_module_state()?.paused {
+                if self
+                    .info
+                    .token_state
+                    .decode_module_state()?
+                    .paused
+                    .unwrap_or_default()
+                {
                     return Err(TokenError::Paused);
                 }
 
@@ -303,7 +309,7 @@ impl TokenClient {
     /// * `signer` - A [`WalletAccount`] who's address is used as a sender and
     ///   keys as a signer.
     /// * `amount` - The amounts of tokens to burn.
-    /// * `meta` - The optional transaction metadata. Inclides optional
+    /// * `meta` - The optional transaction metadata. Includes optional
     ///   expiration, nonce, and validation.
     pub async fn burn(
         &mut self,
@@ -320,7 +326,13 @@ impl TokenClient {
         if let Some(validate) = validate {
             if validate {
                 // checks if the token is not paused
-                if self.info.token_state.decode_module_state()?.paused {
+                if self
+                    .info
+                    .token_state
+                    .decode_module_state()?
+                    .paused
+                    .unwrap_or_default()
+                {
                     return Err(TokenError::Paused);
                 }
 
@@ -366,7 +378,7 @@ impl TokenClient {
     /// * `signer` - A [`WalletAccount`] who's address is used as a sender and
     ///   keys as a signer.
     /// * `targets` - The account addresses to be added to the allow list.
-    /// * `meta` - The optional transaction metadata. Inclides optional
+    /// * `meta` - The optional transaction metadata. Includes optional
     ///   expiration, nonce, and validation.
     pub async fn add_allow_list(
         &mut self,
@@ -402,7 +414,7 @@ impl TokenClient {
     /// * `signer` - A [`WalletAccount`] who's address is used as a sender and
     ///   keys as a signer.
     /// * `targets` - The account addresses to be removed from the allow list.
-    /// * `meta` - The optional transaction metadata. Inclides optional
+    /// * `meta` - The optional transaction metadata. Includes optional
     ///   expiration, nonce, and validation.
     pub async fn remove_allow_list(
         &mut self,
@@ -440,7 +452,7 @@ impl TokenClient {
     /// * `targets` - The account addresses to be added to the deny list.
     /// * `expiry` - The optional expiry time for the transaction.
     /// * `opts` - Options for the list update operation.
-    /// * `meta` - The optional transaction metadata. Inclides optional
+    /// * `meta` - The optional transaction metadata. Includes optional
     ///   expiration, nonce, and validation.
     pub async fn add_deny_list(
         &mut self,
@@ -476,7 +488,7 @@ impl TokenClient {
     /// * `signer` - A [`WalletAccount`] who's address is used as a sender and
     ///   keys as a signer.
     /// * `targets` - The account addresses to be removed from the deny list.
-    /// * `meta` - The optional transaction metadata. Inclides optional
+    /// * `meta` - The optional transaction metadata. Includes optional
     ///   expiration, nonce, and validation.
     pub async fn remove_deny_list(
         &mut self,
@@ -544,7 +556,13 @@ impl TokenClient {
         sender: AccountAddress,
         payload: Vec<TransferTokens>,
     ) -> TokenResult<()> {
-        if self.info.token_state.decode_module_state()?.paused {
+        if self
+            .info
+            .token_state
+            .decode_module_state()?
+            .paused
+            .unwrap_or_default()
+        {
             return Err(TokenError::Paused);
         }
 
@@ -661,7 +679,7 @@ impl TokenClient {
     ///   keys as a signer.
     /// * `expiry` - The optional expiry time for the transaction.
     /// * `operations` - A list of protocol level token operations.
-    /// * `meta` - The optional transaction metadata. Inclides optional
+    /// * `meta` - The optional transaction metadata. Includes optional
     ///   expiration, nonce. Validation is ignored for this method.
     pub async fn send_operations(
         &mut self,
