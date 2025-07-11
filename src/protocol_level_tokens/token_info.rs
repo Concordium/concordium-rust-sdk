@@ -11,7 +11,7 @@ use concordium_base::{
 ///
 /// Response type for
 /// [`Client::get_token_info`](crate::v2::Client::get_token_info).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TokenInfo {
     /// The unique token id.
     pub token_id:    TokenId,
@@ -23,7 +23,7 @@ pub struct TokenInfo {
 ///
 /// Part of the response for
 /// [`Client::get_token_info`](crate::v2::Client::get_token_info).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TokenState {
     /// The reference of the module implementing this token.
     pub token_module_ref: TokenModuleRef,
