@@ -1,5 +1,8 @@
 ## Unreleased changes
 
+## 7.0.0-alpha.3
+
+- Add `TokenClient`, which is a client for interacting with PLTs.
 - Adds support for constructing "pause" and "unpause" PLT operations.
 
 ## 7.0.0-alpha.2
