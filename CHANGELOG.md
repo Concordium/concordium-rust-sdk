@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+- Add `NextUpdateSequenceNumbers::protocol_level_tokens` and protobuf deserialization of it
+
 ## 7.0.0-alpha.3
 
 - Add `TokenClient`, which is a client for interacting with PLTs.

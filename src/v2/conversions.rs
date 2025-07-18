@@ -3387,6 +3387,10 @@ impl TryFrom<NextUpdateSequenceNumbers> for super::types::queries::NextUpdateSeq
                 .validator_score_parameters
                 .map(Into::into)
                 .unwrap_or_default(),
+            protocol_level_tokens: message
+                .protocol_level_tokens
+                .map(Into::into)
+                .unwrap_or_default(),
         })
     }
 }
