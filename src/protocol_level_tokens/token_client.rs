@@ -291,8 +291,7 @@ impl TokenClient {
                 self.validate_governance_operation(signer.address)?;
 
                 // check if amount to be minted has the same decimals as the token.
-                if amount.decimals() != self.info.token_state.decimals
-                {
+                if amount.decimals() != self.info.token_state.decimals {
                     return Err(TokenError::InvalidTokenAmount);
                 }
             }
@@ -340,8 +339,7 @@ impl TokenClient {
                 self.validate_governance_operation(signer.address)?;
 
                 // check if amount to be burned has the same decimals as the token.
-                if amount.decimals() != self.info.token_state.decimals
-                {
+                if amount.decimals() != self.info.token_state.decimals {
                     return Err(TokenError::InvalidTokenAmount);
                 }
 
