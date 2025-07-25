@@ -116,7 +116,7 @@ async fn main() -> anyhow::Result<()> {
                 ConversionRule::AllowRounding,
             )?;
             token_client.validate_governance_operation(keys.address)?;
-            token_client.mint(&keys, vec![token_amount], meta).await
+            token_client.mint(&keys, token_amount, meta).await
         }
         Action::Burn { amount } => {
             let token_amount = TokenAmount::try_from_rust_decimal(
@@ -125,7 +125,7 @@ async fn main() -> anyhow::Result<()> {
                 ConversionRule::AllowRounding,
             )?;
             token_client.validate_governance_operation(keys.address)?;
-            token_client.burn(&keys, vec![token_amount], meta).await
+            token_client.burn(&keys, token_amount, meta).await
         }
         Action::Transfer { receiver, amount } => {
             let token_amount = TokenAmount::try_from_rust_decimal(
