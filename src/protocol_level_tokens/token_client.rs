@@ -737,9 +737,3 @@ impl TokenClient {
         Ok(self.client.send_block_item(&block_item).await?)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn validate_account() {}
-}
