@@ -3,7 +3,7 @@
 //! operations as its methods.
 //!
 //! Using the [`TokenClient`] is functionally equivalent to using the mid-level
-//! abstractions in [`operations`](crate::protocol_level_tokens::operations).
+//! abstractions in [`operations`].
 
 use concordium_base::{
     base::Nonce,
@@ -736,10 +736,4 @@ impl TokenClient {
         let block_item = BlockItem::AccountTransaction(transaction);
         Ok(self.client.send_block_item(&block_item).await?)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn validate_account() {}
 }

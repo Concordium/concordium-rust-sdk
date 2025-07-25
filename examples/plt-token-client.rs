@@ -25,16 +25,8 @@ struct App {
     endpoint: v2::Endpoint,
     #[structopt(long = "sender", help = "Path to the sender account key file.")]
     account:  PathBuf,
-    #[structopt(long = "receiver", help = "Target account address.")]
-    receiver: String,
-    #[structopt(long = "token", help = "Token id of token.")]
+    #[structopt(long = "token", help = "Token id of the token.")]
     token_id: String,
-    #[structopt(
-        long = "amount",
-        help = "Optional amount to send/mint/burn.",
-        default_value = "100.0"
-    )]
-    amount:   Decimal,
     #[structopt(subcommand)]
     cmd:      Action,
 }
@@ -42,13 +34,38 @@ struct App {
 /// TokenClient operations
 #[derive(StructOpt)]
 enum Action {
-    Mint,
-    Burn,
-    Transfer,
-    AddAllow,
-    RemoveAllow,
-    AddDeny,
-    RemoveDeny,
+    Mint {
+        #[structopt(long = "amount", help = "Amount of token to mint.")]
+        amount: Decimal,
+    },
+    Burn {
+        #[structopt(long = "amount", help = "Amount of token to burn.")]
+        amount: Decimal,
+    },
+    Transfer {
+        #[structopt(long = "receiver", help = "Target account address.")]
+        receiver: String,
+        #[structopt(long = "amount", help = "Amount of token to transfer.")]
+        amount:   Decimal,
+    },
+    AddAllow {
+        #[structopt(long = "target", help = "Account address to add to allow list.")]
+        target: String,
+    },
+    RemoveAllow {
+        #[structopt(long = "target", help = "Account address to remove from allow list.")]
+        target: String,
+    },
+    AddDeny {
+        #[structopt(long = "target", help = "Account address to add to deny list.")]
+        target: String,
+    },
+    RemoveDeny {
+        #[structopt(long = "target", help = "Account address to remove from deny list.")]
+        target: String,
+    },
+    Pause,
+    Unpause,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -66,18 +83,6 @@ async fn main() -> anyhow::Result<()> {
     // The convenience wrapper for interactions with a PLT.
     let mut token_client =
         token_client::TokenClient::init_from_token_id(client.clone(), token_id).await?;
-
-    // Amount of tokens to send/mint/burn. The number of decimals in the TokenAmount
-    // must be the same as the number of decimals in the TokenInfo
-    let token_amount = TokenAmount::try_from_rust_decimal(
-        app.amount,
-        token_client.token_info().token_state.decimals,
-        ConversionRule::AllowRounding,
-    )?;
-    println!("Token amount: {}", token_amount,);
-
-    // Target address of the action.
-    let target_address = AccountAddress::from_str(&app.receiver)?;
 
     // Load account keys and sender address from a file
     let keys: WalletAccount = WalletAccount::from_json_file(app.account)
@@ -104,15 +109,32 @@ async fn main() -> anyhow::Result<()> {
 
     // Submit the transaction to the chain
     let transaction_hash = match app.cmd {
-        Action::Mint => {
+        Action::Mint { amount } => {
+            let token_amount = TokenAmount::try_from_rust_decimal(
+                amount,
+                token_client.token_info().token_state.decimals,
+                ConversionRule::AllowRounding,
+            )?;
             token_client.validate_governance_operation(keys.address)?;
             token_client.mint(&keys, vec![token_amount], meta).await
         }
-        Action::Burn => {
+        Action::Burn { amount } => {
+            let token_amount = TokenAmount::try_from_rust_decimal(
+                amount,
+                token_client.token_info().token_state.decimals,
+                ConversionRule::AllowRounding,
+            )?;
             token_client.validate_governance_operation(keys.address)?;
             token_client.burn(&keys, vec![token_amount], meta).await
         }
-        Action::Transfer => {
+        Action::Transfer { receiver, amount } => {
+            let token_amount = TokenAmount::try_from_rust_decimal(
+                amount,
+                token_client.token_info().token_state.decimals,
+                ConversionRule::AllowRounding,
+            )?;
+            let target_address = AccountAddress::from_str(&receiver)?;
+
             let payload = TransferTokens {
                 amount:    token_amount,
                 recipient: target_address,
@@ -123,31 +145,48 @@ async fn main() -> anyhow::Result<()> {
                 .await?;
             token_client.transfer(&keys, vec![payload], meta).await
         }
-        Action::AddAllow => {
+        Action::AddAllow { target } => {
+            let target_address = AccountAddress::from_str(&target)?;
+
             token_client.validate_governance_operation(keys.address)?;
             token_client
                 .add_allow_list(&keys, vec![target_address], meta)
                 .await
         }
-        Action::RemoveAllow => {
+        Action::RemoveAllow { target } => {
+            let target_address = AccountAddress::from_str(&target)?;
+
             token_client.validate_governance_operation(keys.address)?;
             token_client
                 .remove_allow_list(&keys, vec![target_address], meta)
                 .await
         }
-        Action::AddDeny => {
+        Action::AddDeny { target } => {
+            let target_address = AccountAddress::from_str(&target)?;
+
             token_client.validate_governance_operation(keys.address)?;
             token_client
                 .add_deny_list(&keys, vec![target_address], meta)
                 .await
         }
-        Action::RemoveDeny => {
+        Action::RemoveDeny { target } => {
+            let target_address = AccountAddress::from_str(&target)?;
+
             token_client.validate_governance_operation(keys.address)?;
             token_client
                 .remove_deny_list(&keys, vec![target_address], meta)
                 .await
         }
+        Action::Pause => {
+            token_client.validate_governance_operation(keys.address)?;
+            token_client.pause(&keys, meta).await
+        }
+        Action::Unpause => {
+            token_client.validate_governance_operation(keys.address)?;
+            token_client.unpause(&keys, meta).await
+        }
     }?;
+
     println!("Transaction {} submitted.", transaction_hash,);
 
     let (bh, bs) = client.wait_until_finalized(&transaction_hash).await?;
