@@ -103,8 +103,8 @@ async fn main() -> anyhow::Result<()> {
     let balance = token_client
         .balance_of(&keys.address.into(), None::<BlockIdentifier>)
         .await?;
-    if let Some(ballance) = ballance {
-        println!("The sender has {}{} available", ballance, app.token_id,);
+    if let Some(balance) = balance {
+        println!("The sender has {}{} available", balance, app.token_id,);
     }
 
     // Submit the transaction to the chain
