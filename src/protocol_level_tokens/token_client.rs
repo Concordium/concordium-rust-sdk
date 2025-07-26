@@ -259,13 +259,13 @@ impl TokenClient {
     ///
     /// * `signer` - a [`WalletAccount`] who's address is used as a sender and
     ///   keys as a signer.
-    /// * `amounts` - The amounts of tokens to mint.
+    /// * `amount` - The amount of tokens to mint.
     /// * `meta` - The optional transaction metadata. Includes optional
     ///   expiration, nonce, and validation.
     pub async fn mint(
         &mut self,
         signer: &WalletAccount,
-        amounts: Vec<TokenAmount>,
+        amount: TokenAmount,
         meta: Option<TransactionMetadata>,
     ) -> TokenResult<TransactionHash> {
         let TransactionMetadata {
@@ -290,17 +290,13 @@ impl TokenClient {
                 // check if the signer is authorized to mint tokens.
                 self.validate_governance_operation(signer.address)?;
 
-                // check if every amount ot be minted have the same decimals as the token.
-                if amounts
-                    .iter()
-                    .any(|amount| amount.decimals() != self.info.token_state.decimals)
-                {
+                // check if amount to be minted has the same decimals as the token.
+                if amount.decimals() != self.info.token_state.decimals {
                     return Err(TokenError::InvalidTokenAmount);
                 }
             }
         }
-
-        let operations = amounts.into_iter().map(operations::mint_tokens).collect();
+        let operations = [operations::mint_tokens(amount)].into_iter().collect();
 
         self.sign_and_send(signer, operations, expiry, nonce).await
     }
@@ -311,13 +307,13 @@ impl TokenClient {
     ///
     /// * `signer` - A [`WalletAccount`] who's address is used as a sender and
     ///   keys as a signer.
-    /// * `amount` - The amounts of tokens to burn.
+    /// * `amount` - The amount of tokens to burn.
     /// * `meta` - The optional transaction metadata. Includes optional
     ///   expiration, nonce, and validation.
     pub async fn burn(
         &mut self,
         signer: &WalletAccount,
-        amounts: Vec<TokenAmount>,
+        amount: TokenAmount,
         meta: Option<TransactionMetadata>,
     ) -> TokenResult<TransactionHash> {
         let TransactionMetadata {
@@ -342,34 +338,23 @@ impl TokenClient {
                 // check if the signer is authorized to burn tokens.
                 self.validate_governance_operation(signer.address)?;
 
-                // check if every amount ot be burned have the same decimals as the token.
-                if amounts
-                    .iter()
-                    .any(|amount| amount.decimals() != self.info.token_state.decimals)
-                {
+                // check if amount to be burned has the same decimals as the token.
+                if amount.decimals() != self.info.token_state.decimals {
                     return Err(TokenError::InvalidTokenAmount);
                 }
 
-                // check if total amount to burn exceeds total token supply
-                let payload_total = TokenAmount::from_raw(
-                    amounts
-                        .iter()
-                        .try_fold(0u64, |acc, x| acc.checked_add(x.value()))
-                        .ok_or(TokenError::InvalidTokenAmount)?,
-                    self.info.token_state.decimals,
-                );
+                // check if amount to be burned exceeds government account's token supply
                 let governer_token_amount = self
                     .balance_of(&signer.address.into(), None::<BlockIdentifier>)
                     .await?
                     .ok_or(TokenError::InsufficientSupply)?;
 
-                if governer_token_amount.value() < payload_total.value() {
+                if governer_token_amount.value() < amount.value() {
                     return Err(TokenError::InsufficientSupply);
                 }
             }
         }
-
-        let operations = amounts.into_iter().map(operations::burn_tokens).collect();
+        let operations = [operations::burn_tokens(amount)].into_iter().collect();
 
         self.sign_and_send(signer, operations, expiry, nonce).await
     }
