@@ -99,8 +99,8 @@ async fn main() -> anyhow::Result<()> {
         validate: None,
     });
 
-    // Check the ballance of the sender
-    let ballance = token_client
+    // Check the balance of the sender
+    let balance = token_client
         .balance_of(&keys.address.into(), None::<BlockIdentifier>)
         .await?;
     if let Some(ballance) = ballance {
