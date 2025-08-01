@@ -16,7 +16,7 @@ use concordium_base::{
 use thiserror::Error;
 
 use crate::{
-    protocol_level_tokens::{CborMemo, CborTokenHolder, TokenInfo},
+    protocol_level_tokens::{CborMemo, TokenInfo},
     types::WalletAccount,
     v2::{AccountIdentifier, BlockIdentifier, Client, IntoBlockIdentifier, QueryError, RPCError},
 };
@@ -163,18 +163,7 @@ impl TokenClient {
         signer: &WalletAccount,
         meta: Option<TransactionMetadata>,
     ) -> TokenResult<TransactionHash> {
-        let TransactionMetadata {
-            expiry,
-            nonce,
-            validate,
-        } = meta.unwrap_or_default();
-
-        if let Some(validate) = validate {
-            if validate {
-                // check if the signer is authorized to pause token supply change operations.
-                self.validate_governance_operation(signer.address)?;
-            }
-        }
+        let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
 
         let operations = [operations::pause()].into_iter().collect();
         self.sign_and_send(signer, operations, expiry, nonce).await
@@ -194,18 +183,8 @@ impl TokenClient {
         signer: &WalletAccount,
         meta: Option<TransactionMetadata>,
     ) -> TokenResult<TransactionHash> {
-        let TransactionMetadata {
-            expiry,
-            nonce,
-            validate,
-        } = meta.unwrap_or_default();
+        let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
 
-        if let Some(validate) = validate {
-            if validate {
-                // check if the signer is authorized to unpause token supply change operations.
-                self.validate_governance_operation(signer.address)?;
-            }
-        }
         let operations = [operations::unpause()].into_iter().collect();
         self.sign_and_send(signer, operations, expiry, nonce).await
     }
@@ -287,9 +266,6 @@ impl TokenClient {
                     return Err(TokenError::Paused);
                 }
 
-                // check if the signer is authorized to mint tokens.
-                self.validate_governance_operation(signer.address)?;
-
                 // check if amount to be minted has the same decimals as the token.
                 if amount.decimals() != self.info.token_state.decimals {
                     return Err(TokenError::InvalidTokenAmount);
@@ -335,21 +311,18 @@ impl TokenClient {
                     return Err(TokenError::Paused);
                 }
 
-                // check if the signer is authorized to burn tokens.
-                self.validate_governance_operation(signer.address)?;
-
                 // check if amount to be burned has the same decimals as the token.
                 if amount.decimals() != self.info.token_state.decimals {
                     return Err(TokenError::InvalidTokenAmount);
                 }
 
-                // check if amount to be burned exceeds government account's token supply
-                let governer_token_amount = self
+                // check if amount to be burned exceeds account's token amount in possesion
+                let burn_amount = self
                     .balance_of(&signer.address.into(), None::<BlockIdentifier>)
                     .await?
                     .ok_or(TokenError::InsufficientSupply)?;
 
-                if governer_token_amount.value() < amount.value() {
+                if burn_amount.value() < amount.value() {
                     return Err(TokenError::InsufficientSupply);
                 }
             }
@@ -374,18 +347,7 @@ impl TokenClient {
         targets: Vec<AccountAddress>,
         meta: Option<TransactionMetadata>,
     ) -> TokenResult<TransactionHash> {
-        let TransactionMetadata {
-            expiry,
-            nonce,
-            validate,
-        } = meta.unwrap_or_default();
-
-        if let Some(validate) = validate {
-            if validate {
-                // check if the signer is authorized to add to token's allow list.
-                self.validate_governance_operation(signer.address)?;
-            }
-        }
+        let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
 
         let operations = targets
             .into_iter()
@@ -410,18 +372,7 @@ impl TokenClient {
         targets: Vec<AccountAddress>,
         meta: Option<TransactionMetadata>,
     ) -> TokenResult<TransactionHash> {
-        let TransactionMetadata {
-            expiry,
-            nonce,
-            validate,
-        } = meta.unwrap_or_default();
-
-        if let Some(validate) = validate {
-            if validate {
-                // check if the signer is authorized to remove from token's allow list.
-                self.validate_governance_operation(signer.address)?;
-            }
-        }
+        let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
 
         let operations = targets
             .into_iter()
@@ -448,18 +399,7 @@ impl TokenClient {
         targets: Vec<AccountAddress>,
         meta: Option<TransactionMetadata>,
     ) -> TokenResult<TransactionHash> {
-        let TransactionMetadata {
-            expiry,
-            nonce,
-            validate,
-        } = meta.unwrap_or_default();
-
-        if let Some(validate) = validate {
-            if validate {
-                // check if the signer is authorized to add to token's deny list.
-                self.validate_governance_operation(signer.address)?;
-            }
-        }
+        let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
 
         let operations = targets
             .into_iter()
@@ -484,18 +424,7 @@ impl TokenClient {
         targets: Vec<AccountAddress>,
         meta: Option<TransactionMetadata>,
     ) -> TokenResult<TransactionHash> {
-        let TransactionMetadata {
-            expiry,
-            nonce,
-            validate,
-        } = meta.unwrap_or_default();
-
-        if let Some(validate) = validate {
-            if validate {
-                // check if the signer is authorized to remove from token's deny list.
-                self.validate_governance_operation(signer.address)?;
-            }
-        }
+        let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
 
         let operations = targets
             .into_iter()
@@ -645,17 +574,7 @@ impl TokenClient {
     /// # Arguments
     ///
     /// * `sender` - The account address of the sender.
-    pub fn validate_governance_operation(&mut self, sender: AccountAddress) -> TokenResult<()> {
-        let CborTokenHolder::Account(governance_account) = self
-            .info
-            .token_state
-            .decode_module_state()?
-            .governance_account;
-
-        if governance_account.address != sender {
-            return Err(TokenError::UnauthorizedGovernanceOperation);
-        }
-
+    pub fn validate_governance_operation(&mut self, _sender: AccountAddress) -> TokenResult<()> {
         Ok(())
     }
 
