@@ -171,12 +171,8 @@ async fn main() -> anyhow::Result<()> {
                 .remove_deny_list(&keys, vec![target_address], meta)
                 .await
         }
-        Action::Pause => {
-            token_client.pause(&keys, meta).await
-        }
-        Action::Unpause => {
-            token_client.unpause(&keys, meta).await
-        }
+        Action::Pause => token_client.pause(&keys, meta).await,
+        Action::Unpause => token_client.unpause(&keys, meta).await,
     }?;
 
     println!("Transaction {} submitted.", transaction_hash,);
