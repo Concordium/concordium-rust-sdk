@@ -836,15 +836,14 @@ mod tests {
             address: &AccountIdentifier,
             _block: BlockIdentifier,
         ) -> endpoints::QueryResult<QueryResponse<AccountInfo>> {
-            let AccountIdentifier::Address(_address) = address else {
+            let AccountIdentifier::Address(address) = address else {
                 return Err(QueryError::NotFound);
             };
-            // self.responses
-            //     .get(address)
-            //     .cloned()
-            //     .map(|x| QueryResponse { response: x.response.0, ..x})
-            //     .ok_or(QueryError::NotFound)
-            Err(QueryError::NotFound)
+            
+            self.responses
+                .get(address)
+                .cloned()
+                .ok_or(QueryError::NotFound)
         }
     }
 
