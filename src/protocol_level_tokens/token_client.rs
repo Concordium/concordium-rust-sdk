@@ -317,12 +317,12 @@ impl TokenClient {
                 }
 
                 // check if amount to be burned exceeds account's token amount in possesion
-                let burn_amount = self
+                let burnable_amount = self
                     .balance_of(&signer.address.into(), None::<BlockIdentifier>)
                     .await?
                     .ok_or(TokenError::InsufficientSupply)?;
 
-                if burn_amount.value() < amount.value() {
+                if burnable_amount.value() < amount.value() {
                     return Err(TokenError::InsufficientSupply);
                 }
             }
