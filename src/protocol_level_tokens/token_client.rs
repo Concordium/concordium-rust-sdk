@@ -91,10 +91,6 @@ pub enum TokenError {
          allow/deny list."
     )]
     NotAllowed,
-    /// Error type indicating an unauthorized governance operation was
-    /// attempted.
-    #[error("Unauthorized governance operation attempted")]
-    UnauthorizedGovernanceOperation,
     /// Error that indicates that provided payload for raw operations does not
     /// match with the client's token ID.
     #[error("Invalid token ID in the provided payload.")]
@@ -103,8 +99,18 @@ pub enum TokenError {
     /// burn the total amount in the payload.
     #[error("Total token amount in the payload exceeds governance account balance.")]
     InsufficientSupply,
-    #[error("The token state is paused")]
+    #[error("The token state is paused.")]
     Paused,
+    /// Error that indicates that the token does not support minting.
+    #[error("The token cannot be minted.")]
+    NotMintable,
+    /// Error that indicates that the token does not support burning.
+    #[error("The token cannot be burned.")]
+    NotBurnable,
+    /// Error that indicates that allow/deny list is not available for this
+    /// token.
+    #[error("The token does not have allow/deny list")]
+    NoList,
 }
 
 impl TokenClient {
@@ -211,11 +217,9 @@ impl TokenClient {
             validate,
         } = meta.unwrap_or_default();
 
-        if let Some(validate) = validate {
-            if validate {
-                self.validate_transfer(signer.address, payload.clone())
-                    .await?;
-            }
+        if validate.unwrap_or_default() {
+            self.validate_transfer(signer.address, payload.clone())
+                .await?;
         }
 
         let operations: TokenOperations = payload
@@ -253,23 +257,21 @@ impl TokenClient {
             validate,
         } = meta.unwrap_or_default();
 
-        if let Some(validate) = validate {
-            if validate {
-                // checks if the token is not paused
-                if self
-                    .info
-                    .token_state
-                    .decode_module_state()?
-                    .paused
-                    .unwrap_or_default()
-                {
-                    return Err(TokenError::Paused);
-                }
+        if validate.unwrap_or_default() {
+            let state = self.info.token_state.decode_module_state()?;
+            // checks if the token is not paused
+            if state.paused.unwrap_or_default() {
+                return Err(TokenError::Paused);
+            }
 
-                // check if amount to be minted has the same decimals as the token.
-                if amount.decimals() != self.info.token_state.decimals {
-                    return Err(TokenError::InvalidTokenAmount);
-                }
+            // check if the token is mintable
+            if !state.mintable.unwrap_or_default() {
+                return Err(TokenError::NotMintable);
+            }
+
+            // check if amount to be minted has the same decimals as the token.
+            if amount.decimals() != self.info.token_state.decimals {
+                return Err(TokenError::InvalidTokenAmount);
             }
         }
         let operations = [operations::mint_tokens(amount)].into_iter().collect();
@@ -298,33 +300,31 @@ impl TokenClient {
             validate,
         } = meta.unwrap_or_default();
 
-        if let Some(validate) = validate {
-            if validate {
-                // checks if the token is not paused
-                if self
-                    .info
-                    .token_state
-                    .decode_module_state()?
-                    .paused
-                    .unwrap_or_default()
-                {
-                    return Err(TokenError::Paused);
-                }
+        if validate.unwrap_or_default() {
+            let state = self.info.token_state.decode_module_state()?;
+            // checks if the token is not paused
+            if state.paused.unwrap_or_default() {
+                return Err(TokenError::Paused);
+            }
 
-                // check if amount to be burned has the same decimals as the token.
-                if amount.decimals() != self.info.token_state.decimals {
-                    return Err(TokenError::InvalidTokenAmount);
-                }
+            // check if the token is burnable
+            if !state.burnable.unwrap_or_default() {
+                return Err(TokenError::NotBurnable);
+            }
 
-                // check if amount to be burned exceeds account's token amount in possesion
-                let burnable_amount = self
-                    .balance_of(&signer.address.into(), None::<BlockIdentifier>)
-                    .await?
-                    .ok_or(TokenError::InsufficientSupply)?;
+            // check if amount to be burned has the same decimals as the token.
+            if amount.decimals() != self.info.token_state.decimals {
+                return Err(TokenError::InvalidTokenAmount);
+            }
 
-                if burnable_amount.value() < amount.value() {
-                    return Err(TokenError::InsufficientSupply);
-                }
+            // check if amount to be burned exceeds account's token amount in possesion
+            let burnable_amount = self
+                .balance_of(&signer.address.into(), None::<BlockIdentifier>)
+                .await?
+                .ok_or(TokenError::InsufficientSupply)?;
+
+            if burnable_amount.value() < amount.value() {
+                return Err(TokenError::InsufficientSupply);
             }
         }
         let operations = [operations::burn_tokens(amount)].into_iter().collect();
@@ -347,7 +347,18 @@ impl TokenClient {
         targets: Vec<AccountAddress>,
         meta: Option<TransactionMetadata>,
     ) -> TokenResult<TransactionHash> {
-        let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
+        let TransactionMetadata {
+            expiry,
+            nonce,
+            validate,
+        } = meta.unwrap_or_default();
+
+        if validate.unwrap_or_default() {
+            let state = self.info.token_state.decode_module_state()?;
+            if !state.allow_list.unwrap_or_default() {
+                return Err(TokenError::NoList);
+            }
+        }
 
         let operations = targets
             .into_iter()
@@ -372,7 +383,18 @@ impl TokenClient {
         targets: Vec<AccountAddress>,
         meta: Option<TransactionMetadata>,
     ) -> TokenResult<TransactionHash> {
-        let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
+        let TransactionMetadata {
+            expiry,
+            nonce,
+            validate,
+        } = meta.unwrap_or_default();
+
+        if validate.unwrap_or_default() {
+            let state = self.info.token_state.decode_module_state()?;
+            if !state.allow_list.unwrap_or_default() {
+                return Err(TokenError::NoList);
+            }
+        }
 
         let operations = targets
             .into_iter()
@@ -399,7 +421,18 @@ impl TokenClient {
         targets: Vec<AccountAddress>,
         meta: Option<TransactionMetadata>,
     ) -> TokenResult<TransactionHash> {
-        let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
+        let TransactionMetadata {
+            expiry,
+            nonce,
+            validate,
+        } = meta.unwrap_or_default();
+
+        if validate.unwrap_or_default() {
+            let state = self.info.token_state.decode_module_state()?;
+            if !state.deny_list.unwrap_or_default() {
+                return Err(TokenError::NoList);
+            }
+        }
 
         let operations = targets
             .into_iter()
@@ -424,7 +457,18 @@ impl TokenClient {
         targets: Vec<AccountAddress>,
         meta: Option<TransactionMetadata>,
     ) -> TokenResult<TransactionHash> {
-        let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
+        let TransactionMetadata {
+            expiry,
+            nonce,
+            validate,
+        } = meta.unwrap_or_default();
+
+        if validate.unwrap_or_default() {
+            let state = self.info.token_state.decode_module_state()?;
+            if !state.deny_list.unwrap_or_default() {
+                return Err(TokenError::NoList);
+            }
+        }
 
         let operations = targets
             .into_iter()
@@ -473,13 +517,9 @@ impl TokenClient {
         sender: AccountAddress,
         payload: Vec<TransferTokens>,
     ) -> TokenResult<()> {
-        if self
-            .info
-            .token_state
-            .decode_module_state()?
-            .paused
-            .unwrap_or_default()
-        {
+        let module_state = self.info.token_state.decode_module_state()?;
+
+        if module_state.paused.unwrap_or_default() {
             return Err(TokenError::Paused);
         }
 
@@ -517,7 +557,6 @@ impl TokenClient {
         }
 
         // Check if token has no allow and deny lists
-        let module_state = self.info.token_state.decode_module_state()?;
         if module_state.allow_list.is_none_or(|val| !val)
             && module_state.deny_list.is_none_or(|val| !val)
         {
@@ -565,16 +604,6 @@ impl TokenClient {
                 }
             }
         }
-        Ok(())
-    }
-
-    /// Validates that the sender is authorized to perform governance operations
-    /// on the token.
-    ///
-    /// # Arguments
-    ///
-    /// * `sender` - The account address of the sender.
-    pub fn validate_governance_operation(&mut self, _sender: AccountAddress) -> TokenResult<()> {
         Ok(())
     }
 
