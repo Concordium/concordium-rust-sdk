@@ -115,7 +115,6 @@ async fn main() -> anyhow::Result<()> {
                 token_client.token_info().token_state.decimals,
                 ConversionRule::AllowRounding,
             )?;
-            token_client.validate_governance_operation(keys.address)?;
             token_client.mint(&keys, token_amount, meta).await
         }
         Action::Burn { amount } => {
@@ -124,7 +123,6 @@ async fn main() -> anyhow::Result<()> {
                 token_client.token_info().token_state.decimals,
                 ConversionRule::AllowRounding,
             )?;
-            token_client.validate_governance_operation(keys.address)?;
             token_client.burn(&keys, token_amount, meta).await
         }
         Action::Transfer { receiver, amount } => {
@@ -148,7 +146,6 @@ async fn main() -> anyhow::Result<()> {
         Action::AddAllow { target } => {
             let target_address = AccountAddress::from_str(&target)?;
 
-            token_client.validate_governance_operation(keys.address)?;
             token_client
                 .add_allow_list(&keys, vec![target_address], meta)
                 .await
@@ -156,7 +153,6 @@ async fn main() -> anyhow::Result<()> {
         Action::RemoveAllow { target } => {
             let target_address = AccountAddress::from_str(&target)?;
 
-            token_client.validate_governance_operation(keys.address)?;
             token_client
                 .remove_allow_list(&keys, vec![target_address], meta)
                 .await
@@ -164,7 +160,6 @@ async fn main() -> anyhow::Result<()> {
         Action::AddDeny { target } => {
             let target_address = AccountAddress::from_str(&target)?;
 
-            token_client.validate_governance_operation(keys.address)?;
             token_client
                 .add_deny_list(&keys, vec![target_address], meta)
                 .await
@@ -172,17 +167,14 @@ async fn main() -> anyhow::Result<()> {
         Action::RemoveDeny { target } => {
             let target_address = AccountAddress::from_str(&target)?;
 
-            token_client.validate_governance_operation(keys.address)?;
             token_client
                 .remove_deny_list(&keys, vec![target_address], meta)
                 .await
         }
         Action::Pause => {
-            token_client.validate_governance_operation(keys.address)?;
             token_client.pause(&keys, meta).await
         }
         Action::Unpause => {
-            token_client.validate_governance_operation(keys.address)?;
             token_client.unpause(&keys, meta).await
         }
     }?;
