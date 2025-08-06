@@ -314,6 +314,10 @@ impl<Type> ContractInitHandle<Type> {
                 "Expected smart contract initialization status, but received chain update \
                  instruction.",
             ),
+            crate::types::BlockItemSummaryDetails::TokenCreationDetails(_) => mk_error(
+                "Expected smart contract initialization status, but received token creation chain \
+                 update instruction.",
+            ),
         }
     }
 
@@ -651,6 +655,10 @@ impl ModuleDeployHandle {
             crate::types::BlockItemSummaryDetails::Update(_) => {
                 mk_error("Expected module deploy status, but received chain update instruction.")
             }
+            crate::types::BlockItemSummaryDetails::TokenCreationDetails(_) => mk_error(
+                "Expected module deploy status, but received token creation chain update \
+                 instruction.",
+            ),
         }
     }
 
@@ -1663,6 +1671,10 @@ impl ContractUpdateHandle {
             }
             crate::types::BlockItemSummaryDetails::Update(_) => mk_error(
                 "Expected smart contract update status, but received chain update instruction.",
+            ),
+            crate::types::BlockItemSummaryDetails::TokenCreationDetails(_) => mk_error(
+                "Expected smart contract update status, but received token creation chain update \
+                 instruction.",
             ),
         }
     }

@@ -1,5 +1,52 @@
 ## Unreleased changes
 
+- Add `NextUpdateSequenceNumbers::protocol_level_tokens` and protobuf deserialization of it
+- Changed `TokenClient`'s `burn` and `mint` methods to accept a singular `TokenAmount`, instead of `Vec<TokenAmount>`.
+
+## 7.0.0-alpha.3
+
+- Add `TokenClient`, which is a client for interacting with PLTs.
+- Adds support for constructing "pause" and "unpause" PLT operations.
+
+## 7.0.0-alpha.2
+
+- Remove `member_allow_list` and `member_deny_list` from `TokenAccountState`, replaced with
+  CBOR-encoded state.
+- Add functions `TokenAmount::try_from_rust_decimal` and `TokenAmount::from_str` to help
+  construct token amount values.
+- Replace concepts `TokenHolder` and `TokenGovernance` by `TokenUpdate`.
+
+## 7.0.0-alpha.1
+
+- Make `member_allow_list` and `member_deny_list` optional on `TokenAccountState` to comply with protobuf definition.
+- Extend `BlockItemSummaryDetails` with `TokenCreationDetails` variant including contained PLT events. `TokenCreationDetails`
+  is the summary corresponding to `CreatePlt` updates.
+- Change JSON serialization of PLT events to align them with Haskell code base.
+- Expanded the `affected_addresses` function within the `BlockItemSummary` implementation to return a vector of addresses whose CCD or PLT token balances were impacted by the transaction.
+
+## 7.0.0-alpha
+
+- Protocol level token events and reject reasons are now defined in `concordium_base::protocol_level_tokens`.
+  Event and reject reasons CBOR can be decoded with `TokenModuleEvent::decode_token_module_event_type` or
+  `TokenModuleRejectReason::decode_reject_reason_type`.
+- Transaction `Payload` now supports `TokenGovernance` payloads.
+  Operations can be created using functions in `concordium_base::protocol_level_tokens::operations`
+  and composed to transactions with `send::token_governance_operations` and `construct::token_governance_operations`.
+  Governance operation examples can be found in `examples/plt-mint-and-burn.rs` and `examples/plt-allow-and-deny-list.rs`.
+- Transaction `Payload` now supports `TokenHolder` payloads.
+  Operations can be created using functions in `concordium_base::protocol_level_tokens::operations`
+  and composed to transactions with `send::token_holder_operations` and `construct::token_holder_operations`.
+  The underlying model for protocol level tokens is defined in `concordium_base::protocol_level_tokens`. A transfer example
+  can be found in `examples/plt-transfer.rs`.
+- Publish `get_canonical_address` on `AccountAddress`.
+- Introduce protocol version 9 `ProtocolVersion::P9`.
+- Introduce basic types related to protocol level tokens (PLT):
+  - `RawCbor`, `TokenId`, `TokenAmount`, `TokenModuleRef`.
+  - Extend `UpdatePayload` with `CreatePlt` variant.
+  - Extend `RejectReason` with `TokenHolderTransactionFailed` and `NonExistentTokenId` variants.
+  - Add `tokens` field to `AccountInfo` with PLTs held by the account.
+  - Extend `AccountTransactionEffects` with `TokenHolder` and `TokenGovernance` variants.
+  - Extend `TransactionType` with `TokenHolder` and `TokenGovernance` variants.
 - Add getter function `reward_period_epochs` to access the field in the struct `RewardPeriodLength`.
 - Introduce `RewardsOverview::common_reward_data` for getting the common reward data across `RewardsOverview` version 0 and version 1.
 - Add constructor `TokenAddress::new` for CIS2 type `TokenAddress`.

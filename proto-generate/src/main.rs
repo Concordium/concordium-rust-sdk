@@ -3,6 +3,7 @@ fn main() {
         .build_client(true)
         .build_server(false)
         .out_dir("../src/v2/generated")
+        .include_file("mod.rs")
         .compile_protos(
             &["../concordium-base/concordium-grpc-api/v2/concordium/service.proto"],
             &["../concordium-base/concordium-grpc-api/"],

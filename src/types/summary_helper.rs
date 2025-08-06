@@ -14,6 +14,7 @@ use super::{
     Energy, InstanceUpdatedEvent, Memo, NewEncryptedAmountEvent, OpenStatus, RegisteredData,
     RejectReason, TransactionIndex, TransactionType, UpdatePayload, UrlText,
 };
+
 use crate::types::Address;
 use concordium_base::{
     common::{
@@ -21,6 +22,11 @@ use concordium_base::{
         SerdeDeserialize, SerdeSerialize,
     },
     id::types::AccountAddress,
+    protocol_level_tokens::{
+        TokenEvent, TokenEventDetails, TokenId, TokenModuleEvent, TokenSupplyUpdateEvent,
+        TokenTransferEvent,
+    },
+    updates::{CreatePlt, UpdateType},
 };
 use std::convert::{TryFrom, TryInto};
 use thiserror::Error;
@@ -368,6 +374,84 @@ pub(crate) enum Event {
         /// Baker account
         account:  AccountAddress,
     },
+    /// An event emitted by a plt (protocol level token) module.
+    #[serde(rename_all = "camelCase")]
+    #[allow(clippy::enum_variant_names)] // Note: The clippy warning is disabled to keep
+    // the name `TokenModuleEvent` which has to align with the corresponding type in the haskell
+    // code base in `concordium-base`. This is needed as the JSON representation of the event
+    // is tagged with this name in the haskell code base.
+    TokenModuleEvent {
+        /// The token id of the token.
+        token_id: TokenId,
+        /// The event includes the `type` and cbor encoded `details` of the
+        /// event.
+        #[serde(flatten)]
+        event:    TokenModuleEvent,
+    },
+    /// An event emitted when a transfer of plt (protocol level token) is
+    /// performed.
+    #[serde(rename_all = "camelCase")]
+    TokenTransfer {
+        /// The token id of the token.
+        token_id: TokenId,
+        /// The event includes the `from` and `to` addresses and the `amount` of
+        /// tokens being transferred. An optional `memo` can be present.
+        #[serde(flatten)]
+        event:    TokenTransferEvent,
+    },
+    /// An event emitted when the plt (protocol level token) supply is updated
+    /// by minting tokens to a token holder.
+    #[serde(rename_all = "camelCase")]
+    TokenMint {
+        /// The token id of the token.
+        token_id: TokenId,
+        /// The event includes the `target` address and the `amount` of tokens
+        /// minted.
+        #[serde(flatten)]
+        event:    TokenSupplyUpdateEvent,
+    },
+    /// An event emitted when the plt (protocol level token) supply is updated
+    /// by burning tokens from the balance of a token holder.
+    #[serde(rename_all = "camelCase")]
+    TokenBurn {
+        /// The token id of the token.
+        token_id: TokenId,
+        /// The event includes the `target` address and the `amount` of tokens
+        /// burned.
+        #[serde(flatten)]
+        event:    TokenSupplyUpdateEvent,
+    },
+    /// An event emitted when the plt (protocol level token) is created.
+    #[serde(rename_all = "camelCase")]
+    TokenCreated {
+        /// The transaction payload when the token was created.
+        /// It includes the `token_id`, `token_module_reference`,
+        /// `governance_account`, `decimal` and `initialization_parameters`.
+        payload: CreatePlt,
+    },
+}
+
+impl From<TokenEvent> for Event {
+    fn from(e: TokenEvent) -> Self {
+        match e.event {
+            TokenEventDetails::Module(token_module_event) => Event::TokenModuleEvent {
+                token_id: e.token_id,
+                event:    token_module_event,
+            },
+            TokenEventDetails::Transfer(token_transfer_event) => Event::TokenTransfer {
+                token_id: e.token_id,
+                event:    token_transfer_event,
+            },
+            TokenEventDetails::Mint(token_supply_update_event) => Event::TokenMint {
+                token_id: e.token_id,
+                event:    token_supply_update_event,
+            },
+            TokenEventDetails::Burn(token_supply_update_event) => Event::TokenBurn {
+                token_id: e.token_id,
+                event:    token_supply_update_event,
+            },
+        }
+    }
 }
 
 impl From<super::ContractTraceElement> for Event {
@@ -406,7 +490,10 @@ impl TryFrom<Event> for super::ContractTraceElement {
             Event::Interrupted { address, events } => Ok(Self::Interrupted { address, events }),
             Event::Resumed { address, success } => Ok(Self::Resumed { address, success }),
             Event::Upgraded { address, from, to } => Ok(Self::Upgraded { address, from, to }),
-            _ => Err(ConversionError::InvalidTransactionResult),
+            other_event => Err(ConversionError::InvalidTransactionResult(format!(
+                "Didn't expect event `{:?}` in contract trace element",
+                other_event
+            ))),
         }
     }
 }
@@ -782,6 +869,11 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                             .collect();
                         (Some(ty), BlockItemResult::Success { events })
                     }
+                    super::AccountTransactionEffects::TokenUpdate { events } => {
+                        let ty = TransactionType::TokenUpdate;
+                        let events: Vec<Event> = events.into_iter().map(|x| x.into()).collect();
+                        (Some(ty), BlockItemResult::Success { events })
+                    }
                 };
                 BlockItemSummary {
                     sender: Some(sender),
@@ -831,6 +923,27 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                 },
                 index:        bi.index,
             },
+            super::BlockItemSummaryDetails::TokenCreationDetails(token_creation_details) => {
+                let mut events = vec![Event::TokenCreated {
+                    payload: token_creation_details.create_plt,
+                }];
+                let additional_events: Vec<Event> = token_creation_details
+                    .events
+                    .into_iter()
+                    .map(|x| x.into())
+                    .collect();
+                events.extend(additional_events);
+
+                BlockItemSummary {
+                    sender:       None,
+                    hash:         bi.hash,
+                    cost:         Amount::zero(),
+                    energy_cost:  bi.energy_cost,
+                    summary_type: BlockItemType::Update(UpdateType::UpdateCreatePLT),
+                    result:       BlockItemResult::Success { events },
+                    index:        bi.index,
+                }
+            }
         }
     }
 }
@@ -845,8 +958,8 @@ pub enum ConversionError {
     FailedUpdate,
     #[error("Unexpected response for an update instruction.")]
     InvalidUpdateResult,
-    #[error("Unexpected response for an account transaction.")]
-    InvalidTransactionResult,
+    #[error("Unexpected response for an account transaction. Details: {0}")]
+    InvalidTransactionResult(String),
 }
 
 #[inline(always)]
@@ -854,11 +967,13 @@ fn with_singleton(
     events: Vec<Event>,
     f: impl Fn(Event) -> Option<super::AccountTransactionEffects>,
 ) -> Result<super::AccountTransactionEffects, ConversionError> {
-    let events_arr: [_; 1] = events
-        .try_into()
-        .map_err(|_| ConversionError::InvalidTransactionResult)?;
+    let events_arr: [_; 1] = events.try_into().map_err(|_| {
+        ConversionError::InvalidTransactionResult("Expect 1 event in singleton".to_string())
+    })?;
     let [e] = events_arr;
-    f(e).ok_or(ConversionError::InvalidTransactionResult)
+    f(e).ok_or(ConversionError::InvalidTransactionResult(
+        "Couldn't convert `Event` to `Option<AccountTransactionEffects>`".to_string(),
+    ))
 }
 
 fn convert_account_transaction(
@@ -932,9 +1047,11 @@ fn convert_account_transaction(
             mk_success(effects)
         }
         TransactionType::TransferWithMemo => {
-            let events_arr: [_; 2] = events
-                .try_into()
-                .map_err(|_| ConversionError::InvalidTransactionResult)?;
+            let events_arr: [_; 2] = events.try_into().map_err(|_| {
+                ConversionError::InvalidTransactionResult(
+                    "Expect 2 events in transaction type `TransferWithMemo`".to_string(),
+                )
+            })?;
             match events_arr {
                 [Event::Transferred {
                     from: _,
@@ -947,7 +1064,10 @@ fn convert_account_transaction(
                         memo,
                     })
                 }
-                _ => Err(ConversionError::InvalidTransactionResult),
+                other_event => Err(ConversionError::InvalidTransactionResult(format!(
+                    "Didn't expect event `{:?}` in transaction type `TransferWithMemo`",
+                    other_event
+                ))),
             }
         }
         #[allow(deprecated)]
@@ -1042,9 +1162,11 @@ fn convert_account_transaction(
         }
         #[allow(deprecated)]
         TransactionType::EncryptedAmountTransfer => {
-            let events_arr: [_; 2] = events
-                .try_into()
-                .map_err(|_| ConversionError::InvalidTransactionResult)?;
+            let events_arr: [_; 2] = events.try_into().map_err(|_| {
+                ConversionError::InvalidTransactionResult(
+                    "Expect 2 events in transaction type `EncryptedAmountTransfer`".to_string(),
+                )
+            })?;
             match events_arr {
                 [Event::EncryptedAmountsRemoved { data: removed }, Event::NewEncryptedAmount { data: added }] => {
                     mk_success(
@@ -1054,14 +1176,20 @@ fn convert_account_transaction(
                         },
                     )
                 }
-                _ => Err(ConversionError::InvalidTransactionResult),
+                other_events => Err(ConversionError::InvalidTransactionResult(format!(
+                    "Didn't expect events `{:?}` in transaction type `EncryptedAmountTransfer`",
+                    other_events
+                ))),
             }
         }
         #[allow(deprecated)]
         TransactionType::EncryptedAmountTransferWithMemo => {
-            let events_arr: [_; 3] = events
-                .try_into()
-                .map_err(|_| ConversionError::InvalidTransactionResult)?;
+            let events_arr: [_; 3] = events.try_into().map_err(|_| {
+                ConversionError::InvalidTransactionResult(
+                    "Expect 3 events in transaction type `EncryptedAmountTransferWithMemo`"
+                        .to_string(),
+                )
+            })?;
             match events_arr {
                 [Event::EncryptedAmountsRemoved { data: removed }, Event::NewEncryptedAmount { data: added }, Event::TransferMemo { memo }] => {
                     mk_success(
@@ -1072,7 +1200,11 @@ fn convert_account_transaction(
                         },
                     )
                 }
-                _ => Err(ConversionError::InvalidTransactionResult),
+                other_events => Err(ConversionError::InvalidTransactionResult(format!(
+                    "Didn't expect events `{:?}` in transaction type \
+                     `EncryptedAmountTransferWithMemo`",
+                    other_events
+                ))),
             }
         }
         #[allow(deprecated)]
@@ -1086,9 +1218,11 @@ fn convert_account_transaction(
             mk_success(effects)
         }
         TransactionType::TransferToPublic => {
-            let events_arr: [_; 2] = events
-                .try_into()
-                .map_err(|_| ConversionError::InvalidTransactionResult)?;
+            let events_arr: [_; 2] = events.try_into().map_err(|_| {
+                ConversionError::InvalidTransactionResult(
+                    "Expect 2 events in transaction type `TransferToPublic`".to_string(),
+                )
+            })?;
             match events_arr {
                 [Event::EncryptedAmountsRemoved { data: removed }, Event::AmountAddedByDecryption { account: _, amount }] => {
                     mk_success(super::AccountTransactionEffects::TransferredToPublic {
@@ -1096,7 +1230,10 @@ fn convert_account_transaction(
                         amount,
                     })
                 }
-                _ => Err(ConversionError::InvalidTransactionResult),
+                other_events => Err(ConversionError::InvalidTransactionResult(format!(
+                    "Didn't expect events `{:?}` in transaction type `TransferToPublic`",
+                    other_events
+                ))),
             }
         }
         TransactionType::TransferWithSchedule => {
@@ -1109,9 +1246,11 @@ fn convert_account_transaction(
             mk_success(effects)
         }
         TransactionType::TransferWithScheduleAndMemo => {
-            let events_arr: [_; 2] = events
-                .try_into()
-                .map_err(|_| ConversionError::InvalidTransactionResult)?;
+            let events_arr: [_; 2] = events.try_into().map_err(|_| {
+                ConversionError::InvalidTransactionResult(
+                    "Expect 2 events in transaction type `TransferWithScheduleAndMemo`".to_string(),
+                )
+            })?;
             match events_arr {
                 [Event::TransferredWithSchedule { to, amount, .. }, Event::TransferMemo { memo }] => {
                     mk_success(
@@ -1122,7 +1261,10 @@ fn convert_account_transaction(
                         },
                     )
                 }
-                _ => Err(ConversionError::InvalidTransactionResult),
+                other_events => Err(ConversionError::InvalidTransactionResult(format!(
+                    "Didn't expect events `{:?}` in transaction type `TransferWithScheduleAndMemo`",
+                    other_events
+                ))),
             }
         }
         TransactionType::UpdateCredentials => {
@@ -1229,7 +1371,10 @@ fn convert_account_transaction(
                         delegator_id,
                         account: _,
                     } => Ok(super::BakerEvent::DelegationRemoved { delegator_id }),
-                    _ => Err(ConversionError::InvalidTransactionResult),
+                    other_event => Err(ConversionError::InvalidTransactionResult(format!(
+                        "Didn't expect event `{:?}` in transaction type `ConfigureBaker`",
+                        other_event
+                    ))),
                 })
                 .collect::<Result<_, ConversionError>>()?;
             mk_success(super::AccountTransactionEffects::BakerConfigured { data })
@@ -1282,10 +1427,41 @@ fn convert_account_transaction(
                         baker_id,
                         account: _,
                     } => Ok(super::DelegationEvent::BakerRemoved { baker_id }),
-                    _ => Err(ConversionError::InvalidTransactionResult),
+                    other_event => Err(ConversionError::InvalidTransactionResult(format!(
+                        "Didn't expect event `{:?}` in transaction type `ConfigureDelegation`",
+                        other_event
+                    ))),
                 })
                 .collect::<Result<_, ConversionError>>()?;
             mk_success(super::AccountTransactionEffects::DelegationConfigured { data })
+        }
+        TransactionType::TokenUpdate => {
+            let events = events
+                .into_iter()
+                .map(|ev| match ev {
+                    Event::TokenModuleEvent { token_id, event } => Ok(TokenEvent {
+                        token_id,
+                        event: TokenEventDetails::Module(event),
+                    }),
+                    Event::TokenTransfer { token_id, event } => Ok(TokenEvent {
+                        token_id,
+                        event: TokenEventDetails::Transfer(event),
+                    }),
+                    Event::TokenMint { token_id, event } => Ok(TokenEvent {
+                        token_id,
+                        event: TokenEventDetails::Mint(event),
+                    }),
+                    Event::TokenBurn { token_id, event } => Ok(TokenEvent {
+                        token_id,
+                        event: TokenEventDetails::Burn(event),
+                    }),
+                    other_event => Err(ConversionError::InvalidTransactionResult(format!(
+                        "Didn't expect event `{:?}` in transaction type `TokenUpdate`",
+                        other_event
+                    ))),
+                })
+                .collect::<Result<_, ConversionError>>()?;
+            mk_success(super::AccountTransactionEffects::TokenUpdate { events })
         }
     }
 }
@@ -1301,7 +1477,9 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
                 let hash = value.hash;
                 let sender = value
                     .sender
-                    .ok_or(ConversionError::InvalidTransactionResult)?;
+                    .ok_or(ConversionError::InvalidTransactionResult(
+                        "Expect `BlockItemType::Account` to have a sender".to_string(),
+                    ))?;
                 let details = convert_account_transaction(ty, value.cost, sender, value.result)?;
                 Ok(super::BlockItemSummary {
                     index,
@@ -1345,26 +1523,38 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
             }
             BlockItemType::Update(_) => {
                 let ud = match value.result {
-                    BlockItemResult::Success { mut events } => {
-                        if events.len() == 1 {
-                            if let Event::UpdateEnqueued {
+                    BlockItemResult::Success { events } => {
+                        let Some(first_event) = events.first() else {
+                            return Err(ConversionError::InvalidUpdateResult);
+                        };
+
+                        match first_event {
+                            Event::UpdateEnqueued {
                                 effective_time,
                                 payload,
-                            } = events.remove(0)
-                            {
-                                super::UpdateDetails {
-                                    effective_time,
-                                    payload,
+                            } => {
+                                if events.len() != 1 {
+                                    return Err(ConversionError::InvalidUpdateResult);
                                 }
-                            } else {
-                                return Err(ConversionError::InvalidUpdateResult);
+
+                                Ok(super::UpdateDetails {
+                                    effective_time: *effective_time,
+                                    payload:        payload.clone(),
+                                })
                             }
-                        } else {
-                            return Err(ConversionError::InvalidUpdateResult);
+                            Event::TokenCreated { payload } => Ok(super::UpdateDetails {
+                                // `Effective_time` is always 0 for plt token creation
+                                // transactions. Plt token creation
+                                // transactions are not queued and instead take
+                                // effect immediately.
+                                effective_time: TransactionTime { seconds: 0 },
+                                payload:        UpdatePayload::CreatePlt(payload.clone()),
+                            }),
+                            _ => Err(ConversionError::InvalidUpdateResult),
                         }
                     }
                     BlockItemResult::Reject { .. } => return Err(ConversionError::FailedUpdate),
-                };
+                }?;
                 let details = super::BlockItemSummaryDetails::Update(ud);
                 Ok(super::BlockItemSummary {
                     index: value.index,

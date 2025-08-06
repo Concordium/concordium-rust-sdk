@@ -1,15 +1,13 @@
 //! Helpers and trait implementations to convert from proto generated types to
 //! their Rust equivalents.
 
-use super::generated::*;
-
-use super::Require;
+use super::{generated::*, Require};
 use crate::{
     types::{
         queries::ConcordiumBFTDetails, AccountReleaseSchedule, ActiveBakerPoolStatus,
         UpdateKeysCollectionSkeleton,
     },
-    v2::generated::BlockCertificates,
+    v2::generated::{block_item_summary::Details, BlockCertificates},
 };
 use chrono::TimeZone;
 use concordium_base::{
@@ -448,6 +446,7 @@ impl From<ProtocolVersion> for super::types::ProtocolVersion {
             ProtocolVersion::ProtocolVersion6 => super::types::ProtocolVersion::P6,
             ProtocolVersion::ProtocolVersion7 => super::types::ProtocolVersion::P7,
             ProtocolVersion::ProtocolVersion8 => super::types::ProtocolVersion::P8,
+            ProtocolVersion::ProtocolVersion9 => super::types::ProtocolVersion::P9,
         }
     }
 }
@@ -463,6 +462,7 @@ impl From<super::types::ProtocolVersion> for ProtocolVersion {
             super::types::ProtocolVersion::P6 => ProtocolVersion::ProtocolVersion6,
             super::types::ProtocolVersion::P7 => ProtocolVersion::ProtocolVersion7,
             super::types::ProtocolVersion::P8 => ProtocolVersion::ProtocolVersion8,
+            super::types::ProtocolVersion::P9 => ProtocolVersion::ProtocolVersion9,
         }
     }
 }
@@ -953,6 +953,7 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             address,
             cooldowns,
             available_balance,
+            tokens,
         } = value;
         let account_nonce = sequence_number.require()?.into();
         let account_amount = amount.require()?.into();
@@ -998,7 +999,10 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             // locked amount.
             account_amount - locked_amount
         });
-
+        let tokens = tokens
+            .into_iter()
+            .map(|token| token.try_into())
+            .collect::<Result<_, _>>()?;
         Ok(Self {
             account_nonce,
             account_amount,
@@ -1021,6 +1025,7 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             account_address,
             cooldowns,
             available_balance,
+            tokens,
         })
     }
 }
@@ -1322,6 +1327,18 @@ impl TryFrom<BlockItemSummary> for super::types::BlockItemSummary {
                         payload:        v.payload.require()?.try_into()?,
                     })
                 }
+                Details::TokenCreation(v) => {
+                    super::types::BlockItemSummaryDetails::TokenCreationDetails(
+                        super::types::TokenCreationDetails {
+                            create_plt: v.create_plt.require()?.try_into()?,
+                            events:     v
+                                .events
+                                .into_iter()
+                                .map(TryInto::try_into)
+                                .collect::<Result<_, tonic::Status>>()?,
+                        },
+                    )
+                }
             },
         })
     }
@@ -1424,6 +1441,24 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
             update_payload::Payload::ValidatorScoreParametersUpdate(v) => {
                 Self::ValidatorScoreParametersCPV3(v.try_into()?)
             }
+            update_payload::Payload::CreatePltUpdate(create_plt) => {
+                Self::CreatePlt(create_plt.try_into()?)
+            }
+        })
+    }
+}
+
+impl TryFrom<super::generated::plt::CreatePlt> for concordium_base::updates::CreatePlt {
+    type Error = tonic::Status;
+
+    fn try_from(value: super::generated::plt::CreatePlt) -> Result<Self, Self::Error> {
+        Ok(Self {
+            token_id:                  value.token_id.require()?.try_into()?,
+            token_module:              value.token_module.require()?.try_into()?,
+            decimals:                  value.decimals.try_into().map_err(|_| {
+                tonic::Status::internal("Unexpected integer size for token decimals.")
+            })?,
+            initialization_parameters: value.initialization_parameters.require()?.into(),
         })
     }
 }
@@ -1537,6 +1572,7 @@ impl TryFrom<AuthorizationsV1> for super::types::AuthorizationsV1 {
             v0:                  value.v0.require()?.try_into()?,
             cooldown_parameters: value.parameter_cooldown.require()?.try_into()?,
             time_parameters:     value.parameter_time.require()?.try_into()?,
+            create_plt:          value.create_plt.map(|x| x.try_into()).transpose()?,
         })
     }
 }
@@ -1780,6 +1816,15 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
             account_transaction_effects::Effect::DelegationConfigured(dc) => {
                 Ok(Self::DelegationConfigured {
                     data: dc
+                        .events
+                        .into_iter()
+                        .map(TryInto::try_into)
+                        .collect::<Result<_, tonic::Status>>()?,
+                })
+            }
+            account_transaction_effects::Effect::TokenUpdateEffect(token_effect) => {
+                Ok(Self::TokenUpdate {
+                    events: token_effect
                         .events
                         .into_iter()
                         .map(TryInto::try_into)
@@ -2218,6 +2263,12 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
                 Self::PoolWouldBecomeOverDelegated
             }
             reject_reason::Reason::PoolClosed(_) => Self::PoolClosed,
+            reject_reason::Reason::NonExistentTokenId(token_id) => {
+                Self::NonExistentTokenId(token_id.try_into()?)
+            }
+            reject_reason::Reason::TokenUpdateTransactionFailed(token_module_reject_reason) => {
+                Self::TokenUpdateTransactionFailed(token_module_reject_reason.try_into()?)
+            }
         })
     }
 }
@@ -3336,6 +3387,10 @@ impl TryFrom<NextUpdateSequenceNumbers> for super::types::queries::NextUpdateSeq
                 .validator_score_parameters
                 .map(Into::into)
                 .unwrap_or_default(),
+            protocol_level_tokens: message
+                .protocol_level_tokens
+                .map(Into::into)
+                .unwrap_or_default(),
         })
     }
 }
@@ -3826,7 +3881,6 @@ impl TryFrom<ConsensusDetailedStatus> for super::types::queries::ConsensusDetail
 
 #[cfg(test)]
 mod test {
-
     use super::*;
 
     #[test]

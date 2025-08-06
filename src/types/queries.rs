@@ -372,6 +372,8 @@ pub struct NextUpdateSequenceNumbers {
     /// Updates to the validator score parameters for chain parameters version 3
     /// onwards.
     pub validator_score_parameters: UpdateSequenceNumber,
+    // Updates to the protocol level tokens. Introduced in protocol version 9.
+    pub protocol_level_tokens: UpdateSequenceNumber,
 }
 
 /// The status of the node with respect to its participation in the consensus
