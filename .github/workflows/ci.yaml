@@ -7,7 +7,6 @@ on:
      - main
 
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, edited]
 
   workflow_dispatch: # allows manual trigger
 
