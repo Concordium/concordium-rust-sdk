@@ -2,6 +2,10 @@
 
 - Add `NextUpdateSequenceNumbers::protocol_level_tokens` and protobuf deserialization of it
 - Changed `TokenClient`'s `burn` and `mint` methods to accept a singular `TokenAmount`, instead of `Vec<TokenAmount>`.
+- Removed authorization from `TokenClient` validation.
+- Added `validate_mint`, `validate_burn`, `validate_allow_list_update`, `validate_deny_list_update` methods to `TokenClient`.
+- Added `update_token_info` method to `TokenClient`.
+- Added `Validation` as a separate enum for `TokenClient` operations.
 
 ## 7.0.0-alpha.3
 
