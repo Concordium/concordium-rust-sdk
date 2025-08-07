@@ -710,7 +710,8 @@ impl TokenClient {
         self.sign_and_send(signer, operations, expiry, nonce).await
     }
 
-    /// Updates token's info to a last finilized block.
+    /// Updates token's info to a last finilized block. The method can be
+    /// ommited before calling the validation methods.
     pub async fn update_token_info(&mut self) -> TokenResult<()> {
         self.info = self
             .client
