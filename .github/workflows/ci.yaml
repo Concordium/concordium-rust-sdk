@@ -42,7 +42,7 @@ jobs:
           rustup component add clippy
       - name: Run Clippy
         run: |
-          cargo clippy --locked --all-targets --all-features --no-deps -- -D warnings
+          cargo clippy --all-targets --all-features --no-deps -- -D warnings
 
   tests:
     name: Tests
@@ -54,4 +54,4 @@ jobs:
           submodules: recursive
       - name: Run tests
         run: |
-          cargo test --locked --all-features --release
+          cargo test --all-features --release
