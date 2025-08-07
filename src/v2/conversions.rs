@@ -2263,11 +2263,13 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
                 Self::PoolWouldBecomeOverDelegated
             }
             reject_reason::Reason::PoolClosed(_) => Self::PoolClosed,
-            reject_reason::Reason::NonExistentTokenId(token_id) => {
-                Self::NonExistentTokenId(token_id.try_into()?)
-            }
+            reject_reason::Reason::NonExistentTokenId(token_id) => Self::NonExistentTokenId {
+                token_id: token_id.try_into()?,
+            },
             reject_reason::Reason::TokenUpdateTransactionFailed(token_module_reject_reason) => {
-                Self::TokenUpdateTransactionFailed(token_module_reject_reason.try_into()?)
+                Self::TokenUpdateTransactionFailed {
+                    reject_reason: token_module_reject_reason.try_into()?,
+                }
             }
         })
     }

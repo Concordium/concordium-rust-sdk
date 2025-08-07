@@ -3,6 +3,7 @@
 - Add `NextUpdateSequenceNumbers::protocol_level_tokens` and protobuf deserialization of it
 - Changed `TokenClient`'s `burn` and `mint` methods to accept a singular `TokenAmount`, instead of `Vec<TokenAmount>`.
 - Added `PartialEq`, `Eq`, `Hash` to `TokenInfo`
+- Fix JSON serialization of `RejectReason` such that it matches the Haskell counterpart.
 
 ## 7.0.0-alpha.3
 
