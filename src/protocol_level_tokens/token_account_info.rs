@@ -11,7 +11,7 @@ use concordium_base::{
 ///
 /// Part of the response for
 /// [`v2::Client::get_account_info`](crate::v2::Client::get_account_info).
-#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountToken {
     /// The unique identifier/symbol for the protocol level token.
@@ -24,7 +24,7 @@ pub struct AccountToken {
 ///
 /// Part of the response for
 /// [`Client::get_account_info`](crate::v2::Client::get_account_info).
-#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TokenAccountState {
     /// The token balance of the account.

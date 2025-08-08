@@ -51,7 +51,7 @@ use std::{
 /// zero-knowledge proofs.
 pub type CryptographicParameters = crate::id::types::GlobalContext<crate::id::constants::ArCurve>;
 
-#[derive(SerdeSerialize, PartialEq, Eq, SerdeDeserialize, Debug)]
+#[derive(SerdeSerialize, PartialEq, Eq, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 /// The state of the encrypted balance of an account.
 pub struct AccountEncryptedAmount {
@@ -217,7 +217,7 @@ impl AccountEncryptedAmount {
         }
     }
 }
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Eq, PartialEq)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Eq, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 /// State of the account's release schedule. This is the balance of the account
 /// that is owned by the account, but cannot be used until the release point.
@@ -228,7 +228,7 @@ pub struct AccountReleaseSchedule {
     pub schedule: Vec<Release>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Eq, PartialEq)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Eq, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 /// An individual release of a locked balance.
 pub struct Release {
@@ -303,7 +303,7 @@ impl AccountStakingInfo {
 /// a payday) it enters the pre-cooldown state. At the subsequent payday, it
 /// enters the cooldown state. At the payday after the end of the cooldown
 /// period, the stake is finally released.
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq, Clone)]
 pub enum CooldownStatus {
     /// The amount is in cooldown and will expire at the specified time,
     /// becoming available at the subsequent pay day.
@@ -322,7 +322,7 @@ pub enum CooldownStatus {
     PrePreCooldown,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Cooldown {
     /// The time in milliseconds since the Unix epoch when the cooldown period
@@ -337,7 +337,7 @@ pub struct Cooldown {
     pub status: CooldownStatus,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 /// Account information exposed via the node's API. This is always the state of
 /// an account in a specific block.
