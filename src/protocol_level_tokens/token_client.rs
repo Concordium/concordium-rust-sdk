@@ -636,7 +636,7 @@ impl TokenClient {
 
         // Check the sender ballance
         let sender_balance = sender_info
-            .token_amount(&token_id)
+            .token_amount(token_id)
             .unwrap_or(TokenAmount::from_raw(0, decimals));
 
         let payload_total = TokenAmount::from_raw(
