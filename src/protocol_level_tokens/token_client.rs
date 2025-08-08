@@ -686,7 +686,7 @@ impl TokenClient {
         for account in accounts {
             let token_state = account
                 .tokens()
-                .into_iter()
+                .iter()
                 .find(|t| t.token_id == *token_id)
                 .cloned()
                 .map(|t| t.state)
