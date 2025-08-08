@@ -17,7 +17,7 @@ use thiserror::Error;
 
 use crate::{
     endpoints,
-    protocol_level_tokens::{CborMemo, TokenAccountState, TokenInfo},
+    protocol_level_tokens::{AccountToken, CborMemo, TokenAccountState, TokenInfo},
     types::{AccountInfo, WalletAccount},
     v2::{
         AccountIdentifier, BlockIdentifier, Client, IntoBlockIdentifier, QueryError, QueryResponse,
@@ -608,6 +608,7 @@ impl TokenClient {
             .await
     }
 
+    /// Private implementation of transfer validation for the testing purposes.
     async fn inner_validate_transfer(
         mut client: impl AccountInfoFetch + Clone,
         token_id: &TokenId,
@@ -636,7 +637,11 @@ impl TokenClient {
 
         // Check the sender ballance
         let sender_balance = sender_info
-            .token_amount(token_id)
+            .tokens()
+            .iter()
+            .find(|t| t.token_id == *token_id)
+            .cloned()
+            .map(|t| t.state.balance)
             .unwrap_or(TokenAmount::from_raw(0, decimals));
 
         let payload_total = TokenAmount::from_raw(
@@ -680,9 +685,10 @@ impl TokenClient {
 
         for account in accounts {
             let token_state = account
-                .tokens
+                .tokens()
                 .into_iter()
                 .find(|t| t.token_id == *token_id)
+                .cloned()
                 .map(|t| t.state)
                 .unwrap_or(TokenAccountState {
                     balance:      TokenAmount::from_raw(0, decimals),
@@ -781,51 +787,91 @@ impl TokenClient {
     }
 }
 
+/// Helper trait for mock testing the PLT holder accounts
+trait HasTokens {
+    fn tokens(&self) -> &[AccountToken];
+}
+
+impl HasTokens for AccountInfo {
+    fn tokens(&self) -> &[AccountToken] { &self.tokens }
+}
+
 /// Helper trait for testing the transfer validation.
 trait AccountInfoFetch {
+    type Info: HasTokens + Clone;
+
     async fn get_account_info(
         &mut self,
         address: &AccountIdentifier,
         block: BlockIdentifier,
-    ) -> endpoints::QueryResult<QueryResponse<AccountInfo>>;
+    ) -> endpoints::QueryResult<QueryResponse<Self::Info>>;
 }
 
 impl AccountInfoFetch for Client {
+    type Info = AccountInfo;
+
     async fn get_account_info(
         &mut self,
         address: &AccountIdentifier,
         block: BlockIdentifier,
-    ) -> endpoints::QueryResult<QueryResponse<AccountInfo>> {
+    ) -> endpoints::QueryResult<QueryResponse<Self::Info>> {
         self.get_account_info(address, block).await
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::protocol_level_tokens::{CborHolderAccount, CborTokenHolder, MetadataUrl};
+    use concordium_base::{hashes::HashBytes, protocol_level_tokens::TokenModuleAccountState};
+
+    use crate::{
+        common::cbor,
+        protocol_level_tokens::{CborHolderAccount, CborTokenHolder, MetadataUrl},
+    };
 
     use super::*;
     use std::{collections::HashMap, str::FromStr};
 
+    const ADDRESS_1: &str = "4UC8o4m8AgTxt5VBFMdLwMCwwJQVJwjesNzW7RPXkACynrULmd";
+    const ADDRESS_2: &str = "3ybJ66spZ2xdWF3avgxQb2meouYa7mpvMWNPmUnczU8FoF8cGB";
+    const TOKEN_ID: &str = "MockToken";
+
+    #[derive(Debug, Clone)]
+    struct MockInfo {
+        info: Vec<AccountToken>,
+    }
+
+    impl HasTokens for MockInfo {
+        fn tokens(&self) -> &[AccountToken] { &self.info }
+    }
+
     #[derive(Debug, Clone)]
     struct MockClient {
-        responses: HashMap<AccountAddress, QueryResponse<AccountInfo>>,
+        responses: HashMap<AccountAddress, QueryResponse<MockInfo>>,
     }
 
     impl MockClient {
         fn new() -> Self {
-            Self {
-                responses: HashMap::new(),
-            }
+            let responses = HashMap::new();
+            Self { responses }
+        }
+
+        fn add_account_info(&mut self, account: AccountAddress, info: MockInfo) {
+            let response = QueryResponse {
+                block_hash: HashBytes::from([0; 32]),
+                response:   info,
+            };
+            let _ = self.responses.insert(account, response);
         }
     }
 
     impl AccountInfoFetch for MockClient {
+        type Info = MockInfo;
+
         async fn get_account_info(
             &mut self,
             address: &AccountIdentifier,
             _block: BlockIdentifier,
-        ) -> endpoints::QueryResult<QueryResponse<AccountInfo>> {
+        ) -> endpoints::QueryResult<QueryResponse<Self::Info>> {
             let AccountIdentifier::Address(address) = address else {
                 return Err(QueryError::NotFound);
             };
@@ -838,21 +884,52 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn successfull_transfer_validation() {
-        let client = MockClient::new();
-        let token_id =
-            TokenId::from_str("MockToken").expect("The Token Id must be able to created");
+    async fn successful_transfer_validation() {
+        // basic data
+        let account_1 = AccountAddress::from_str(ADDRESS_1).expect("Must be valid Address");
+        let account_2 = AccountAddress::from_str(ADDRESS_2).expect("Must be valid Address");
+        let token_id = TokenId::from_str(TOKEN_ID).expect("The Token Id must be valid");
         let decimals = 8;
+
+        // create and puplate mock client
+        let mut client = MockClient::new();
+
+        let amount_1 = TokenAmount::from_raw(1_000_000_000, decimals);
+        let info_1 = MockInfo {
+            info: vec![AccountToken {
+                token_id: token_id.clone(),
+                state:    TokenAccountState {
+                    balance:      amount_1,
+                    module_state: None,
+                },
+            }],
+        };
+
+        let amount_2 = TokenAmount::from_raw(1_000_000, decimals);
+        let info_2 = MockInfo {
+            info: vec![AccountToken {
+                token_id: token_id.clone(),
+                state:    TokenAccountState {
+                    balance:      amount_2,
+                    module_state: None,
+                },
+            }],
+        };
+
+        client.add_account_info(account_1, info_1);
+        client.add_account_info(account_2, info_2);
+
+        // creating token module state
         let token_module_state = TokenModuleState {
-            name:               "MockToken".into(),
+            name:               TOKEN_ID.into(),
             metadata:           MetadataUrl {
-                url:              "SomeUrl".into(),
+                url:              "https://example.com/metadata".into(),
                 checksum_sha_256: None,
                 additional:       HashMap::new(),
             },
             governance_account: CborTokenHolder::Account(CborHolderAccount {
                 coin_info: None,
-                address:   AccountAddress::from_str("SomeAddress").expect("Must be valid Address"),
+                address:   account_1,
             }),
             allow_list:         None,
             deny_list:          None,
@@ -861,32 +938,471 @@ mod tests {
             paused:             None,
             additional:         HashMap::new(),
         };
-        let sender =
-            AccountAddress::from_str("address").expect("The account address must be valid");
-        let payload = Vec::new();
-        if let Err(err) = TokenClient::inner_validate_transfer(
+
+        // creating payload
+        let payload = vec![
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+        ];
+
+        let result = TokenClient::inner_validate_transfer(
             client,
             &token_id,
             decimals,
             token_module_state,
-            sender,
+            account_1,
             payload,
         )
-        .await
-        {
-            panic!("validation failed! Reason: {err}");
-        }
+        .await;
+
+        assert!(result.is_ok(), "expected Ok(()), got: {result:?}");
     }
 
     #[tokio::test]
-    async fn fail_validate_transfer_paused() {}
+    async fn fail_validate_transfer_paused() {
+        // basic data
+        let account_1 = AccountAddress::from_str(ADDRESS_1).expect("Must be valid Address");
+        let account_2 = AccountAddress::from_str(ADDRESS_2).expect("Must be valid Address");
+        let token_id = TokenId::from_str(TOKEN_ID).expect("The Token Id must be valid");
+        let decimals = 8;
+
+        // create and puplate mock client
+        let mut client = MockClient::new();
+
+        let amount_1 = TokenAmount::from_raw(1_000_000_000, decimals);
+        let info_1 = MockInfo {
+            info: vec![AccountToken {
+                token_id: token_id.clone(),
+                state:    TokenAccountState {
+                    balance:      amount_1,
+                    module_state: None,
+                },
+            }],
+        };
+
+        let amount_2 = TokenAmount::from_raw(1_000_000, decimals);
+        let info_2 = MockInfo {
+            info: vec![AccountToken {
+                token_id: token_id.clone(),
+                state:    TokenAccountState {
+                    balance:      amount_2,
+                    module_state: None,
+                },
+            }],
+        };
+
+        client.add_account_info(account_1, info_1);
+        client.add_account_info(account_2, info_2);
+
+        // creating token module with a paused state
+        let token_module_state = TokenModuleState {
+            name:               TOKEN_ID.into(),
+            metadata:           MetadataUrl {
+                url:              "https://example.com/metadata".into(),
+                checksum_sha_256: None,
+                additional:       HashMap::new(),
+            },
+            governance_account: CborTokenHolder::Account(CborHolderAccount {
+                coin_info: None,
+                address:   account_1,
+            }),
+            allow_list:         None,
+            deny_list:          None,
+            mintable:           None,
+            burnable:           None,
+            paused:             Some(true),
+            additional:         HashMap::new(),
+        };
+
+        // creating payload
+        let payload = vec![
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+        ];
+
+        let result = TokenClient::inner_validate_transfer(
+            client,
+            &token_id,
+            decimals,
+            token_module_state,
+            account_1,
+            payload,
+        )
+        .await;
+
+        assert!(
+            matches!(result, Err(TokenError::Paused)),
+            "expected error: TokenError::Paused, got {result:?}"
+        );
+    }
 
     #[tokio::test]
-    async fn fail_validate_transfer_insufficent_funds() {}
+    async fn fail_validate_transfer_insufficent_funds() {
+        // basic data
+        let account_1 = AccountAddress::from_str(ADDRESS_1).expect("Must be valid Address");
+        let account_2 = AccountAddress::from_str(ADDRESS_2).expect("Must be valid Address");
+        let token_id = TokenId::from_str(TOKEN_ID).expect("The Token Id must be valid");
+        let decimals = 8;
+
+        // create and puplate mock client
+        let mut client = MockClient::new();
+
+        // creating sender with insufficient amount of tokens
+        let amount_1 = TokenAmount::from_raw(1_000_000, decimals);
+        let info_1 = MockInfo {
+            info: vec![AccountToken {
+                token_id: token_id.clone(),
+                state:    TokenAccountState {
+                    balance:      amount_1,
+                    module_state: None,
+                },
+            }],
+        };
+
+        let amount_2 = TokenAmount::from_raw(1_000_000, decimals);
+        let info_2 = MockInfo { info: vec![] };
+
+        client.add_account_info(account_1, info_1);
+        client.add_account_info(account_2, info_2);
+
+        // creating token module state
+        let token_module_state = TokenModuleState {
+            name:               TOKEN_ID.into(),
+            metadata:           MetadataUrl {
+                url:              "https://example.com/metadata".into(),
+                checksum_sha_256: None,
+                additional:       HashMap::new(),
+            },
+            governance_account: CborTokenHolder::Account(CborHolderAccount {
+                coin_info: None,
+                address:   account_1,
+            }),
+            allow_list:         None,
+            deny_list:          None,
+            mintable:           None,
+            burnable:           None,
+            paused:             None,
+            additional:         HashMap::new(),
+        };
+
+        // creating payload
+        let payload = vec![
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+        ];
+
+        let result = TokenClient::inner_validate_transfer(
+            client,
+            &token_id,
+            decimals,
+            token_module_state,
+            account_1,
+            payload,
+        )
+        .await;
+
+        assert!(
+            matches!(result, Err(TokenError::InsufficientFunds)),
+            "expected error: TokenError::InsufficientFunds, got {result:?}"
+        );
+    }
 
     #[tokio::test]
-    async fn fail_validate_transfer_invalid_amount_in_payload() {}
+    async fn fail_validate_transfer_invalid_amount_in_payload() {
+        // basic data
+        let account_1 = AccountAddress::from_str(ADDRESS_1).expect("Must be valid Address");
+        let account_2 = AccountAddress::from_str(ADDRESS_2).expect("Must be valid Address");
+        let token_id = TokenId::from_str(TOKEN_ID).expect("The Token Id must be valid");
+        let decimals = 8;
+
+        // create and puplate mock client
+        let mut client = MockClient::new();
+
+        let amount_1 = TokenAmount::from_raw(1_000_000, decimals);
+        let info_1 = MockInfo {
+            info: vec![AccountToken {
+                token_id: token_id.clone(),
+                state:    TokenAccountState {
+                    balance:      amount_1,
+                    module_state: None,
+                },
+            }],
+        };
+
+        let info_2 = MockInfo { info: vec![] };
+
+        client.add_account_info(account_1, info_1);
+        client.add_account_info(account_2, info_2);
+
+        // creating token module state
+        let token_module_state = TokenModuleState {
+            name:               TOKEN_ID.into(),
+            metadata:           MetadataUrl {
+                url:              "https://example.com/metadata".into(),
+                checksum_sha_256: None,
+                additional:       HashMap::new(),
+            },
+            governance_account: CborTokenHolder::Account(CborHolderAccount {
+                coin_info: None,
+                address:   account_1,
+            }),
+            allow_list:         None,
+            deny_list:          None,
+            mintable:           None,
+            burnable:           None,
+            paused:             None,
+            additional:         HashMap::new(),
+        };
+
+        // creating amount with the wrong decimals
+        let amount_2 = TokenAmount::from_raw(1_000_000, decimals + 2);
+
+        // creating payload
+        let payload = vec![
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+        ];
+
+        let result = TokenClient::inner_validate_transfer(
+            client,
+            &token_id,
+            decimals,
+            token_module_state,
+            account_1,
+            payload,
+        )
+        .await;
+
+        assert!(
+            matches!(result, Err(TokenError::InvalidTokenAmount)),
+            "expected error: TokenError::InvalidTokenAmount, got {result:?}"
+        );
+    }
 
     #[tokio::test]
-    async fn fail_validate_transfer_list_error() {}
+    async fn fail_validate_transfer_list_error() {
+        // basic data
+        let account_1 = AccountAddress::from_str(ADDRESS_1).expect("Must be valid Address");
+        let account_2 = AccountAddress::from_str(ADDRESS_2).expect("Must be valid Address");
+        let token_id = TokenId::from_str(TOKEN_ID).expect("The Token Id must be valid");
+        let decimals = 8;
+
+        // create and puplate mock client
+        let mut client = MockClient::new();
+
+        let amount_1 = TokenAmount::from_raw(1_000_000_000, decimals);
+        let info_1 = MockInfo {
+            info: vec![AccountToken {
+                token_id: token_id.clone(),
+                state:    TokenAccountState {
+                    balance:      amount_1,
+                    module_state: None,
+                },
+            }],
+        };
+
+        // creating an account that is in the deny list
+        let amount_2 = TokenAmount::from_raw(1_000_000, decimals);
+        let account_module_state_2 = TokenModuleAccountState {
+            allow_list: None,
+            deny_list:  Some(true),
+            additional: HashMap::new(),
+        };
+        let cbor = cbor::cbor_encode(&account_module_state_2)
+            .expect("TokenModuleAccountState must be serializbale");
+        // account_module_state_2
+        let info_2 = MockInfo {
+            info: vec![AccountToken {
+                token_id: token_id.clone(),
+                state:    TokenAccountState {
+                    balance:      amount_2,
+                    module_state: Some(cbor.into()),
+                },
+            }],
+        };
+
+        client.add_account_info(account_1, info_1);
+        client.add_account_info(account_2, info_2);
+
+        // creating token module state with a deny list
+        let token_module_state = TokenModuleState {
+            name:               TOKEN_ID.into(),
+            metadata:           MetadataUrl {
+                url:              "https://example.com/metadata".into(),
+                checksum_sha_256: None,
+                additional:       HashMap::new(),
+            },
+            governance_account: CborTokenHolder::Account(CborHolderAccount {
+                coin_info: None,
+                address:   account_1,
+            }),
+            allow_list:         None,
+            deny_list:          Some(true),
+            mintable:           None,
+            burnable:           None,
+            paused:             None,
+            additional:         HashMap::new(),
+        };
+
+        // creating payload
+        let payload = vec![
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+            TransferTokens {
+                amount:    amount_2,
+                recipient: account_2,
+                memo:      None,
+            },
+        ];
+
+        let result = TokenClient::inner_validate_transfer(
+            client,
+            &token_id,
+            decimals,
+            token_module_state,
+            account_1,
+            payload,
+        )
+        .await;
+
+        assert!(
+            matches!(result, Err(TokenError::NotAllowed)),
+            "expected TokenError::NotAllowed, got: {result:?}"
+        );
+    }
 }
