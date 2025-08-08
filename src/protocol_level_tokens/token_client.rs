@@ -600,196 +600,193 @@ impl TokenClient {
         // Fetching latest final token info
         self.update_token_info().await?;
 
-        let module_state = self.info.token_state.decode_module_state()?;
-
-        // Check if the token is paused
-        if module_state.paused.unwrap_or_default() {
         let client = self.client.clone();
         let token_id = &self.info.token_id;
         let decimals = self.info.token_state.decimals;
-        let token_module_state = self.info.token_state.decode_module_state()?;
+        let module_state = self.info.token_state.decode_module_state()?;
         Self::inner_validate_transfer(
             client,
             token_id,
             decimals,
-            token_module_state,
+            module_state,
             sender,
             payload,
         )
         .await
     }
 
-    async fn inner_validate_transfer(
-        mut client: impl AccountInfoFetch + Clone,
-        token_id: &TokenId,
-        decimals: u8,
-        token_module_state: TokenModuleState,
-        sender: AccountAddress,
-        payload: Vec<TransferTokens>,
-    ) -> TokenResult<()> {
-        // check for pause
-        if token_module_state.paused.unwrap_or_default() {
-            return Err(TokenError::Paused);
-        }
+        async fn inner_validate_transfer(
+            mut client: impl AccountInfoFetch + Clone,
+            token_id: &TokenId,
+            decimals: u8,
+            module_state: TokenModuleState,
+            sender: AccountAddress,
+            payload: Vec<TransferTokens>,
+        ) -> TokenResult<()> {
+            // check for pause
+            if module_state.paused.unwrap_or_default() {
+                return Err(TokenError::Paused);
+            }
 
-        // Validate all amounts
-        if payload
-            .iter()
-            .any(|transfer| transfer.amount.decimals() != decimals)
-        {
-            return Err(TokenError::InvalidTokenAmount);
-        }
-
-        let sender_info = client
-            .get_account_info(&sender.into(), BlockIdentifier::LastFinal)
-            .await?
-            .response;
-
-        // Check the sender ballance
-        let sender_balance = sender_info
-            .token_amount(&token_id)
-            .unwrap_or(TokenAmount::from_raw(0, decimals));
-
-        let payload_total = TokenAmount::from_raw(
-            payload
+            // Validate all amounts
+            if payload
                 .iter()
-                .try_fold(0u64, |acc, x| acc.checked_add(x.amount.value()))
-                .ok_or(TokenError::InvalidTokenAmount)?,
-            decimals,
-        );
-
-        if payload_total > sender_balance {
-            return Err(TokenError::InsufficientFunds);
-        }
-
-        // Check if token has no allow and deny lists
-        if !module_state.allow_list.unwrap_or_default()
-            && !module_state.deny_list.unwrap_or_default()
-        {
-            return Ok(());
-        }
-
-        // Check sender and recievers for allow and deny lists
-        let mut accounts = Vec::with_capacity(payload.len() + 1);
-        accounts.push(sender_info);
-
-        let futures = payload.into_iter().map(|transfer| {
-            let holder = transfer.recipient;
-            let mut client = client.clone();
-            async move {
-                client
-                    .get_account_info(&holder.into(), BlockIdentifier::LastFinal)
-                    .await
-            }
-        });
-
-        let recepients = futures::future::try_join_all(futures).await?;
-        for recepient in recepients {
-            let info = recepient.response;
-            accounts.push(info);
-        }
-
-        for account in accounts {
-            let token_state = account
-                .tokens
-                .into_iter()
-                .find(|t| t.token_id == *token_id)
-                .map(|t| t.state)
-                .unwrap_or(TokenAccountState {
-                    balance:      TokenAmount::from_raw(0, self.info.token_state.decimals),
-                    module_state: None,
-                });
-
-            let account_module_state = token_state.decode_module_state()?;
-            if module_state.deny_list.unwrap_or_default()
-                && account_module_state.deny_list.unwrap_or_default()
+                .any(|transfer| transfer.amount.decimals() != decimals)
             {
-                return Err(TokenError::NotAllowed);
+                return Err(TokenError::InvalidTokenAmount);
             }
 
-            if module_state.allow_list.unwrap_or_default()
-                && !account_module_state.allow_list.unwrap_or_default()
+            let sender_info = client
+                .get_account_info(&sender.into(), BlockIdentifier::LastFinal)
+                .await?
+                .response;
+
+            // Check the sender ballance
+            let sender_balance = sender_info
+                .token_amount(&token_id)
+                .unwrap_or(TokenAmount::from_raw(0, decimals));
+
+            let payload_total = TokenAmount::from_raw(
+                payload
+                    .iter()
+                    .try_fold(0u64, |acc, x| acc.checked_add(x.amount.value()))
+                    .ok_or(TokenError::InvalidTokenAmount)?,
+                decimals,
+            );
+
+            if payload_total > sender_balance {
+                return Err(TokenError::InsufficientFunds);
+            }
+
+            // Check if token has no allow and deny lists
+            if !module_state.allow_list.unwrap_or_default()
+                && !module_state.deny_list.unwrap_or_default()
             {
-                return Err(TokenError::NotAllowed);
+                return Ok(());
             }
+
+            // Check sender and recievers for allow and deny lists
+            let mut accounts = Vec::with_capacity(payload.len() + 1);
+            accounts.push(sender_info);
+
+            let futures = payload.into_iter().map(|transfer| {
+                let holder = transfer.recipient;
+                let mut client = client.clone();
+                async move {
+                    client
+                        .get_account_info(&holder.into(), BlockIdentifier::LastFinal)
+                        .await
+                }
+            });
+
+            let recepients = futures::future::try_join_all(futures).await?;
+            for recepient in recepients {
+                let info = recepient.response;
+                accounts.push(info);
+            }
+
+            for account in accounts {
+                let token_state = account
+                    .tokens
+                    .into_iter()
+                    .find(|t| t.token_id == *token_id)
+                    .map(|t| t.state)
+                    .unwrap_or(TokenAccountState {
+                        balance:      TokenAmount::from_raw(0, decimals),
+                        module_state: None,
+                    });
+
+                let account_module_state = token_state.decode_module_state()?;
+                if module_state.deny_list.unwrap_or_default()
+                    && account_module_state.deny_list.unwrap_or_default()
+                {
+                    return Err(TokenError::NotAllowed);
+                }
+
+                if module_state.allow_list.unwrap_or_default()
+                    && !account_module_state.allow_list.unwrap_or_default()
+                {
+                    return Err(TokenError::NotAllowed);
+                }
+            }
+            Ok(())
         }
-        Ok(())
+
+        /// Initiates a transaction with a list of PLT operations for a given
+        /// token.
+        ///
+        /// # Arguments
+        ///
+        /// * `signer` - A [`WalletAccount`] who's address is used as a sender
+        ///   and keys as a signer.
+        /// * `expiry` - The optional expiry time for the transaction.
+        /// * `operations` - A list of protocol level token operations.
+        /// * `meta` - The optional transaction metadata. Includes optional
+        ///   expiration, nonce. Validation is ignored for this method.
+        pub async fn send_operations(
+            &mut self,
+            signer: &WalletAccount,
+            operations: TokenOperations,
+            meta: Option<TransactionMetadata>,
+        ) -> TokenResult<TransactionHash> {
+            let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
+            self.sign_and_send(signer, operations, expiry, nonce).await
+        }
+
+        /// Updates token's info to a last finilized block. The method can be
+        /// ommited before calling the validation methods.
+        pub async fn update_token_info(&mut self) -> TokenResult<()> {
+            self.info = self
+                .client
+                .get_token_info(self.info.token_id.clone(), BlockIdentifier::LastFinal)
+                .await?
+                .response;
+            Ok(())
+        }
+
+        /// Helper method containing the common logic related to signing and
+        /// sending PLT operations.
+        ///
+        /// # Arguments
+        ///
+        /// * `signer` - A [`WalletAccount`] who's address is used as a sender
+        ///   and keys as a signer.
+        /// * `operations` - A list of protocol level token operations.
+        /// * `expiry` - The expiry time for the transaction.
+        /// * `nonce` - Option
+        async fn sign_and_send(
+            &mut self,
+            signer: &WalletAccount,
+            operations: TokenOperations,
+            expiry: Option<TransactionTime>,
+            nonce: Option<Nonce>,
+        ) -> TokenResult<TransactionHash> {
+            let expiry = expiry.unwrap_or(TransactionTime::seconds_after(self.default_expiry));
+
+            let nonce = match nonce {
+                Some(nonce) => nonce,
+                None => {
+                    self.client
+                        .get_next_account_sequence_number(&signer.address)
+                        .await?
+                        .nonce
+                }
+            };
+
+            let token_id = self.info.token_id.clone();
+
+            let transaction = send::token_update_operations(
+                &signer,
+                signer.address,
+                nonce,
+                expiry,
+                token_id,
+                operations,
+            )?;
+            let block_item = BlockItem::AccountTransaction(transaction);
+            Ok(self.client.send_block_item(&block_item).await?)
+        }
     }
-
-    /// Initiates a transaction with a list of PLT operations for a given token.
-    ///
-    /// # Arguments
-    ///
-    /// * `signer` - A [`WalletAccount`] who's address is used as a sender and
-    ///   keys as a signer.
-    /// * `expiry` - The optional expiry time for the transaction.
-    /// * `operations` - A list of protocol level token operations.
-    /// * `meta` - The optional transaction metadata. Includes optional
-    ///   expiration, nonce. Validation is ignored for this method.
-    pub async fn send_operations(
-        &mut self,
-        signer: &WalletAccount,
-        operations: TokenOperations,
-        meta: Option<TransactionMetadata>,
-    ) -> TokenResult<TransactionHash> {
-        let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
-        self.sign_and_send(signer, operations, expiry, nonce).await
-    }
-
-    /// Updates token's info to a last finilized block. The method can be
-    /// ommited before calling the validation methods.
-    pub async fn update_token_info(&mut self) -> TokenResult<()> {
-        self.info = self
-            .client
-            .get_token_info(self.info.token_id.clone(), BlockIdentifier::LastFinal)
-            .await?
-            .response;
-        Ok(())
-    }
-
-    /// Helper method containing the common logic related to signing and sending
-    /// PLT operations.
-    ///
-    /// # Arguments
-    ///
-    /// * `signer` - A [`WalletAccount`] who's address is used as a sender and
-    ///   keys as a signer.
-    /// * `operations` - A list of protocol level token operations.
-    /// * `expiry` - The expiry time for the transaction.
-    /// * `nonce` - Option
-    async fn sign_and_send(
-        &mut self,
-        signer: &WalletAccount,
-        operations: TokenOperations,
-        expiry: Option<TransactionTime>,
-        nonce: Option<Nonce>,
-    ) -> TokenResult<TransactionHash> {
-        let expiry = expiry.unwrap_or(TransactionTime::seconds_after(self.default_expiry));
-
-        let nonce = match nonce {
-            Some(nonce) => nonce,
-            None => {
-                self.client
-                    .get_next_account_sequence_number(&signer.address)
-                    .await?
-                    .nonce
-            }
-        };
-
-        let token_id = self.info.token_id.clone();
-
-        let transaction = send::token_update_operations(
-            &signer,
-            signer.address,
-            nonce,
-            expiry,
-            token_id,
-            operations,
-        )?;
-        let block_item = BlockItem::AccountTransaction(transaction);
-        Ok(self.client.send_block_item(&block_item).await?)
-    }
-}
 
 /// Helper trait for testing the transfer validation.
 trait AccountInfoFetch {
@@ -812,14 +809,14 @@ impl AccountInfoFetch for Client {
 
 #[cfg(test)]
 mod tests {
-    use concordium_base::{protocol_level_tokens::{CborHolderAccount, MetadataUrl}};
+    use concordium_base::protocol_level_tokens::{CborHolderAccount, MetadataUrl};
 
     use super::*;
-    use std::{collections::{HashMap}, str::FromStr};
+    use std::{collections::HashMap, str::FromStr};
 
     #[derive(Debug, Clone)]
     struct MockClient {
-        responses: HashMap<AccountAddress, QueryResponse<AccountInfo>>
+        responses: HashMap<AccountAddress, QueryResponse<AccountInfo>>,
     }
 
     impl MockClient {
@@ -839,7 +836,7 @@ mod tests {
             let AccountIdentifier::Address(address) = address else {
                 return Err(QueryError::NotFound);
             };
-            
+
             self.responses
                 .get(address)
                 .cloned()
