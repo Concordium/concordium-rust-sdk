@@ -1,5 +1,8 @@
 ## Unreleased changes
 
+
+- Introduce `ProtocolVersionInt` newtype, wrapping the `u64` representation of the `ProtocolVersion`. This type is forward-compatible, meaning future protocol versions can be represented using this type.
+- Change type for field `protocol_version` in struct `BlockInfo` and `ConsensusInfo` to `ProtocolVersionInt` making these types forward-compatible.
 - Add `NextUpdateSequenceNumbers::protocol_level_tokens` and protobuf deserialization of it
 - Changed `TokenClient`'s `burn` and `mint` methods to accept a singular `TokenAmount`, instead of `Vec<TokenAmount>`.
 - Added `PartialEq`, `Eq`, `Hash` to `TokenInfo`
