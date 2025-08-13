@@ -3,7 +3,7 @@ use clap::AppSettings;
 use concordium_rust_sdk::{
     indexer::{TransactionIndexer, TraverseConfig},
     types::{AbsoluteBlockHeight, BlockItemSummary, BlockItemSummaryDetails, CredentialType},
-    v2,
+    v2::{self, upward::Upward},
 };
 use structopt::StructOpt;
 
@@ -60,6 +60,9 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         for BlockItemSummary { details, .. } in summaries {
+            let Upward::Known(details) = details else {
+                continue;
+            };
             match details {
                 BlockItemSummaryDetails::AccountTransaction(_) => {}
                 BlockItemSummaryDetails::AccountCreation(x) => {

@@ -47,6 +47,7 @@ async fn main() -> anyhow::Result<()> {
             while let Some(event) = events.next().await.transpose()? {
                 if event
                     .affected_contracts()
+                    .require()?
                     .contains(&ContractAddress::new(866, 0))
                 {
                     println!(

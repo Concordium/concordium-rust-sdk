@@ -14,11 +14,12 @@ pub enum Upward<A> {
 }
 
 impl<A> Upward<A> {
-    /// Returns the contained [`Known`] value, consuming the `self` value.
+    /// Returns the contained [`Upward::Known`] value, consuming the `self`
+    /// value.
     ///
     /// # Panics
     ///
-    /// Panics if the self value equals [`Unknown`].
+    /// Panics if the self value equals [`Upward::Unknown`].
     pub fn unwrap(self) -> A {
         match self {
             Self::Known(value) => value,
@@ -27,15 +28,17 @@ impl<A> Upward<A> {
     }
 
     /// Transforms `Upward<T>` into a [`Option<T>`] where [`Option::Some`]
-    /// represents [`Known`] and [`Option::None`] represents [`Unknown`].
+    /// represents [`Upward::Known`] and [`Option::None`] represents
+    /// [`Upward::Unknown`].
     pub fn known(self) -> Option<A> { Option::from(self) }
 
     /// Borrow `Upward<T>` aa [`Option<&T>`] where [`Option::Some`]
-    /// represents [`Known`] and [`Option::None`] represents [`Unknown`].
+    /// represents [`Upward::Known`] and [`Option::None`] represents
+    /// [`Upward::Unknown`].
     pub fn as_known(&self) -> Option<&A> { Option::from(self.as_ref()) }
 
     /// Transforms the `Upward<T>` into a [`Result<T, E>`], mapping
-    /// [`Known(v)`] to [`Ok(v)`] and [`Unknown`] to [`Err(err)`].
+    /// [`Known(v)`] to [`Ok(v)`] and [`Upward::Unknown`] to [`Err(err)`].
     ///
     /// Arguments passed to `ok_or` are eagerly evaluated; if you are passing
     /// the result of a function call, it is recommended to use
@@ -43,24 +46,24 @@ impl<A> Upward<A> {
     ///
     /// [`Ok(v)`]: Ok
     /// [`Err(err)`]: Err
-    /// [`Known(v)`]: Known
+    /// [`Known(v)`]: Upward::Known
     /// [`ok_or_else`]: Upward::ok_or_else
     pub fn ok_or<E>(self, error: E) -> Result<A, E> { Option::from(self).ok_or(error) }
 
     /// Transforms the `Upward<T>` into a [`Result<T, E>`], mapping
-    /// [`Known(v)`] to [`Ok(v)`] and [`Unknown`] to [`Err(err())`].
+    /// [`Known(v)`] to [`Ok(v)`] and [`Upward::Unknown`] to [`Err(err())`].
     ///
     /// [`Ok(v)`]: Ok
     /// [`Err(err())`]: Err
-    /// [`Known(v)`]: Known
+    /// [`Known(v)`]: Upward::Known
     pub fn ok_or_else<E, F>(self, error: F) -> Result<A, E>
     where
         F: FnOnce() -> E, {
         Option::from(self).ok_or_else(error)
     }
 
-    /// Returns `true` if the Upward is a [`Known`] and the value inside of
-    /// it matches a predicate.
+    /// Returns `true` if the Upward is a [`Upward::Known`] and the value inside
+    /// of it matches a predicate.
     pub fn is_known_and(self, f: impl FnOnce(A) -> bool) -> bool {
         Option::from(self).is_some_and(f)
     }
