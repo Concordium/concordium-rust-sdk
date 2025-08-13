@@ -1202,6 +1202,11 @@ impl BlockItemSummary {
         self.details.as_known()?.sender_account()
     }
 
+    /// Return the list of smart contract addresses affected by the block
+    /// summary.
+    ///
+    /// Returns [`Upward::Unknown`] when encountering unfamiliar data from newer
+    /// versions of the node to stay forward-compatible.
     pub fn affected_contracts(&self) -> Upward<Vec<ContractAddress>> {
         self.details
             .as_ref()
@@ -1231,17 +1236,15 @@ impl BlockItemSummary {
     }
 
     /// Return the list of addresses affected by the block summary.
-    /// These are addresses that have their CCD balance or plt token balance
+    /// These are addresses that have their CCD balance or PLT token balance
     /// changed as part of the block summary.
     ///
     /// Returns [`Upward::Unknown`] when encountering unfamiliar data from newer
     /// versions of the node to stay forward-compatible.
     pub fn affected_addresses(&self) -> Upward<Vec<AccountAddress>> {
-        if let Upward::Known(details) = self.details.as_ref() {
-            Upward::Known(details.affected_addresses())
-        } else {
-            Upward::Unknown
-        }
+        self.details
+            .as_ref()
+            .map(BlockItemSummaryDetails::affected_addresses)
     }
 }
 
