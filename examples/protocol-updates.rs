@@ -320,7 +320,7 @@ async fn send_and_wait(
     pv: ProtocolVersion,
 ) -> anyhow::Result<bool> {
     let ci = client.get_consensus_info().await?;
-    if ci.protocol_version == pv {
+    if ci.protocol_version == pv.into() {
         let submission_id = client
             .send_block_item(block_item)
             .await
@@ -341,7 +341,7 @@ async fn send_and_wait(
         loop {
             interval.tick().await;
             let ci = client.get_consensus_info().await?;
-            if ci.protocol_version > pv {
+            if ci.protocol_version > pv.into() {
                 break;
             }
         }

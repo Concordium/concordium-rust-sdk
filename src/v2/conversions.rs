@@ -2,12 +2,9 @@
 //! their Rust equivalents.
 
 use super::{generated::*, Require};
-use crate::{
-    types::{
-        queries::ConcordiumBFTDetails, AccountReleaseSchedule, ActiveBakerPoolStatus,
-        UpdateKeysCollectionSkeleton,
-    },
-    v2::generated::{block_item_summary::Details, BlockCertificates},
+use crate::types::{
+    queries::{ConcordiumBFTDetails, ProtocolVersionInt},
+    AccountReleaseSchedule, ActiveBakerPoolStatus, UpdateKeysCollectionSkeleton,
 };
 use chrono::TimeZone;
 use concordium_base::{
@@ -1327,7 +1324,7 @@ impl TryFrom<BlockItemSummary> for super::types::BlockItemSummary {
                         payload:        v.payload.require()?.try_into()?,
                     })
                 }
-                Details::TokenCreation(v) => {
+                block_item_summary::Details::TokenCreation(v) => {
                     super::types::BlockItemSummaryDetails::TokenCreationDetails(
                         super::types::TokenCreationDetails {
                             create_plt: v.create_plt.require()?.try_into()?,
@@ -2302,9 +2299,10 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
     type Error = tonic::Status;
 
     fn try_from(value: ConsensusInfo) -> Result<Self, Self::Error> {
-        let protocol_version = ProtocolVersion::try_from(value.protocol_version)
-            .map_err(|_| tonic::Status::internal("Unknown protocol version"))?
-            .into();
+        let protocol_version =
+            ProtocolVersionInt(u64::try_from(value.protocol_version).map_err(|err| {
+                tonic::Status::internal(format!("Invalid protocol version: {err}"))
+            })?);
         Ok(Self {
             last_finalized_block_height: value.last_finalized_block_height.require()?.into(),
             block_arrive_latency_e_m_s_d: value.block_arrive_latency_emsd,
@@ -2345,7 +2343,7 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
             genesis_index: value.genesis_index.require()?.into(),
             current_era_genesis_block: value.current_era_genesis_block.require()?.try_into()?,
             current_era_genesis_time: value.current_era_genesis_time.require()?.try_into()?,
-            concordium_bft_status: if protocol_version <= super::types::ProtocolVersion::P5 {
+            concordium_bft_status: if protocol_version <= super::types::ProtocolVersion::P5.into() {
                 None
             } else {
                 Some(ConcordiumBFTDetails {
@@ -2607,14 +2605,11 @@ impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
     type Error = tonic::Status;
 
     fn try_from(value: BlockInfo) -> Result<Self, Self::Error> {
-        let protocol_version = ProtocolVersion::try_from(value.protocol_version)
-            .map_err(|_| {
-                tonic::Status::internal(format!(
-                    "Unknown protocol version: {}",
-                    value.protocol_version
-                ))
-            })?
-            .into();
+        let protocol_version =
+            ProtocolVersionInt(u64::try_from(value.protocol_version).map_err(|err| {
+                tonic::Status::internal(format!("Invalid protocol version: {err}"))
+            })?);
+
         Ok(Self {
             transactions_size: value.transactions_size.into(),
             block_parent: value.parent_block.require()?.try_into()?,
@@ -2625,7 +2620,7 @@ impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
             block_receive_time: value.receive_time.require()?.try_into()?,
             transaction_count: value.transaction_count.into(),
             transaction_energy_cost: value.transactions_energy_cost.require()?.into(),
-            block_slot: if protocol_version <= super::types::ProtocolVersion::P5 {
+            block_slot: if protocol_version <= super::types::ProtocolVersion::P5.into() {
                 Some(value.slot_number.require()?.into())
             } else {
                 None
@@ -2637,12 +2632,12 @@ impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
             genesis_index: value.genesis_index.require()?.into(),
             block_baker: value.baker.map(|b| b.into()),
             protocol_version,
-            round: if protocol_version >= super::types::ProtocolVersion::P6 {
+            round: if protocol_version >= super::types::ProtocolVersion::P6.into() {
                 Some(value.round.require()?.into())
             } else {
                 None
             },
-            epoch: if protocol_version >= super::types::ProtocolVersion::P6 {
+            epoch: if protocol_version >= super::types::ProtocolVersion::P6.into() {
                 Some(value.epoch.require()?.into())
             } else {
                 None
