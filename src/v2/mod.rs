@@ -56,6 +56,7 @@ use self::dry_run::WithRemainingQuota;
 
 mod conversions;
 pub mod dry_run;
+pub mod upward;
 #[path = "generated/mod.rs"]
 #[allow(
     clippy::large_enum_variant,

@@ -1,8 +1,5 @@
 //! Type definitions used throughout the rest of the SDK.
-use anyhow::Context;
-pub use concordium_base::hashes;
-// re-export to maintain backwards compatibility.
-pub use concordium_base::id::types::CredentialType;
+
 pub mod block_certificates;
 pub mod network;
 pub mod queries;
@@ -10,9 +7,13 @@ pub mod smart_contracts;
 mod summary_helper;
 pub mod transactions;
 
-use crate::{constants::*, protocol_level_tokens};
+use anyhow::Context;
+pub use concordium_base::hashes;
+// re-export to maintain backwards compatibility.
+use crate::{constants::*, protocol_level_tokens, v2::upward::Upward};
 pub use concordium_base::{
     base::*,
+    id::types::CredentialType,
     smart_contracts::{ContractTraceElement, InstanceUpdatedEvent},
 };
 use concordium_base::{
@@ -1142,13 +1143,15 @@ pub struct FinalizationSummaryParty {
     pub signed:   bool,
 }
 
-#[derive(SerdeDeserialize, SerdeSerialize, Debug, Clone)]
-#[serde(
-    try_from = "summary_helper::BlockItemSummary",
-    into = "summary_helper::BlockItemSummary"
-)]
+#[derive(SerdeDeserialize, Debug, Clone)]
+#[serde(try_from = "summary_helper::BlockItemSummary")]
 /// Summary of the outcome of a block item in structured form.
 /// The summary determines which transaction type it was.
+///
+/// Note the serde::Serialize implementation will produce a runtime error if any
+/// of the content contains [`Upward::Unknown`].
+/// The serde::Serialize implementation for this type is now deprecated and will
+/// be removed.
 pub struct BlockItemSummary {
     /// Index of the transaction in the block where it is included.
     pub index:       TransactionIndex,
@@ -1159,103 +1162,62 @@ pub struct BlockItemSummary {
     /// Details that are specific to different transaction types.
     /// For successful transactions there is a one to one mapping of transaction
     /// types and variants (together with subvariants) of this type.
-    pub details:     BlockItemSummaryDetails,
+    pub details:     Upward<BlockItemSummaryDetails>,
 }
 
 impl BlockItemSummary {
     /// Return whether the transaction was successful, i.e., the intended effect
     /// happened.
-    pub fn is_success(&self) -> bool {
-        match &self.details {
-            BlockItemSummaryDetails::AccountTransaction(ad) => ad.is_rejected().is_none(),
-            BlockItemSummaryDetails::AccountCreation(_) => true,
-            BlockItemSummaryDetails::Update(_) => true,
-            BlockItemSummaryDetails::TokenCreationDetails(_) => true,
-        }
+    ///
+    /// Returns [`Upward::Unknown`] when encountering unfamiliar data from newer
+    /// versions of the node to stay forward-compatible.
+    pub fn is_success(&self) -> Upward<bool> {
+        self.details
+            .as_ref()
+            .map(BlockItemSummaryDetails::is_success)
     }
 
     /// Return whether the transaction has failed to achieve the intended
     /// effects.
-    pub fn is_reject(&self) -> bool { self.is_rejected_account_transaction().is_some() }
+    ///
+    /// Returns [`Upward::Unknown`] when encountering unfamiliar data from newer
+    /// versions of the node to stay forward-compatible, in case future block
+    /// items include some notion of being rejected as well.
+    pub fn is_reject(&self) -> Upward<bool> {
+        self.details
+            .as_ref()
+            .map(BlockItemSummaryDetails::is_reject)
+    }
 
     /// Return `Some` if the result corresponds to a rejected account
     /// transaction. This returns `Some` if and only if
     /// [`is_reject`](Self::is_reject) returns `true`.
     pub fn is_rejected_account_transaction(&self) -> Option<&RejectReason> {
-        match &self.details {
-            BlockItemSummaryDetails::AccountTransaction(ad) => ad.is_rejected(),
-            BlockItemSummaryDetails::AccountCreation(_) => None,
-            BlockItemSummaryDetails::Update(_) => None,
-            BlockItemSummaryDetails::TokenCreationDetails(_) => None,
-        }
+        self.details.as_known()?.account_transaction_reject_reason()
     }
 
+    /// Return the account address signing the
+    /// `[BlockItemSummaryDetails::AccountTransaction]` otherwise `[None]`.
     pub fn sender_account(&self) -> Option<AccountAddress> {
-        match &self.details {
-            BlockItemSummaryDetails::AccountTransaction(at) => Some(at.sender),
-            BlockItemSummaryDetails::AccountCreation(_) => None,
-            BlockItemSummaryDetails::Update(_) => None,
-            BlockItemSummaryDetails::TokenCreationDetails(_) => None,
-        }
+        self.details.as_known()?.sender_account()
     }
 
-    pub fn affected_contracts(&self) -> Vec<ContractAddress> {
-        if let BlockItemSummaryDetails::AccountTransaction(at) = &self.details {
-            match &at.effects {
-                AccountTransactionEffects::ContractInitialized { data } => vec![data.address],
-                AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                    let mut seen = HashSet::new();
-                    let mut addresses = Vec::new();
-                    for effect in effects {
-                        match effect {
-                            ContractTraceElement::Updated { data } => {
-                                if seen.insert(data.address) {
-                                    addresses.push(data.address);
-                                }
-                            }
-                            ContractTraceElement::Transferred { .. } => (),
-                            ContractTraceElement::Interrupted { .. } => (),
-                            ContractTraceElement::Resumed { .. } => (),
-                            ContractTraceElement::Upgraded { .. } => (),
-                        }
-                    }
-                    addresses
-                }
-                _ => Vec::new(),
-            }
-        } else {
-            Vec::new()
-        }
+    pub fn affected_contracts(&self) -> Upward<Vec<ContractAddress>> {
+        self.details
+            .as_ref()
+            .map(BlockItemSummaryDetails::affected_contracts)
     }
 
     /// If the block item is a smart contract update transaction then return the
     /// execution tree.
     pub fn contract_update(self) -> Option<ExecutionTree> {
-        if let BlockItemSummaryDetails::AccountTransaction(at) = self.details {
-            match at.effects {
-                AccountTransactionEffects::ContractInitialized { .. } => None,
-                AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                    execution_tree(effects)
-                }
-                _ => None,
-            }
-        } else {
-            None
-        }
+        self.details.known()?.contract_update()
     }
 
     /// If the block item is a smart contract init transaction then
     /// return the initialization data.
     pub fn contract_init(&self) -> Option<&ContractInitializedEvent> {
-        if let BlockItemSummaryDetails::AccountTransaction(at) = &self.details {
-            match &at.effects {
-                AccountTransactionEffects::ContractInitialized { data } => Some(data),
-                AccountTransactionEffects::ContractUpdateIssued { .. } => None,
-                _ => None,
-            }
-        } else {
-            None
-        }
+        self.details.as_known()?.contract_init()
     }
 
     /// If the block item is a smart contract update transaction then return
@@ -1265,119 +1227,31 @@ impl BlockItemSummary {
         &self,
     ) -> Option<impl Iterator<Item = (ContractAddress, &[smart_contracts::ContractEvent])> + '_>
     {
-        if let BlockItemSummaryDetails::AccountTransaction(at) = &self.details {
-            match &at.effects {
-                AccountTransactionEffects::ContractInitialized { .. } => None,
-                AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                    let iter = effects.iter().flat_map(|effect| match effect {
-                        ContractTraceElement::Updated { data } => {
-                            Some((data.address, &data.events[..]))
-                        }
-                        ContractTraceElement::Transferred { .. } => None,
-                        ContractTraceElement::Interrupted { address, events } => {
-                            Some((*address, &events[..]))
-                        }
-                        ContractTraceElement::Resumed { .. } => None,
-                        ContractTraceElement::Upgraded { .. } => None,
-                    });
-                    Some(iter)
-                }
-                _ => None,
-            }
-        } else {
-            None
-        }
+        self.details.as_known()?.contract_update_logs()
     }
 
     /// Return the list of addresses affected by the block summary.
     /// These are addresses that have their CCD balance or plt token balance
     /// changed as part of the block summary.
-    pub fn affected_addresses(&self) -> Vec<AccountAddress> {
-        match &self.details {
-            BlockItemSummaryDetails::AccountTransaction(at) => match &at.effects {
-                AccountTransactionEffects::None { .. } => vec![at.sender],
-                AccountTransactionEffects::ModuleDeployed { .. } => vec![at.sender],
-                AccountTransactionEffects::ContractInitialized { .. } => vec![at.sender],
-                AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                    let mut seen = BTreeSet::new();
-                    seen.insert(at.sender);
-                    let mut addresses = vec![at.sender];
-                    for effect in effects {
-                        match effect {
-                            ContractTraceElement::Updated { .. } => (),
-                            ContractTraceElement::Transferred { to, .. } => {
-                                if seen.insert(*to) {
-                                    addresses.push(*to);
-                                }
-                            }
-                            ContractTraceElement::Interrupted { .. } => (),
-                            ContractTraceElement::Resumed { .. } => (),
-                            ContractTraceElement::Upgraded { .. } => (),
-                        }
-                    }
-                    addresses
-                }
-                AccountTransactionEffects::AccountTransfer { to, .. } => {
-                    if *to == at.sender {
-                        vec![at.sender]
-                    } else {
-                        vec![at.sender, *to]
-                    }
-                }
-                AccountTransactionEffects::AccountTransferWithMemo { to, .. } => {
-                    if *to == at.sender {
-                        vec![at.sender]
-                    } else {
-                        vec![at.sender, *to]
-                    }
-                }
-                AccountTransactionEffects::BakerAdded { .. } => vec![at.sender],
-                AccountTransactionEffects::BakerRemoved { .. } => vec![at.sender],
-                AccountTransactionEffects::BakerStakeUpdated { .. } => vec![at.sender],
-                AccountTransactionEffects::BakerRestakeEarningsUpdated { .. } => {
-                    vec![at.sender]
-                }
-                AccountTransactionEffects::BakerKeysUpdated { .. } => vec![at.sender],
-                AccountTransactionEffects::EncryptedAmountTransferred { removed, added } => {
-                    vec![removed.account, added.receiver]
-                }
-                AccountTransactionEffects::EncryptedAmountTransferredWithMemo {
-                    removed,
-                    added,
-                    ..
-                } => vec![removed.account, added.receiver],
-                AccountTransactionEffects::TransferredToEncrypted { data } => {
-                    vec![data.account]
-                }
-                AccountTransactionEffects::TransferredToPublic { removed, .. } => {
-                    vec![removed.account]
-                }
-                AccountTransactionEffects::TransferredWithSchedule { to, .. } => {
-                    vec![at.sender, *to]
-                }
-                AccountTransactionEffects::TransferredWithScheduleAndMemo { to, .. } => {
-                    vec![at.sender, *to]
-                }
-                AccountTransactionEffects::CredentialKeysUpdated { .. } => vec![at.sender],
-                AccountTransactionEffects::CredentialsUpdated { .. } => vec![at.sender],
-                AccountTransactionEffects::DataRegistered { .. } => vec![at.sender],
-                AccountTransactionEffects::BakerConfigured { .. } => vec![at.sender],
-                AccountTransactionEffects::DelegationConfigured { .. } => vec![at.sender],
-                AccountTransactionEffects::TokenUpdate { events } => {
-                    let mut addresses = BTreeSet::new();
-                    addresses.insert(at.sender);
-                    add_token_event_addresses(&mut addresses, events);
-                    addresses.into_iter().collect()
-                }
-            },
-            BlockItemSummaryDetails::AccountCreation(_) => Vec::new(),
-            BlockItemSummaryDetails::Update(_) => Vec::new(),
-            BlockItemSummaryDetails::TokenCreationDetails(token_creation_details) => {
-                let mut addresses = BTreeSet::new();
-                add_token_event_addresses(&mut addresses, &token_creation_details.events);
-                addresses.into_iter().collect()
-            }
+    ///
+    /// Returns [`Upward::Unknown`] when encountering unfamiliar data from newer
+    /// versions of the node to stay forward-compatible.
+    pub fn affected_addresses(&self) -> Upward<Vec<AccountAddress>> {
+        if let Upward::Known(details) = self.details.as_ref() {
+            Upward::Known(details.affected_addresses())
+        } else {
+            Upward::Unknown
         }
+    }
+}
+
+impl SerdeSerialize for BlockItemSummary {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer, {
+        summary_helper::BlockItemSummary::try_from(self.clone())
+            .map_err(|_| serde::ser::Error::custom("Cannot serialize Upward::Unknown due"))?
+            .serialize(serializer)
     }
 }
 
@@ -1841,6 +1715,247 @@ pub enum BlockItemSummaryDetails {
     Update(UpdateDetails),
     /// The summary is of a token creation update.
     TokenCreationDetails(TokenCreationDetails),
+}
+impl BlockItemSummaryDetails {
+    /// Extract the [`BlockItemSummaryDetails::AccountTransaction`] if relevant
+    /// otherwise [`None`].
+    pub fn account_transaction(self) -> Option<AccountTransactionDetails> {
+        if let Self::AccountTransaction(details) = self {
+            Some(details)
+        } else {
+            None
+        }
+    }
+
+    /// Borrow the [`BlockItemSummaryDetails::AccountTransaction`] if relevant
+    /// otherwise [`None`].
+    pub fn as_account_transaction(&self) -> Option<&AccountTransactionDetails> {
+        if let Self::AccountTransaction(details) = &self {
+            Some(details)
+        } else {
+            None
+        }
+    }
+
+    /// Return whether the transaction was successful, i.e., the intended effect
+    /// happened.
+    pub fn is_success(&self) -> bool {
+        match self {
+            BlockItemSummaryDetails::AccountTransaction(ad) => ad.is_rejected().is_none(),
+            BlockItemSummaryDetails::AccountCreation(_) => true,
+            BlockItemSummaryDetails::Update(_) => true,
+            BlockItemSummaryDetails::TokenCreationDetails(_) => true,
+        }
+    }
+
+    /// Return whether the transaction has failed to achieve the intended
+    /// effects.
+    pub fn is_reject(&self) -> bool {
+        if let Self::AccountTransaction(details) = self {
+            details.is_rejected().is_some()
+        } else {
+            false
+        }
+    }
+
+    /// Return `Some` if the result corresponds to a rejected account
+    /// transaction. This returns `Some` if and only if
+    /// [`is_reject`](Self::is_reject) returns `true`.
+    pub fn account_transaction_reject_reason(&self) -> Option<&RejectReason> {
+        match self {
+            BlockItemSummaryDetails::AccountTransaction(ad) => ad.is_rejected(),
+            BlockItemSummaryDetails::AccountCreation(_) => None,
+            BlockItemSummaryDetails::Update(_) => None,
+            BlockItemSummaryDetails::TokenCreationDetails(_) => None,
+        }
+    }
+
+    /// Return the account address signing the
+    /// `[BlockItemSummaryDetails::AccountTransaction]` otherwise `[None]`.
+    pub fn sender_account(&self) -> Option<AccountAddress> {
+        Some(self.as_account_transaction()?.sender)
+    }
+
+    pub fn affected_contracts(&self) -> Vec<ContractAddress> {
+        if let BlockItemSummaryDetails::AccountTransaction(at) = self {
+            match &at.effects {
+                AccountTransactionEffects::ContractInitialized { data } => vec![data.address],
+                AccountTransactionEffects::ContractUpdateIssued { effects } => {
+                    let mut seen = HashSet::new();
+                    let mut addresses = Vec::new();
+                    for effect in effects {
+                        match effect {
+                            ContractTraceElement::Updated { data } => {
+                                if seen.insert(data.address) {
+                                    addresses.push(data.address);
+                                }
+                            }
+                            ContractTraceElement::Transferred { .. } => (),
+                            ContractTraceElement::Interrupted { .. } => (),
+                            ContractTraceElement::Resumed { .. } => (),
+                            ContractTraceElement::Upgraded { .. } => (),
+                        }
+                    }
+                    addresses
+                }
+                _ => Vec::new(),
+            }
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// If the block item is a smart contract update transaction then return the
+    /// execution tree.
+    pub fn contract_update(self) -> Option<ExecutionTree> {
+        if let BlockItemSummaryDetails::AccountTransaction(at) = self {
+            match at.effects {
+                AccountTransactionEffects::ContractInitialized { .. } => None,
+                AccountTransactionEffects::ContractUpdateIssued { effects } => {
+                    execution_tree(effects)
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    /// If the block item is a smart contract init transaction then
+    /// return the initialization data.
+    pub fn contract_init(&self) -> Option<&ContractInitializedEvent> {
+        if let BlockItemSummaryDetails::AccountTransaction(at) = self {
+            match &at.effects {
+                AccountTransactionEffects::ContractInitialized { data } => Some(data),
+                AccountTransactionEffects::ContractUpdateIssued { .. } => None,
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    /// If the block item is a smart contract update transaction then return
+    /// an iterator over pairs of a contract address that was affected, and the
+    /// logs that were produced.
+    pub fn contract_update_logs(
+        &self,
+    ) -> Option<impl Iterator<Item = (ContractAddress, &[smart_contracts::ContractEvent])> + '_>
+    {
+        if let BlockItemSummaryDetails::AccountTransaction(at) = self {
+            match &at.effects {
+                AccountTransactionEffects::ContractInitialized { .. } => None,
+                AccountTransactionEffects::ContractUpdateIssued { effects } => {
+                    let iter = effects.iter().flat_map(|effect| match effect {
+                        ContractTraceElement::Updated { data } => {
+                            Some((data.address, &data.events[..]))
+                        }
+                        ContractTraceElement::Transferred { .. } => None,
+                        ContractTraceElement::Interrupted { address, events } => {
+                            Some((*address, &events[..]))
+                        }
+                        ContractTraceElement::Resumed { .. } => None,
+                        ContractTraceElement::Upgraded { .. } => None,
+                    });
+                    Some(iter)
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Return the list of addresses affected by the block summary.
+    /// These are addresses that have their CCD balance or plt token balance
+    /// changed as part of the block summary.
+    pub fn affected_addresses(&self) -> Vec<AccountAddress> {
+        match self {
+            BlockItemSummaryDetails::AccountTransaction(at) => match &at.effects {
+                AccountTransactionEffects::None { .. } => vec![at.sender],
+                AccountTransactionEffects::ModuleDeployed { .. } => vec![at.sender],
+                AccountTransactionEffects::ContractInitialized { .. } => vec![at.sender],
+                AccountTransactionEffects::ContractUpdateIssued { effects } => {
+                    let mut seen = BTreeSet::new();
+                    seen.insert(at.sender);
+                    let mut addresses = vec![at.sender];
+                    for effect in effects {
+                        match effect {
+                            ContractTraceElement::Updated { .. } => (),
+                            ContractTraceElement::Transferred { to, .. } => {
+                                if seen.insert(*to) {
+                                    addresses.push(*to);
+                                }
+                            }
+                            ContractTraceElement::Interrupted { .. } => (),
+                            ContractTraceElement::Resumed { .. } => (),
+                            ContractTraceElement::Upgraded { .. } => (),
+                        }
+                    }
+                    addresses
+                }
+                AccountTransactionEffects::AccountTransfer { to, .. } => {
+                    if *to == at.sender {
+                        vec![at.sender]
+                    } else {
+                        vec![at.sender, *to]
+                    }
+                }
+                AccountTransactionEffects::AccountTransferWithMemo { to, .. } => {
+                    if *to == at.sender {
+                        vec![at.sender]
+                    } else {
+                        vec![at.sender, *to]
+                    }
+                }
+                AccountTransactionEffects::BakerAdded { .. } => vec![at.sender],
+                AccountTransactionEffects::BakerRemoved { .. } => vec![at.sender],
+                AccountTransactionEffects::BakerStakeUpdated { .. } => vec![at.sender],
+                AccountTransactionEffects::BakerRestakeEarningsUpdated { .. } => {
+                    vec![at.sender]
+                }
+                AccountTransactionEffects::BakerKeysUpdated { .. } => vec![at.sender],
+                AccountTransactionEffects::EncryptedAmountTransferred { removed, added } => {
+                    vec![removed.account, added.receiver]
+                }
+                AccountTransactionEffects::EncryptedAmountTransferredWithMemo {
+                    removed,
+                    added,
+                    ..
+                } => vec![removed.account, added.receiver],
+                AccountTransactionEffects::TransferredToEncrypted { data } => {
+                    vec![data.account]
+                }
+                AccountTransactionEffects::TransferredToPublic { removed, .. } => {
+                    vec![removed.account]
+                }
+                AccountTransactionEffects::TransferredWithSchedule { to, .. } => {
+                    vec![at.sender, *to]
+                }
+                AccountTransactionEffects::TransferredWithScheduleAndMemo { to, .. } => {
+                    vec![at.sender, *to]
+                }
+                AccountTransactionEffects::CredentialKeysUpdated { .. } => vec![at.sender],
+                AccountTransactionEffects::CredentialsUpdated { .. } => vec![at.sender],
+                AccountTransactionEffects::DataRegistered { .. } => vec![at.sender],
+                AccountTransactionEffects::BakerConfigured { .. } => vec![at.sender],
+                AccountTransactionEffects::DelegationConfigured { .. } => vec![at.sender],
+                AccountTransactionEffects::TokenUpdate { events } => {
+                    let mut addresses = BTreeSet::new();
+                    addresses.insert(at.sender);
+                    add_token_event_addresses(&mut addresses, events);
+                    addresses.into_iter().collect()
+                }
+            },
+            BlockItemSummaryDetails::AccountCreation(_) => Vec::new(),
+            BlockItemSummaryDetails::Update(_) => Vec::new(),
+            BlockItemSummaryDetails::TokenCreationDetails(token_creation_details) => {
+                let mut addresses = BTreeSet::new();
+                add_token_event_addresses(&mut addresses, &token_creation_details.events);
+                addresses.into_iter().collect()
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
