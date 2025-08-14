@@ -525,7 +525,7 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                         events: vec![ev1, ev2, ev3],
                     })
                 };
-                let (transaction_type, result) = match effects {
+                let (transaction_type, result) = match effects.require()? {
                     super::AccountTransactionEffects::None {
                         transaction_type,
                         reject_reason,
@@ -992,10 +992,10 @@ fn convert_account_transaction(
         Ok(super::AccountTransactionDetails {
             cost,
             sender,
-            effects: super::AccountTransactionEffects::None {
+            effects: Upward::Known(super::AccountTransactionEffects::None {
                 transaction_type: ty,
                 reject_reason,
-            },
+            }),
         })
     };
 
@@ -1003,7 +1003,7 @@ fn convert_account_transaction(
         Ok(super::AccountTransactionDetails {
             cost,
             sender,
-            effects,
+            effects: Upward::Known(effects),
         })
     };
 
