@@ -831,10 +831,7 @@ mod tests {
         common::cbor,
         protocol_level_tokens::{CborHolderAccount, CborTokenHolder, MetadataUrl},
     };
-    use concordium_base::{
-        hashes::HashBytes,
-        protocol_level_tokens::{TokenModuleAccountState},
-    };
+    use concordium_base::{hashes::HashBytes, protocol_level_tokens::TokenModuleAccountState};
 
     use super::*;
     use std::{collections::HashMap, str::FromStr};
@@ -916,9 +913,9 @@ mod tests {
         fn payload(&self, entries: usize, amount: u64) -> Vec<TransferTokens> {
             (0..entries)
                 .map(|_| TransferTokens {
-                    amount: TokenAmount::from_raw(amount, self.decimals),
+                    amount:    TokenAmount::from_raw(amount, self.decimals),
                     recipient: self.recipient,
-                    memo: None,
+                    memo:      None,
                 })
                 .collect()
         }
@@ -1254,7 +1251,8 @@ mod tests {
         assert!(
             matches!(result, Err(TokenError::NotAllowed)),
             "expected TokenError::NotAllowed, got: {result:?}"
-        );    }
+        );
+    }
 
     #[tokio::test]
     async fn fail_validate_transfer_recipient_not_in_allow_list() {
@@ -1297,7 +1295,10 @@ mod tests {
         // create and populate mock client
         let mut client = MockClient::new();
         // sender is both in allow and deny lists
-        client.add_account_info(fixture.sender, fixture.account_info(1_000_000, Some(true), Some(true)));
+        client.add_account_info(
+            fixture.sender,
+            fixture.account_info(1_000_000, Some(true), Some(true)),
+        );
         client.add_account_info(fixture.recipient, fixture.account_info(0, None, None));
 
         // creating token module state with allow and deny list
@@ -1329,7 +1330,10 @@ mod tests {
 
         // create and populate mock client
         let mut client = MockClient::new();
-        client.add_account_info(fixture.sender, fixture.account_info(1_000_000, Some(true), Some(true)));
+        client.add_account_info(
+            fixture.sender,
+            fixture.account_info(1_000_000, Some(true), Some(true)),
+        );
         // recipient is both in allow and deny lists
         client.add_account_info(fixture.recipient, fixture.account_info(0, None, None));
 
