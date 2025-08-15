@@ -8,7 +8,7 @@ use concordium_rust_sdk::{
     types::{
         AbsoluteBlockHeight, AccountTransactionEffects, BlockItemSummaryDetails, TransactionType,
     },
-    v2,
+    v2::{self, upward::Upward},
 };
 use std::collections::HashSet;
 use structopt::StructOpt;
@@ -82,7 +82,9 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         for bisummary in summary {
-            if let BlockItemSummaryDetails::AccountTransaction(at) = &bisummary.details {
+            if let Upward::Known(BlockItemSummaryDetails::AccountTransaction(at)) =
+                &bisummary.details
+            {
                 if types.is_empty() || at.transaction_type().is_some_and(|tt| types.contains(&tt)) {
                     let is_success = !matches!(&at.effects, AccountTransactionEffects::None { .. });
                     let type_string = at

@@ -1,7 +1,7 @@
 //! Helpers and trait implementations to convert from proto generated types to
 //! their Rust equivalents.
 
-use super::{generated::*, Require};
+use super::{generated::*, upward::Upward, Require};
 use crate::types::{
     queries::{ConcordiumBFTDetails, ProtocolVersionInt},
     AccountReleaseSchedule, ActiveBakerPoolStatus, UpdateKeysCollectionSkeleton,
@@ -1305,39 +1305,48 @@ impl TryFrom<BlockItemSummary> for super::types::BlockItemSummary {
             index:       value.index.require()?.into(),
             energy_cost: value.energy_cost.require()?.into(),
             hash:        value.hash.require()?.try_into()?,
-            details:     match value.details.require()? {
-                block_item_summary::Details::AccountTransaction(v) => {
-                    super::types::BlockItemSummaryDetails::AccountTransaction(v.try_into()?)
-                }
-                block_item_summary::Details::AccountCreation(v) => {
-                    super::types::BlockItemSummaryDetails::AccountCreation(
-                        super::types::AccountCreationDetails {
-                            credential_type: v.credential_type().into(),
-                            address:         v.address.require()?.try_into()?,
-                            reg_id:          v.reg_id.require()?.try_into()?,
-                        },
-                    )
-                }
-                block_item_summary::Details::Update(v) => {
-                    super::types::BlockItemSummaryDetails::Update(super::types::UpdateDetails {
-                        effective_time: v.effective_time.require()?.into(),
-                        payload:        v.payload.require()?.try_into()?,
-                    })
-                }
-                block_item_summary::Details::TokenCreation(v) => {
-                    super::types::BlockItemSummaryDetails::TokenCreationDetails(
-                        super::types::TokenCreationDetails {
-                            create_plt: v.create_plt.require()?.try_into()?,
-                            events:     v
-                                .events
-                                .into_iter()
-                                .map(TryInto::try_into)
-                                .collect::<Result<_, tonic::Status>>()?,
-                        },
-                    )
-                }
-            },
+            details:     Upward::from(value.details.map(TryFrom::try_from).transpose()?),
         })
+    }
+}
+
+impl TryFrom<block_item_summary::Details> for super::types::BlockItemSummaryDetails {
+    type Error = tonic::Status;
+
+    fn try_from(value: block_item_summary::Details) -> Result<Self, Self::Error> {
+        let out = match value {
+            block_item_summary::Details::AccountTransaction(v) => {
+                super::types::BlockItemSummaryDetails::AccountTransaction(v.try_into()?)
+            }
+            block_item_summary::Details::AccountCreation(v) => {
+                super::types::BlockItemSummaryDetails::AccountCreation(
+                    super::types::AccountCreationDetails {
+                        credential_type: v.credential_type().into(),
+                        address:         v.address.require()?.try_into()?,
+                        reg_id:          v.reg_id.require()?.try_into()?,
+                    },
+                )
+            }
+            block_item_summary::Details::Update(v) => {
+                super::types::BlockItemSummaryDetails::Update(super::types::UpdateDetails {
+                    effective_time: v.effective_time.require()?.into(),
+                    payload:        v.payload.require()?.try_into()?,
+                })
+            }
+            block_item_summary::Details::TokenCreation(v) => {
+                super::types::BlockItemSummaryDetails::TokenCreationDetails(
+                    super::types::TokenCreationDetails {
+                        create_plt: v.create_plt.require()?.try_into()?,
+                        events:     v
+                            .events
+                            .into_iter()
+                            .map(TryInto::try_into)
+                            .collect::<Result<_, tonic::Status>>()?,
+                    },
+                )
+            }
+        };
+        Ok(out)
     }
 }
 

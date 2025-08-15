@@ -292,8 +292,13 @@ impl<Type> ContractInitHandle<Type> {
                 RPCError::CallError(tonic::Status::invalid_argument(msg)),
             )))
         };
-
-        match result.details {
+        let v2::upward::Upward::Known(details) = result.details else {
+            return mk_error(
+                "Expected smart contract initialization status, but received unknown block item \
+                 details.",
+            );
+        };
+        match details {
             crate::types::BlockItemSummaryDetails::AccountTransaction(at) => match at.effects {
                 AccountTransactionEffects::ContractInitialized { data } => {
                     let contract_client = ContractClient::create(self.client, data.address).await?;
@@ -636,7 +641,12 @@ impl ModuleDeployHandle {
             )))
         };
 
-        match result.details {
+        let v2::upward::Upward::Known(details) = result.details else {
+            return mk_error(
+                "Expected  module deploy status, but received unknown block item details.",
+            );
+        };
+        match details {
             crate::types::BlockItemSummaryDetails::AccountTransaction(at) => match at.effects {
                 AccountTransactionEffects::ModuleDeployed { module_ref } => Ok(ModuleDeployData {
                     energy:           result.energy_cost,
@@ -1643,8 +1653,12 @@ impl ContractUpdateHandle {
                 RPCError::CallError(tonic::Status::invalid_argument(msg)),
             )))
         };
-
-        match result.details {
+        let v2::upward::Upward::Known(details) = result.details else {
+            return mk_error(
+                "Expected smart contract update status, but received unknown block item details.",
+            );
+        };
+        match details {
             crate::types::BlockItemSummaryDetails::AccountTransaction(at) => match at.effects {
                 AccountTransactionEffects::ContractUpdateIssued { effects } => {
                     let Some(execution_tree) = crate::types::execution_tree(effects) else {

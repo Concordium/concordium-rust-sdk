@@ -10,7 +10,20 @@ use concordium_base::{
 use std::net::IpAddr;
 
 /// Integer representation of the protocol version.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, SerdeSerialize, SerdeDeserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    SerdeSerialize,
+    SerdeDeserialize,
+    Hash,
+    derive_more::Display,
+)]
+#[display(fmt = "P{_0}")]
 #[repr(transparent)]
 pub struct ProtocolVersionInt(pub u64);
 

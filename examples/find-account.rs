@@ -1,7 +1,9 @@
 //! Find when an account was created on the chain.
 //! That is, the block in which the account creation transaction is committed.
 use clap::AppSettings;
-use concordium_rust_sdk::{id::types::AccountAddress, types::BlockItemSummaryDetails, v2};
+use concordium_rust_sdk::{
+    id::types::AccountAddress, types::BlockItemSummaryDetails, v2, v2::upward::Upward,
+};
 use futures::stream::StreamExt;
 use structopt::StructOpt;
 
@@ -31,12 +33,12 @@ async fn main() -> anyhow::Result<()> {
         println!("Account not found.");
         return Ok(());
     };
-    println!("Account created in block {}.", bh);
+    println!("Account created in block {bh}.");
     let bi = client.get_block_info(&bh).await?.response;
     println!("Timestamp of this block {}.", bi.block_slot_time);
     let mut block_summary = client.get_block_transaction_events(&bh).await?.response;
     while let Some(summary) = block_summary.next().await.transpose()? {
-        if let BlockItemSummaryDetails::AccountCreation(ac) = &summary.details {
+        if let Upward::Known(BlockItemSummaryDetails::AccountCreation(ac)) = &summary.details {
             if ac.address == app.account {
                 println!("Created by transaction hash {}", summary.hash);
                 break;

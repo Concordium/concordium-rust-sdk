@@ -1,8 +1,11 @@
 ## Unreleased changes
 
-
 - Introduce `ProtocolVersionInt` newtype, wrapping the `u64` representation of the `ProtocolVersion`. This type is forward-compatible, meaning future protocol versions can be represented using this type.
 - Change type for field `protocol_version` in struct `BlockInfo` and `ConsensusInfo` to `ProtocolVersionInt` making these types forward-compatible.
+- Introduce `Upward<A>` for representing types, which might get extended in a future version of the Concordium Node API and allows the consumer of this library to decide how to handle some unknown future data, like new transaction types.
+- Change type for field `details` in struct `BlockItemSummary` from `BlockItemSummaryDetails` to `Upward<BlockItemSummaryDetails>` preventing queries producing this type from failing due to future unknown data.
+- Change `BlockItemSummary::affected_addresses` return type from `Vec<AccountAddress>` to `Upward<Vec<AccountAddress>>` which now returns `Upward::Unknown` when block item summary contains any unknown data introduced in a later node API version.
+- Change `BlockItemSummary::affected_contracts` return type from `Vec<ContractAddress>` to `Upward<Vec<ContractAddress>>` which now returns `Upward::Unknown` when block item summary contains any unknown data introduced in a later node API version.
 - Add `NextUpdateSequenceNumbers::protocol_level_tokens` and protobuf deserialization of it
 - Changed `TokenClient`'s `burn` and `mint` methods to accept a singular `TokenAmount`, instead of `Vec<TokenAmount>`.
 - Added `PartialEq`, `Eq`, `Hash` to `TokenInfo`
