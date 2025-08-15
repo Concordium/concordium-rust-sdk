@@ -1779,7 +1779,7 @@ impl BlockItemSummaryDetails {
         Some(self.as_account_transaction()?.sender)
     }
 
-    pub fn affected_contracts(&self) -> Vec<ContractAddress> {
+    fn affected_contracts(&self) -> Vec<ContractAddress> {
         if let BlockItemSummaryDetails::AccountTransaction(at) = self {
             match &at.effects {
                 AccountTransactionEffects::ContractInitialized { data } => vec![data.address],
@@ -1872,7 +1872,7 @@ impl BlockItemSummaryDetails {
     /// Return the list of addresses affected by the block summary.
     /// These are addresses that have their CCD balance or plt token balance
     /// changed as part of the block summary.
-    pub fn affected_addresses(&self) -> Vec<AccountAddress> {
+    fn affected_addresses(&self) -> Vec<AccountAddress> {
         match self {
             BlockItemSummaryDetails::AccountTransaction(at) => match &at.effects {
                 AccountTransactionEffects::None { .. } => vec![at.sender],
