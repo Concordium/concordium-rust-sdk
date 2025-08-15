@@ -831,6 +831,7 @@ mod tests {
         common::cbor,
         protocol_level_tokens::{CborHolderAccount, CborTokenHolder, MetadataUrl},
     };
+    use assert_matches::assert_matches;
     use concordium_base::{hashes::HashBytes, protocol_level_tokens::TokenModuleAccountState};
 
     use super::*;
@@ -1037,10 +1038,7 @@ mod tests {
         )
         .await;
 
-        assert!(
-            matches!(result, Err(TokenError::Paused)),
-            "expected error: TokenError::Paused, got {result:?}"
-        );
+        assert_matches!(result, Err(TokenError::Paused));
     }
 
     #[tokio::test]
@@ -1073,10 +1071,7 @@ mod tests {
         )
         .await;
 
-        assert!(
-            matches!(result, Err(TokenError::InsufficientFunds)),
-            "expected error: TokenError::InsufficientFunds, got {result:?}"
-        );
+        assert_matches!(result, Err(TokenError::InsufficientFunds));
     }
 
     #[tokio::test]
@@ -1113,10 +1108,7 @@ mod tests {
         )
         .await;
 
-        assert!(
-            matches!(result, Err(TokenError::InvalidTokenAmount)),
-            "expected error: TokenError::InvalidTokenAmount, got {result:?}"
-        );
+        assert_matches!(result, Err(TokenError::InvalidTokenAmount));
     }
 
     #[tokio::test]
@@ -1146,10 +1138,7 @@ mod tests {
         )
         .await;
 
-        assert!(
-            matches!(result, Err(TokenError::InvalidTokenAmount)),
-            "expected error: TokenError::InvalidTokenAmount, got {result:?}"
-        );
+        assert_matches!(result, Err(TokenError::InvalidTokenAmount));
     }
 
     #[tokio::test]
@@ -1164,6 +1153,7 @@ mod tests {
             fixture.sender,
             fixture.account_info(1_000_000, None, Some(true)),
         );
+        // recipient not in deny list
         client.add_account_info(fixture.recipient, fixture.account_info(0, None, None));
 
         // creating token module state with deny list
@@ -1182,10 +1172,7 @@ mod tests {
         )
         .await;
 
-        assert!(
-            matches!(result, Err(TokenError::NotAllowed)),
-            "expected TokenError::NotAllowed, got: {result:?}"
-        );
+        assert_matches!(result, Err(TokenError::NotAllowed));
     }
 
     #[tokio::test]
@@ -1195,6 +1182,7 @@ mod tests {
 
         // create and populate mock client
         let mut client = MockClient::new();
+        // sender not in deny list
         client.add_account_info(fixture.sender, fixture.account_info(1_000_000, None, None));
         // recipient in deny list
         client.add_account_info(fixture.recipient, fixture.account_info(0, None, Some(true)));
@@ -1215,10 +1203,7 @@ mod tests {
         )
         .await;
 
-        assert!(
-            matches!(result, Err(TokenError::NotAllowed)),
-            "expected TokenError::NotAllowed, got: {result:?}"
-        );
+        assert_matches!(result, Err(TokenError::NotAllowed));
     }
 
     #[tokio::test]
@@ -1230,6 +1215,41 @@ mod tests {
         let mut client = MockClient::new();
         // sender not in allow list
         client.add_account_info(fixture.sender, fixture.account_info(1_000_000, None, None));
+        // recipient in allow list
+        client.add_account_info(fixture.recipient, fixture.account_info(0, Some(true), None));
+
+        // creating token module state with allow list
+        let token_module_state = fixture.token_module_state(Some(true), None, None);
+
+        // creating payload
+        let payload = fixture.payload(1, 1000);
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert_matches!(result, Err(TokenError::NotAllowed));
+    }
+
+    #[tokio::test]
+    async fn fail_validate_transfer_recipient_not_in_allow_list() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
+        let mut client = MockClient::new();
+        // sender in allow list
+        client.add_account_info(
+            fixture.sender,
+            fixture.account_info(1_000_000, Some(true), None),
+        );
+        // recipient not in allow list
         client.add_account_info(fixture.recipient, fixture.account_info(0, None, None));
 
         // creating token module state with allow list
@@ -1248,43 +1268,7 @@ mod tests {
         )
         .await;
 
-        assert!(
-            matches!(result, Err(TokenError::NotAllowed)),
-            "expected TokenError::NotAllowed, got: {result:?}"
-        );
-    }
-
-    #[tokio::test]
-    async fn fail_validate_transfer_recipient_not_in_allow_list() {
-        // basic data
-        let fixture = TransferFixture::new();
-
-        // create and populate mock client
-        let mut client = MockClient::new();
-        client.add_account_info(fixture.sender, fixture.account_info(1_000_000, None, None));
-        // recipient not in allow list
-        client.add_account_info(fixture.recipient, fixture.account_info(0, None, None));
-
-        // creating token module state with deny list
-        let token_module_state = fixture.token_module_state(Some(true), None, None);
-
-        // creating payload
-        let payload = fixture.payload(1, 1000);
-
-        let result = TokenClient::inner_validate_transfer(
-            &mut client,
-            &fixture.token_id,
-            fixture.decimals,
-            token_module_state,
-            fixture.sender,
-            payload,
-        )
-        .await;
-
-        assert!(
-            matches!(result, Err(TokenError::NotAllowed)),
-            "expected TokenError::NotAllowed, got: {result:?}"
-        );
+        assert_matches!(result, Err(TokenError::NotAllowed));
     }
 
     #[tokio::test]
@@ -1299,9 +1283,10 @@ mod tests {
             fixture.sender,
             fixture.account_info(1_000_000, Some(true), Some(true)),
         );
-        client.add_account_info(fixture.recipient, fixture.account_info(0, None, None));
+        // recipient in allow list
+        client.add_account_info(fixture.recipient, fixture.account_info(0, Some(true), None));
 
-        // creating token module state with allow and deny list
+        // creating token module state with allow and deny lists
         let token_module_state = fixture.token_module_state(Some(true), Some(true), None);
 
         // creating payload
@@ -1317,10 +1302,7 @@ mod tests {
         )
         .await;
 
-        assert!(
-            matches!(result, Err(TokenError::NotAllowed)),
-            "expected TokenError::NotAllowed, got: {result:?}"
-        );
+        assert_matches!(result, Err(TokenError::NotAllowed));
     }
 
     #[tokio::test]
@@ -1330,14 +1312,18 @@ mod tests {
 
         // create and populate mock client
         let mut client = MockClient::new();
+        // sender in allow list
         client.add_account_info(
             fixture.sender,
-            fixture.account_info(1_000_000, Some(true), Some(true)),
+            fixture.account_info(1_000_000, Some(true), None),
         );
         // recipient is both in allow and deny lists
-        client.add_account_info(fixture.recipient, fixture.account_info(0, None, None));
+        client.add_account_info(
+            fixture.recipient,
+            fixture.account_info(0, Some(true), Some(true)),
+        );
 
-        // creating token module state with allow and deny list
+        // creating token module state with allow and deny lists
         let token_module_state = fixture.token_module_state(Some(true), Some(true), None);
 
         // creating payload
@@ -1353,9 +1339,6 @@ mod tests {
         )
         .await;
 
-        assert!(
-            matches!(result, Err(TokenError::NotAllowed)),
-            "expected TokenError::NotAllowed, got: {result:?}"
-        );
+        assert_matches!(result, Err(TokenError::NotAllowed));
     }
 }
