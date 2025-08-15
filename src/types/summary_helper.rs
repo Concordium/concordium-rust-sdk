@@ -525,7 +525,7 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                         events: vec![ev1, ev2, ev3],
                     })
                 };
-                let (transaction_type, result) = match effects.require()? {
+                let (transaction_type, result) = match effects.known_or_err()? {
                     super::AccountTransactionEffects::None {
                         transaction_type,
                         reject_reason,

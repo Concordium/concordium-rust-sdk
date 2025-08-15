@@ -2020,6 +2020,40 @@ impl AccountTransactionEffects {
             AccountTransactionEffects::TokenUpdate { .. } => Some(TokenUpdate),
         }
     }
+
+    /// Return [`Some`] if the transaction has been rejected.
+    pub fn is_rejected(&self) -> Option<&RejectReason> {
+        if let Self::None { reject_reason, .. } = self {
+            Some(reject_reason)
+        } else {
+            None
+        }
+    }
+
+    fn affected_contracts(&self) -> Vec<ContractAddress> {
+        match self {
+            AccountTransactionEffects::ContractInitialized { data } => vec![data.address],
+            AccountTransactionEffects::ContractUpdateIssued { effects } => {
+                let mut seen = HashSet::new();
+                let mut addresses = Vec::new();
+                for effect in effects {
+                    match effect {
+                        ContractTraceElement::Updated { data } => {
+                            if seen.insert(data.address) {
+                                addresses.push(data.address);
+                            }
+                        }
+                        ContractTraceElement::Transferred { .. } => (),
+                        ContractTraceElement::Interrupted { .. } => (),
+                        ContractTraceElement::Resumed { .. } => (),
+                        ContractTraceElement::Upgraded { .. } => (),
+                    }
+                }
+                addresses
+            }
+            _ => Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -2201,42 +2235,6 @@ pub enum AccountTransactionEffects {
         /// Events produced by the update.
         events: Vec<protocol_level_tokens::TokenEvent>,
     },
-}
-
-impl AccountTransactionEffects {
-    /// Return [`Some`] if the transaction has been rejected.
-    pub fn is_rejected(&self) -> Option<&RejectReason> {
-        if let Self::None { reject_reason, .. } = self {
-            Some(reject_reason)
-        } else {
-            None
-        }
-    }
-
-    fn affected_contracts(&self) -> Vec<ContractAddress> {
-        match self {
-            AccountTransactionEffects::ContractInitialized { data } => vec![data.address],
-            AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                let mut seen = HashSet::new();
-                let mut addresses = Vec::new();
-                for effect in effects {
-                    match effect {
-                        ContractTraceElement::Updated { data } => {
-                            if seen.insert(data.address) {
-                                addresses.push(data.address);
-                            }
-                        }
-                        ContractTraceElement::Transferred { .. } => (),
-                        ContractTraceElement::Interrupted { .. } => (),
-                        ContractTraceElement::Resumed { .. } => (),
-                        ContractTraceElement::Upgraded { .. } => (),
-                    }
-                }
-                addresses
-            }
-            _ => Vec::new(),
-        }
-    }
 }
 
 /// Events that may happen as a result of the
