@@ -299,19 +299,28 @@ impl<Type> ContractInitHandle<Type> {
             );
         };
         match details {
-            crate::types::BlockItemSummaryDetails::AccountTransaction(at) => match at.effects {
-                AccountTransactionEffects::ContractInitialized { data } => {
-                    let contract_client = ContractClient::create(self.client, data.address).await?;
-                    Ok((contract_client, data.events))
+            crate::types::BlockItemSummaryDetails::AccountTransaction(at) => {
+                let v2::upward::Upward::Known(effects) = at.effects else {
+                    return mk_error(
+                        "Expected smart contract initialization status, but received unknown \
+                         block item details.",
+                    );
+                };
+                match effects {
+                    AccountTransactionEffects::ContractInitialized { data } => {
+                        let contract_client =
+                            ContractClient::create(self.client, data.address).await?;
+                        Ok((contract_client, data.events))
+                    }
+                    AccountTransactionEffects::None {
+                        transaction_type: _,
+                        reject_reason,
+                    } => Err(ContractInitError::Failed(reject_reason)),
+                    _ => mk_error(
+                        "Expected smart contract initialization status, but did not receive it.",
+                    ),
                 }
-                AccountTransactionEffects::None {
-                    transaction_type: _,
-                    reject_reason,
-                } => Err(ContractInitError::Failed(reject_reason)),
-                _ => mk_error(
-                    "Expected smart contract initialization status, but did not receive it.",
-                ),
-            },
+            }
             crate::types::BlockItemSummaryDetails::AccountCreation(_) => mk_error(
                 "Expected smart contract initialization status, but received account creation.",
             ),
@@ -434,7 +443,11 @@ impl<Type> ContractInitBuilder<Type> {
             .await?
             .inner;
 
-        let data = match result.details.effects {
+        let data = match result.details.effects.known_or_else(|| {
+            dry_run::DryRunError::CallError(tonic::Status::invalid_argument(
+                "Unexpected response from dry-running a contract initialization.",
+            ))
+        })? {
             AccountTransactionEffects::None {
                 transaction_type: _,
                 reject_reason,
@@ -552,7 +565,11 @@ impl ModuleDeployBuilder {
             .await?
             .inner;
 
-        let module_ref = match result.details.effects {
+        let module_ref = match result.details.effects.known_or_else(|| {
+            dry_run::DryRunError::CallError(tonic::Status::invalid_argument(
+                "Unexpected response from dry-running a module deployment.",
+            ))
+        })? {
             AccountTransactionEffects::None {
                 transaction_type: _,
                 reject_reason,
@@ -561,7 +578,7 @@ impl ModuleDeployBuilder {
             _ => {
                 return Err(
                     dry_run::DryRunError::CallError(tonic::Status::invalid_argument(
-                        "Unexpected response from dry-running a contract initialization.",
+                        "Unexpected response from dry-running a module deployment.",
                     ))
                     .into(),
                 )
@@ -647,18 +664,27 @@ impl ModuleDeployHandle {
             );
         };
         match details {
-            crate::types::BlockItemSummaryDetails::AccountTransaction(at) => match at.effects {
-                AccountTransactionEffects::ModuleDeployed { module_ref } => Ok(ModuleDeployData {
-                    energy:           result.energy_cost,
-                    cost:             at.cost,
-                    module_reference: module_ref,
-                }),
-                AccountTransactionEffects::None {
-                    transaction_type: _,
-                    reject_reason,
-                } => Err(ModuleDeployError::Failed(reject_reason)),
-                _ => mk_error("Expected module deploy status, but did not receive it."),
-            },
+            crate::types::BlockItemSummaryDetails::AccountTransaction(at) => {
+                let v2::upward::Upward::Known(effects) = at.effects else {
+                    return mk_error(
+                        "Expected  module deploy status, but received unknown block item effect.",
+                    );
+                };
+                match effects {
+                    AccountTransactionEffects::ModuleDeployed { module_ref } => {
+                        Ok(ModuleDeployData {
+                            energy:           result.energy_cost,
+                            cost:             at.cost,
+                            module_reference: module_ref,
+                        })
+                    }
+                    AccountTransactionEffects::None {
+                        transaction_type: _,
+                        reject_reason,
+                    } => Err(ModuleDeployError::Failed(reject_reason)),
+                    _ => mk_error("Expected module deploy status, but did not receive it."),
+                }
+            }
             crate::types::BlockItemSummaryDetails::AccountCreation(_) => {
                 mk_error("Expected module deploy status, but received account creation.")
             }
@@ -1659,27 +1685,36 @@ impl ContractUpdateHandle {
             );
         };
         match details {
-            crate::types::BlockItemSummaryDetails::AccountTransaction(at) => match at.effects {
-                AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                    let Some(execution_tree) = crate::types::execution_tree(effects) else {
-                        return mk_error(
-                            "Expected smart contract update, but received invalid execution tree.",
-                        );
-                    };
-                    Ok(ContractUpdateInfo {
-                        execution_tree,
-                        energy_cost: result.energy_cost,
-                        cost: at.cost,
-                        transaction_hash: self.tx_hash,
-                        sender: at.sender,
-                    })
+            crate::types::BlockItemSummaryDetails::AccountTransaction(at) => {
+                let v2::upward::Upward::Known(effects) = at.effects else {
+                    return mk_error(
+                        "Expected smart contract update status, but received unknown block item \
+                         effects.",
+                    );
+                };
+                match effects {
+                    AccountTransactionEffects::ContractUpdateIssued { effects } => {
+                        let Some(execution_tree) = crate::types::execution_tree(effects) else {
+                            return mk_error(
+                                "Expected smart contract update, but received invalid execution \
+                                 tree.",
+                            );
+                        };
+                        Ok(ContractUpdateInfo {
+                            execution_tree,
+                            energy_cost: result.energy_cost,
+                            cost: at.cost,
+                            transaction_hash: self.tx_hash,
+                            sender: at.sender,
+                        })
+                    }
+                    AccountTransactionEffects::None {
+                        transaction_type: _,
+                        reject_reason,
+                    } => Err(ContractUpdateError::Failed(reject_reason)),
+                    _ => mk_error("Expected smart contract update status, but did not receive it."),
                 }
-                AccountTransactionEffects::None {
-                    transaction_type: _,
-                    reject_reason,
-                } => Err(ContractUpdateError::Failed(reject_reason)),
-                _ => mk_error("Expected smart contract update status, but did not receive it."),
-            },
+            }
             crate::types::BlockItemSummaryDetails::AccountCreation(_) => {
                 mk_error("Expected smart contract update status, but received account creation.")
             }

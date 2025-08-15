@@ -57,8 +57,11 @@ impl indexer::ProcessEvent for StoreTransfers {
             let Upward::Known(BlockItemSummaryDetails::AccountTransaction(at)) = &tx.details else {
                 continue;
             };
+            let Upward::Known(effects) = &at.effects else {
+                continue;
+            };
             // we only look at transfers or transfers with memo.
-            let (amount, to) = match at.effects {
+            let (amount, to) = match effects {
                 AccountTransactionEffects::AccountTransfer { amount, to } => (amount, to),
                 AccountTransactionEffects::AccountTransferWithMemo {
                     amount,

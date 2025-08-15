@@ -124,6 +124,17 @@ impl<A> Upward<A> {
             Self::Unknown => Upward::Unknown,
         }
     }
+
+    /// Returns [`Upward::Unknown`] if the option is [`Upward::Unknown`],
+    /// otherwise calls `f` with the wrapped value and returns the result.
+    pub fn and_then<U, F>(self, f: F) -> Upward<U>
+    where
+        F: FnOnce(A) -> Upward<U>, {
+        match self {
+            Upward::Unknown => Upward::Unknown,
+            Upward::Known(x) => f(x),
+        }
+    }
 }
 
 impl<A> From<Option<A>> for Upward<A> {
