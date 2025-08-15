@@ -10,15 +10,19 @@ use concordium_base::{
     common::{cbor::CborSerializationError, types::TransactionTime},
     contracts_common::AccountAddress,
     hashes::TransactionHash,
-    protocol_level_tokens::{operations, TokenAmount, TokenId, TokenOperations},
+    protocol_level_tokens::{operations, TokenAmount, TokenId, TokenModuleState, TokenOperations},
     transactions::{send, BlockItem},
 };
 use thiserror::Error;
 
 use crate::{
-    protocol_level_tokens::{CborMemo, TokenAccountState, TokenInfo},
-    types::WalletAccount,
-    v2::{AccountIdentifier, BlockIdentifier, Client, IntoBlockIdentifier, QueryError, RPCError},
+    endpoints,
+    protocol_level_tokens::{AccountToken, CborMemo, TokenAccountState, TokenInfo},
+    types::{AccountInfo, WalletAccount},
+    v2::{
+        AccountIdentifier, BlockIdentifier, Client, IntoBlockIdentifier, QueryError, QueryResponse,
+        RPCError,
+    },
 };
 
 /// A wrapper around the gRPC client representing a PLT, which
@@ -596,14 +600,34 @@ impl TokenClient {
         // Fetching latest final token info
         self.update_token_info().await?;
 
+        let mut client = self.client.clone();
+        let token_id = &self.info.token_id;
+        let decimals = self.info.token_state.decimals;
         let module_state = self.info.token_state.decode_module_state()?;
+        Self::inner_validate_transfer(
+            &mut client,
+            token_id,
+            decimals,
+            module_state,
+            sender,
+            payload,
+        )
+        .await
+    }
 
-        // Check if the token is paused
+    /// Private implementation of transfer validation for the testing purposes.
+    async fn inner_validate_transfer(
+        client: &mut (impl AccountInfoFetch + Clone),
+        token_id: &TokenId,
+        decimals: u8,
+        module_state: TokenModuleState,
+        sender: AccountAddress,
+        payload: Vec<TransferTokens>,
+    ) -> TokenResult<()> {
+        // check for pause
         if module_state.paused.unwrap_or_default() {
             return Err(TokenError::Paused);
         }
-
-        let decimals = self.info.token_state.decimals;
 
         // Validate all amounts
         if payload
@@ -613,15 +637,17 @@ impl TokenClient {
             return Err(TokenError::InvalidTokenAmount);
         }
 
-        let sender_info = self
-            .client
+        let sender_info = client
             .get_account_info(&sender.into(), BlockIdentifier::LastFinal)
             .await?
             .response;
 
         // Check the sender ballance
         let sender_balance = sender_info
-            .token_amount(&self.info.token_id)
+            .tokens()
+            .iter()
+            .find(|&t| t.token_id == *token_id)
+            .map(|t| t.state.balance)
             .unwrap_or(TokenAmount::from_raw(0, decimals));
 
         let payload_total = TokenAmount::from_raw(
@@ -649,7 +675,7 @@ impl TokenClient {
 
         let futures = payload.into_iter().map(|transfer| {
             let holder = transfer.recipient;
-            let mut client = self.client.clone();
+            let mut client = client.clone();
             async move {
                 client
                     .get_account_info(&holder.into(), BlockIdentifier::LastFinal)
@@ -665,12 +691,13 @@ impl TokenClient {
 
         for account in accounts {
             let token_state = account
-                .tokens
-                .into_iter()
-                .find(|t| t.token_id == self.info.token_id)
+                .tokens()
+                .iter()
+                .find(|t| t.token_id == *token_id)
+                .cloned()
                 .map(|t| t.state)
                 .unwrap_or(TokenAccountState {
-                    balance:      TokenAmount::from_raw(0, self.info.token_state.decimals),
+                    balance:      TokenAmount::from_raw(0, decimals),
                     module_state: None,
                 });
 
@@ -690,7 +717,8 @@ impl TokenClient {
         Ok(())
     }
 
-    /// Initiates a transaction with a list of PLT operations for a given token.
+    /// Initiates a transaction with a list of PLT operations for a given
+    /// token.
     ///
     /// # Arguments
     ///
@@ -721,8 +749,8 @@ impl TokenClient {
         Ok(())
     }
 
-    /// Helper method containing the common logic related to signing and sending
-    /// PLT operations.
+    /// Helper method containing the common logic related to signing and
+    /// sending PLT operations.
     ///
     /// # Arguments
     ///
@@ -762,5 +790,555 @@ impl TokenClient {
         )?;
         let block_item = BlockItem::AccountTransaction(transaction);
         Ok(self.client.send_block_item(&block_item).await?)
+    }
+}
+
+/// Helper trait for mock testing the PLT holder accounts
+trait HasTokens {
+    fn tokens(&self) -> &[AccountToken];
+}
+
+impl HasTokens for AccountInfo {
+    fn tokens(&self) -> &[AccountToken] { &self.tokens }
+}
+
+/// Helper trait for testing the transfer validation.
+trait AccountInfoFetch {
+    type Info: HasTokens + Clone;
+
+    async fn get_account_info(
+        &mut self,
+        address: &AccountIdentifier,
+        block: BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<Self::Info>>;
+}
+
+impl AccountInfoFetch for Client {
+    type Info = AccountInfo;
+
+    async fn get_account_info(
+        &mut self,
+        address: &AccountIdentifier,
+        block: BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<Self::Info>> {
+        self.get_account_info(address, block).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        common::cbor,
+        protocol_level_tokens::{CborHolderAccount, CborTokenHolder, MetadataUrl},
+    };
+    use assert_matches::assert_matches;
+    use concordium_base::{hashes::HashBytes, protocol_level_tokens::TokenModuleAccountState};
+
+    use super::*;
+    use std::{collections::HashMap, str::FromStr};
+
+    const ADDRESS_1: &str = "4UC8o4m8AgTxt5VBFMdLwMCwwJQVJwjesNzW7RPXkACynrULmd";
+    const ADDRESS_2: &str = "3ybJ66spZ2xdWF3avgxQb2meouYa7mpvMWNPmUnczU8FoF8cGB";
+    const TOKEN_ID: &str = "MockToken";
+
+    #[derive(Debug, Clone)]
+    struct MockInfo {
+        info: Vec<AccountToken>,
+    }
+
+    impl HasTokens for MockInfo {
+        fn tokens(&self) -> &[AccountToken] { &self.info }
+    }
+
+    #[derive(Debug, Clone)]
+    struct MockClient {
+        responses: HashMap<AccountAddress, QueryResponse<MockInfo>>,
+    }
+
+    impl MockClient {
+        fn new() -> Self {
+            let responses = HashMap::new();
+            Self { responses }
+        }
+
+        fn add_account_info(&mut self, account: AccountAddress, info: MockInfo) {
+            let response = QueryResponse {
+                block_hash: HashBytes::from([0; 32]),
+                response:   info,
+            };
+            let _ = self.responses.insert(account, response);
+        }
+    }
+
+    impl AccountInfoFetch for MockClient {
+        type Info = MockInfo;
+
+        async fn get_account_info(
+            &mut self,
+            address: &AccountIdentifier,
+            _block: BlockIdentifier,
+        ) -> endpoints::QueryResult<QueryResponse<Self::Info>> {
+            let AccountIdentifier::Address(address) = address else {
+                return Err(QueryError::NotFound);
+            };
+
+            self.responses
+                .get(address)
+                .cloned()
+                .ok_or(QueryError::NotFound)
+        }
+    }
+
+    struct TransferFixture {
+        sender:    AccountAddress,
+        recipient: AccountAddress,
+        token_id:  TokenId,
+        decimals:  u8,
+    }
+
+    impl TransferFixture {
+        fn new() -> Self {
+            let sender = AccountAddress::from_str(ADDRESS_1).expect("Must be a valid address");
+            let recipient = AccountAddress::from_str(ADDRESS_2).expect("Must be a valid address");
+            let token_id = TokenId::from_str(TOKEN_ID).expect("The Token Id must be valid");
+            let decimals = 8;
+
+            Self {
+                sender,
+                recipient,
+                token_id,
+                decimals,
+            }
+        }
+
+        fn payload(&self, entries: usize, amount: u64) -> Vec<TransferTokens> {
+            (0..entries)
+                .map(|_| TransferTokens {
+                    amount:    TokenAmount::from_raw(amount, self.decimals),
+                    recipient: self.recipient,
+                    memo:      None,
+                })
+                .collect()
+        }
+
+        fn token_module_state(
+            &self,
+            allow_list: Option<bool>,
+            deny_list: Option<bool>,
+            paused: Option<bool>,
+        ) -> TokenModuleState {
+            TokenModuleState {
+                name: TOKEN_ID.into(),
+                metadata: MetadataUrl {
+                    url:              "https://example.com/metadata".into(),
+                    checksum_sha_256: None,
+                    additional:       HashMap::new(),
+                },
+                governance_account: CborTokenHolder::Account(CborHolderAccount {
+                    coin_info: None,
+                    address:   self.sender,
+                }),
+                allow_list,
+                deny_list,
+                mintable: None,
+                burnable: None,
+                paused,
+                additional: HashMap::new(),
+            }
+        }
+
+        fn account_info(
+            &self,
+            balance: u64,
+            allow_list: Option<bool>,
+            deny_list: Option<bool>,
+        ) -> MockInfo {
+            let module_state = (allow_list.is_some() || deny_list.is_some())
+                .then(|| TokenModuleAccountState {
+                    allow_list,
+                    deny_list,
+                    additional: HashMap::new(),
+                })
+                .map(|s| {
+                    cbor::cbor_encode(&s)
+                        .expect("TokenModuleAccountState must be serializbale")
+                        .into()
+                });
+
+            MockInfo {
+                info: vec![AccountToken {
+                    token_id: self.token_id.clone(),
+                    state:    TokenAccountState {
+                        balance: TokenAmount::from_raw(balance, self.decimals),
+                        module_state,
+                    },
+                }],
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn successful_validate_transfer() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
+        let mut client = MockClient::new();
+
+        let sender_info = fixture.account_info(1_000_000_000, None, None);
+        let recipient_info = fixture.account_info(0, None, None);
+        client.add_account_info(fixture.sender, sender_info);
+        client.add_account_info(fixture.recipient, recipient_info);
+
+        // creating token module state
+        let token_module_state = fixture.token_module_state(None, None, None);
+
+        // creating payload
+        let payload = fixture.payload(3, 1_000_000);
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert!(result.is_ok(), "expected Ok(()), got: {result:?}");
+    }
+
+    #[tokio::test]
+    async fn fail_validate_transfer_paused() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
+        let mut client = MockClient::new();
+
+        let sender_info = fixture.account_info(1_000_000_000, None, None);
+        let recipient_info = fixture.account_info(10_000_000, None, None);
+        client.add_account_info(fixture.sender, sender_info);
+        client.add_account_info(fixture.recipient, recipient_info);
+
+        // creating token module with a paused state
+        let token_module_state = fixture.token_module_state(None, None, Some(true));
+
+        // creating payload
+        let payload = fixture.payload(0, 1_000_000);
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert_matches!(result, Err(TokenError::Paused));
+    }
+
+    #[tokio::test]
+    async fn fail_validate_transfer_insufficent_funds() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
+        let mut client = MockClient::new();
+
+        // creating sender with insufficient amount of tokens
+        let sender_info = fixture.account_info(1_000_000, None, None);
+        let recipient_info = fixture.account_info(0, None, None);
+        client.add_account_info(fixture.sender, sender_info);
+        client.add_account_info(fixture.recipient, recipient_info);
+
+        // creating token module state
+        let token_module_state = fixture.token_module_state(None, None, None);
+
+        // creating payload
+        let payload = fixture.payload(10, 1_000_000);
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert_matches!(result, Err(TokenError::InsufficientFunds));
+    }
+
+    #[tokio::test]
+    async fn fail_validate_transfer_invalid_decimals_in_amount_in_payload() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
+        let mut client = MockClient::new();
+
+        let sender_info = fixture.account_info(1_000_000, None, None);
+        let recipient_info = fixture.account_info(0, None, None);
+        client.add_account_info(fixture.sender, sender_info);
+        client.add_account_info(fixture.recipient, recipient_info);
+
+        // creating token module state
+        let token_module_state = fixture.token_module_state(None, None, None);
+
+        // creating payload with invalid decimals in token amount
+        let invalid_amount = TokenAmount::from_raw(1_000_000, fixture.decimals + 2);
+        let payload = vec![TransferTokens {
+            amount:    invalid_amount,
+            recipient: fixture.recipient,
+            memo:      None,
+        }];
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert_matches!(result, Err(TokenError::InvalidTokenAmount));
+    }
+
+    #[tokio::test]
+    async fn fail_validate_transfer_payload_amount_overflow() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
+        let mut client = MockClient::new();
+
+        client.add_account_info(fixture.sender, fixture.account_info(1_000_000, None, None));
+        client.add_account_info(fixture.recipient, fixture.account_info(0, None, None));
+
+        // creating token module state
+        let token_module_state = fixture.token_module_state(None, None, None);
+
+        // payload with overflowing total token amount
+        let payload = fixture.payload(2, u64::MAX);
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert_matches!(result, Err(TokenError::InvalidTokenAmount));
+    }
+
+    #[tokio::test]
+    async fn fail_validate_transfer_sender_in_deny_list() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
+        let mut client = MockClient::new();
+        // sender in deny list
+        client.add_account_info(
+            fixture.sender,
+            fixture.account_info(1_000_000, None, Some(true)),
+        );
+        // recipient not in deny list
+        client.add_account_info(fixture.recipient, fixture.account_info(0, None, None));
+
+        // creating token module state with deny list
+        let token_module_state = fixture.token_module_state(None, Some(true), None);
+
+        // creating payload
+        let payload = fixture.payload(1, 1000);
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert_matches!(result, Err(TokenError::NotAllowed));
+    }
+
+    #[tokio::test]
+    async fn fail_validate_transfer_recipient_in_deny_list() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
+        let mut client = MockClient::new();
+        // sender not in deny list
+        client.add_account_info(fixture.sender, fixture.account_info(1_000_000, None, None));
+        // recipient in deny list
+        client.add_account_info(fixture.recipient, fixture.account_info(0, None, Some(true)));
+
+        // creating token module state with deny list
+        let token_module_state = fixture.token_module_state(None, Some(true), None);
+
+        // creating payload
+        let payload = fixture.payload(1, 1000);
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert_matches!(result, Err(TokenError::NotAllowed));
+    }
+
+    #[tokio::test]
+    async fn fail_validate_transfer_sender_not_in_allow_list() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
+        let mut client = MockClient::new();
+        // sender not in allow list
+        client.add_account_info(fixture.sender, fixture.account_info(1_000_000, None, None));
+        // recipient in allow list
+        client.add_account_info(fixture.recipient, fixture.account_info(0, Some(true), None));
+
+        // creating token module state with allow list
+        let token_module_state = fixture.token_module_state(Some(true), None, None);
+
+        // creating payload
+        let payload = fixture.payload(1, 1000);
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert_matches!(result, Err(TokenError::NotAllowed));
+    }
+
+    #[tokio::test]
+    async fn fail_validate_transfer_recipient_not_in_allow_list() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
+        let mut client = MockClient::new();
+        // sender in allow list
+        client.add_account_info(
+            fixture.sender,
+            fixture.account_info(1_000_000, Some(true), None),
+        );
+        // recipient not in allow list
+        client.add_account_info(fixture.recipient, fixture.account_info(0, None, None));
+
+        // creating token module state with allow list
+        let token_module_state = fixture.token_module_state(Some(true), None, None);
+
+        // creating payload
+        let payload = fixture.payload(1, 1000);
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert_matches!(result, Err(TokenError::NotAllowed));
+    }
+
+    #[tokio::test]
+    async fn fail_validate_transfer_sender_deny_overrule_allow_list() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
+        let mut client = MockClient::new();
+        // sender is both in allow and deny lists
+        client.add_account_info(
+            fixture.sender,
+            fixture.account_info(1_000_000, Some(true), Some(true)),
+        );
+        // recipient in allow list
+        client.add_account_info(fixture.recipient, fixture.account_info(0, Some(true), None));
+
+        // creating token module state with allow and deny lists
+        let token_module_state = fixture.token_module_state(Some(true), Some(true), None);
+
+        // creating payload
+        let payload = fixture.payload(1, 1000);
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert_matches!(result, Err(TokenError::NotAllowed));
+    }
+
+    #[tokio::test]
+    async fn fail_validate_transfer_recipient_deny_overrule_allow_list() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
+        let mut client = MockClient::new();
+        // sender in allow list
+        client.add_account_info(
+            fixture.sender,
+            fixture.account_info(1_000_000, Some(true), None),
+        );
+        // recipient is both in allow and deny lists
+        client.add_account_info(
+            fixture.recipient,
+            fixture.account_info(0, Some(true), Some(true)),
+        );
+
+        // creating token module state with allow and deny lists
+        let token_module_state = fixture.token_module_state(Some(true), Some(true), None);
+
+        // creating payload
+        let payload = fixture.payload(1, 1000);
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert_matches!(result, Err(TokenError::NotAllowed));
     }
 }
