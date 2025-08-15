@@ -600,17 +600,24 @@ impl TokenClient {
         // Fetching latest final token info
         self.update_token_info().await?;
 
-        let client = self.client.clone();
+        let mut client = self.client.clone();
         let token_id = &self.info.token_id;
         let decimals = self.info.token_state.decimals;
         let module_state = self.info.token_state.decode_module_state()?;
-        Self::inner_validate_transfer(client, token_id, decimals, module_state, sender, payload)
-            .await
+        Self::inner_validate_transfer(
+            &mut client,
+            token_id,
+            decimals,
+            module_state,
+            sender,
+            payload,
+        )
+        .await
     }
 
     /// Private implementation of transfer validation for the testing purposes.
     async fn inner_validate_transfer(
-        mut client: impl AccountInfoFetch + Clone,
+        client: &mut (impl AccountInfoFetch + Clone),
         token_id: &TokenId,
         decimals: u8,
         module_state: TokenModuleState,
@@ -639,8 +646,7 @@ impl TokenClient {
         let sender_balance = sender_info
             .tokens()
             .iter()
-            .find(|t| t.token_id == *token_id)
-            .cloned()
+            .find(|&t| t.token_id == *token_id)
             .map(|t| t.state.balance)
             .unwrap_or(TokenAmount::from_raw(0, decimals));
 
@@ -821,11 +827,13 @@ impl AccountInfoFetch for Client {
 
 #[cfg(test)]
 mod tests {
-    use concordium_base::{hashes::HashBytes, protocol_level_tokens::TokenModuleAccountState};
-
     use crate::{
         common::cbor,
         protocol_level_tokens::{CborHolderAccount, CborTokenHolder, MetadataUrl},
+    };
+    use concordium_base::{
+        hashes::HashBytes,
+        protocol_level_tokens::{TokenModuleAccountState},
     };
 
     use super::*;
@@ -883,102 +891,119 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn successful_transfer_validation() {
-        // basic data
-        let account_1 = AccountAddress::from_str(ADDRESS_1).expect("Must be valid Address");
-        let account_2 = AccountAddress::from_str(ADDRESS_2).expect("Must be valid Address");
-        let token_id = TokenId::from_str(TOKEN_ID).expect("The Token Id must be valid");
-        let decimals = 8;
+    struct TransferFixture {
+        sender:    AccountAddress,
+        recipient: AccountAddress,
+        token_id:  TokenId,
+        decimals:  u8,
+    }
 
-        // create and puplate mock client
+    impl TransferFixture {
+        fn new() -> Self {
+            let sender = AccountAddress::from_str(ADDRESS_1).expect("Must be a valid address");
+            let recipient = AccountAddress::from_str(ADDRESS_2).expect("Must be a valid address");
+            let token_id = TokenId::from_str(TOKEN_ID).expect("The Token Id must be valid");
+            let decimals = 8;
+
+            Self {
+                sender,
+                recipient,
+                token_id,
+                decimals,
+            }
+        }
+
+        fn payload(&self, entries: usize, amount: u64) -> Vec<TransferTokens> {
+            (0..entries)
+                .map(|_| TransferTokens {
+                    amount: TokenAmount::from_raw(amount, self.decimals),
+                    recipient: self.recipient,
+                    memo: None,
+                })
+                .collect()
+        }
+
+        fn token_module_state(
+            &self,
+            allow_list: Option<bool>,
+            deny_list: Option<bool>,
+            paused: Option<bool>,
+        ) -> TokenModuleState {
+            TokenModuleState {
+                name: TOKEN_ID.into(),
+                metadata: MetadataUrl {
+                    url:              "https://example.com/metadata".into(),
+                    checksum_sha_256: None,
+                    additional:       HashMap::new(),
+                },
+                governance_account: CborTokenHolder::Account(CborHolderAccount {
+                    coin_info: None,
+                    address:   self.sender,
+                }),
+                allow_list,
+                deny_list,
+                mintable: None,
+                burnable: None,
+                paused,
+                additional: HashMap::new(),
+            }
+        }
+
+        fn account_info(
+            &self,
+            balance: u64,
+            allow_list: Option<bool>,
+            deny_list: Option<bool>,
+        ) -> MockInfo {
+            let module_state = (allow_list.is_some() || deny_list.is_some())
+                .then(|| TokenModuleAccountState {
+                    allow_list,
+                    deny_list,
+                    additional: HashMap::new(),
+                })
+                .map(|s| {
+                    cbor::cbor_encode(&s)
+                        .expect("TokenModuleAccountState must be serializbale")
+                        .into()
+                });
+
+            MockInfo {
+                info: vec![AccountToken {
+                    token_id: self.token_id.clone(),
+                    state:    TokenAccountState {
+                        balance: TokenAmount::from_raw(balance, self.decimals),
+                        module_state,
+                    },
+                }],
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn successful_validate_transfer() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
         let mut client = MockClient::new();
 
-        let amount_1 = TokenAmount::from_raw(1_000_000_000, decimals);
-        let info_1 = MockInfo {
-            info: vec![AccountToken {
-                token_id: token_id.clone(),
-                state:    TokenAccountState {
-                    balance:      amount_1,
-                    module_state: None,
-                },
-            }],
-        };
-
-        let amount_2 = TokenAmount::from_raw(1_000_000, decimals);
-        let info_2 = MockInfo {
-            info: vec![AccountToken {
-                token_id: token_id.clone(),
-                state:    TokenAccountState {
-                    balance:      amount_2,
-                    module_state: None,
-                },
-            }],
-        };
-
-        client.add_account_info(account_1, info_1);
-        client.add_account_info(account_2, info_2);
+        let sender_info = fixture.account_info(1_000_000_000, None, None);
+        let recipient_info = fixture.account_info(0, None, None);
+        client.add_account_info(fixture.sender, sender_info);
+        client.add_account_info(fixture.recipient, recipient_info);
 
         // creating token module state
-        let token_module_state = TokenModuleState {
-            name:               TOKEN_ID.into(),
-            metadata:           MetadataUrl {
-                url:              "https://example.com/metadata".into(),
-                checksum_sha_256: None,
-                additional:       HashMap::new(),
-            },
-            governance_account: CborTokenHolder::Account(CborHolderAccount {
-                coin_info: None,
-                address:   account_1,
-            }),
-            allow_list:         None,
-            deny_list:          None,
-            mintable:           None,
-            burnable:           None,
-            paused:             None,
-            additional:         HashMap::new(),
-        };
+        let token_module_state = fixture.token_module_state(None, None, None);
 
         // creating payload
-        let payload = vec![
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-        ];
+        let payload = fixture.payload(3, 1_000_000);
 
         let result = TokenClient::inner_validate_transfer(
-            client,
-            &token_id,
-            decimals,
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
             token_module_state,
-            account_1,
+            fixture.sender,
             payload,
         )
         .await;
@@ -989,99 +1014,28 @@ mod tests {
     #[tokio::test]
     async fn fail_validate_transfer_paused() {
         // basic data
-        let account_1 = AccountAddress::from_str(ADDRESS_1).expect("Must be valid Address");
-        let account_2 = AccountAddress::from_str(ADDRESS_2).expect("Must be valid Address");
-        let token_id = TokenId::from_str(TOKEN_ID).expect("The Token Id must be valid");
-        let decimals = 8;
+        let fixture = TransferFixture::new();
 
-        // create and puplate mock client
+        // create and populate mock client
         let mut client = MockClient::new();
 
-        let amount_1 = TokenAmount::from_raw(1_000_000_000, decimals);
-        let info_1 = MockInfo {
-            info: vec![AccountToken {
-                token_id: token_id.clone(),
-                state:    TokenAccountState {
-                    balance:      amount_1,
-                    module_state: None,
-                },
-            }],
-        };
-
-        let amount_2 = TokenAmount::from_raw(1_000_000, decimals);
-        let info_2 = MockInfo {
-            info: vec![AccountToken {
-                token_id: token_id.clone(),
-                state:    TokenAccountState {
-                    balance:      amount_2,
-                    module_state: None,
-                },
-            }],
-        };
-
-        client.add_account_info(account_1, info_1);
-        client.add_account_info(account_2, info_2);
+        let sender_info = fixture.account_info(1_000_000_000, None, None);
+        let recipient_info = fixture.account_info(10_000_000, None, None);
+        client.add_account_info(fixture.sender, sender_info);
+        client.add_account_info(fixture.recipient, recipient_info);
 
         // creating token module with a paused state
-        let token_module_state = TokenModuleState {
-            name:               TOKEN_ID.into(),
-            metadata:           MetadataUrl {
-                url:              "https://example.com/metadata".into(),
-                checksum_sha_256: None,
-                additional:       HashMap::new(),
-            },
-            governance_account: CborTokenHolder::Account(CborHolderAccount {
-                coin_info: None,
-                address:   account_1,
-            }),
-            allow_list:         None,
-            deny_list:          None,
-            mintable:           None,
-            burnable:           None,
-            paused:             Some(true),
-            additional:         HashMap::new(),
-        };
+        let token_module_state = fixture.token_module_state(None, None, Some(true));
 
         // creating payload
-        let payload = vec![
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-        ];
+        let payload = fixture.payload(0, 1_000_000);
 
         let result = TokenClient::inner_validate_transfer(
-            client,
-            &token_id,
-            decimals,
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
             token_module_state,
-            account_1,
+            fixture.sender,
             payload,
         )
         .await;
@@ -1095,92 +1049,29 @@ mod tests {
     #[tokio::test]
     async fn fail_validate_transfer_insufficent_funds() {
         // basic data
-        let account_1 = AccountAddress::from_str(ADDRESS_1).expect("Must be valid Address");
-        let account_2 = AccountAddress::from_str(ADDRESS_2).expect("Must be valid Address");
-        let token_id = TokenId::from_str(TOKEN_ID).expect("The Token Id must be valid");
-        let decimals = 8;
+        let fixture = TransferFixture::new();
 
-        // create and puplate mock client
+        // create and populate mock client
         let mut client = MockClient::new();
 
         // creating sender with insufficient amount of tokens
-        let amount_1 = TokenAmount::from_raw(1_000_000, decimals);
-        let info_1 = MockInfo {
-            info: vec![AccountToken {
-                token_id: token_id.clone(),
-                state:    TokenAccountState {
-                    balance:      amount_1,
-                    module_state: None,
-                },
-            }],
-        };
-
-        let amount_2 = TokenAmount::from_raw(1_000_000, decimals);
-        let info_2 = MockInfo { info: vec![] };
-
-        client.add_account_info(account_1, info_1);
-        client.add_account_info(account_2, info_2);
+        let sender_info = fixture.account_info(1_000_000, None, None);
+        let recipient_info = fixture.account_info(0, None, None);
+        client.add_account_info(fixture.sender, sender_info);
+        client.add_account_info(fixture.recipient, recipient_info);
 
         // creating token module state
-        let token_module_state = TokenModuleState {
-            name:               TOKEN_ID.into(),
-            metadata:           MetadataUrl {
-                url:              "https://example.com/metadata".into(),
-                checksum_sha_256: None,
-                additional:       HashMap::new(),
-            },
-            governance_account: CborTokenHolder::Account(CborHolderAccount {
-                coin_info: None,
-                address:   account_1,
-            }),
-            allow_list:         None,
-            deny_list:          None,
-            mintable:           None,
-            burnable:           None,
-            paused:             None,
-            additional:         HashMap::new(),
-        };
+        let token_module_state = fixture.token_module_state(None, None, None);
 
         // creating payload
-        let payload = vec![
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-        ];
+        let payload = fixture.payload(10, 1_000_000);
 
         let result = TokenClient::inner_validate_transfer(
-            client,
-            &token_id,
-            decimals,
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
             token_module_state,
-            account_1,
+            fixture.sender,
             payload,
         )
         .await;
@@ -1192,95 +1083,35 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fail_validate_transfer_invalid_amount_in_payload() {
+    async fn fail_validate_transfer_invalid_decimals_in_amount_in_payload() {
         // basic data
-        let account_1 = AccountAddress::from_str(ADDRESS_1).expect("Must be valid Address");
-        let account_2 = AccountAddress::from_str(ADDRESS_2).expect("Must be valid Address");
-        let token_id = TokenId::from_str(TOKEN_ID).expect("The Token Id must be valid");
-        let decimals = 8;
+        let fixture = TransferFixture::new();
 
-        // create and puplate mock client
+        // create and populate mock client
         let mut client = MockClient::new();
 
-        let amount_1 = TokenAmount::from_raw(1_000_000, decimals);
-        let info_1 = MockInfo {
-            info: vec![AccountToken {
-                token_id: token_id.clone(),
-                state:    TokenAccountState {
-                    balance:      amount_1,
-                    module_state: None,
-                },
-            }],
-        };
-
-        let info_2 = MockInfo { info: vec![] };
-
-        client.add_account_info(account_1, info_1);
-        client.add_account_info(account_2, info_2);
+        let sender_info = fixture.account_info(1_000_000, None, None);
+        let recipient_info = fixture.account_info(0, None, None);
+        client.add_account_info(fixture.sender, sender_info);
+        client.add_account_info(fixture.recipient, recipient_info);
 
         // creating token module state
-        let token_module_state = TokenModuleState {
-            name:               TOKEN_ID.into(),
-            metadata:           MetadataUrl {
-                url:              "https://example.com/metadata".into(),
-                checksum_sha_256: None,
-                additional:       HashMap::new(),
-            },
-            governance_account: CborTokenHolder::Account(CborHolderAccount {
-                coin_info: None,
-                address:   account_1,
-            }),
-            allow_list:         None,
-            deny_list:          None,
-            mintable:           None,
-            burnable:           None,
-            paused:             None,
-            additional:         HashMap::new(),
-        };
+        let token_module_state = fixture.token_module_state(None, None, None);
 
-        // creating amount with the wrong decimals
-        let amount_2 = TokenAmount::from_raw(1_000_000, decimals + 2);
-
-        // creating payload
-        let payload = vec![
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-        ];
+        // creating payload with invalid decimals in token amount
+        let invalid_amount = TokenAmount::from_raw(1_000_000, fixture.decimals + 2);
+        let payload = vec![TransferTokens {
+            amount:    invalid_amount,
+            recipient: fixture.recipient,
+            memo:      None,
+        }];
 
         let result = TokenClient::inner_validate_transfer(
-            client,
-            &token_id,
-            decimals,
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
             token_module_state,
-            account_1,
+            fixture.sender,
             payload,
         )
         .await;
@@ -1292,110 +1123,228 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fail_validate_transfer_list_error() {
+    async fn fail_validate_transfer_payload_amount_overflow() {
         // basic data
-        let account_1 = AccountAddress::from_str(ADDRESS_1).expect("Must be valid Address");
-        let account_2 = AccountAddress::from_str(ADDRESS_2).expect("Must be valid Address");
-        let token_id = TokenId::from_str(TOKEN_ID).expect("The Token Id must be valid");
-        let decimals = 8;
+        let fixture = TransferFixture::new();
 
-        // create and puplate mock client
+        // create and populate mock client
         let mut client = MockClient::new();
 
-        let amount_1 = TokenAmount::from_raw(1_000_000_000, decimals);
-        let info_1 = MockInfo {
-            info: vec![AccountToken {
-                token_id: token_id.clone(),
-                state:    TokenAccountState {
-                    balance:      amount_1,
-                    module_state: None,
-                },
-            }],
-        };
+        client.add_account_info(fixture.sender, fixture.account_info(1_000_000, None, None));
+        client.add_account_info(fixture.recipient, fixture.account_info(0, None, None));
 
-        // creating an account that is in the deny list
-        let amount_2 = TokenAmount::from_raw(1_000_000, decimals);
-        let account_module_state_2 = TokenModuleAccountState {
-            allow_list: None,
-            deny_list:  Some(true),
-            additional: HashMap::new(),
-        };
-        let cbor = cbor::cbor_encode(&account_module_state_2)
-            .expect("TokenModuleAccountState must be serializbale");
-        // account_module_state_2
-        let info_2 = MockInfo {
-            info: vec![AccountToken {
-                token_id: token_id.clone(),
-                state:    TokenAccountState {
-                    balance:      amount_2,
-                    module_state: Some(cbor.into()),
-                },
-            }],
-        };
+        // creating token module state
+        let token_module_state = fixture.token_module_state(None, None, None);
 
-        client.add_account_info(account_1, info_1);
-        client.add_account_info(account_2, info_2);
-
-        // creating token module state with a deny list
-        let token_module_state = TokenModuleState {
-            name:               TOKEN_ID.into(),
-            metadata:           MetadataUrl {
-                url:              "https://example.com/metadata".into(),
-                checksum_sha_256: None,
-                additional:       HashMap::new(),
-            },
-            governance_account: CborTokenHolder::Account(CborHolderAccount {
-                coin_info: None,
-                address:   account_1,
-            }),
-            allow_list:         None,
-            deny_list:          Some(true),
-            mintable:           None,
-            burnable:           None,
-            paused:             None,
-            additional:         HashMap::new(),
-        };
-
-        // creating payload
-        let payload = vec![
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-            TransferTokens {
-                amount:    amount_2,
-                recipient: account_2,
-                memo:      None,
-            },
-        ];
+        // payload with overflowing total token amount
+        let payload = fixture.payload(2, u64::MAX);
 
         let result = TokenClient::inner_validate_transfer(
-            client,
-            &token_id,
-            decimals,
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
             token_module_state,
-            account_1,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert!(
+            matches!(result, Err(TokenError::InvalidTokenAmount)),
+            "expected error: TokenError::InvalidTokenAmount, got {result:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn fail_validate_transfer_sender_in_deny_list() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
+        let mut client = MockClient::new();
+        // sender in deny list
+        client.add_account_info(
+            fixture.sender,
+            fixture.account_info(1_000_000, None, Some(true)),
+        );
+        client.add_account_info(fixture.recipient, fixture.account_info(0, None, None));
+
+        // creating token module state with deny list
+        let token_module_state = fixture.token_module_state(None, Some(true), None);
+
+        // creating payload
+        let payload = fixture.payload(1, 1000);
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert!(
+            matches!(result, Err(TokenError::NotAllowed)),
+            "expected TokenError::NotAllowed, got: {result:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn fail_validate_transfer_recipient_in_deny_list() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
+        let mut client = MockClient::new();
+        client.add_account_info(fixture.sender, fixture.account_info(1_000_000, None, None));
+        // recipient in deny list
+        client.add_account_info(fixture.recipient, fixture.account_info(0, None, Some(true)));
+
+        // creating token module state with deny list
+        let token_module_state = fixture.token_module_state(None, Some(true), None);
+
+        // creating payload
+        let payload = fixture.payload(1, 1000);
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert!(
+            matches!(result, Err(TokenError::NotAllowed)),
+            "expected TokenError::NotAllowed, got: {result:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn fail_validate_transfer_sender_not_in_allow_list() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
+        let mut client = MockClient::new();
+        // sender not in allow list
+        client.add_account_info(fixture.sender, fixture.account_info(1_000_000, None, None));
+        client.add_account_info(fixture.recipient, fixture.account_info(0, None, None));
+
+        // creating token module state with allow list
+        let token_module_state = fixture.token_module_state(Some(true), None, None);
+
+        // creating payload
+        let payload = fixture.payload(1, 1000);
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert!(
+            matches!(result, Err(TokenError::NotAllowed)),
+            "expected TokenError::NotAllowed, got: {result:?}"
+        );    }
+
+    #[tokio::test]
+    async fn fail_validate_transfer_recipient_not_in_allow_list() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
+        let mut client = MockClient::new();
+        client.add_account_info(fixture.sender, fixture.account_info(1_000_000, None, None));
+        // recipient not in allow list
+        client.add_account_info(fixture.recipient, fixture.account_info(0, None, None));
+
+        // creating token module state with deny list
+        let token_module_state = fixture.token_module_state(Some(true), None, None);
+
+        // creating payload
+        let payload = fixture.payload(1, 1000);
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert!(
+            matches!(result, Err(TokenError::NotAllowed)),
+            "expected TokenError::NotAllowed, got: {result:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn fail_validate_transfer_sender_deny_overrule_allow_list() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
+        let mut client = MockClient::new();
+        // sender is both in allow and deny lists
+        client.add_account_info(fixture.sender, fixture.account_info(1_000_000, Some(true), Some(true)));
+        client.add_account_info(fixture.recipient, fixture.account_info(0, None, None));
+
+        // creating token module state with allow and deny list
+        let token_module_state = fixture.token_module_state(Some(true), Some(true), None);
+
+        // creating payload
+        let payload = fixture.payload(1, 1000);
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert!(
+            matches!(result, Err(TokenError::NotAllowed)),
+            "expected TokenError::NotAllowed, got: {result:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn fail_validate_transfer_recipient_deny_overrule_allow_list() {
+        // basic data
+        let fixture = TransferFixture::new();
+
+        // create and populate mock client
+        let mut client = MockClient::new();
+        client.add_account_info(fixture.sender, fixture.account_info(1_000_000, Some(true), Some(true)));
+        // recipient is both in allow and deny lists
+        client.add_account_info(fixture.recipient, fixture.account_info(0, None, None));
+
+        // creating token module state with allow and deny list
+        let token_module_state = fixture.token_module_state(Some(true), Some(true), None);
+
+        // creating payload
+        let payload = fixture.payload(1, 1000);
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
             payload,
         )
         .await;
