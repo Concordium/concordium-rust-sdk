@@ -37,18 +37,25 @@ impl<A> Upward<A> {
     /// [`Upward::Unknown`].
     pub fn as_known(&self) -> Option<&A> { Option::from(self.as_ref()) }
 
+    /// Require the data to be known, converting it from `Upward<A>` to
+    /// `Result<A, UnknownDataError>`.
+    ///
+    /// This is effectively opt out of forward-compatibility, forcing the
+    /// library to be up to date with the node version.
+    pub fn known_or_err(self) -> Result<A, UnknownDataError> { self.known_or(UnknownDataError) }
+
     /// Transforms the `Upward<T>` into a [`Result<T, E>`], mapping
     /// [`Known(v)`] to [`Ok(v)`] and [`Upward::Unknown`] to [`Err(err)`].
     ///
-    /// Arguments passed to `ok_or` are eagerly evaluated; if you are passing
+    /// Arguments passed to `known_or` are eagerly evaluated; if you are passing
     /// the result of a function call, it is recommended to use
-    /// [`ok_or_else`], which is lazily evaluated.
+    /// [`known_or_else`], which is lazily evaluated.
     ///
     /// [`Ok(v)`]: Ok
     /// [`Err(err)`]: Err
     /// [`Known(v)`]: Upward::Known
-    /// [`ok_or_else`]: Upward::ok_or_else
-    pub fn ok_or<E>(self, error: E) -> Result<A, E> { Option::from(self).ok_or(error) }
+    /// [`known_or_else`]: Upward::known_or_else
+    pub fn known_or<E>(self, error: E) -> Result<A, E> { Option::from(self).ok_or(error) }
 
     /// Transforms the `Upward<T>` into a [`Result<T, E>`], mapping
     /// [`Known(v)`] to [`Ok(v)`] and [`Upward::Unknown`] to [`Err(err())`].
@@ -56,7 +63,7 @@ impl<A> Upward<A> {
     /// [`Ok(v)`]: Ok
     /// [`Err(err())`]: Err
     /// [`Known(v)`]: Upward::Known
-    pub fn ok_or_else<E, F>(self, error: F) -> Result<A, E>
+    pub fn known_or_else<E, F>(self, error: F) -> Result<A, E>
     where
         F: FnOnce() -> E, {
         Option::from(self).ok_or_else(error)
@@ -79,6 +86,37 @@ impl<A> Upward<A> {
         }
     }
 
+    /// Returns the provided default result (if [`Upward::Unknown`]),
+    /// or applies a function to the contained value (if [`Upward::Known`]).
+    ///
+    /// Arguments passed to `map_or` are eagerly evaluated; if you are passing
+    /// the result of a function call, it is recommended to use [`map_or_else`],
+    /// which is lazily evaluated.
+    ///
+    /// [`map_or_else`]: Upward::map_or_else
+    #[must_use = "if you don't need the returned value, use `if let` instead"]
+    pub fn map_or<U, F>(self, default: U, f: F) -> U
+    where
+        F: FnOnce(A) -> U, {
+        match self {
+            Upward::Known(a) => f(a),
+            Upward::Unknown => default,
+        }
+    }
+
+    /// Computes a default function result (if [`Upward::Unknown`]), or
+    /// applies a different function to the contained value (if
+    /// [`Upward::Known`]).
+    pub fn map_or_else<U, D, F>(self, default: D, f: F) -> U
+    where
+        D: FnOnce() -> U,
+        F: FnOnce(A) -> U, {
+        match self {
+            Upward::Known(t) => f(t),
+            Upward::Unknown => default(),
+        }
+    }
+
     /// Converts from `&Option<A>` to `Option<&A>`.
     pub const fn as_ref(&self) -> Upward<&A> {
         match *self {
@@ -86,13 +124,6 @@ impl<A> Upward<A> {
             Self::Unknown => Upward::Unknown,
         }
     }
-
-    /// Require the data to be known, converting it from `Upward<A>` to
-    /// `Result<A, RequireDataError>`.
-    ///
-    /// This is effectively opt out of forward-compatibility, forcing the
-    /// library to be up to date with the node version.
-    pub fn require(self) -> Result<A, RequireDataError> { self.ok_or(RequireDataError) }
 }
 
 impl<A> From<Option<A>> for Upward<A> {
@@ -126,12 +157,12 @@ where
             a.serialize(serializer)
         } else {
             Err(serde::ser::Error::custom(
-                "Cannot serialize Upward::Unknown due",
+                "Serializing `Upward::Unknown` is not supported",
             ))
         }
     }
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("Encountered some unknown data structure was marked as required to be known")]
-pub struct RequireDataError;
+#[error("Encountered unknown data from the Node API, which is required to be known.")]
+pub struct UnknownDataError;

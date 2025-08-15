@@ -17,7 +17,7 @@ use super::{
 
 use crate::{
     types::Address,
-    v2::upward::{RequireDataError, Upward},
+    v2::upward::{UnknownDataError, Upward},
 };
 use concordium_base::{
     common::{
@@ -502,10 +502,10 @@ impl TryFrom<Event> for super::ContractTraceElement {
 }
 
 impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
-    type Error = RequireDataError;
+    type Error = UnknownDataError;
 
     fn try_from(bi: super::BlockItemSummary) -> Result<Self, Self::Error> {
-        let out = match bi.details.require()? {
+        let out = match bi.details.known_or_err()? {
             super::BlockItemSummaryDetails::AccountTransaction(
                 super::AccountTransactionDetails {
                     cost,
