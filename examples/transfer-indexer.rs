@@ -7,7 +7,7 @@ use concordium_rust_sdk::{
         queries::BlockInfo, AbsoluteBlockHeight, AccountTransactionEffects, BlockItemSummary,
         BlockItemSummaryDetails,
     },
-    v2,
+    v2::{self, upward::Upward},
 };
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -54,7 +54,7 @@ impl indexer::ProcessEvent for StoreTransfers {
         // a single database transaction. So we do that.
         self.db_conn.execute("BEGIN")?;
         for tx in txs {
-            let BlockItemSummaryDetails::AccountTransaction(at) = &tx.details else {
+            let Upward::Known(BlockItemSummaryDetails::AccountTransaction(at)) = &tx.details else {
                 continue;
             };
             // we only look at transfers or transfers with memo.

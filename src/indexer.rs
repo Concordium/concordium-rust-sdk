@@ -6,7 +6,7 @@
 use crate::{
     types::{
         execution_tree, queries::BlockInfo, AccountTransactionEffects, BlockItemSummary,
-        BlockItemSummaryDetails, ExecutionTree, SpecialTransactionOutcome,
+        ExecutionTree, SpecialTransactionOutcome,
     },
     v2::{self, FinalizedBlockInfo, QueryError, QueryResult},
 };
@@ -443,10 +443,7 @@ pub struct ContractUpdateInfo {
 }
 
 fn update_info(summary: BlockItemSummary) -> Option<ContractUpdateInfo> {
-    let BlockItemSummaryDetails::AccountTransaction(at) = summary.details else {
-        return None;
-    };
-
+    let at = summary.details.known()?.account_transaction()?;
     let AccountTransactionEffects::ContractUpdateIssued { effects } = at.effects else {
         return None;
     };
