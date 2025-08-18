@@ -51,6 +51,7 @@ pub use tonic::{
     transport::{Endpoint, Error},
     Code, Status,
 };
+pub use upward::Upward;
 
 use self::dry_run::WithRemainingQuota;
 
@@ -1767,6 +1768,10 @@ impl Client {
         let block_hash = special_events.block_hash;
 
         while let Some(event) = special_events.response.next().await.transpose()? {
+            let Upward::Known(event) = event else {
+                // Ignore new unknown block special events.
+                continue;
+            };
             let has_payday_event = matches!(
                 event,
                 SpecialTransactionOutcome::PaydayPoolReward { .. }
@@ -2398,7 +2403,9 @@ impl Client {
         &mut self,
         bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<
-        QueryResponse<impl Stream<Item = Result<types::SpecialTransactionOutcome, tonic::Status>>>,
+        QueryResponse<
+            impl Stream<Item = Result<Upward<types::SpecialTransactionOutcome>, tonic::Status>>,
+        >,
     > {
         let response = self
             .client

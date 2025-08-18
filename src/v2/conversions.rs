@@ -2918,11 +2918,11 @@ impl TryFrom<block_special_event::AccountAmounts>
     }
 }
 
-impl TryFrom<BlockSpecialEvent> for super::types::SpecialTransactionOutcome {
+impl TryFrom<block_special_event::Event> for super::types::SpecialTransactionOutcome {
     type Error = tonic::Status;
 
-    fn try_from(message: BlockSpecialEvent) -> Result<Self, Self::Error> {
-        let event = match message.event.require()? {
+    fn try_from(special_event: block_special_event::Event) -> Result<Self, Self::Error> {
+        let event = match special_event {
             block_special_event::Event::BakingRewards(event) => Self::BakingRewards {
                 baker_rewards: event.baker_rewards.require()?.try_into()?,
                 remainder:     event.remainder.require()?.into(),
@@ -2988,6 +2988,18 @@ impl TryFrom<BlockSpecialEvent> for super::types::SpecialTransactionOutcome {
             }
         };
         Ok(event)
+    }
+}
+
+impl TryFrom<BlockSpecialEvent> for Upward<super::types::SpecialTransactionOutcome> {
+    type Error = tonic::Status;
+
+    fn try_from(message: BlockSpecialEvent) -> Result<Self, Self::Error> {
+        let event = message
+            .event
+            .map(super::types::SpecialTransactionOutcome::try_from)
+            .transpose()?;
+        Ok(Upward::from(event))
     }
 }
 

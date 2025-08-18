@@ -12,6 +12,8 @@
   - Method `BlockItemSummary::affected_contracts` return value.
   - Type `AccountTransactionDetails` field `effects`.
   - Method `AccountTransactionDetails::transaction_type` return value.
+  - Method `Client::get_block_special_events` response stream items.
+  - Associated type `Indexer::Data` for `indexer::BlockEventsIndexer`.
 
 - Add `NextUpdateSequenceNumbers::protocol_level_tokens` and protobuf deserialization of it
 - Changed `TokenClient`'s `burn` and `mint` methods to accept a singular `TokenAmount`, instead of `Vec<TokenAmount>`.
