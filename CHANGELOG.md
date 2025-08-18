@@ -1,12 +1,14 @@
 ## Unreleased changes
 
 - Introduce `ProtocolVersionInt` newtype, wrapping the `u64` representation of the `ProtocolVersion`. This type is forward-compatible, meaning future protocol versions can be represented using this type.
-- Change type for field `protocol_version` in struct `BlockInfo` and `ConsensusInfo` to `ProtocolVersionInt` making these types forward-compatible.
+- BREAKING: Change type `ProtocolVersion` to  `ProtocolVersionInt` for field `protocol_version` in the types listed below. Now introducing new protocol versions in `ProtocolVersion` does not result in RPC parsing errors, and consumers of this library can write more applications that are more forward-compatible.
+  - `BlockInfo`
+  - `ConsensusInfo`
+  - `CommonRewardData`
 - Introduce `Upward<A>` for representing types, which might get extended in a future version of the Concordium Node API and allows the consumer of this library to decide how to handle some unknown future data, like new transaction types and chain events.
 - BREAKING: Change types related to gRPC API responses to wrap `Upward` for values which might be extended in a future version of the API of the Concordium Node.
 
   The changes are for:
-
   - Type `BlockItemSummary` field `details`.
   - Method `BlockItemSummary::affected_addresses` return value.
   - Method `BlockItemSummary::affected_contracts` return value.

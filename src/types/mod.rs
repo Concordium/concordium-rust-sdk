@@ -554,7 +554,7 @@ impl RewardsOverview {
 pub struct CommonRewardData {
     /// Protocol version that applies to these rewards. V0 variant
     /// only exists for protocol versions 1, 2, and 3.
-    pub protocol_version:            ProtocolVersion,
+    pub protocol_version:            queries::ProtocolVersionInt,
     /// The total CCD in existence.
     pub total_amount:                Amount,
     /// The total CCD in encrypted balances.
@@ -590,7 +590,7 @@ mod rewards_overview {
         type Error = anyhow::Error;
 
         fn try_from(value: RewardsDataRaw) -> Result<Self, Self::Error> {
-            if value.common.protocol_version <= ProtocolVersion::P3 {
+            if value.common.protocol_version <= ProtocolVersion::P3.into() {
                 Ok(Self::V0 { data: value.common })
             } else {
                 let foundation_transaction_rewards =
