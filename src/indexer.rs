@@ -634,7 +634,7 @@ impl Indexer for BlockEventsIndexer {
     type Data = (
         BlockInfo,
         Vec<BlockItemSummary>,
-        Vec<SpecialTransactionOutcome>,
+        Vec<v2::Upward<SpecialTransactionOutcome>>,
     );
 
     async fn on_connect<'a>(
