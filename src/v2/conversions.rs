@@ -1266,22 +1266,39 @@ impl TryFrom<UpdateInstruction> for concordium_base::updates::UpdateInstruction 
 }
 
 impl TryFrom<BlockItem>
-    for concordium_base::transactions::BlockItem<concordium_base::transactions::EncodedPayload>
+    for Upward<
+        concordium_base::transactions::BlockItem<concordium_base::transactions::EncodedPayload>,
+    >
 {
     type Error = tonic::Status;
 
     fn try_from(value: BlockItem) -> Result<Self, Self::Error> {
-        match value.block_item.require()? {
+        if let Some(item) = value.block_item {
+            Ok(Upward::Known(item.try_into()?))
+        } else {
+            Ok(Upward::Unknown)
+        }
+    }
+}
+
+impl TryFrom<block_item::BlockItem>
+    for concordium_base::transactions::BlockItem<concordium_base::transactions::EncodedPayload>
+{
+    type Error = tonic::Status;
+
+    fn try_from(item: block_item::BlockItem) -> Result<Self, Self::Error> {
+        type Item =
+            concordium_base::transactions::BlockItem<concordium_base::transactions::EncodedPayload>;
+        let out = match item {
             block_item::BlockItem::AccountTransaction(at) => {
-                Ok(Self::AccountTransaction(at.try_into()?))
+                Item::AccountTransaction(at.try_into()?)
             }
             block_item::BlockItem::CredentialDeployment(cd) => {
-                Ok(Self::CredentialDeployment(Box::new(cd.try_into()?)))
+                Item::CredentialDeployment(Box::new(cd.try_into()?))
             }
-            block_item::BlockItem::UpdateInstruction(ui) => {
-                Ok(Self::UpdateInstruction(ui.try_into()?))
-            }
-        }
+            block_item::BlockItem::UpdateInstruction(ui) => Item::UpdateInstruction(ui.try_into()?),
+        };
+        Ok(out)
     }
 }
 
