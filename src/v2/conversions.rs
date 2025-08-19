@@ -1292,7 +1292,7 @@ impl TryFrom<AccountTransactionDetails> for super::types::AccountTransactionDeta
         Ok(Self {
             cost:    v.cost.require()?.into(),
             sender:  v.sender.require()?.try_into()?,
-            effects: v.effects.require()?.try_into()?,
+            effects: Upward::from(v.effects.map(TryFrom::try_from).transpose()?),
         })
     }
 }

@@ -444,7 +444,7 @@ pub struct ContractUpdateInfo {
 
 fn update_info(summary: BlockItemSummary) -> Option<ContractUpdateInfo> {
     let at = summary.details.known()?.account_transaction()?;
-    let AccountTransactionEffects::ContractUpdateIssued { effects } = at.effects else {
+    let AccountTransactionEffects::ContractUpdateIssued { effects } = at.effects.known()? else {
         return None;
     };
 
