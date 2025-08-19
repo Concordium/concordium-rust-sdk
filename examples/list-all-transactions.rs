@@ -8,7 +8,7 @@ use concordium_rust_sdk::{
     types::{
         AbsoluteBlockHeight, AccountTransactionEffects, BlockItemSummaryDetails, TransactionType,
     },
-    v2,
+    v2::{self, upward::Upward},
 };
 use std::collections::HashSet;
 use structopt::StructOpt;
@@ -82,18 +82,24 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         for bisummary in summary {
-            if let BlockItemSummaryDetails::AccountTransaction(at) = &bisummary.details {
-                if types.is_empty() || at.transaction_type().is_some_and(|tt| types.contains(&tt)) {
-                    let is_success = !matches!(&at.effects, AccountTransactionEffects::None { .. });
-                    let type_string = at
-                        .transaction_type()
-                        .map_or_else(|| "N/A".into(), |tt| tt.to_string());
-                    println!(
-                        "{}, {}, {}, {}, {}",
-                        bi.block_slot_time, bi.block_hash, bisummary.hash, is_success, type_string
-                    )
-                }
+            let Upward::Known(BlockItemSummaryDetails::AccountTransaction(at)) = &bisummary.details
+            else {
+                continue;
+            };
+            let Upward::Known(effects) = &at.effects else {
+                continue;
+            };
+            let Some(transaction_type) = effects.transaction_type() else {
+                continue;
+            };
+            if !types.is_empty() && !types.contains(&transaction_type) {
+                continue;
             }
+            let is_success = !matches!(effects, AccountTransactionEffects::None { .. });
+            println!(
+                "{}, {}, {}, {}, {}",
+                bi.block_slot_time, bi.block_hash, bisummary.hash, is_success, transaction_type
+            );
         }
     }
     Ok(())

@@ -2,7 +2,7 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_base::hashes::BlockHash;
-use concordium_rust_sdk::{types::AccountIndex, v2};
+use concordium_rust_sdk::v2;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -14,7 +14,7 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "address", help = "Account address to query.")]
-    address:  AccountIndex,
+    address:  v2::AccountIdentifier,
     #[structopt(long = "block", help = "Block to query the account in.")]
     block:    Option<BlockHash>,
 }
@@ -36,10 +36,8 @@ async fn main() -> anyhow::Result<()> {
         .context("Cannot connect.")?;
 
     {
-        let ai = client
-            .get_account_info(&app.address.into(), &block_ident)
-            .await?;
-        println!("{:#?}", ai);
+        let ai = client.get_account_info(&app.address, &block_ident).await?;
+        println!("{ai:#?}");
     }
 
     Ok(())

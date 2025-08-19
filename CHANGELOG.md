@@ -1,5 +1,22 @@
 ## Unreleased changes
 
+- Introduce `ProtocolVersionInt` newtype, wrapping the `u64` representation of the `ProtocolVersion`. This type is forward-compatible, meaning future protocol versions can be represented using this type.
+- BREAKING: Change type `ProtocolVersion` to  `ProtocolVersionInt` for field `protocol_version` in the types listed below. Now introducing new protocol versions in `ProtocolVersion` does not result in RPC parsing errors, and consumers of this library can write more applications that are more forward-compatible.
+  - `BlockInfo`
+  - `ConsensusInfo`
+  - `CommonRewardData`
+- Introduce `Upward<A>` for representing types, which might get extended in a future version of the Concordium Node API and allows the consumer of this library to decide how to handle some unknown future data, like new transaction types and chain events.
+- BREAKING: Change types related to gRPC API responses to wrap `Upward` for values which might be extended in a future version of the API of the Concordium Node.
+
+  The changes are for:
+  - Type `BlockItemSummary` field `details`.
+  - Method `BlockItemSummary::affected_addresses` return value.
+  - Method `BlockItemSummary::affected_contracts` return value.
+  - Type `AccountTransactionDetails` field `effects`.
+  - Method `AccountTransactionDetails::transaction_type` return value.
+  - Method `Client::get_block_special_events` response stream items.
+  - Associated type `Indexer::Data` for `indexer::BlockEventsIndexer`.
+
 - Add `NextUpdateSequenceNumbers::protocol_level_tokens` and protobuf deserialization of it
 - Changed `TokenClient`'s `burn` and `mint` methods to accept a singular `TokenAmount`, instead of `Vec<TokenAmount>`.
 - Added `PartialEq`, `Eq`, `Hash` to `TokenInfo`

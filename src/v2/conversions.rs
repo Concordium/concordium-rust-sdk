@@ -1,13 +1,10 @@
 //! Helpers and trait implementations to convert from proto generated types to
 //! their Rust equivalents.
 
-use super::{generated::*, Require};
-use crate::{
-    types::{
-        queries::ConcordiumBFTDetails, AccountReleaseSchedule, ActiveBakerPoolStatus,
-        UpdateKeysCollectionSkeleton,
-    },
-    v2::generated::{block_item_summary::Details, BlockCertificates},
+use super::{generated::*, upward::Upward, Require};
+use crate::types::{
+    queries::{ConcordiumBFTDetails, ProtocolVersionInt},
+    AccountReleaseSchedule, ActiveBakerPoolStatus, UpdateKeysCollectionSkeleton,
 };
 use chrono::TimeZone;
 use concordium_base::{
@@ -1295,7 +1292,7 @@ impl TryFrom<AccountTransactionDetails> for super::types::AccountTransactionDeta
         Ok(Self {
             cost:    v.cost.require()?.into(),
             sender:  v.sender.require()?.try_into()?,
-            effects: v.effects.require()?.try_into()?,
+            effects: Upward::from(v.effects.map(TryFrom::try_from).transpose()?),
         })
     }
 }
@@ -1308,39 +1305,48 @@ impl TryFrom<BlockItemSummary> for super::types::BlockItemSummary {
             index:       value.index.require()?.into(),
             energy_cost: value.energy_cost.require()?.into(),
             hash:        value.hash.require()?.try_into()?,
-            details:     match value.details.require()? {
-                block_item_summary::Details::AccountTransaction(v) => {
-                    super::types::BlockItemSummaryDetails::AccountTransaction(v.try_into()?)
-                }
-                block_item_summary::Details::AccountCreation(v) => {
-                    super::types::BlockItemSummaryDetails::AccountCreation(
-                        super::types::AccountCreationDetails {
-                            credential_type: v.credential_type().into(),
-                            address:         v.address.require()?.try_into()?,
-                            reg_id:          v.reg_id.require()?.try_into()?,
-                        },
-                    )
-                }
-                block_item_summary::Details::Update(v) => {
-                    super::types::BlockItemSummaryDetails::Update(super::types::UpdateDetails {
-                        effective_time: v.effective_time.require()?.into(),
-                        payload:        v.payload.require()?.try_into()?,
-                    })
-                }
-                Details::TokenCreation(v) => {
-                    super::types::BlockItemSummaryDetails::TokenCreationDetails(
-                        super::types::TokenCreationDetails {
-                            create_plt: v.create_plt.require()?.try_into()?,
-                            events:     v
-                                .events
-                                .into_iter()
-                                .map(TryInto::try_into)
-                                .collect::<Result<_, tonic::Status>>()?,
-                        },
-                    )
-                }
-            },
+            details:     Upward::from(value.details.map(TryFrom::try_from).transpose()?),
         })
+    }
+}
+
+impl TryFrom<block_item_summary::Details> for super::types::BlockItemSummaryDetails {
+    type Error = tonic::Status;
+
+    fn try_from(value: block_item_summary::Details) -> Result<Self, Self::Error> {
+        let out = match value {
+            block_item_summary::Details::AccountTransaction(v) => {
+                super::types::BlockItemSummaryDetails::AccountTransaction(v.try_into()?)
+            }
+            block_item_summary::Details::AccountCreation(v) => {
+                super::types::BlockItemSummaryDetails::AccountCreation(
+                    super::types::AccountCreationDetails {
+                        credential_type: v.credential_type().into(),
+                        address:         v.address.require()?.try_into()?,
+                        reg_id:          v.reg_id.require()?.try_into()?,
+                    },
+                )
+            }
+            block_item_summary::Details::Update(v) => {
+                super::types::BlockItemSummaryDetails::Update(super::types::UpdateDetails {
+                    effective_time: v.effective_time.require()?.into(),
+                    payload:        v.payload.require()?.try_into()?,
+                })
+            }
+            block_item_summary::Details::TokenCreation(v) => {
+                super::types::BlockItemSummaryDetails::TokenCreationDetails(
+                    super::types::TokenCreationDetails {
+                        create_plt: v.create_plt.require()?.try_into()?,
+                        events:     v
+                            .events
+                            .into_iter()
+                            .map(TryInto::try_into)
+                            .collect::<Result<_, tonic::Status>>()?,
+                    },
+                )
+            }
+        };
+        Ok(out)
     }
 }
 
@@ -2302,9 +2308,10 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
     type Error = tonic::Status;
 
     fn try_from(value: ConsensusInfo) -> Result<Self, Self::Error> {
-        let protocol_version = ProtocolVersion::try_from(value.protocol_version)
-            .map_err(|_| tonic::Status::internal("Unknown protocol version"))?
-            .into();
+        let protocol_version =
+            ProtocolVersionInt(u64::try_from(value.protocol_version).map_err(|err| {
+                tonic::Status::internal(format!("Invalid protocol version: {err}"))
+            })?);
         Ok(Self {
             last_finalized_block_height: value.last_finalized_block_height.require()?.into(),
             block_arrive_latency_e_m_s_d: value.block_arrive_latency_emsd,
@@ -2345,7 +2352,7 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
             genesis_index: value.genesis_index.require()?.into(),
             current_era_genesis_block: value.current_era_genesis_block.require()?.try_into()?,
             current_era_genesis_time: value.current_era_genesis_time.require()?.try_into()?,
-            concordium_bft_status: if protocol_version <= super::types::ProtocolVersion::P5 {
+            concordium_bft_status: if protocol_version <= super::types::ProtocolVersion::P5.into() {
                 None
             } else {
                 Some(ConcordiumBFTDetails {
@@ -2607,14 +2614,11 @@ impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
     type Error = tonic::Status;
 
     fn try_from(value: BlockInfo) -> Result<Self, Self::Error> {
-        let protocol_version = ProtocolVersion::try_from(value.protocol_version)
-            .map_err(|_| {
-                tonic::Status::internal(format!(
-                    "Unknown protocol version: {}",
-                    value.protocol_version
-                ))
-            })?
-            .into();
+        let protocol_version =
+            ProtocolVersionInt(u64::try_from(value.protocol_version).map_err(|err| {
+                tonic::Status::internal(format!("Invalid protocol version: {err}"))
+            })?);
+
         Ok(Self {
             transactions_size: value.transactions_size.into(),
             block_parent: value.parent_block.require()?.try_into()?,
@@ -2625,7 +2629,7 @@ impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
             block_receive_time: value.receive_time.require()?.try_into()?,
             transaction_count: value.transaction_count.into(),
             transaction_energy_cost: value.transactions_energy_cost.require()?.into(),
-            block_slot: if protocol_version <= super::types::ProtocolVersion::P5 {
+            block_slot: if protocol_version <= super::types::ProtocolVersion::P5.into() {
                 Some(value.slot_number.require()?.into())
             } else {
                 None
@@ -2637,12 +2641,12 @@ impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
             genesis_index: value.genesis_index.require()?.into(),
             block_baker: value.baker.map(|b| b.into()),
             protocol_version,
-            round: if protocol_version >= super::types::ProtocolVersion::P6 {
+            round: if protocol_version >= super::types::ProtocolVersion::P6.into() {
                 Some(value.round.require()?.into())
             } else {
                 None
             },
-            epoch: if protocol_version >= super::types::ProtocolVersion::P6 {
+            epoch: if protocol_version >= super::types::ProtocolVersion::P6.into() {
                 Some(value.epoch.require()?.into())
             } else {
                 None
@@ -2775,14 +2779,11 @@ impl TryFrom<TokenomicsInfo> for super::types::RewardsOverview {
         match value.tokenomics.require()? {
             tokenomics_info::Tokenomics::V0(value) => Ok(Self::V0 {
                 data: super::types::CommonRewardData {
-                    protocol_version:            ProtocolVersion::try_from(value.protocol_version)
-                        .map_err(|_| {
-                            tonic::Status::internal(format!(
-                                "Unknown protocol version: {}",
-                                value.protocol_version
-                            ))
-                        })?
-                        .into(),
+                    protocol_version:            ProtocolVersionInt(
+                        u64::try_from(value.protocol_version).map_err(|err| {
+                            tonic::Status::internal(format!("Invalid protocol version: {err}"))
+                        })?,
+                    ),
                     total_amount:                value.total_amount.require()?.into(),
                     total_encrypted_amount:      value.total_encrypted_amount.require()?.into(),
                     baking_reward_account:       value.baking_reward_account.require()?.into(),
@@ -2795,14 +2796,11 @@ impl TryFrom<TokenomicsInfo> for super::types::RewardsOverview {
             }),
             tokenomics_info::Tokenomics::V1(value) => Ok(Self::V1 {
                 common: super::types::CommonRewardData {
-                    protocol_version:            ProtocolVersion::try_from(value.protocol_version)
-                        .map_err(|_| {
-                            tonic::Status::internal(format!(
-                                "Unknown protocol version: {}",
-                                value.protocol_version
-                            ))
-                        })?
-                        .into(),
+                    protocol_version:            ProtocolVersionInt(
+                        u64::try_from(value.protocol_version).map_err(|err| {
+                            tonic::Status::internal(format!("Invalid protocol version: {err}"))
+                        })?,
+                    ),
                     total_amount:                value.total_amount.require()?.into(),
                     total_encrypted_amount:      value.total_encrypted_amount.require()?.into(),
                     baking_reward_account:       value.baking_reward_account.require()?.into(),
@@ -2914,11 +2912,11 @@ impl TryFrom<block_special_event::AccountAmounts>
     }
 }
 
-impl TryFrom<BlockSpecialEvent> for super::types::SpecialTransactionOutcome {
+impl TryFrom<block_special_event::Event> for super::types::SpecialTransactionOutcome {
     type Error = tonic::Status;
 
-    fn try_from(message: BlockSpecialEvent) -> Result<Self, Self::Error> {
-        let event = match message.event.require()? {
+    fn try_from(special_event: block_special_event::Event) -> Result<Self, Self::Error> {
+        let event = match special_event {
             block_special_event::Event::BakingRewards(event) => Self::BakingRewards {
                 baker_rewards: event.baker_rewards.require()?.try_into()?,
                 remainder:     event.remainder.require()?.into(),
@@ -2984,6 +2982,18 @@ impl TryFrom<BlockSpecialEvent> for super::types::SpecialTransactionOutcome {
             }
         };
         Ok(event)
+    }
+}
+
+impl TryFrom<BlockSpecialEvent> for Upward<super::types::SpecialTransactionOutcome> {
+    type Error = tonic::Status;
+
+    fn try_from(message: BlockSpecialEvent) -> Result<Self, Self::Error> {
+        let event = message
+            .event
+            .map(super::types::SpecialTransactionOutcome::try_from)
+            .transpose()?;
+        Ok(Upward::from(event))
     }
 }
 

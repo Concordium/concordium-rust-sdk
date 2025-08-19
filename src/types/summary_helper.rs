@@ -15,7 +15,10 @@ use super::{
     RejectReason, TransactionIndex, TransactionType, UpdatePayload, UrlText,
 };
 
-use crate::types::Address;
+use crate::{
+    types::Address,
+    v2::upward::{UnknownDataError, Upward},
+};
 use concordium_base::{
     common::{
         types::{Amount, Timestamp, TransactionTime},
@@ -498,9 +501,11 @@ impl TryFrom<Event> for super::ContractTraceElement {
     }
 }
 
-impl From<super::BlockItemSummary> for BlockItemSummary {
-    fn from(bi: super::BlockItemSummary) -> Self {
-        match bi.details {
+impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
+    type Error = UnknownDataError;
+
+    fn try_from(bi: super::BlockItemSummary) -> Result<Self, Self::Error> {
+        let out = match bi.details.known_or_err()? {
             super::BlockItemSummaryDetails::AccountTransaction(
                 super::AccountTransactionDetails {
                     cost,
@@ -520,7 +525,7 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                         events: vec![ev1, ev2, ev3],
                     })
                 };
-                let (transaction_type, result) = match effects {
+                let (transaction_type, result) = match effects.known_or_err()? {
                     super::AccountTransactionEffects::None {
                         transaction_type,
                         reject_reason,
@@ -944,7 +949,8 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                     index:        bi.index,
                 }
             }
-        }
+        };
+        Ok(out)
     }
 }
 
@@ -986,10 +992,10 @@ fn convert_account_transaction(
         Ok(super::AccountTransactionDetails {
             cost,
             sender,
-            effects: super::AccountTransactionEffects::None {
+            effects: Upward::Known(super::AccountTransactionEffects::None {
                 transaction_type: ty,
                 reject_reason,
-            },
+            }),
         })
     };
 
@@ -997,7 +1003,7 @@ fn convert_account_transaction(
         Ok(super::AccountTransactionDetails {
             cost,
             sender,
-            effects,
+            effects: Upward::Known(effects),
         })
     };
 
@@ -1485,7 +1491,9 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
                     index,
                     energy_cost,
                     hash,
-                    details: super::BlockItemSummaryDetails::AccountTransaction(details),
+                    details: Upward::Known(super::BlockItemSummaryDetails::AccountTransaction(
+                        details,
+                    )),
                 })
             }
             BlockItemType::CredentialDeployment(credential_type) => {
@@ -1513,7 +1521,7 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
                     address,
                     reg_id,
                 };
-                let details = super::BlockItemSummaryDetails::AccountCreation(acd);
+                let details = Upward::Known(super::BlockItemSummaryDetails::AccountCreation(acd));
                 Ok(super::BlockItemSummary {
                     index: value.index,
                     energy_cost: value.energy_cost,
@@ -1555,7 +1563,7 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
                     }
                     BlockItemResult::Reject { .. } => return Err(ConversionError::FailedUpdate),
                 }?;
-                let details = super::BlockItemSummaryDetails::Update(ud);
+                let details = Upward::Known(super::BlockItemSummaryDetails::Update(ud));
                 Ok(super::BlockItemSummary {
                     index: value.index,
                     energy_cost: value.energy_cost,
