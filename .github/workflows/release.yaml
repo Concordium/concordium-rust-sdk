@@ -10,7 +10,7 @@ on:
 jobs:
   release-rust-sdk:
     runs-on: ubuntu-latest
-    environment: release
+    #environment: release
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
