@@ -19,17 +19,38 @@ env:
 jobs:
   
   ## rust formatting checks
-  lint-fmt:
-    name: lint:fmt
+  rust-standard-checks:
+    name: rust:checks
     runs-on: ubuntu-latest
     steps:
+      # Checkout the code with submodules recursive
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Format
+        with:
+          submodules: recursive
+
+      # RustFmt checks
+      - name: Rust Formatter
         run: |
           rustup default $RUST_FMT
           rustup component add rustfmt
           cargo fmt -- --color=always --check
+
+      # Clippy checks
+      - name: Clippy
+        run: |
+          rustup default $RUST_VERSION
+          rustup component add clippy
+          cargo clippy --color=always --all-targets --all-features -- -D warnings
+          # Examples can be large with a lot of debug info due to tokio. So we
+          # disable debug info generation.
+          RUSTFLAGS="-C debuginfo=0" cargo test --all-targets --all-features
+      
+      - name: Compilation Check
+        run: |
+          rustup default $RUST_VERSION
+          cargo check --all-targets --all-features 
+
   
 
   #release-rust-sdk:
