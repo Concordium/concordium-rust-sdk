@@ -17,10 +17,10 @@ env:
   #CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
 
 jobs:
-  
-  ## rust formatting checks
-  rust-standard-checks:
-    name: rust:checks
+
+  ## Rust Release Build
+  concordium-rust-sdk-release:
+    name: concordium-rust-sdk:release
     runs-on: ubuntu-latest
     steps:
       # Checkout the code with submodules recursive
@@ -29,43 +29,75 @@ jobs:
         with:
           submodules: recursive
 
-      # RustFmt checks
- #     - name: Rust Formatter
- #       run: |
- #         rustup default $RUST_FMT
- #         rustup component add rustfmt
- #         cargo fmt -- --color=always --check
-
-      # Clippy checks
-#      - name: Clippy
-#        run: |
-#          rustup default $RUST_VERSION
-#          rustup component add clippy
-#          cargo clippy --color=always --all-targets --all-features -- -D warnings
-          # Examples can be large with a lot of debug info due to tokio. So we
-          # disable debug info generation.
-#          RUSTFLAGS="-C debuginfo=0" cargo test --all-targets --all-features
-      
-#      - name: Compilation Check
-#        run: |
-#          rustup default $RUST_VERSION
-#          cargo check --all-targets --all-features 
-
-      # Rust Release Build
-      - name: Rust Build
-        run: cargo build --release
-
-      # Cargo Release Test
-      - name: Run Tests
-        run: cargo test --release
+      - name: Build Rust SDK
+        run: |
+          echo "Building Concordium Rust SDK..."
+          cd concordium-rust-sdk
+          echo "Current directory: $(pwd)"
+          cargo build --release
 
       # Publish to crates.io (dry run)
       - name: Publish to crates.io
         env:
          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-
-         # run 2 commands to publish the crate, dry run and package list
         run: |
-          cargo publish --token $CARGO_REGISTRY_TOKEN --dry-run
+          cargo publish --dry-run
           cargo package --list
-         #run: cargo publish --token $CARGO_REGISTRY_TOKEN --dry-run --no-verify
+
+
+
+  ## rust formatting checks
+ # rust-standard-checks:
+ #   name: rust:checks
+ #   runs-on: ubuntu-latest
+ #   steps:
+ #     # Checkout the code with submodules recursive
+ #     - name: Checkout
+ #       uses: actions/checkout@v4
+ #       with:
+ #         submodules: recursive
+#
+ #     # RustFmt checks
+ #     - name: Rust Formatter
+ #       run: |
+ #         rustup default $RUST_FMT
+ #         rustup component add rustfmt
+ #         cargo fmt -- --color=always --check
+#
+ #     # Clippy checks
+ #     - name: Clippy
+ #       run: |
+ #         rustup default $RUST_VERSION
+ #         rustup component add clippy
+ #         cargo clippy --color=always --all-targets --all-features -- -D warnings
+ #         # Examples can be large with a lot of debug info due to tokio. So we
+ #         # disable debug info generation.
+ #         RUSTFLAGS="-C debuginfo=0" cargo test --all-targets --all-features
+ #     
+ #     - name: Compilation Check
+ #       run: |
+ #         rustup default $RUST_VERSION
+ #         cargo check --all-targets --all-features 
+#
+ #     # Rust Release Build
+ #     - name: Rust Build
+ #       run: cargo build --release
+#
+ #     # Cargo Release Test
+ #     - name: Run Tests
+ #       run: cargo test --release
+#
+ #     # Publish to crates.io (dry run)
+ #     - name: Publish to crates.io
+ #       env:
+ #        CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+#
+ #        # run 2 commands to publish the crate, dry run and package list
+ #       run: |
+ #         cargo publish --token $CARGO_REGISTRY_TOKEN --dry-run
+ #         cargo package --list
+ #        #run: cargo publish --token $CARGO_REGISTRY_TOKEN --dry-run --no-verify
+
+
+  build:
+
