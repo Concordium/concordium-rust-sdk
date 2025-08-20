@@ -1,0 +1,40 @@
+name: Release Concordium Rust SDK
+
+on:
+  push:
+    tags:
+      - release/concordium-rust-sdk/*
+
+jobs:
+  release-rust-sdk:
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions/setup-rust@v1
+        with:
+          rust-version: stable
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Run tests
+        run: cargo test --release
+
+
+#     - name: Publish to crates.io
+#       env:
+#         CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+#       run: cargo publish --token $CARGO_REGISTRY_TOKEN --no-verify
+#
+#     - name: Create GitHub Release
+#       uses: softprops/action-gh-release@v2
+#       with:
+#         tag_name: ${{ github.ref_name }}
+#         name: Concordium Rust SDK ${{ github.ref_name }}
+#         body: |
+#           See CHANGELOG.md for details.
+
