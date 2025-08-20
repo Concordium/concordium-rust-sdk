@@ -1,30 +1,54 @@
 name: Release Concordium Rust SDK
 
 on:
+
+  workflow_dispatch: # allows manual trigger
+
+  ## TODO remove later - this is to test on each push to my branch
   push:
     branches: 
       - feature/COR1640-release-pipeline
     tags:
       - release/concordium-rust-sdk/*
 
+env:
+  RUST_FMT: nightly-2023-04-01-x86_64-unknown-linux-gnu
+  RUST_VERSION: "1.85"
+  #CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+
 jobs:
-  release-rust-sdk:
+  
+  ## rust formatting checks
+  lint-fmt:
+    name: lint:fmt
     runs-on: ubuntu-latest
-    #environment: release
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
+      - name: Format
+        run: |
+          rustup default $RUST_FMT
+          rustup component add rustfmt
+          cargo fmt -- --color=always --check
+  
 
-      - name: Set up Rust
-        uses: actions/setup-rust@v1
-        with:
-          rust-version: stable
-
-      - name: Build
-        run: cargo build --release
-
-      - name: Run tests
-        run: cargo test --release
+  #release-rust-sdk:
+  #  runs-on: ubuntu-latest
+  #  #environment: release
+  #  steps:
+  #    - name: Checkout code
+  #      uses: actions/checkout@v4
+#
+  #    - name: Set up Rust
+  #      uses: actions/setup-rust@v1
+  #      with:
+  #        rust-version: stable
+#
+  #    - name: Build
+  #      run: cargo build --release
+#
+  #    - name: Run tests
+  #      run: cargo test --release
 
 
 #     - name: Publish to crates.io
