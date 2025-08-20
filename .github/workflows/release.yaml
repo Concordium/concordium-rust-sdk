@@ -4,8 +4,8 @@ on:
 
   workflow_dispatch: # allows manual trigger
 
-  ## TODO remove later - this is to test on each push to my branch
   push:
+    ## TODO remove later - this is to test on each push to my branch
     branches: 
       - feature/COR1640-release-pipeline
     tags:
@@ -14,85 +14,67 @@ on:
 env:
   RUST_FMT: nightly-2023-04-01-x86_64-unknown-linux-gnu
   RUST_VERSION: "1.85"
-  #CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+  CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
 
 jobs:
-
-  ## Rust Release Build
+  ## Concordium Rust SDK Release Build
   concordium-rust-sdk-release:
     name: concordium-rust-sdk:release
     runs-on: ubuntu-latest
+    
     steps:
+
       # Checkout the code with submodules recursive
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Build Rust SDK
+      # RustFmt checks
+      - name: Rust format checks
         run: |
-          echo "Building Concordium Rust SDK..."
-          cargo build --release
+          rustup default $RUST_FMT
+          rustup component add rustfmt
+          cargo fmt -- --color=always --check
+
+      # Compilation Check
+      - name: Compilation Check
+        run: |
+          rustup default $RUST_VERSION
+          cargo check --all-targets --all-features 
+
+      # Clippy checks
+      - name: Clippy
+        run: |
+          rustup default $RUST_VERSION
+          rustup component add clippy
+          cargo clippy --color=always --all-targets --all-features -- -D warnings
+          # Examples can be large with a lot of debug info due to tokio. So we
+          # disable debug info generation.
+          RUSTFLAGS="-C debuginfo=0" cargo test --all-targets --all-features
+
+      ## Probably not needed
+      #- name: Build Rust SDK
+      #  run: |
+      #    echo "Building Concordium Rust SDK..."
+      #    cargo build --release
+
+      #- name: Run Tests
+      #  run: cargo test --release
+
 
       # Publish to crates.io (dry run)
-      - name: Publish to crates.io
-        env:
-         CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+      - name: Dry run Publish to crates.io
         run: |
           cargo publish --dry-run
           cargo package --list
 
-
-
-  ## rust formatting checks
- # rust-standard-checks:
- #   name: rust:checks
- #   runs-on: ubuntu-latest
- #   steps:
- #     # Checkout the code with submodules recursive
- #     - name: Checkout
- #       uses: actions/checkout@v4
- #       with:
- #         submodules: recursive
-#
- #     # RustFmt checks
- #     - name: Rust Formatter
- #       run: |
- #         rustup default $RUST_FMT
- #         rustup component add rustfmt
- #         cargo fmt -- --color=always --check
-#
- #     # Clippy checks
- #     - name: Clippy
- #       run: |
- #         rustup default $RUST_VERSION
- #         rustup component add clippy
- #         cargo clippy --color=always --all-targets --all-features -- -D warnings
- #         # Examples can be large with a lot of debug info due to tokio. So we
- #         # disable debug info generation.
- #         RUSTFLAGS="-C debuginfo=0" cargo test --all-targets --all-features
- #     
- #     - name: Compilation Check
- #       run: |
- #         rustup default $RUST_VERSION
- #         cargo check --all-targets --all-features 
-#
- #     # Rust Release Build
- #     - name: Rust Build
- #       run: cargo build --release
-#
- #     # Cargo Release Test
- #     - name: Run Tests
- #       run: cargo test --release
-#
- #     # Publish to crates.io (dry run)
- #     - name: Publish to crates.io
- #       env:
- #        CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-#
- #        # run 2 commands to publish the crate, dry run and package list
- #       run: |
- #         cargo publish --token $CARGO_REGISTRY_TOKEN --dry-run
- #         cargo package --list
- #        #run: cargo publish --token $CARGO_REGISTRY_TOKEN --dry-run --no-verify
+      # Publish to crates.io
+      - name: Publish to crates.io
+        #env:
+        #  CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: |
+          # Uncomment the next line to actually publish
+          echo "Publishing Concordium Rust SDK to crates.io..."
+          # cargo publish --token $CARGO_REGISTRY_TOKEN
 
