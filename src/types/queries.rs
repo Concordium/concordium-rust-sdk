@@ -299,7 +299,7 @@ pub struct PendingUpdate {
     /// Time when it will become effective.
     pub effective_time: TransactionTime,
     /// The effect the update will have.
-    pub effect:         PendingUpdateEffect,
+    pub effect:         Upward<PendingUpdateEffect>,
 }
 
 #[derive(Debug, Clone, SerdeSerialize, SerdeDeserialize)]
