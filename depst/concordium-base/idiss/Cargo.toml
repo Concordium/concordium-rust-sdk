@@ -1,0 +1,50 @@
+[package]
+name = "idiss"
+build = "build.rs"
+version = "0.7.0"
+authors = ["Concordium AG <developers@concordium.com>"]
+edition = "2018"
+license-file = "../../LICENSE-APACHE"
+
+description = "Exports of the identity issuance functionality needed by the identity provider. Currently supports use from nodejs."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# Use the same optimization level for building build.rs as for the library
+# itself in release mode. This is necessary because some of the dependencies
+# (e.g., id) have a `cdylib/staticlib` crate-type which builds some artifacts
+# even though they are not needed directly by the build script. This then leads
+# to name clashes and failed compilation.
+#
+# Ideally we would have the crate-type of dependencies feature configurable, but
+# this is not supported by Cargo at the moment.
+[profile.release.build-override]
+opt-level = 3
+
+[features]
+nodejs = ["nodejs-sys"]
+csharp = []
+
+[dependencies]
+anyhow = "1.0"
+hex = "0.4"
+serde = "1.0"
+serde_json = "1.0"
+chrono = "0.4.35" # the patch version is necessary since chrono adds new functionality in patch versions
+ed25519-dalek = "2.0"
+byteorder = "1.3"
+
+[dependencies.nodejs-sys]
+version = "0.12.0"
+features = ["napi_v6"]
+optional = true
+
+[dependencies.concordium_base]
+path = "../rust-src/concordium_base"
+features = ["ffi"]
+
+[build-dependencies]
+napi-build = "*"
+
+[lib]
+name = "idiss"
+crate-type = ["cdylib", "rlib"]

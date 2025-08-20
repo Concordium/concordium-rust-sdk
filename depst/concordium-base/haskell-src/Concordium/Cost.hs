@@ -1,0 +1,340 @@
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE TypeFamilies #-}
+
+-- |
+-- Definition of cost functions for the different transactions.
+--
+-- * @SPEC: <$DOCS/Transactions#transaction-cost>
+module Concordium.Cost where
+
+import Concordium.ID.Types as ID
+import Concordium.Types
+import qualified Concordium.Wasm as Wasm
+import Data.Word
+
+-- | A class to convert to and from 'Energy' used by the scheduler.
+--  The function should satisfy
+--
+--    * @toEnergy (fromEnergy x) <= x@
+class ResourceMeasure a where
+    toEnergy :: a -> Energy
+    fromEnergy :: Energy -> a
+
+instance ResourceMeasure Energy where
+    {-# INLINE toEnergy #-}
+    toEnergy = id
+    {-# INLINE fromEnergy #-}
+    fromEnergy = id
+
+-- | Measures the cost of running the interpreter.
+instance ResourceMeasure Wasm.InterpreterEnergy where
+    {-# INLINE toEnergy #-}
+    toEnergy = fromInterpreterEnergy
+    {-# INLINE fromEnergy #-}
+    fromEnergy = toInterpreterEnergy
+
+-- | Measures the cost of __storing__ the given amount of bytes of smart contract
+--  state.
+instance ResourceMeasure Wasm.ByteSize where
+    {-# INLINE toEnergy #-}
+    toEnergy = fromIntegral
+    {-# INLINE fromEnergy #-}
+    fromEnergy = fromIntegral
+
+-- * Cost factors
+
+-- | The amount of interpreter energy corresponding to one unit of energy.
+interpreterEnergyFactor :: Wasm.InterpreterEnergy
+interpreterEnergyFactor = 1000
+
+-- | Convert an energy amount to interpreter energy.
+toInterpreterEnergy :: Energy -> Wasm.InterpreterEnergy
+toInterpreterEnergy = (* interpreterEnergyFactor) . fromIntegral
+
+-- | Convert interpreter energy to general energy (rounding down).
+fromInterpreterEnergy :: Wasm.InterpreterEnergy -> Energy
+fromInterpreterEnergy = fromIntegral . (`div` interpreterEnergyFactor)
+
+-- * Costs for top-level account transactions
+
+-- | The NRG cost is assigned according to the formula A * numSignatures + B *
+--  size + C_t where C_t is transaction specific cost and A and B are transaction
+--  independent factors.
+
+-- | The A constant for NRG assignment.
+constA :: Energy
+constA = 100
+
+-- | The B constant for NRG assignment.
+constB :: Energy
+constB = 1
+
+-- | C_t for simple transfer.
+simpleTransferCost :: Energy
+simpleTransferCost = 300
+
+-- | C_t for encrypted transfer
+encryptedTransferCost :: Energy
+encryptedTransferCost = 27000
+
+-- | C_t for transfer from public to encrypted
+transferToEncryptedCost :: Energy
+transferToEncryptedCost = 600
+
+-- | C_t for transfer from encrypted to public
+transferToPublicCost :: Energy
+transferToPublicCost = 14850
+
+-- | C_t for transfer with schedule. The argument is the number of releases.
+scheduledTransferCost :: Int -> Energy
+scheduledTransferCost n = fromIntegral n * (300 + 64)
+
+-- | C_t for adding a baker
+addBakerCost :: Energy
+addBakerCost = 4050
+
+-- | C_t for configure baker when keys are not present
+configureBakerCostWithoutKeys :: Energy
+configureBakerCostWithoutKeys = 300
+
+-- | C_t for configure baker when keys are present
+configureBakerCostWithKeys :: Energy
+configureBakerCostWithKeys = 4050
+
+-- | C_t for updating baker keys
+updateBakerKeysCost :: Energy
+updateBakerKeysCost = 4050
+
+-- | C_t for updating baker stake.
+updateBakerStakeCost :: Energy
+updateBakerStakeCost = 300
+
+-- | C_t for updating baker automatic restake option
+updateBakerRestakeCost :: Energy
+updateBakerRestakeCost = 300
+
+-- | C_t for removing a baker
+removeBakerCost :: Energy
+removeBakerCost = 300
+
+-- | C_t for configure delegation
+configureDelegationCost :: Energy
+configureDelegationCost = 300
+
+-- | Base cost for token update transactions.
+tokenUpdateBaseCost :: Energy
+tokenUpdateBaseCost = 300
+
+-- | Cost for the execution of a token transfer.
+tokenTransferCost :: Energy
+tokenTransferCost = 100
+
+-- | Cost to mint a token.
+tokenMintCost :: Energy
+tokenMintCost = 50
+
+-- | Cost to burn a token.
+tokenBurnCost :: Energy
+tokenBurnCost = 50
+
+-- | Cost to carry out a list operation (add/remove from allow/deny list).
+tokenListOperationCost :: Energy
+tokenListOperationCost = 50
+
+-- | Cost to pause/unpause mint/burn/transfer operations.
+tokenPauseUnpauseCost :: Energy
+tokenPauseUnpauseCost = 50
+
+-- | C_t for updating account credentials
+updateCredentialsCost ::
+    -- | The number of credentials on the account before the update.
+    Int ->
+    -- | A list of keys attached to each new credential.
+    [Int] ->
+    Energy
+updateCredentialsCost numCredentials =
+    (updateCredentialsBaseCost +)
+        . updateCredentialsVariableCost numCredentials
+
+-- | C_t for registering data on chain.
+registerDataCost :: Energy
+registerDataCost = 300
+
+-- | C_t for deploying a Wasm module.
+--  The argument is the size of the Wasm module in bytes.
+deployModuleCost :: Word64 -> Energy
+deployModuleCost size = fromIntegral size `div` 10
+
+-- | C_t for initializing a contract instance.
+initializeContractInstanceCost ::
+    SProtocolVersion pv ->
+    -- | How much energy it took to execute the initialization code.
+    Wasm.InterpreterEnergy ->
+    -- | Size in bytes of the smart contract module that the instance is created from.
+    Word64 ->
+    -- | Size of the initial smart contract state if initialization succeeded.
+    Maybe Wasm.ByteSize ->
+    Energy
+initializeContractInstanceCost spv ie ms ss =
+    lookupModule spv ms + toEnergy ie + maybe 0 ((initializeContractInstanceCreateCost +) . toEnergy) ss + initializeContractInstanceBaseCost
+
+-- | C_t for updating smart contract state.
+--  This will be applied to each smart contract that is affected by the transaction.
+updateContractInstanceCost ::
+    SProtocolVersion pv ->
+    -- | How much energy it t ook to execute the update code.
+    Wasm.InterpreterEnergy ->
+    -- | Size in bytes of the module the contract code belongs to.
+    Word64 ->
+    -- | Size of the original state.
+    Wasm.ByteSize ->
+    -- | Size of the new state, if update was successful.
+    Maybe Wasm.ByteSize ->
+    Energy
+updateContractInstanceCost spv ie ms se ss =
+    lookupModule spv ms + lookupContractState se + toEnergy ie + maybe 0 toEnergy ss + updateContractInstanceBaseCost
+
+-- | C_t for updating existing credential keys. Parametrised by amount of
+--  existing credentials and new keys. Due to the way the accounts are stored a
+--  new copy of all credentials will be created, so we need to account for that
+--  storage increase.
+updateCredentialKeysCost ::
+    -- | The number of existing credentials on the account.
+    Int ->
+    -- | The number of keys that will belong to the credential.
+    Int ->
+    Energy
+updateCredentialKeysCost numCredentials numKeys = 500 * fromIntegral numCredentials + 100 * fromIntegral numKeys
+
+-- * NRG assignments for non-account transactions.
+
+-- | NRG value of adding a credential to an account. This cost is costant
+--  regardless of the details of the data. It is not charged directly, but it is accounted for
+--  in block energy.
+deployCredential ::
+    -- | Type of the credential. Initial credentials are cheaper.
+    ID.CredentialType ->
+    -- | Number of keys belonging to the credential.
+    Int ->
+    Energy
+deployCredential ID.Initial numKeys = 1000 + 100 * fromIntegral numKeys
+deployCredential ID.Normal numKeys = 54000 + 100 * fromIntegral numKeys
+
+-- * Auxiliary definitions
+
+-- | The cost A * numKeys + B * size
+baseCost ::
+    -- | The size of the transaction body in bytes.
+    Word64 ->
+    -- | The number of keys that signed the transaction.
+    Int ->
+    Energy
+baseCost size numKeys = constA * fromIntegral numKeys + constB * fromIntegral size
+
+-- | Fixed cost per generated inter-contract message.
+interContractMessage :: Energy
+interContractMessage = 10
+
+-- | Cost of looking up a contract instance with a given state.
+lookupContractState :: Wasm.ByteSize -> Energy
+lookupContractState ss = fromIntegral ss `div` 50
+
+lookupModule :: SProtocolVersion pv -> Word64 -> Energy
+lookupModule SP1 ms = fromIntegral ms `div` 50
+lookupModule SP2 ms = fromIntegral ms `div` 50
+lookupModule SP3 ms = fromIntegral ms `div` 50
+lookupModule SP4 ms = fromIntegral ms `div` 50
+lookupModule SP5 ms = fromIntegral ms `div` 50
+lookupModule SP6 ms = fromIntegral ms `div` 50
+lookupModule SP7 ms = fromIntegral ms `div` 500
+lookupModule SP8 ms = fromIntegral ms `div` 500
+lookupModule SP9 ms = fromIntegral ms `div` 500
+
+-- | The base cost of initializing a contract instance to cover administrative costs.
+-- Even if no code is run and no instance created.
+initializeContractInstanceBaseCost :: Energy
+initializeContractInstanceBaseCost = 300
+
+-- | Cost of creating an empty smart contract instance.
+initializeContractInstanceCreateCost :: Energy
+initializeContractInstanceCreateCost = 200
+
+-- | The base cost of updating a contract instance to cover administrative
+-- costs. Even if no code is run.
+updateContractInstanceBaseCost :: Energy
+updateContractInstanceBaseCost = 300
+
+-- | Maximum amount of nested V1 contract calls. That is, the maximum amount of
+--  execution frames that need to be kept alive at the same time.
+--
+--  Since each frame that is kept alive can consume up to 32MB of memory this limits
+--  the worst case memory use of contract calls.
+allowedContractCallDepth :: SProtocolVersion pv -> Word -> Bool
+allowedContractCallDepth spv n = demoteProtocolVersion spv <= P6 || n < 384
+
+-- | Base cost of updating credentials. There is a non-trivial amount of lookup
+--  that needs to be done before we can start any checking. This ensures that
+--  those lookups are not a problem. If the credential updates are genuine then
+--  this cost is going to be negligible compared to verifying the credential.
+updateCredentialsBaseCost :: Energy
+updateCredentialsBaseCost = 500
+
+-- | Variable cost of updating credentials.
+updateCredentialsVariableCost ::
+    -- | The number of credentials on the account before the update.
+    Int ->
+    -- | A list of keys attached to each new credential.
+    [Int] ->
+    Energy
+updateCredentialsVariableCost numCredentials =
+    (500 * fromIntegral numCredentials +)
+        . sum
+        . map (deployCredential ID.Normal)
+
+-- the 500 * numCredentials is to account for transactions which do nothing,
+-- e.g., don't add don't remove, and don't update the threshold. These still
+-- have a cost since the way the accounts are stored it will update the stored
+-- account data, which does take up quite a bit of space per credential.
+
+-- | Cost of querying the account balance from a within smart contract instance.
+contractInstanceQueryAccountBalanceCost :: Energy
+contractInstanceQueryAccountBalanceCost = 200
+
+-- | Cost of querying the contract balance from a within smart contract instance.
+contractInstanceQueryContractBalanceCost :: Energy
+contractInstanceQueryContractBalanceCost = 200
+
+-- | Cost of querying the current exchange rates from a within smart contract instance.
+contractInstanceQueryExchangeRatesCost :: Energy
+contractInstanceQueryExchangeRatesCost = 100
+
+-- | Base cost of querying the account keys from within smart contract instance.
+--  In addition to this there is the cost based on the amount of keys that are returned.
+contractInstanceQueryAccountKeysBaseCost :: Energy
+contractInstanceQueryAccountKeysBaseCost = 200
+
+-- | Cost of returning the account keys, based on the number of keys.
+--  Each key is 32 bytes, and there is a bit of administrative overhead.
+contractInstanceQueryAccountKeysReturnCost :: Int -> Energy
+contractInstanceQueryAccountKeysReturnCost numKeys = fromIntegral (numKeys * 3)
+
+-- | The cost of signature checks. This cost is the same as the cost
+--  `verify_ed25519_cost` in `constants.rs` in
+--  `concordium-smart-contract-engine`.
+contractInstanceCheckAccountSignatureCost ::
+    -- | The size of the data in bytes.
+    Word64 ->
+    -- | The number of signatures.
+    Int ->
+    Energy
+contractInstanceCheckAccountSignatureCost size numSigs = fromIntegral numSigs * fromIntegral (100 + size `div` 10)
+
+-- | The cost of querying the contract module reference from a smart contract instance.
+contractInstanceQueryContractModuleReferenceCost :: Energy
+contractInstanceQueryContractModuleReferenceCost = 200
+
+-- | The cost of querying the contract module name from a smart contract instance.
+--  While the length of a smart contract name is variable, it is at most 100 characters, so there
+--  is no real benefit to varying the cost based on the length.
+contractInstanceQueryContractNameCost :: Energy
+contractInstanceQueryContractNameCost = 200

@@ -1,0 +1,36 @@
+[package]
+name = "concordium-wasm"
+version = "5.1.0"
+authors = ["Concordium <developers@concordium.com>"]
+edition = "2021"
+license-file = "../../LICENSE"
+readme = "./README.md"
+description = "Concordium's Wasm execution engine"
+homepage = "https://github.com/Concordium/concordium-base/tree/main/smart-contracts/wasm-transform"
+repository = "https://github.com/Concordium/concordium-base/"
+
+[features]
+fuzz-coverage = []
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies]
+leb128 = "0.2"
+anyhow = "1.0"
+num_enum = "0.6"
+derive_more = "0.99"
+
+
+[dependencies.concordium-contracts-common]
+version = "9"
+path = "../contracts-common/concordium-contracts-common"
+features = ["derive-serde"]
+
+[dev-dependencies]
+criterion = "0.4"
+
+[lib]
+crate-type = ["rlib"]
+
+[[bench]]
+name = "validation-time"
+harness = false

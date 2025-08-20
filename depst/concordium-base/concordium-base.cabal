@@ -1,0 +1,701 @@
+cabal-version: 2.0
+
+-- This file has been generated from package.yaml by hpack version 0.37.0.
+--
+-- see: https://github.com/sol/hpack
+
+name:           concordium-base
+version:        0.1.0.0
+description:    See README
+author:         Concordium AG
+maintainer:     developers@concordium.com
+copyright:      Concordium AG
+license:        MPL-2.0
+license-file:   LICENSE
+build-type:     Custom
+extra-source-files:
+    README.md
+    LICENSE
+    ./concordium-grpc-api/v2/concordium/kernel.proto
+    ./concordium-grpc-api/v2/concordium/protocol-level-tokens.proto
+    ./concordium-grpc-api/v2/concordium/types.proto
+    ./concordium-grpc-api/v2/concordium/service.proto
+    ./concordium-grpc-api/v2/concordium/health.proto
+
+custom-setup
+  setup-depends:
+      Cabal >=2.2
+    , base >=4.7
+    , directory >=1.3
+    , proto-lens-setup >=0.4
+
+flag static
+  description: Use static linking.
+  manual: True
+  default: False
+
+library
+  exposed-modules:
+      Concordium.Common.Amount
+      Concordium.Common.Time
+      Concordium.Common.Version
+      Concordium.Constants
+      Concordium.Cost
+      Concordium.Crypto.BlockSignature
+      Concordium.Crypto.BlsSignature
+      Concordium.Crypto.ByteStringHelpers
+      Concordium.Crypto.DummyData
+      Concordium.Crypto.Ed25519Signature
+      Concordium.Crypto.EncryptedTransfers
+      Concordium.Crypto.FFIDataTypes
+      Concordium.Crypto.FFIHelpers
+      Concordium.Crypto.Proofs
+      Concordium.Crypto.SHA256
+      Concordium.Crypto.SignatureScheme
+      Concordium.Crypto.VRF
+      Concordium.Genesis.Account
+      Concordium.Genesis.Data
+      Concordium.Genesis.Data.Base
+      Concordium.Genesis.Data.BaseV1
+      Concordium.Genesis.Data.P1
+      Concordium.Genesis.Data.P2
+      Concordium.Genesis.Data.P3
+      Concordium.Genesis.Data.P4
+      Concordium.Genesis.Data.P5
+      Concordium.Genesis.Data.P6
+      Concordium.Genesis.Data.P7
+      Concordium.Genesis.Data.P8
+      Concordium.Genesis.Data.P9
+      Concordium.Genesis.Parameters
+      Concordium.GRPC2
+      Concordium.ID.Account
+      Concordium.ID.AnonymityRevoker
+      Concordium.ID.DummyData
+      Concordium.ID.IdentityProvider
+      Concordium.ID.Parameters
+      Concordium.ID.Types
+      Concordium.Logger
+      Concordium.MerkleProofs
+      Concordium.Types
+      Concordium.Types.Accounts
+      Concordium.Types.Accounts.Releases
+      Concordium.Types.AnonymityRevokers
+      Concordium.Types.Block
+      Concordium.Types.Conditionally
+      Concordium.Types.DummyData
+      Concordium.Types.Execution
+      Concordium.Types.Execution.TH
+      Concordium.Types.HashableTo
+      Concordium.Types.IdentityProviders
+      Concordium.Types.InvokeContract
+      Concordium.Types.Memo
+      Concordium.Types.Migration
+      Concordium.Types.Parameters
+      Concordium.Types.ProtocolLevelTokens.CBOR
+      Concordium.Types.ProtocolVersion
+      Concordium.Types.ProtocolVersion.TH
+      Concordium.Types.Queries
+      Concordium.Types.Queries.KonsensusV1
+      Concordium.Types.Queries.Tokens
+      Concordium.Types.SeedState
+      Concordium.Types.SmartContracts
+      Concordium.Types.Tokens
+      Concordium.Types.Transactions
+      Concordium.Types.UpdateQueues
+      Concordium.Types.Updates
+      Concordium.Utils
+      Concordium.Utils.BinarySearch
+      Concordium.Utils.Encryption
+      Concordium.Utils.InterpolationSearch
+      Concordium.Utils.Serialization
+      Concordium.Utils.Serialization.Put
+      Concordium.Wasm
+      Data.Base58Encoding
+      Data.Base58Encoding.TH
+      Data.FixedByteString
+      Proto.V2.Concordium.Health Proto.V2.Concordium.Health_Fields Proto.V2.Concordium.Service Proto.V2.Concordium.Service_Fields Proto.V2.Concordium.Types Proto.V2.Concordium.Types_Fields Proto.V2.Concordium.Kernel Proto.V2.Concordium.Kernel_Fields Proto.V2.Concordium.ProtocolLevelTokens Proto.V2.Concordium.ProtocolLevelTokens_Fields
+  other-modules:
+      Paths_concordium_base
+  autogen-modules:
+      Paths_concordium_base
+      Proto.V2.Concordium.Health Proto.V2.Concordium.Health_Fields Proto.V2.Concordium.Service Proto.V2.Concordium.Service_Fields Proto.V2.Concordium.Types Proto.V2.Concordium.Types_Fields Proto.V2.Concordium.Kernel Proto.V2.Concordium.Kernel_Fields Proto.V2.Concordium.ProtocolLevelTokens Proto.V2.Concordium.ProtocolLevelTokens_Fields
+  hs-source-dirs:
+      haskell-src
+  default-extensions:
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GeneralizedNewtypeDeriving
+      LambdaCase
+      MultiParamTypeClasses
+      RecordWildCards
+      TupleSections
+      TypeOperators
+  ghc-options: -Wall -Wcompat -Werror=missing-fields -Werror=missing-methods -Wredundant-constraints -fno-ignore-asserts
+  extra-libraries:
+      concordium_base
+      sha_2
+  build-depends:
+      QuickCheck >=2.12
+    , aeson >=1.4.2
+    , attoparsec-aeson
+    , base >=4.7 && <5
+    , base16-bytestring >=0.1.1.6
+    , base64-bytestring >=1.1.0.0
+    , binary >=0.8
+    , bytestring >=0.10
+    , cborg >=0.2
+    , cereal >=0.5
+    , containers >=0.6
+    , cryptonite >=0.27
+    , deepseq >=1.4
+    , exceptions >=0.10
+    , ghc-prim >=0.5.3
+    , hashable >=1.2
+    , microlens >=0.3
+    , microlens-platform >=0.3
+    , mtl >=2.2
+    , persistent >=2.10
+    , pqueue >=1.4.1
+    , prettyprinter >=1.2
+    , primitive >=0.7
+    , proto-lens >=0.7
+    , proto-lens-runtime >=0.7
+    , random >=1.1
+    , scientific >=0.3.2
+    , singletons
+    , singletons-base
+    , singletons-th
+    , template-haskell >=2.14
+    , text >=1.2
+    , time >=1.8
+    , transformers >=0.5
+    , unordered-containers >=0.2
+    , vector >=0.12
+  default-language: Haskell2010
+  if os(windows)
+    extra-libraries:
+        userenv
+        ws2_32
+        bcrypt
+
+executable generate-update-keys
+  main-is: Main.hs
+  other-modules:
+      Paths_concordium_base
+  autogen-modules:
+      Paths_concordium_base
+  hs-source-dirs:
+      haskell-bins/generate-update-keys
+  default-extensions:
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GeneralizedNewtypeDeriving
+      LambdaCase
+      MultiParamTypeClasses
+      RecordWildCards
+      TupleSections
+      TypeOperators
+  ghc-options: -Wall -Wcompat -Werror=missing-fields -Werror=missing-methods -Wredundant-constraints -fno-ignore-asserts
+  build-depends:
+      QuickCheck >=2.12
+    , aeson >=1.4.2
+    , aeson-pretty >=0.8
+    , attoparsec-aeson
+    , base >=4.7 && <5
+    , base16-bytestring >=0.1.1.6
+    , base64-bytestring >=1.1.0.0
+    , binary >=0.8
+    , bytestring >=0.10
+    , cborg >=0.2
+    , cereal >=0.5
+    , concordium-base
+    , containers >=0.6
+    , cryptonite >=0.27
+    , deepseq >=1.4
+    , exceptions >=0.10
+    , filepath >=1.4
+    , ghc-prim >=0.5.3
+    , hashable >=1.2
+    , microlens >=0.3
+    , microlens-platform >=0.3
+    , mtl >=2.2
+    , optparse-applicative >=0.15
+    , persistent >=2.10
+    , pqueue >=1.4.1
+    , prettyprinter >=1.2
+    , primitive >=0.7
+    , proto-lens >=0.7
+    , proto-lens-runtime >=0.7
+    , random >=1.1
+    , scientific >=0.3.2
+    , singletons
+    , singletons-base
+    , singletons-th
+    , template-haskell >=2.14
+    , text >=1.2
+    , time >=1.8
+    , transformers >=0.5
+    , unordered-containers >=0.2
+    , vector >=0.12
+  default-language: Haskell2010
+
+executable genesis
+  main-is: Genesis.hs
+  other-modules:
+      Paths_concordium_base
+  autogen-modules:
+      Paths_concordium_base
+  hs-source-dirs:
+      haskell-bins/genesis
+  default-extensions:
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GeneralizedNewtypeDeriving
+      LambdaCase
+      MultiParamTypeClasses
+      RecordWildCards
+      TupleSections
+      TypeOperators
+  ghc-options: -Wall -Wcompat -fno-ignore-asserts
+  build-depends:
+      QuickCheck >=2.12
+    , aeson >=1.4.2
+    , aeson-pretty >=0.8
+    , attoparsec-aeson
+    , base >=4.7 && <5
+    , base16-bytestring >=0.1.1.6
+    , base64-bytestring >=1.1.0.0
+    , binary >=0.8
+    , bytestring >=0.10
+    , cborg >=0.2
+    , cereal >=0.5
+    , cmdargs >=0.10
+    , concordium-base
+    , containers >=0.6
+    , cryptonite >=0.27
+    , deepseq >=1.4
+    , exceptions >=0.10
+    , filepath >=1.4
+    , ghc-prim >=0.5.3
+    , hashable >=1.2
+    , microlens >=0.3
+    , microlens-platform >=0.3
+    , mtl >=2.2
+    , persistent >=2.10
+    , pqueue >=1.4.1
+    , prettyprinter >=1.2
+    , primitive >=0.7
+    , proto-lens >=0.7
+    , proto-lens-runtime >=0.7
+    , random >=1.1
+    , scientific >=0.3.2
+    , singletons
+    , singletons-base
+    , singletons-th
+    , template-haskell >=2.14
+    , text >=1.2
+    , time >=1.8
+    , transformers >=0.5
+    , unordered-containers >=0.2
+    , vector >=0.12
+  default-language: Haskell2010
+
+test-suite test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      ConcordiumTests.Common.Version
+      ConcordiumTests.Crypto.BlsSignature
+      ConcordiumTests.Crypto.Ed25519DlogProofs
+      ConcordiumTests.Crypto.Ed25519Signature
+      ConcordiumTests.Crypto.EncryptedTransfers
+      ConcordiumTests.Crypto.FFIDataTypes
+      ConcordiumTests.Crypto.FFIVerify
+      ConcordiumTests.Crypto.SHA256
+      ConcordiumTests.Crypto.VRF
+      ConcordiumTests.Data.Base58Encoding
+      ConcordiumTests.ID.Types
+      ConcordiumTests.MerkleProofs
+      ConcordiumTests.Utils.Encryption
+      ConcordiumTests.Utils.InterpolationSearch
+      Generators
+      Genesis.ParametersSpec
+      Types.AccountEncryptedAmountSpec
+      Types.AddressesSpec
+      Types.AmountFraction
+      Types.AmountSpec
+      Types.CBOR
+      Types.ParametersSpec
+      Types.PayloadSerializationSpec
+      Types.PayloadSpec
+      Types.TimestampSpec
+      Types.TokensSpec
+      Types.TransactionSerializationSpec
+      Types.TransactionSummarySpec
+      Types.UpdatesSpec
+      Types.ValidName
+      Paths_concordium_base
+  autogen-modules:
+      Paths_concordium_base
+  hs-source-dirs:
+      haskell-tests
+  default-extensions:
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GeneralizedNewtypeDeriving
+      LambdaCase
+      MultiParamTypeClasses
+      RecordWildCards
+      TupleSections
+      TypeOperators
+  ghc-options: -threaded -with-rtsopts=-N -Wall -Wno-deprecations
+  build-depends:
+      HUnit >=1.6
+    , QuickCheck >=2.12
+    , aeson >=1.4.2
+    , attoparsec-aeson
+    , base >=4.7 && <5
+    , base16-bytestring >=0.1.1.6
+    , base64-bytestring >=1.1.0.0
+    , binary >=0.8
+    , bytestring >=0.10
+    , cborg >=0.2
+    , cereal >=0.5
+    , concordium-base
+    , containers
+    , cryptonite >=0.27
+    , deepseq >=1.4
+    , exceptions >=0.10
+    , ghc-prim >=0.5.3
+    , hashable >=1.2
+    , hspec >=2.6
+    , hspec-expectations >=0.8
+    , microlens >=0.3
+    , microlens-platform >=0.3
+    , mtl >=2.2
+    , persistent >=2.10
+    , pqueue >=1.4.1
+    , prettyprinter >=1.2
+    , primitive >=0.7
+    , proto-lens >=0.7
+    , proto-lens-runtime >=0.7
+    , random
+    , scientific >=0.3.2
+    , singletons
+    , singletons-base
+    , singletons-th
+    , template-haskell >=2.14
+    , text >=1.2
+    , time >=1.8
+    , transformers >=0.5
+    , unordered-containers >=0.2
+    , vector >=0.12
+  default-language: Haskell2010
+  if flag(static)
+    ld-options: -static
+  if !os(windows)
+    ghc-options: -dynamic
+
+benchmark bls-perf
+  type: exitcode-stdio-1.0
+  main-is: haskell-bench/BlsPerf.hs
+  other-modules:
+      Paths_concordium_base
+  autogen-modules:
+      Paths_concordium_base
+  default-extensions:
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GeneralizedNewtypeDeriving
+      LambdaCase
+      MultiParamTypeClasses
+      RecordWildCards
+      TupleSections
+      TypeOperators
+  build-depends:
+      QuickCheck >=2.12
+    , aeson >=1.4.2
+    , attoparsec-aeson
+    , base >=4.7 && <5
+    , base16-bytestring >=0.1.1.6
+    , base64-bytestring >=1.1.0.0
+    , binary >=0.8
+    , bytestring >=0.10
+    , cborg >=0.2
+    , cereal >=0.5
+    , concordium-base
+    , containers >=0.6
+    , criterion >=1.5
+    , cryptonite >=0.27
+    , deepseq >=1.4
+    , exceptions >=0.10
+    , ghc-prim >=0.5.3
+    , hashable >=1.2
+    , microlens >=0.3
+    , microlens-platform >=0.3
+    , mtl >=2.2
+    , persistent >=2.10
+    , pqueue >=1.4.1
+    , prettyprinter >=1.2
+    , primitive >=0.7
+    , proto-lens >=0.7
+    , proto-lens-runtime >=0.7
+    , random >=1.1
+    , scientific >=0.3.2
+    , singletons
+    , singletons-base
+    , singletons-th
+    , template-haskell >=2.14
+    , text >=1.2
+    , time >=1.8
+    , transformers >=0.5
+    , unordered-containers >=0.2
+    , vector >=0.12
+  default-language: Haskell2010
+  if !os(windows)
+    ghc-options: -dynamic
+
+benchmark ed25519-perf
+  type: exitcode-stdio-1.0
+  main-is: haskell-bench/Ed25519Perf.hs
+  other-modules:
+      Paths_concordium_base
+  autogen-modules:
+      Paths_concordium_base
+  default-extensions:
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GeneralizedNewtypeDeriving
+      LambdaCase
+      MultiParamTypeClasses
+      RecordWildCards
+      TupleSections
+      TypeOperators
+  build-depends:
+      QuickCheck >=2.12
+    , aeson >=1.4.2
+    , attoparsec-aeson
+    , base >=4.7 && <5
+    , base16-bytestring >=0.1.1.6
+    , base64-bytestring >=1.1.0.0
+    , binary >=0.8
+    , bytestring >=0.10
+    , cborg >=0.2
+    , cereal >=0.5
+    , concordium-base
+    , containers >=0.6
+    , criterion >=1.5
+    , cryptonite >=0.27
+    , deepseq >=1.4
+    , exceptions >=0.10
+    , ghc-prim >=0.5.3
+    , hashable >=1.2
+    , microlens >=0.3
+    , microlens-platform >=0.3
+    , mtl >=2.2
+    , persistent >=2.10
+    , pqueue >=1.4.1
+    , prettyprinter >=1.2
+    , primitive >=0.7
+    , proto-lens >=0.7
+    , proto-lens-runtime >=0.7
+    , random >=1.1
+    , scientific >=0.3.2
+    , singletons
+    , singletons-base
+    , singletons-th
+    , template-haskell >=2.14
+    , text >=1.2
+    , time >=1.8
+    , transformers >=0.5
+    , unordered-containers >=0.2
+    , vector >=0.12
+  default-language: Haskell2010
+  if !os(windows)
+    ghc-options: -dynamic
+
+benchmark ed25519dlog-perf
+  type: exitcode-stdio-1.0
+  main-is: haskell-bench/Ed25519DlogPerf.hs
+  other-modules:
+      Paths_concordium_base
+  autogen-modules:
+      Paths_concordium_base
+  default-extensions:
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GeneralizedNewtypeDeriving
+      LambdaCase
+      MultiParamTypeClasses
+      RecordWildCards
+      TupleSections
+      TypeOperators
+  build-depends:
+      QuickCheck >=2.12
+    , aeson >=1.4.2
+    , attoparsec-aeson
+    , base >=4.7 && <5
+    , base16-bytestring >=0.1.1.6
+    , base64-bytestring >=1.1.0.0
+    , binary >=0.8
+    , bytestring >=0.10
+    , cborg >=0.2
+    , cereal >=0.5
+    , concordium-base
+    , containers >=0.6
+    , criterion >=1.5
+    , cryptonite >=0.27
+    , deepseq >=1.4
+    , exceptions >=0.10
+    , ghc-prim >=0.5.3
+    , hashable >=1.2
+    , microlens >=0.3
+    , microlens-platform >=0.3
+    , mtl >=2.2
+    , persistent >=2.10
+    , pqueue >=1.4.1
+    , prettyprinter >=1.2
+    , primitive >=0.7
+    , proto-lens >=0.7
+    , proto-lens-runtime >=0.7
+    , random >=1.1
+    , scientific >=0.3.2
+    , singletons
+    , singletons-base
+    , singletons-th
+    , template-haskell >=2.14
+    , text >=1.2
+    , time >=1.8
+    , transformers >=0.5
+    , unordered-containers >=0.2
+    , vector >=0.12
+  default-language: Haskell2010
+  if !os(windows)
+    ghc-options: -dynamic
+
+benchmark sha256-perf
+  type: exitcode-stdio-1.0
+  main-is: haskell-bench/SHA256Perf.hs
+  other-modules:
+      Paths_concordium_base
+  autogen-modules:
+      Paths_concordium_base
+  default-extensions:
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GeneralizedNewtypeDeriving
+      LambdaCase
+      MultiParamTypeClasses
+      RecordWildCards
+      TupleSections
+      TypeOperators
+  build-depends:
+      QuickCheck >=2.12
+    , aeson >=1.4.2
+    , attoparsec-aeson
+    , base >=4.7 && <5
+    , base16-bytestring >=0.1.1.6
+    , base64-bytestring >=1.1.0.0
+    , binary >=0.8
+    , bytestring >=0.10
+    , cborg >=0.2
+    , cereal >=0.5
+    , concordium-base
+    , containers >=0.6
+    , criterion >=1.5
+    , cryptonite >=0.27
+    , deepseq >=1.4
+    , exceptions >=0.10
+    , ghc-prim >=0.5.3
+    , hashable >=1.2
+    , microlens >=0.3
+    , microlens-platform >=0.3
+    , mtl >=2.2
+    , persistent >=2.10
+    , pqueue >=1.4.1
+    , prettyprinter >=1.2
+    , primitive >=0.7
+    , proto-lens >=0.7
+    , proto-lens-runtime >=0.7
+    , random >=1.1
+    , scientific >=0.3.2
+    , singletons
+    , singletons-base
+    , singletons-th
+    , template-haskell >=2.14
+    , text >=1.2
+    , time >=1.8
+    , transformers >=0.5
+    , unordered-containers >=0.2
+    , vector >=0.12
+  default-language: Haskell2010
+  if !os(windows)
+    ghc-options: -dynamic
+
+benchmark verify-credential-perf
+  type: exitcode-stdio-1.0
+  main-is: haskell-bench/VerifyCredentialPerf.hs
+  other-modules:
+      Paths_concordium_base
+  autogen-modules:
+      Paths_concordium_base
+  default-extensions:
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GeneralizedNewtypeDeriving
+      LambdaCase
+      MultiParamTypeClasses
+      RecordWildCards
+      TupleSections
+      TypeOperators
+  build-depends:
+      QuickCheck >=2.12
+    , aeson >=1.4.2
+    , attoparsec-aeson
+    , base >=4.7 && <5
+    , base16-bytestring >=0.1.1.6
+    , base64-bytestring >=1.1.0.0
+    , binary >=0.8
+    , bytestring >=0.10
+    , cborg >=0.2
+    , cereal >=0.5
+    , concordium-base
+    , containers >=0.6
+    , criterion >=1.5
+    , cryptonite >=0.27
+    , deepseq >=1.4
+    , exceptions >=0.10
+    , ghc-prim >=0.5.3
+    , hashable >=1.2
+    , microlens >=0.3
+    , microlens-platform >=0.3
+    , mtl >=2.2
+    , persistent >=2.10
+    , pqueue >=1.4.1
+    , prettyprinter >=1.2
+    , primitive >=0.7
+    , proto-lens >=0.7
+    , proto-lens-runtime >=0.7
+    , random >=1.1
+    , scientific >=0.3.2
+    , singletons
+    , singletons-base
+    , singletons-th
+    , template-haskell >=2.14
+    , text >=1.2
+    , time >=1.8
+    , transformers >=0.5
+    , unordered-containers >=0.2
+    , vector >=0.12
+  default-language: Haskell2010
+  if !os(windows)
+    ghc-options: -dynamic
