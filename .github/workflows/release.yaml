@@ -32,8 +32,6 @@ jobs:
       - name: Build Rust SDK
         run: |
           echo "Building Concordium Rust SDK..."
-          cd concordium-rust-sdk
-          echo "Current directory: $(pwd)"
           cargo build --release
 
       # Publish to crates.io (dry run)
