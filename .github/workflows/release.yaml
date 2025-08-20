@@ -2,6 +2,8 @@ name: Release Concordium Rust SDK
 
 on:
   push:
+    branches: 
+      - feature/COR1640-release-pipeline
     tags:
       - release/concordium-rust-sdk/*
 
