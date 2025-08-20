@@ -71,10 +71,7 @@ jobs:
 
       # Publish to crates.io
       - name: Publish to crates.io
-        #env:
-        #  CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: |
           # Uncomment the next line to actually publish
           echo "Publishing Concordium Rust SDK to crates.io..."
           # cargo publish --token $CARGO_REGISTRY_TOKEN
-
