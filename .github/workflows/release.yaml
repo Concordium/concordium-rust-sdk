@@ -5,6 +5,8 @@ on:
   workflow_dispatch: # allows manual trigger
 
   push:
+    branches:
+      - feature/COR1640-release-pipeline-publishing-crate
     tags:
       - release/concordium-rust-sdk/*
 
