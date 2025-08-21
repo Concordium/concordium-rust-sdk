@@ -8,7 +8,6 @@ on:
     tags:
       - release/concordium-rust-sdk/*
 
-
 env:
   TAG: ${{ github.ref_name }}
 
@@ -25,21 +24,9 @@ jobs:
         with:
           submodules: recursive
 
-      # Check that the tag exists on the main branch before proceeding
-      - name: Check git tag was created on the main branch
-        run: |
-          git fetch origin main
-          git checkout main
-
-          echo "Checking if tag $TAG exists on main branch"
-          git tag --merged main | grep $TAG || { echo "Tag $TAG not found on main branch. Exiting."; exit 1; }
-          echo "Tag $TAG found on main branch. Proceeding with release."
-
       # Validate that the tag version matches the version in Cargo.toml
       - name: validate tag version has correct matching tag
         run: |
-          git checkout $TAG
-
           echo "Validating tag version $TAG matches expected version from Cargo.toml"
           EXPECTED_VERSION_FROM_CARGO=$(yq .package.version ./Cargo.toml)
           TAG_VERSION_NUMBER=${TAG##release/concordium-rust-sdk/}
