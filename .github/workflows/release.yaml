@@ -5,67 +5,55 @@ on:
   workflow_dispatch: # allows manual trigger
 
   push:
-    ## TODO remove later - this is to test on each push to my branch
-    branches: 
-      - feature/COR1640-release-pipeline
     tags:
       - release/concordium-rust-sdk/*
 
 env:
-  RUST_FMT: nightly-2023-04-01-x86_64-unknown-linux-gnu
-  RUST_VERSION: "1.85"
   CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
   TAG: ${{ github.ref_name }}
 
 jobs:
+
   ## Concordium Rust SDK Release Build
   concordium-rust-sdk-release:
     name: concordium-rust-sdk:release
     runs-on: ubuntu-latest
-    
-    steps:
 
-      # Checkout the code with submodules recursive
+    steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # Check git tag is present on the main branch and matches expected version from Cargo.toml and 
-      - name: Check git tag
+      # Check that the tag exists on the main branch before proceeding
+      - name: Check git tag was created on the main branch
         run: |
+          git fetch origin main
+          git checkout main
 
-          # first check if the tag is in the expected release Format and is on the main branch, extract the version from the tag
-          echo "Checking the following git tag: ${{ env.TAG }}"
-          TAG_VERSION_NUMBER=${TAG##release/concordium-rust-sdk/}
-          echo "<TODO> - main branch check here"
+          echo "Checking if tag $TAG exists on main branch"
+          git tag --merged main | grep $TAG || { echo "Tag $TAG not found on main branch. Exiting."; exit 1; }
+          echo "Tag $TAG found on main branch. Proceeding with release."
 
-          # extract the expected version from Cargo.toml
+      # Validate that the tag version matches the version in Cargo.toml
+      - name: validate tag version has correct matching tag
+        run: |
+          git checkout $TAG
+
+          echo "Validating tag version $TAG matches expected version from Cargo.toml"
           EXPECTED_VERSION_FROM_CARGO=$(yq .package.version ./Cargo.toml)
-          echo "Expected version from Cargo.toml: $EXPECTED_VERSION_FROM_CARGO"
-
-          # Ensure the tagged version number matches the expected version from Cargo.toml
+          TAG_VERSION_NUMBER=${TAG##release/concordium-rust-sdk/}
+          
+          # Check if the tag version number matches the expected version from Cargo.toml
           if [ "$TAG_VERSION_NUMBER" != "$EXPECTED_VERSION_FROM_CARGO" ]; then
-            echo "Tag version number ($TAG_VERSION_NUMBER) does not match expected version from Cargo.toml ($EXPECTED_VERSION_FROM_CARGO). Exiting.";
-            exit 1;
+            echo "version tagged: $TAG_VERSION_NUMBER  does not match cargo version: $EXPECTED_VERSION_FROM_CARGO. Exiting."
+            exit 1
           else
-            echo "Tag version number matches expected version from Cargo.toml. Proceeding with release.";
+            echo "Tag version number matches expected version from Cargo.toml. Proceeding with release."
           fi
-
-      # Check version number does not already exist in crates.io
-      - name: Check if version exists in crates.io
-        run: |
-          echo "Checking if version already exists in crates.io..."
-          if cargo search concordium-rust-sdk | grep -q '"version":'; then
-            echo "Version already exists in crates.io. Exiting.";
-            exit 1;
-          else
-            echo "Version does not exist in crates.io. Proceeding with release.";
-          fi 
 
       # Publish to crates.io
       - name: Publish to crates.io
         run: |
-          # Uncomment the next line to actually publish
           echo "Publishing Concordium Rust SDK to crates.io for version: $TAG_VERSION"
-          # cargo publish --token $CARGO_REGISTRY_TOKEN --locked
+          cargo publish --token $CARGO_REGISTRY_TOKEN --locked
