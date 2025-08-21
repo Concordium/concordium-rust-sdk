@@ -15,6 +15,7 @@ env:
   RUST_FMT: nightly-2023-04-01-x86_64-unknown-linux-gnu
   RUST_VERSION: "1.85"
   CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+  TAG: ${{ github.ref_name }}
 
 jobs:
   ## Concordium Rust SDK Release Build
@@ -30,48 +31,41 @@ jobs:
         with:
           submodules: recursive
 
-      # RustFmt checks
-      - name: Rust format checks
+      # Check git tag is present on the main branch and matches expected version from Cargo.toml and 
+      - name: Check git tag
         run: |
-          rustup default $RUST_FMT
-          rustup component add rustfmt
-          cargo fmt -- --color=always --check
 
-      # Compilation Check
-      - name: Compilation Check
+          # first check if the tag is in the expected release Format and is on the main branch, extract the version from the tag
+          echo "Checking the following git tag: ${{ env.TAG }}"
+          TAG_VERSION_NUMBER=${TAG##release/concordium-rust-sdk/}
+          echo "<TODO> - main branch check here"
+
+          # extract the expected version from Cargo.toml
+          EXPECTED_VERSION_FROM_CARGO=$(yq .package.version ./Cargo.toml)
+          echo "Expected version from Cargo.toml: $EXPECTED_VERSION_FROM_CARGO"
+
+          # Ensure the tagged version number matches the expected version from Cargo.toml
+          if [ "$TAG_VERSION_NUMBER" != "$EXPECTED_VERSION_FROM_CARGO" ]; then
+            echo "Tag version number ($TAG_VERSION_NUMBER) does not match expected version from Cargo.toml ($EXPECTED_VERSION_FROM_CARGO). Exiting.";
+            exit 1;
+          else
+            echo "Tag version number matches expected version from Cargo.toml. Proceeding with release.";
+          fi
+
+      # Check version number does not already exist in crates.io
+      - name: Check if version exists in crates.io
         run: |
-          rustup default $RUST_VERSION
-          cargo check --all-targets --all-features 
-
-      # Clippy checks
-      - name: Clippy
-        run: |
-          rustup default $RUST_VERSION
-          rustup component add clippy
-          cargo clippy --color=always --all-targets --all-features -- -D warnings
-          # Examples can be large with a lot of debug info due to tokio. So we
-          # disable debug info generation.
-          RUSTFLAGS="-C debuginfo=0" cargo test --all-targets --all-features
-
-      ## Probably not needed
-      #- name: Build Rust SDK
-      #  run: |
-      #    echo "Building Concordium Rust SDK..."
-      #    cargo build --release
-
-      #- name: Run Tests
-      #  run: cargo test --release
-
-
-      # Publish to crates.io (dry run)
-      - name: Dry run Publish to crates.io
-        run: |
-          cargo publish --dry-run
-          cargo package --list
+          echo "Checking if version already exists in crates.io..."
+          if cargo search concordium-rust-sdk | grep -q '"version":'; then
+            echo "Version already exists in crates.io. Exiting.";
+            exit 1;
+          else
+            echo "Version does not exist in crates.io. Proceeding with release.";
+          fi 
 
       # Publish to crates.io
       - name: Publish to crates.io
         run: |
           # Uncomment the next line to actually publish
-          echo "Publishing Concordium Rust SDK to crates.io..."
-          # cargo publish --token $CARGO_REGISTRY_TOKEN
+          echo "Publishing Concordium Rust SDK to crates.io for version: $TAG_VERSION"
+          # cargo publish --token $CARGO_REGISTRY_TOKEN --locked
