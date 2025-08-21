@@ -19,6 +19,30 @@
   - Method `Client::get_block_items` response stream items.
   - Method `Client::get_finalized_block_item` return type.
   - Type `PendingUpdate` field `effect`.
+  - Type `ViewError::QueryFailed`.
+  - Type `ContractInitError::Failed`.
+  - Type `ContractUpdateError::Failed`.
+  - Type `ContractInitHandle::Failed`.
+  - Type `Cis2DryRunError::NodeRejected`.
+  - Type `Cis2QueryError::NodeRejected`.
+  - Type `Cis3PermitDryRunError::NodeRejected`.
+  - Type `Cis3SupportsPermitError::NodeRejected`.
+  - Type `Cis4QueryError::NodeRejected`.
+  - Method `Cis4QueryError::is_contract_error` return value.
+  - Type `Cis4TransactionError::NodeRejected`.
+  - Type `ModuleDeployError::Failed`.
+  - Type `DryRunModuleDeployError::Failed`.
+  - Type `RejectedTransaction` field `reason`.
+  - Method `ContractClient::view<P, A, E>` require `E` to implement `From<v2::Upward<RejectReason>>`.
+  - Method `ContractClient::view_raw<A, E>` require `E` to implement `From<v2::Upward<RejectReason>>`.
+  - Method `ContractClient::invoke_raw<E>` require `E` to implement `From<v2::Upward<RejectReason>>`.
+  - Method `ContractClient::dry_run_update<P, E>` require `E` to implement `From<v2::Upward<RejectReason>>`.
+  - Method `ContractClient::dry_run_update<P, E>` require `E` to implement `From<v2::Upward<RejectReason>>`.
+  - Method `BlockItemSummary::is_rejected_account_transaction` return value.
+  - Method `BlockItemSummaryDetails::is_rejected` return value.
+  - Method `AccountTransactionEffects::is_rejected` return value.
+  - Type `AccountTransactionEffects` field `reject_reason`.
+  - Type `InvokeContractResult` field `reason`.
 
 - Add `NextUpdateSequenceNumbers::protocol_level_tokens` and protobuf deserialization of it
 - Changed `TokenClient`'s `burn` and `mint` methods to accept a singular `TokenAmount`, instead of `Vec<TokenAmount>`.
