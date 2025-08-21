@@ -530,7 +530,7 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                         transaction_type,
                         reject_reason,
                     } => (transaction_type, BlockItemResult::Reject {
-                        reject_reason: Box::new(reject_reason),
+                        reject_reason: Box::new(reject_reason.known_or_err()?),
                     }),
                     super::AccountTransactionEffects::ModuleDeployed { module_ref } => {
                         mk_success_1(TransactionType::DeployModule, Event::ModuleDeployed {
@@ -994,7 +994,7 @@ fn convert_account_transaction(
             sender,
             effects: Upward::Known(super::AccountTransactionEffects::None {
                 transaction_type: ty,
-                reject_reason,
+                reject_reason:    Upward::Known(reject_reason),
             }),
         })
     };

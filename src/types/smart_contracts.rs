@@ -1,4 +1,6 @@
 //! Types related to smart contracts.
+use crate::v2::Upward;
+
 use super::{Address, ContractAddress, Energy, RejectReason};
 pub use concordium_base::smart_contracts::*;
 use concordium_base::{
@@ -260,7 +262,7 @@ pub enum InvokeContractResult {
     #[serde(rename = "failure", rename_all = "camelCase")]
     Failure {
         return_value: Option<ReturnValue>,
-        reason:       RejectReason,
+        reason:       Upward<RejectReason>,
         used_energy:  Energy,
     },
 }

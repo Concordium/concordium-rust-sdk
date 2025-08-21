@@ -1688,7 +1688,11 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                         ),
                     }
                 },
-                reject_reason:    n.reject_reason.require()?.try_into()?,
+                reject_reason:    n
+                    .reject_reason
+                    .map(super::types::RejectReason::try_from)
+                    .transpose()?
+                    .into(),
             }),
             account_transaction_effects::Effect::AccountTransfer(at) => {
                 let amount = at.amount.require()?.into();
@@ -2394,7 +2398,7 @@ impl TryFrom<InvokeInstanceResponse> for super::types::smart_contracts::InvokeCo
         let result = match response.result.require()? {
             invoke_instance_response::Result::Failure(value) => InvokeContractResult::Failure {
                 return_value: value.return_value.map(|b| ReturnValue { value: b }),
-                reason:       value.reason.require()?.try_into()?,
+                reason:       Upward::from(value.reason.map(TryFrom::try_from).transpose()?),
                 used_energy:  value.used_energy.require()?.into(),
             },
             invoke_instance_response::Result::Success(value) => InvokeContractResult::Success {

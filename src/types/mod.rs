@@ -1192,7 +1192,7 @@ impl BlockItemSummary {
     /// Return `Some` if the result corresponds to a rejected account
     /// transaction. This returns `Some` if and only if
     /// [`is_reject`](Self::is_reject) returns `true`.
-    pub fn is_rejected_account_transaction(&self) -> Option<&RejectReason> {
+    pub fn is_rejected_account_transaction(&self) -> Option<Upward<&RejectReason>> {
         self.details.as_known()?.account_transaction_reject_reason()
     }
 
@@ -1764,7 +1764,7 @@ impl BlockItemSummaryDetails {
     /// Return `Some` if the result corresponds to a rejected account
     /// transaction. This returns `Some` if and only if
     /// [`is_reject`](Self::is_reject) returns `true`.
-    pub fn account_transaction_reject_reason(&self) -> Option<&RejectReason> {
+    pub fn account_transaction_reject_reason(&self) -> Option<Upward<&RejectReason>> {
         self.as_account_transaction()?.is_rejected()
     }
 
@@ -1965,7 +1965,9 @@ impl AccountTransactionDetails {
     }
 
     /// Return [`Some`] if the transaction has been rejected.
-    pub fn is_rejected(&self) -> Option<&RejectReason> { self.effects.as_known()?.is_rejected() }
+    pub fn is_rejected(&self) -> Option<Upward<&RejectReason>> {
+        self.effects.as_known()?.is_rejected()
+    }
 }
 
 impl AccountTransactionEffects {
@@ -2022,9 +2024,9 @@ impl AccountTransactionEffects {
     }
 
     /// Return [`Some`] if the transaction has been rejected.
-    pub fn is_rejected(&self) -> Option<&RejectReason> {
+    pub fn is_rejected(&self) -> Option<Upward<&RejectReason>> {
         if let Self::None { reject_reason, .. } = self {
-            Some(reject_reason)
+            Some(reject_reason.as_ref())
         } else {
             None
         }
@@ -2081,7 +2083,7 @@ pub enum AccountTransactionEffects {
         /// In case of serialization failure this will be None.
         transaction_type: Option<TransactionType>,
         /// Reason for rejection of the transaction
-        reject_reason:    RejectReason,
+        reject_reason:    Upward<RejectReason>,
     },
     /// A module was deployed. This corresponds to
     /// [`DeployModule`](transactions::Payload::DeployModule) transaction
