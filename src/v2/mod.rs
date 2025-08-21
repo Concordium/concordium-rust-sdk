@@ -2126,7 +2126,7 @@ impl Client {
     /// returned.
     ///
     /// This endpoint is not expected to return a large amount of data in most
-    /// cases, but in bad network condtions it might.
+    /// cases, but in bad network conditions it might.
     pub async fn get_account_non_finalized_transactions(
         &mut self,
         account_address: &AccountAddress,
@@ -2146,11 +2146,13 @@ impl Client {
     /// If the block does not exist [`QueryError::NotFound`] is returned.
     /// The stream will end when all the block items in the given block have
     /// been returned.
+    /// To allow for forward-compatibility [`Upward::Unknown`] is returned
+    /// if/when encountering a unknown future type of [`BlockItem`].
     pub async fn get_block_items(
         &mut self,
         bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<
-        QueryResponse<impl Stream<Item = Result<BlockItem<EncodedPayload>, tonic::Status>>>,
+        QueryResponse<impl Stream<Item = Result<Upward<BlockItem<EncodedPayload>>, tonic::Status>>>,
     > {
         let response = self
             .client
@@ -2179,18 +2181,29 @@ impl Client {
     /// The return value is a triple of the [`BlockItem`], the hash of the block
     /// in which it is finalized, and the outcome in the form of
     /// [`BlockItemSummary`].
+    /// To allow for forward-compatibility [`Upward::Unknown`] is returned
+    /// if/when encountering a unknown future type of [`BlockItem`].
     pub async fn get_finalized_block_item(
         &mut self,
         th: TransactionHash,
-    ) -> endpoints::QueryResult<(BlockItem<EncodedPayload>, BlockHash, BlockItemSummary)> {
+    ) -> endpoints::QueryResult<(
+        Upward<BlockItem<EncodedPayload>>,
+        BlockHash,
+        BlockItemSummary,
+    )> {
         let status = self.get_block_item_status(&th).await?;
         let Some((bh, status)) = status.is_finalized() else {
             return Err(QueryError::NotFound);
         };
-        let mut response = self.get_block_items(bh).await?.response;
+        let mut response = self
+            .client
+            .get_block_items(&bh.into_block_identifier())
+            .await?
+            .into_inner();
         while let Some(tx) = response.try_next().await? {
-            if tx.hash() == th {
-                return Ok((tx, *bh, status.clone()));
+            let tx_hash = TransactionHash::try_from(tx.hash.clone().require()?)?;
+            if tx_hash == th {
+                return Ok((tx.try_into()?, *bh, status.clone()));
             }
         }
         Err(endpoints::QueryError::NotFound)
