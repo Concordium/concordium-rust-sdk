@@ -3254,125 +3254,98 @@ impl TryFrom<PendingUpdate> for super::types::queries::PendingUpdate {
     type Error = tonic::Status;
 
     fn try_from(message: PendingUpdate) -> Result<Self, Self::Error> {
-        use super::types::queries::PendingUpdateEffect;
         let effective_time = message.effective_time.require()?.into();
-        match message.effect.require()? {
-            pending_update::Effect::RootKeys(e) => {
-                let hk = e.try_into()?;
-                Ok(Self {
-                    effective_time,
-                    effect: PendingUpdateEffect::RootKeys(hk),
-                })
-            }
+        let effect = message
+            .effect
+            .map(super::types::queries::PendingUpdateEffect::try_from)
+            .transpose()?
+            .into();
+        Ok(Self {
+            effective_time,
+            effect,
+        })
+    }
+}
+
+impl TryFrom<pending_update::Effect> for super::types::queries::PendingUpdateEffect {
+    type Error = tonic::Status;
+
+    fn try_from(effect: pending_update::Effect) -> Result<Self, Self::Error> {
+        use super::types::queries::PendingUpdateEffect;
+        let out = match effect {
+            pending_update::Effect::RootKeys(e) => PendingUpdateEffect::RootKeys(e.try_into()?),
             pending_update::Effect::Level1Keys(l1) => {
-                let l1 = l1.try_into()?;
-                Ok(Self {
-                    effective_time,
-                    effect: PendingUpdateEffect::Level1Keys(l1),
-                })
+                PendingUpdateEffect::Level1Keys(l1.try_into()?)
             }
             pending_update::Effect::Level2KeysCpv0(l2) => {
-                let l2 = l2.try_into()?;
-                Ok(Self {
-                    effective_time,
-                    effect: PendingUpdateEffect::Level2KeysCPV0(l2),
-                })
+                PendingUpdateEffect::Level2KeysCPV0(l2.try_into()?)
             }
             pending_update::Effect::Level2KeysCpv1(l2) => {
-                let l2 = l2.try_into()?;
-                Ok(Self {
-                    effective_time,
-                    effect: PendingUpdateEffect::Level2KeysCPV1(l2),
-                })
+                PendingUpdateEffect::Level2KeysCPV1(l2.try_into()?)
             }
-            pending_update::Effect::Protocol(p) => {
-                let p = p.try_into()?;
-                Ok(Self {
-                    effective_time,
-                    effect: PendingUpdateEffect::Protocol(p),
-                })
+            pending_update::Effect::Protocol(p) => PendingUpdateEffect::Protocol(p.try_into()?),
+            pending_update::Effect::ElectionDifficulty(ed) => {
+                PendingUpdateEffect::ElectionDifficulty(ed.try_into()?)
             }
-            pending_update::Effect::ElectionDifficulty(ed) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::ElectionDifficulty(ed.try_into()?),
-            }),
-            pending_update::Effect::EuroPerEnergy(ee) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::EuroPerEnergy(ee.try_into()?),
-            }),
-            pending_update::Effect::MicroCcdPerEuro(mpe) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::MicroCcdPerEnergy(mpe.try_into()?),
-            }),
-            pending_update::Effect::FoundationAccount(fa) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::FoundationAccount(fa.try_into()?),
-            }),
-            pending_update::Effect::MintDistributionCpv0(md) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::MintDistributionV0(md.try_into()?),
-            }),
-            pending_update::Effect::MintDistributionCpv1(md) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::MintDistributionV1(md.try_into()?),
-            }),
-            pending_update::Effect::TransactionFeeDistribution(tfd) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::TransactionFeeDistribution(tfd.try_into()?),
-            }),
-            pending_update::Effect::GasRewards(gr) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::GasRewards(gr.try_into()?),
-            }),
-            pending_update::Effect::PoolParametersCpv0(pp) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::PoolParametersV0(pp.try_into()?),
-            }),
-            pending_update::Effect::PoolParametersCpv1(pp) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::PoolParametersV1(pp.try_into()?),
-            }),
-            pending_update::Effect::AddAnonymityRevoker(aar) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::AddAnonymityRevoker(aar.try_into()?),
-            }),
-            pending_update::Effect::AddIdentityProvider(aidp) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::AddIdentityProvider(Box::new(aidp.try_into()?)),
-            }),
-            pending_update::Effect::CooldownParameters(cdp) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::CooldownParameters(cdp.try_into()?),
-            }),
-            pending_update::Effect::TimeParameters(tp) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::TimeParameters(tp.try_into()?),
-            }),
-            pending_update::Effect::GasRewardsCpv2(update) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::GasRewardsV1(update.try_into()?),
-            }),
-            pending_update::Effect::TimeoutParameters(update) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::TimeoutParameters(update.try_into()?),
-            }),
-            pending_update::Effect::MinBlockTime(update) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::MinBlockTime(update.into()),
-            }),
-            pending_update::Effect::BlockEnergyLimit(update) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::BlockEnergyLimit(update.into()),
-            }),
-            pending_update::Effect::FinalizationCommitteeParameters(update) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::FinalizationCommitteeParameters(update.try_into()?),
-            }),
-            pending_update::Effect::ValidatorScoreParameters(update) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::ValidatorScoreParameters(update.try_into()?),
-            }),
-        }
+            pending_update::Effect::EuroPerEnergy(ee) => {
+                PendingUpdateEffect::EuroPerEnergy(ee.try_into()?)
+            }
+            pending_update::Effect::MicroCcdPerEuro(mpe) => {
+                PendingUpdateEffect::MicroCcdPerEnergy(mpe.try_into()?)
+            }
+            pending_update::Effect::FoundationAccount(fa) => {
+                PendingUpdateEffect::FoundationAccount(fa.try_into()?)
+            }
+            pending_update::Effect::MintDistributionCpv0(md) => {
+                PendingUpdateEffect::MintDistributionV0(md.try_into()?)
+            }
+            pending_update::Effect::MintDistributionCpv1(md) => {
+                PendingUpdateEffect::MintDistributionV1(md.try_into()?)
+            }
+            pending_update::Effect::TransactionFeeDistribution(tfd) => {
+                PendingUpdateEffect::TransactionFeeDistribution(tfd.try_into()?)
+            }
+            pending_update::Effect::GasRewards(gr) => {
+                PendingUpdateEffect::GasRewards(gr.try_into()?)
+            }
+            pending_update::Effect::PoolParametersCpv0(pp) => {
+                PendingUpdateEffect::PoolParametersV0(pp.try_into()?)
+            }
+            pending_update::Effect::PoolParametersCpv1(pp) => {
+                PendingUpdateEffect::PoolParametersV1(pp.try_into()?)
+            }
+            pending_update::Effect::AddAnonymityRevoker(aar) => {
+                PendingUpdateEffect::AddAnonymityRevoker(aar.try_into()?)
+            }
+            pending_update::Effect::AddIdentityProvider(aidp) => {
+                PendingUpdateEffect::AddIdentityProvider(Box::new(aidp.try_into()?))
+            }
+            pending_update::Effect::CooldownParameters(cdp) => {
+                PendingUpdateEffect::CooldownParameters(cdp.try_into()?)
+            }
+            pending_update::Effect::TimeParameters(tp) => {
+                PendingUpdateEffect::TimeParameters(tp.try_into()?)
+            }
+            pending_update::Effect::GasRewardsCpv2(update) => {
+                PendingUpdateEffect::GasRewardsV1(update.try_into()?)
+            }
+            pending_update::Effect::TimeoutParameters(update) => {
+                PendingUpdateEffect::TimeoutParameters(update.try_into()?)
+            }
+            pending_update::Effect::MinBlockTime(update) => {
+                PendingUpdateEffect::MinBlockTime(update.into())
+            }
+            pending_update::Effect::BlockEnergyLimit(update) => {
+                PendingUpdateEffect::BlockEnergyLimit(update.into())
+            }
+            pending_update::Effect::FinalizationCommitteeParameters(update) => {
+                PendingUpdateEffect::FinalizationCommitteeParameters(update.try_into()?)
+            }
+            pending_update::Effect::ValidatorScoreParameters(update) => {
+                PendingUpdateEffect::ValidatorScoreParameters(update.try_into()?)
+            }
+        };
+        Ok(out)
     }
 }
 

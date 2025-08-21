@@ -4,6 +4,15 @@
 /// the Concordium Node API allowing the current SDK version to handle when new
 /// variants are introduced in the API, unknown to this version of the SDK.
 /// This is also used for helper methods extracting deeply nested information.
+///
+/// # `serde` implementation (deprecated).
+///
+/// To ensure some level of backwards-compatibility this implements
+/// [`serde::Serialize`] and [`serde::Deserialize`], but serializing
+/// `Upward::Unknown` will produce a runtime error and deserializing can only
+/// produce `Upward::Known`.
+/// The serde implementation should be considered deprecated and might be
+/// removed in a future version.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Upward<A> {
     /// New unknown variant, the structure is not known to the current version
@@ -154,6 +163,17 @@ impl<A> From<Upward<A>> for Option<A> {
         } else {
             None
         }
+    }
+}
+
+impl<'de, A> serde::Deserialize<'de> for Upward<A>
+where
+    A: serde::Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>, {
+        A::deserialize(deserializer).map(Upward::Known)
     }
 }
 
