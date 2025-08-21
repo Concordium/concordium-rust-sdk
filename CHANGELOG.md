@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+- Add release yaml for publishing to crates.io
+
 ## 7.0.0
 
 Adds support for integrating with Concordium nodes running protocol version 9.
