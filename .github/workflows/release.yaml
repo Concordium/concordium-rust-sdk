@@ -10,6 +10,7 @@ on:
     tags:
       - release/concordium-rust-sdk/*
 
+      
 env:
   TAG: ${{ github.ref_name }}
 
