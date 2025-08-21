@@ -42,7 +42,7 @@ jobs:
       # Publish to crates.io
       - name: Publish to crates.io
         env: release
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+          CARGO_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
           echo "Publishing Concordium Rust SDK to crates.io for version: $TAG_VERSION"
-          cargo publish --token $CARGO_REGISTRY_TOKEN --locked
+          cargo publish --token $CARGO_TOKEN --locked
