@@ -9,7 +9,6 @@ on:
   push:
     branches:
      - main
-     - plt
 
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, edited]
@@ -18,7 +17,6 @@ on:
 
 env:
   RUST_FMT: nightly-2023-04-01-x86_64-unknown-linux-gnu
-  RUST_VERSION: "1.85"
 
 jobs:
   "lint_fmt":
@@ -31,9 +29,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Format
         run: |
-          rustup default $RUST_FMT
-          rustup component add rustfmt
-          cargo fmt -- --color=always --check
+          rustup +$RUST_FMT component add rustfmt
+          cargo +$RUST_FMT fmt -- --color=always --check
 
   "lint_doc":
     name: lint:doc
@@ -47,7 +44,6 @@ jobs:
           submodules: recursive
       - name: Docs
         run: |
-          rustup default $RUST_VERSION
           rustup component add rust-docs
           RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --color=always
 
@@ -65,7 +61,6 @@ jobs:
           submodules: recursive
       - name: Check
         run: |
-          rustup default $RUST_VERSION
           cargo check --all-targets --all-features 
 
   "lint_clippy_test":
@@ -80,7 +75,6 @@ jobs:
           submodules: recursive
       - name: Clippy
         run: |
-          rustup default $RUST_VERSION
           rustup component add clippy
           cargo clippy --color=always --all-targets --all-features -- -D warnings
           # Examples can be large with a lot of debug info due to tokio. So we
