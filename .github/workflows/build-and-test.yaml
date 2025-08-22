@@ -11,7 +11,6 @@ on:
      - main
 
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, edited]
 
   workflow_dispatch: # allows manual trigger
 
@@ -21,8 +20,6 @@ env:
 jobs:
   "lint_fmt":
     name: lint:fmt
-    # Don't run on draft pull requests
-    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -34,8 +31,6 @@ jobs:
 
   "lint_doc":
     name: lint:doc
-    # Don't run on draft pull requests
-    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -51,8 +46,6 @@ jobs:
   # make sure that the features are correctly set for the normal dependencies.
   "check_pure_compilation":
     name: lint:check
-    # Don't run on draft pull requests
-    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -65,8 +58,6 @@ jobs:
 
   "lint_clippy_test":
     name: lint:clippy
-    # Don't run on draft pull requests
-    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
