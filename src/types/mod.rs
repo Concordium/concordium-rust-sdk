@@ -2680,7 +2680,7 @@ pub type Updates<CPV> =
     UpdatesSkeleton<UpdateKeysCollection<CPV>, ChainParameters<CPV>, PendingUpdates<CPV>>;
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(tag = "tag", content = "contents")]
+#[serde(tag = "tag")]
 /// A reason for why a transaction was rejected. Rejected means included in a
 /// block, but the desired action was not achieved. The only effect of a
 /// rejected transaction is payment.
@@ -2849,10 +2849,16 @@ pub enum RejectReason {
     PoolClosed,
     /// The provided identifier does not match a token currently on chain.
     /// Introduced in protocol version 9.
-    NonExistentTokenId(protocol_level_tokens::TokenId),
+    NonExistentTokenId {
+        #[serde(rename = "contents")]
+        token_id: protocol_level_tokens::TokenId,
+    },
     /// The token-holder transaction failed.
     /// Introduced in protocol version 9.
-    TokenUpdateTransactionFailed(protocol_level_tokens::TokenModuleRejectReason),
+    TokenUpdateTransactionFailed {
+        #[serde(rename = "contents")]
+        reject_reason: protocol_level_tokens::TokenModuleRejectReason,
+    },
 }
 
 /// The network information of a node.
