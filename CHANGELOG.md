@@ -1,4 +1,8 @@
 ## Unreleased changes
+- Removed authorization from `TokenClient` validation.
+- Added `validate_mint`, `validate_burn`, `validate_allow_list_update`, `validate_deny_list_update` methods to `TokenClient`.
+- Added `update_token_info` method to `TokenClient`.
+- Added `Validation` as a separate enum for `TokenClient` operations.
 
 ## 7.0.0
 
@@ -54,10 +58,6 @@ Explicit changes with respect to 6.0.0 release:
   - Change `TokenClient`'s `burn` and `mint` methods to accept a singular `TokenAmount`, instead of `Vec<TokenAmount>`.
   - Add `PartialEq`, `Eq`, `Hash` to `TokenInfo`
   - Fix JSON serialization of `RejectReason` such that it matches the Haskell counterpart.
-  - Removed authorization from `TokenClient` validation.
-  - Added `validate_mint`, `validate_burn`, `validate_allow_list_update`, `validate_deny_list_update` methods to `TokenClient`.
-  - Added `update_token_info` method to `TokenClient`.
-  - Added `Validation` as a separate enum for `TokenClient` operations.
 
 ## 7.0.0-alpha.3
 

@@ -87,7 +87,7 @@ pub enum TokenError {
     #[error("query error: {0}.")]
     Query(#[from] QueryError),
     /// Error that can occur during serializing or deserializing CBOR
-    #[error("qbor serialization/deserializing error: {0}.")]
+    #[error("cbor serialization/deserializing error: {0}.")]
     CborSerialization(#[from] CborSerializationError),
     /// Error that can occur over RPC.
     #[error("RPC error: {0}.")]
