@@ -120,11 +120,17 @@ pub enum Cis2QueryError {
 impl From<v2::Upward<sdk_types::RejectReason>> for Cis2QueryError {
     fn from(err: v2::Upward<sdk_types::RejectReason>) -> Self { Self::NodeRejected(err) }
 }
+impl From<sdk_types::RejectReason> for Cis2QueryError {
+    fn from(err: sdk_types::RejectReason) -> Self { Self::NodeRejected(v2::Upward::Known(err)) }
+}
 
 // This is implemented manually, since deriving it using thiserror requires
 // `RejectReason` to implement std::error::Error.
 impl From<v2::Upward<sdk_types::RejectReason>> for Cis2DryRunError {
     fn from(err: v2::Upward<sdk_types::RejectReason>) -> Self { Self::NodeRejected(err) }
+}
+impl From<sdk_types::RejectReason> for Cis2DryRunError {
+    fn from(err: sdk_types::RejectReason) -> Self { Self::NodeRejected(v2::Upward::Known(err)) }
 }
 
 /// Transaction metadata for CIS-2
