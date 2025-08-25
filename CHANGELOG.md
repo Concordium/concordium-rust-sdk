@@ -44,6 +44,8 @@
   - Type `AccountTransactionEffects` field `reject_reason`.
   - Type `InvokeContractResult` field `reason`.
   - Type `UpdateInstruction` field `payload` now needs to be decoded on-demand, ensuring errors due to new variants for `UpdatePayload` can be handled separately and the rest of `UpdateInstruction` can still be read.
+  - Type `UpdateDetails` field `payload` is wrapped.
+  - Method `UpdateDetails::update_type` return type is wrapped.
 
 ## 7.0.0
 

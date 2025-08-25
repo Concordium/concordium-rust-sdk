@@ -914,20 +914,23 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
             super::BlockItemSummaryDetails::Update(super::UpdateDetails {
                 effective_time,
                 payload,
-            }) => BlockItemSummary {
-                sender:       None,
-                hash:         bi.hash,
-                cost:         Amount::zero(),
-                energy_cost:  bi.energy_cost,
-                summary_type: BlockItemType::Update(payload.update_type()),
-                result:       BlockItemResult::Success {
-                    events: vec![Event::UpdateEnqueued {
-                        effective_time,
-                        payload,
-                    }],
-                },
-                index:        bi.index,
-            },
+            }) => {
+                let payload = payload.known_or_err()?;
+                BlockItemSummary {
+                    sender:       None,
+                    hash:         bi.hash,
+                    cost:         Amount::zero(),
+                    energy_cost:  bi.energy_cost,
+                    summary_type: BlockItemType::Update(payload.update_type()),
+                    result:       BlockItemResult::Success {
+                        events: vec![Event::UpdateEnqueued {
+                            effective_time,
+                            payload,
+                        }],
+                    },
+                    index:        bi.index,
+                }
+            }
             super::BlockItemSummaryDetails::TokenCreationDetails(token_creation_details) => {
                 let mut events = vec![Event::TokenCreated {
                     payload: token_creation_details.create_plt,
@@ -1547,7 +1550,7 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
 
                                 Ok(super::UpdateDetails {
                                     effective_time: *effective_time,
-                                    payload:        payload.clone(),
+                                    payload:        Upward::Known(payload.clone()),
                                 })
                             }
                             Event::TokenCreated { payload } => Ok(super::UpdateDetails {
@@ -1556,7 +1559,9 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
                                 // transactions are not queued and instead take
                                 // effect immediately.
                                 effective_time: TransactionTime { seconds: 0 },
-                                payload:        UpdatePayload::CreatePlt(payload.clone()),
+                                payload:        Upward::Known(UpdatePayload::CreatePlt(
+                                    payload.clone(),
+                                )),
                             }),
                             _ => Err(ConversionError::InvalidUpdateResult),
                         }
