@@ -2385,11 +2385,13 @@ pub struct AccountCreationDetails {
 /// cases.
 pub struct UpdateDetails {
     pub effective_time: TransactionTime,
-    pub payload:        UpdatePayload,
+    pub payload:        Upward<UpdatePayload>,
 }
 
 impl UpdateDetails {
-    pub fn update_type(&self) -> UpdateType { self.payload.update_type() }
+    pub fn update_type(&self) -> Upward<UpdateType> {
+        self.payload.as_ref().map(UpdatePayload::update_type)
+    }
 }
 
 #[derive(Debug, Clone)]

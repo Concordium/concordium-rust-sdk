@@ -1345,7 +1345,11 @@ impl TryFrom<block_item_summary::Details> for super::types::BlockItemSummaryDeta
             block_item_summary::Details::Update(v) => {
                 super::types::BlockItemSummaryDetails::Update(super::types::UpdateDetails {
                     effective_time: v.effective_time.require()?.into(),
-                    payload:        v.payload.require()?.try_into()?,
+                    payload:        Upward::from(
+                        v.payload
+                            .map(super::types::UpdatePayload::try_from)
+                            .transpose()?,
+                    ),
                 })
             }
             block_item_summary::Details::TokenCreation(v) => {
