@@ -43,6 +43,9 @@ pub enum Cis4QueryError {
 impl From<v2::Upward<RejectReason>> for Cis4QueryError {
     fn from(value: v2::Upward<RejectReason>) -> Self { Self::NodeRejected(value) }
 }
+impl From<RejectReason> for Cis4QueryError {
+    fn from(value: RejectReason) -> Self { Self::NodeRejected(v2::Upward::Known(value)) }
+}
 
 impl Cis4QueryError {
     /// Check if the error variant is a logic error, i.e., the query

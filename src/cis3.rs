@@ -95,11 +95,17 @@ pub enum Cis3SupportsPermitError {
 impl From<v2::Upward<sdk_types::RejectReason>> for Cis3SupportsPermitError {
     fn from(err: v2::Upward<sdk_types::RejectReason>) -> Self { Self::NodeRejected(err) }
 }
+impl From<sdk_types::RejectReason> for Cis3SupportsPermitError {
+    fn from(err: sdk_types::RejectReason) -> Self { Self::NodeRejected(v2::Upward::Known(err)) }
+}
 
 // This is implemented manually, since deriving it using thiserror requires
 // `RejectReason` to implement std::error::Error.
 impl From<v2::Upward<sdk_types::RejectReason>> for Cis3PermitDryRunError {
     fn from(err: v2::Upward<sdk_types::RejectReason>) -> Self { Self::NodeRejected(err) }
+}
+impl From<sdk_types::RejectReason> for Cis3PermitDryRunError {
+    fn from(err: sdk_types::RejectReason) -> Self { Self::NodeRejected(v2::Upward::Known(err)) }
 }
 
 impl Cis3Contract {
