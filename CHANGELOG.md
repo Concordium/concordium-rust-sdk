@@ -43,6 +43,7 @@
   - Method `AccountTransactionEffects::is_rejected` return value.
   - Type `AccountTransactionEffects` field `reject_reason`.
   - Type `InvokeContractResult` field `reason`.
+  - Type `UpdateInstruction` field `payload` now needs to be decoded on-demand, ensuring errors due to new variants for `UpdatePayload` can be handled separately and the rest of `UpdateInstruction` can still be read.
 
 - Add `NextUpdateSequenceNumbers::protocol_level_tokens` and protobuf deserialization of it
 - Changed `TokenClient`'s `burn` and `mint` methods to accept a singular `TokenAmount`, instead of `Vec<TokenAmount>`.

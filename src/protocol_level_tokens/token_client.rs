@@ -650,7 +650,8 @@ impl TokenClient {
             .info
             .token_state
             .decode_module_state()?
-            .governance_account;
+            .governance_account
+            .ok_or(TokenError::UnauthorizedGovernanceOperation)?;
 
         if governance_account.address != sender {
             return Err(TokenError::UnauthorizedGovernanceOperation);

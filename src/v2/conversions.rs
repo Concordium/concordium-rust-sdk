@@ -1254,9 +1254,7 @@ impl TryFrom<UpdateInstruction> for concordium_base::updates::UpdateInstruction 
         };
         let signatures: concordium_base::updates::UpdateInstructionSignature =
             value.signatures.require()?.try_into()?;
-
-        let payload = consume(&payload)?;
-
+        let payload = updates::EncodedUpdatePayload::from(payload);
         Ok(Self {
             header,
             payload,
