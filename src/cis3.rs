@@ -2,9 +2,8 @@
 //! contracts following the [CIS-3](https://proposals.concordium.software/CIS/cis-3.html) specification.
 use crate::{
     contract_client::{ContractClient, ContractTransactionMetadata},
-    types as sdk_types,
-    types::transactions,
-    v2::IntoBlockIdentifier,
+    types::{self as sdk_types, transactions},
+    v2::{self, IntoBlockIdentifier},
 };
 use concordium_base::{
     base::Energy,
@@ -63,7 +62,7 @@ pub enum Cis3PermitDryRunError {
 
     /// The node rejected the invocation.
     #[error("Rejected by the node: {0:?}.")]
-    NodeRejected(sdk_types::RejectReason),
+    NodeRejected(v2::Upward<sdk_types::RejectReason>),
 }
 
 /// Error which can occur when calling
@@ -88,19 +87,25 @@ pub enum Cis3SupportsPermitError {
 
     /// The node rejected the invocation.
     #[error("Rejected by the node: {0:?}.")]
-    NodeRejected(sdk_types::RejectReason),
+    NodeRejected(v2::Upward<sdk_types::RejectReason>),
 }
 
 // This is implemented manually, since deriving it using thiserror requires
 // `RejectReason` to implement std::error::Error.
+impl From<v2::Upward<sdk_types::RejectReason>> for Cis3SupportsPermitError {
+    fn from(err: v2::Upward<sdk_types::RejectReason>) -> Self { Self::NodeRejected(err) }
+}
 impl From<sdk_types::RejectReason> for Cis3SupportsPermitError {
-    fn from(err: sdk_types::RejectReason) -> Self { Self::NodeRejected(err) }
+    fn from(err: sdk_types::RejectReason) -> Self { Self::NodeRejected(v2::Upward::Known(err)) }
 }
 
 // This is implemented manually, since deriving it using thiserror requires
 // `RejectReason` to implement std::error::Error.
+impl From<v2::Upward<sdk_types::RejectReason>> for Cis3PermitDryRunError {
+    fn from(err: v2::Upward<sdk_types::RejectReason>) -> Self { Self::NodeRejected(err) }
+}
 impl From<sdk_types::RejectReason> for Cis3PermitDryRunError {
-    fn from(err: sdk_types::RejectReason) -> Self { Self::NodeRejected(err) }
+    fn from(err: sdk_types::RejectReason) -> Self { Self::NodeRejected(v2::Upward::Known(err)) }
 }
 
 impl Cis3Contract {

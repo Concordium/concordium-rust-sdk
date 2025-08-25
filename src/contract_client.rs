@@ -15,7 +15,7 @@ use crate::{
     v2::{
         self,
         dry_run::{self, DryRunTransaction},
-        BlockIdentifier, Client,
+        BlockIdentifier, Client, Upward,
     },
 };
 use concordium_base::{
@@ -94,7 +94,7 @@ pub enum ViewError {
     #[error("Invalid receive name: {0}")]
     InvalidName(#[from] NewReceiveNameError),
     #[error("Node rejected with reason: {0:#?}")]
-    QueryFailed(RejectReason),
+    QueryFailed(v2::Upward<RejectReason>),
     #[error("Response was not as expected: {0}")]
     InvalidResponse(#[from] contracts_common::ParseError),
     #[error("Network error: {0}")]
@@ -103,8 +103,8 @@ pub enum ViewError {
     ParameterError(#[from] ExceedsParameterSize),
 }
 
-impl From<RejectReason> for ViewError {
-    fn from(value: RejectReason) -> Self { Self::QueryFailed(value) }
+impl From<v2::Upward<RejectReason>> for ViewError {
+    fn from(value: v2::Upward<RejectReason>) -> Self { Self::QueryFailed(value) }
 }
 
 /// A builder of transactions out of minimal data typically obtained by
@@ -270,7 +270,7 @@ pub enum ContractInitError {
     #[error("The status of the transaction could not be ascertained: {0}")]
     Query(#[from] QueryError),
     #[error("Contract update failed with reason: {0:?}")]
-    Failed(RejectReason),
+    Failed(v2::Upward<RejectReason>),
 }
 
 impl<Type> ContractInitHandle<Type> {
@@ -357,7 +357,7 @@ impl<Type> ContractInitHandle<Type> {
 /// An error that may occur when attempting to dry run a new instance creation.
 pub enum DryRunNewInstanceError {
     #[error("Dry run succeeded, but contract initialization failed due to {0:#?}.")]
-    Failed(RejectReason),
+    Failed(v2::Upward<RejectReason>),
     #[error("Dry run failed: {0}")]
     DryRun(#[from] dry_run::DryRunError),
     #[error("Parameter too large: {0}")]
@@ -373,8 +373,8 @@ pub enum DryRunNewInstanceError {
     },
 }
 
-impl From<RejectReason> for DryRunNewInstanceError {
-    fn from(value: RejectReason) -> Self { Self::Failed(value) }
+impl From<v2::Upward<RejectReason>> for DryRunNewInstanceError {
+    fn from(value: v2::Upward<RejectReason>) -> Self { Self::Failed(value) }
 }
 
 impl<Type> ContractInitBuilder<Type> {
@@ -510,7 +510,7 @@ pub type ModuleDeployBuilder = TransactionBuilder<false, ModuleReference>;
 /// deployment.
 pub enum DryRunModuleDeployError {
     #[error("Dry run succeeded, but module deployment failed due to {0:#?}.")]
-    Failed(RejectReason),
+    Failed(v2::Upward<RejectReason>),
     #[error("Dry run failed: {0}")]
     DryRun(#[from] dry_run::DryRunError),
     #[error("Node query error: {0}")]
@@ -528,12 +528,15 @@ impl DryRunModuleDeployError {
         let Self::Failed(reason) = self else {
             return false;
         };
-        matches!(reason, RejectReason::ModuleHashAlreadyExists { .. })
+        matches!(
+            reason,
+            v2::Upward::Known(RejectReason::ModuleHashAlreadyExists { .. })
+        )
     }
 }
 
-impl From<RejectReason> for DryRunModuleDeployError {
-    fn from(value: RejectReason) -> Self { Self::Failed(value) }
+impl From<v2::Upward<RejectReason>> for DryRunModuleDeployError {
+    fn from(value: v2::Upward<RejectReason>) -> Self { Self::Failed(value) }
 }
 
 impl ModuleDeployBuilder {
@@ -629,7 +632,7 @@ pub enum ModuleDeployError {
     #[error("The status of the transaction could not be ascertained: {0}")]
     Query(#[from] QueryError),
     #[error("Module deployment failed with reason: {0:?}")]
-    Failed(RejectReason),
+    Failed(v2::Upward<RejectReason>),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -812,7 +815,7 @@ pub struct RejectedTransaction {
     /// The return value of the transaction.
     pub return_value:   Option<ReturnValue>,
     /// The reject reason of the transaction.
-    pub reason:         RejectReason,
+    pub reason:         Upward<RejectReason>,
     /// An optional human-readable decoded reason for the reject reason.
     /// This is only available if the reject reason is a smart contract logical
     /// revert and a valid error schema is available for decoding, or the
@@ -1292,7 +1295,7 @@ impl<Type> ContractClient<Type> {
     ) -> Result<A, E>
     where
         E: From<NewReceiveNameError>
-            + From<RejectReason>
+            + From<v2::Upward<RejectReason>>
             + From<contracts_common::ParseError>
             + From<v2::QueryError>
             + From<ExceedsParameterSize>, {
@@ -1309,7 +1312,7 @@ impl<Type> ContractClient<Type> {
     ) -> Result<A, E>
     where
         E: From<NewReceiveNameError>
-            + From<RejectReason>
+            + From<v2::Upward<RejectReason>>
             + From<contracts_common::ParseError>
             + From<v2::QueryError>, {
         let ir = self
@@ -1338,7 +1341,7 @@ impl<Type> ContractClient<Type> {
         bi: impl v2::IntoBlockIdentifier,
     ) -> Result<InvokeContractResult, E>
     where
-        E: From<NewReceiveNameError> + From<RejectReason> + From<v2::QueryError>, {
+        E: From<NewReceiveNameError> + From<v2::Upward<RejectReason>> + From<v2::QueryError>, {
         let contract_name = self.contract_name.as_contract_name().contract_name();
         let method = OwnedReceiveName::try_from(format!("{contract_name}.{entrypoint}"))?;
 
@@ -1374,7 +1377,7 @@ impl<Type> ContractClient<Type> {
     ) -> Result<ContractUpdateBuilder, E>
     where
         E: From<NewReceiveNameError>
-            + From<RejectReason>
+            + From<v2::Upward<RejectReason>>
             + From<v2::QueryError>
             + From<ExceedsParameterSize>, {
         let message = OwnedParameter::from_serial(message)?;
@@ -1419,7 +1422,7 @@ impl<Type> ContractClient<Type> {
         message: OwnedParameter,
     ) -> Result<ContractUpdateBuilder, E>
     where
-        E: From<NewReceiveNameError> + From<RejectReason> + From<v2::QueryError>, {
+        E: From<NewReceiveNameError> + From<v2::Upward<RejectReason>> + From<v2::QueryError>, {
         let contract_name = self.contract_name.as_contract_name().contract_name();
         let receive_name = OwnedReceiveName::try_from(format!("{contract_name}.{entrypoint}"))?;
 
@@ -1512,11 +1515,13 @@ impl<Type> ContractClient<Type> {
                 return_value,
                 used_energy,
             } => {
-                let decoded_reason = decode_smart_contract_revert(
-                    return_value.as_ref(),
-                    &reason,
-                    (*self.schema).as_ref(),
-                );
+                let decoded_reason = reason.as_ref().known().and_then(|reason| {
+                    decode_smart_contract_revert(
+                        return_value.as_ref(),
+                        reason,
+                        (*self.schema).as_ref(),
+                    )
+                });
 
                 Ok(InvokeContractOutcome::Failure(RejectedTransaction {
                     payload: transactions::Payload::Update { payload },
@@ -1660,7 +1665,7 @@ pub enum ContractUpdateError {
     #[error("The status of the transaction could not be ascertained: {0}")]
     Query(#[from] QueryError),
     #[error("Contract update failed with reason: {0:?}")]
-    Failed(RejectReason),
+    Failed(v2::Upward<RejectReason>),
 }
 
 impl ContractUpdateHandle {
