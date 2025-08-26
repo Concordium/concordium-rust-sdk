@@ -829,7 +829,7 @@ impl AccountInfoFetch for Client {
 mod tests {
     use crate::{
         common::cbor,
-        protocol_level_tokens::{CborHolderAccount, CborTokenHolder, MetadataUrl},
+        protocol_level_tokens::{CborHolderAccount, MetadataUrl},
     };
     use assert_matches::assert_matches;
     use concordium_base::{hashes::HashBytes, protocol_level_tokens::TokenModuleAccountState};
@@ -928,13 +928,13 @@ mod tests {
             paused: Option<bool>,
         ) -> TokenModuleState {
             TokenModuleState {
-                name: TOKEN_ID.into(),
-                metadata: MetadataUrl {
+                name: Some(TOKEN_ID.into()),
+                metadata: Some(MetadataUrl {
                     url:              "https://example.com/metadata".into(),
                     checksum_sha_256: None,
                     additional:       HashMap::new(),
-                },
-                governance_account: CborTokenHolder::Account(CborHolderAccount {
+                }),
+                governance_account: Some(CborHolderAccount {
                     coin_info: None,
                     address:   self.sender,
                 }),
