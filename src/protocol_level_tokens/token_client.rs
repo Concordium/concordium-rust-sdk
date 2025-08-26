@@ -928,16 +928,16 @@ mod tests {
             paused: Option<bool>,
         ) -> TokenModuleState {
             TokenModuleState {
-                name: TOKEN_ID.into(),
-                metadata: MetadataUrl {
+                name: Some(TOKEN_ID.into()),
+                metadata: Some(MetadataUrl {
                     url:              "https://example.com/metadata".into(),
                     checksum_sha_256: None,
                     additional:       HashMap::new(),
-                },
-                governance_account: CborHolderAccount {
+                }),
+                governance_account: Some(CborHolderAccount {
                     coin_info: None,
                     address:   self.sender,
-                },
+                }),
                 allow_list,
                 deny_list,
                 mintable: None,
