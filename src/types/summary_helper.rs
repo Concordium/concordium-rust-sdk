@@ -716,162 +716,166 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                         let ty = TransactionType::ConfigureBaker;
                         let events = data
                             .into_iter()
-                            .map(|ev| match ev {
-                                super::BakerEvent::BakerAdded { data } => {
-                                    Event::BakerAdded { data }
-                                }
-                                super::BakerEvent::BakerRemoved { baker_id } => {
-                                    Event::BakerRemoved {
+                            .map(|ev| {
+                                Ok(match ev.known_or_err()? {
+                                    super::BakerEvent::BakerAdded { data } => {
+                                        Event::BakerAdded { data }
+                                    }
+                                    super::BakerEvent::BakerRemoved { baker_id } => {
+                                        Event::BakerRemoved {
+                                            baker_id,
+                                            account: sender,
+                                        }
+                                    }
+                                    super::BakerEvent::BakerStakeIncreased {
+                                        baker_id,
+                                        new_stake,
+                                    } => Event::BakerStakeIncreased {
                                         baker_id,
                                         account: sender,
-                                    }
-                                }
-                                super::BakerEvent::BakerStakeIncreased {
-                                    baker_id,
-                                    new_stake,
-                                } => Event::BakerStakeIncreased {
-                                    baker_id,
-                                    account: sender,
-                                    new_stake,
-                                },
-                                super::BakerEvent::BakerStakeDecreased {
-                                    baker_id,
-                                    new_stake,
-                                } => Event::BakerStakeDecreased {
-                                    baker_id,
-                                    account: sender,
-                                    new_stake,
-                                },
-                                super::BakerEvent::BakerSetOpenStatus {
-                                    baker_id,
-                                    open_status,
-                                } => Event::BakerSetOpenStatus {
-                                    baker_id,
-                                    account: sender,
-                                    open_status,
-                                },
-                                super::BakerEvent::BakerSetMetadataURL {
-                                    baker_id,
-                                    metadata_url,
-                                } => Event::BakerSetMetadataURL {
-                                    baker_id,
-                                    account: sender,
-                                    metadata_url,
-                                },
-                                super::BakerEvent::BakerSetTransactionFeeCommission {
-                                    baker_id,
-                                    transaction_fee_commission,
-                                } => Event::BakerSetTransactionFeeCommission {
-                                    baker_id,
-                                    account: sender,
-                                    transaction_fee_commission,
-                                },
-                                super::BakerEvent::BakerSetBakingRewardCommission {
-                                    baker_id,
-                                    baking_reward_commission,
-                                } => Event::BakerSetBakingRewardCommission {
-                                    baker_id,
-                                    account: sender,
-                                    baking_reward_commission,
-                                },
-                                super::BakerEvent::BakerSetFinalizationRewardCommission {
-                                    baker_id,
-                                    finalization_reward_commission,
-                                } => Event::BakerSetFinalizationRewardCommission {
-                                    baker_id,
-                                    account: sender,
-                                    finalization_reward_commission,
-                                },
-                                super::BakerEvent::BakerRestakeEarningsUpdated {
-                                    baker_id,
-                                    restake_earnings,
-                                } => Event::BakerSetRestakeEarnings {
-                                    baker_id,
-                                    account: sender,
-                                    restake_earnings,
-                                },
-                                super::BakerEvent::BakerKeysUpdated { data } => {
-                                    Event::BakerKeysUpdated { data }
-                                }
-                                super::BakerEvent::DelegationRemoved { delegator_id } => {
-                                    Event::DelegationRemoved {
-                                        delegator_id,
-                                        account: sender,
-                                    }
-                                }
-                                super::BakerEvent::BakerSuspended { baker_id } => {
-                                    Event::BakerSuspended {
+                                        new_stake,
+                                    },
+                                    super::BakerEvent::BakerStakeDecreased {
+                                        baker_id,
+                                        new_stake,
+                                    } => Event::BakerStakeDecreased {
                                         baker_id,
                                         account: sender,
-                                    }
-                                }
-                                super::BakerEvent::BakerResumed { baker_id } => {
-                                    Event::BakerResumed {
+                                        new_stake,
+                                    },
+                                    super::BakerEvent::BakerSetOpenStatus {
+                                        baker_id,
+                                        open_status,
+                                    } => Event::BakerSetOpenStatus {
                                         baker_id,
                                         account: sender,
+                                        open_status,
+                                    },
+                                    super::BakerEvent::BakerSetMetadataURL {
+                                        baker_id,
+                                        metadata_url,
+                                    } => Event::BakerSetMetadataURL {
+                                        baker_id,
+                                        account: sender,
+                                        metadata_url,
+                                    },
+                                    super::BakerEvent::BakerSetTransactionFeeCommission {
+                                        baker_id,
+                                        transaction_fee_commission,
+                                    } => Event::BakerSetTransactionFeeCommission {
+                                        baker_id,
+                                        account: sender,
+                                        transaction_fee_commission,
+                                    },
+                                    super::BakerEvent::BakerSetBakingRewardCommission {
+                                        baker_id,
+                                        baking_reward_commission,
+                                    } => Event::BakerSetBakingRewardCommission {
+                                        baker_id,
+                                        account: sender,
+                                        baking_reward_commission,
+                                    },
+                                    super::BakerEvent::BakerSetFinalizationRewardCommission {
+                                        baker_id,
+                                        finalization_reward_commission,
+                                    } => Event::BakerSetFinalizationRewardCommission {
+                                        baker_id,
+                                        account: sender,
+                                        finalization_reward_commission,
+                                    },
+                                    super::BakerEvent::BakerRestakeEarningsUpdated {
+                                        baker_id,
+                                        restake_earnings,
+                                    } => Event::BakerSetRestakeEarnings {
+                                        baker_id,
+                                        account: sender,
+                                        restake_earnings,
+                                    },
+                                    super::BakerEvent::BakerKeysUpdated { data } => {
+                                        Event::BakerKeysUpdated { data }
                                     }
-                                }
+                                    super::BakerEvent::DelegationRemoved { delegator_id } => {
+                                        Event::DelegationRemoved {
+                                            delegator_id,
+                                            account: sender,
+                                        }
+                                    }
+                                    super::BakerEvent::BakerSuspended { baker_id } => {
+                                        Event::BakerSuspended {
+                                            baker_id,
+                                            account: sender,
+                                        }
+                                    }
+                                    super::BakerEvent::BakerResumed { baker_id } => {
+                                        Event::BakerResumed {
+                                            baker_id,
+                                            account: sender,
+                                        }
+                                    }
+                                })
                             })
-                            .collect();
+                            .collect::<Result<_, _>>()?;
                         (Some(ty), BlockItemResult::Success { events })
                     }
                     super::AccountTransactionEffects::DelegationConfigured { data } => {
                         let ty = TransactionType::ConfigureDelegation;
                         let events = data
                             .into_iter()
-                            .map(|ev| match ev {
-                                super::DelegationEvent::DelegationStakeIncreased {
-                                    delegator_id,
-                                    new_stake,
-                                } => Event::DelegationStakeIncreased {
-                                    delegator_id,
-                                    account: sender,
-                                    new_stake,
-                                },
-                                super::DelegationEvent::DelegationStakeDecreased {
-                                    delegator_id,
-                                    new_stake,
-                                } => Event::DelegationStakeDecreased {
-                                    delegator_id,
-                                    account: sender,
-                                    new_stake,
-                                },
-                                super::DelegationEvent::DelegationSetRestakeEarnings {
-                                    delegator_id,
-                                    restake_earnings,
-                                } => Event::DelegationSetRestakeEarnings {
-                                    delegator_id,
-                                    account: sender,
-                                    restake_earnings,
-                                },
-                                super::DelegationEvent::DelegationSetDelegationTarget {
-                                    delegator_id,
-                                    delegation_target,
-                                } => Event::DelegationSetDelegationTarget {
-                                    delegator_id,
-                                    account: sender,
-                                    delegation_target,
-                                },
-                                super::DelegationEvent::DelegationAdded { delegator_id } => {
-                                    Event::DelegationAdded {
+                            .map(|ev| {
+                                Ok(match ev.known_or_err()? {
+                                    super::DelegationEvent::DelegationStakeIncreased {
+                                        delegator_id,
+                                        new_stake,
+                                    } => Event::DelegationStakeIncreased {
                                         delegator_id,
                                         account: sender,
-                                    }
-                                }
-                                super::DelegationEvent::DelegationRemoved { delegator_id } => {
-                                    Event::DelegationRemoved {
+                                        new_stake,
+                                    },
+                                    super::DelegationEvent::DelegationStakeDecreased {
+                                        delegator_id,
+                                        new_stake,
+                                    } => Event::DelegationStakeDecreased {
                                         delegator_id,
                                         account: sender,
-                                    }
-                                }
-                                super::DelegationEvent::BakerRemoved { baker_id } => {
-                                    Event::BakerRemoved {
-                                        baker_id,
+                                        new_stake,
+                                    },
+                                    super::DelegationEvent::DelegationSetRestakeEarnings {
+                                        delegator_id,
+                                        restake_earnings,
+                                    } => Event::DelegationSetRestakeEarnings {
+                                        delegator_id,
                                         account: sender,
+                                        restake_earnings,
+                                    },
+                                    super::DelegationEvent::DelegationSetDelegationTarget {
+                                        delegator_id,
+                                        delegation_target,
+                                    } => Event::DelegationSetDelegationTarget {
+                                        delegator_id,
+                                        account: sender,
+                                        delegation_target,
+                                    },
+                                    super::DelegationEvent::DelegationAdded { delegator_id } => {
+                                        Event::DelegationAdded {
+                                            delegator_id,
+                                            account: sender,
+                                        }
                                     }
-                                }
+                                    super::DelegationEvent::DelegationRemoved { delegator_id } => {
+                                        Event::DelegationRemoved {
+                                            delegator_id,
+                                            account: sender,
+                                        }
+                                    }
+                                    super::DelegationEvent::BakerRemoved { baker_id } => {
+                                        Event::BakerRemoved {
+                                            baker_id,
+                                            account: sender,
+                                        }
+                                    }
+                                })
                             })
-                            .collect();
+                            .collect::<Result<_, _>>()?;
                         (Some(ty), BlockItemResult::Success { events })
                     }
                     super::AccountTransactionEffects::TokenUpdate { events } => {
@@ -1385,6 +1389,7 @@ fn convert_account_transaction(
                         other_event
                     ))),
                 })
+                .map(|result| result.map(Upward::Known))
                 .collect::<Result<_, ConversionError>>()?;
             mk_success(super::AccountTransactionEffects::BakerConfigured { data })
         }
@@ -1441,6 +1446,7 @@ fn convert_account_transaction(
                         other_event
                     ))),
                 })
+                .map(|result| result.map(Upward::Known))
                 .collect::<Result<_, ConversionError>>()?;
             mk_success(super::AccountTransactionEffects::DelegationConfigured { data })
         }

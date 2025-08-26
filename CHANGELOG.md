@@ -46,6 +46,8 @@
   - Type `UpdateInstruction` field `payload` now needs to be decoded on-demand, ensuring errors due to new variants for `UpdatePayload` can be handled separately and the rest of `UpdateInstruction` can still be read.
   - Type `UpdateDetails` field `payload` is wrapped.
   - Method `UpdateDetails::update_type` return type is wrapped.
+  - Type `AccountTransactionEffects::BakerConfigured` field `data` from `Vec<BakerEvent>` to `Vec<Upward<BakerEvent>>`.
+  - Type `AccountTransactionEffects::DelegationConfigured` field `data` from `Vec<DelegationEvent>` to `Vec<Upward<DelegationEvent>>`.
 
 ## 7.0.0
 

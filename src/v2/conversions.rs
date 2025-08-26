@@ -1839,7 +1839,14 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                 data: bc
                     .events
                     .into_iter()
-                    .map(TryInto::try_into)
+                    .map(|event| {
+                        Ok(Upward::from(
+                            event
+                                .event
+                                .map(super::types::BakerEvent::try_from)
+                                .transpose()?,
+                        ))
+                    })
                     .collect::<Result<_, tonic::Status>>()?,
             }),
             account_transaction_effects::Effect::DelegationConfigured(dc) => {
@@ -1847,7 +1854,14 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                     data: dc
                         .events
                         .into_iter()
-                        .map(TryInto::try_into)
+                        .map(|event| {
+                            Ok(Upward::from(
+                                event
+                                    .event
+                                    .map(super::types::DelegationEvent::try_from)
+                                    .transpose()?,
+                            ))
+                        })
                         .collect::<Result<_, tonic::Status>>()?,
                 })
             }
@@ -1904,11 +1918,11 @@ impl TryFrom<ContractTraceElement> for super::types::ContractTraceElement {
     }
 }
 
-impl TryFrom<DelegationEvent> for super::types::DelegationEvent {
+impl TryFrom<delegation_event::Event> for super::types::DelegationEvent {
     type Error = tonic::Status;
 
-    fn try_from(value: DelegationEvent) -> Result<Self, Self::Error> {
-        Ok(match value.event.require()? {
+    fn try_from(value: delegation_event::Event) -> Result<Self, Self::Error> {
+        Ok(match value {
             delegation_event::Event::DelegationStakeIncreased(v) => {
                 Self::DelegationStakeIncreased {
                     delegator_id: v.delegator_id.require()?.try_into()?,
@@ -1956,11 +1970,11 @@ impl TryFrom<DelegatorId> for super::types::DelegatorId {
     }
 }
 
-impl TryFrom<BakerEvent> for super::types::BakerEvent {
+impl TryFrom<baker_event::Event> for super::types::BakerEvent {
     type Error = tonic::Status;
 
-    fn try_from(value: BakerEvent) -> Result<Self, Self::Error> {
-        Ok(match value.event.require()? {
+    fn try_from(value: baker_event::Event) -> Result<Self, Self::Error> {
+        Ok(match value {
             baker_event::Event::BakerAdded(v) => Self::BakerAdded {
                 data: Box::new(super::types::BakerAddedEvent {
                     keys_event:       v.keys_event.require()?.try_into()?,
