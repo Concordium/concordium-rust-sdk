@@ -16,7 +16,7 @@ use concordium_base::{
 use thiserror::Error;
 
 use crate::{
-    protocol_level_tokens::{CborMemo, CborTokenHolder, TokenInfo},
+    protocol_level_tokens::{CborMemo, TokenInfo},
     types::WalletAccount,
     v2::{AccountIdentifier, BlockIdentifier, Client, IntoBlockIdentifier, QueryError, RPCError},
 };
@@ -646,7 +646,7 @@ impl TokenClient {
     ///
     /// * `sender` - The account address of the sender.
     pub fn validate_governance_operation(&mut self, sender: AccountAddress) -> TokenResult<()> {
-        let CborTokenHolder::Account(governance_account) = self
+        let governance_account = self
             .info
             .token_state
             .decode_module_state()?
