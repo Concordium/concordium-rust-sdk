@@ -1,6 +1,6 @@
 [package]
 name = "concordium-rust-sdk"
-version = "7.0.0"
+version = "7.0.0-alpha.4"
 authors = ["Concordium <developers@concordium.com>"]
 edition = "2021"
 rust-version = "1.85"
@@ -40,6 +40,7 @@ concordium_base = { version = "8.0.0-alpha.1", path = "./concordium-base/rust-sr
 concordium-smart-contract-engine = { version = "6.0", path = "./concordium-base/smart-contracts/wasm-chain-integration/", default-features = false, features = ["async"]}
 aes-gcm = { version = "0.10", features = ["std"] }
 tracing = "0.1"
+assert_matches = "1.5.0"
 
 
 [dev-dependencies]
