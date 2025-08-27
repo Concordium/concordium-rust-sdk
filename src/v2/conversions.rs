@@ -4,6 +4,7 @@
 use super::{generated::*, upward::Upward, Require};
 use crate::types::{
     queries::{ConcordiumBFTDetails, ProtocolVersionInt},
+    smart_contracts::SmartContractVersion,
     AccountReleaseSchedule, ActiveBakerPoolStatus, UpdateKeysCollectionSkeleton,
 };
 use chrono::TimeZone;
@@ -1714,7 +1715,8 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
             account_transaction_effects::Effect::ContractInitialized(cie) => {
                 Ok(Self::ContractInitialized {
                     data: super::types::ContractInitializedEvent {
-                        contract_version: cie.contract_version().into(),
+                        contract_version: SmartContractVersion::try_from(cie.contract_version)
+                            .unwrap(),
                         origin_ref:       cie.origin_ref.require()?.try_into()?,
                         address:          cie.address.require()?.into(),
                         amount:           cie.amount.require()?.into(),
@@ -2116,7 +2118,7 @@ impl TryFrom<InstanceUpdatedEvent> for super::types::InstanceUpdatedEvent {
 
     fn try_from(value: InstanceUpdatedEvent) -> Result<Self, Self::Error> {
         Ok(Self {
-            contract_version: value.contract_version().into(),
+            contract_version: SmartContractVersion::try_from(value.contract_version).unwrap(),
             address:          value.address.require()?.into(),
             instigator:       value.instigator.require()?.try_into()?,
             amount:           value.amount.require()?.into(),
@@ -2124,15 +2126,6 @@ impl TryFrom<InstanceUpdatedEvent> for super::types::InstanceUpdatedEvent {
             receive_name:     value.receive_name.require()?.try_into()?,
             events:           value.events.into_iter().map(Into::into).collect(),
         })
-    }
-}
-
-impl From<ContractVersion> for super::types::smart_contracts::WasmVersion {
-    fn from(value: ContractVersion) -> Self {
-        match value {
-            ContractVersion::V0 => Self::V0,
-            ContractVersion::V1 => Self::V1,
-        }
     }
 }
 

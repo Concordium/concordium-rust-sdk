@@ -10,7 +10,10 @@ pub mod transactions;
 use anyhow::Context;
 pub use concordium_base::hashes;
 // re-export to maintain backwards compatibility.
-use crate::{constants::*, protocol_level_tokens, v2::upward::Upward};
+use crate::{
+    constants::*, protocol_level_tokens, types::smart_contracts::SmartContractVersion,
+    v2::upward::Upward,
+};
 pub use concordium_base::{
     base::*,
     id::types::CredentialType,
@@ -39,7 +42,7 @@ use concordium_base::{
     },
     protocol_level_tokens::{TokenAmount, TokenEvent, TokenEventDetails, TokenHolder, TokenId},
     smart_contracts::{
-        ContractEvent, ModuleReference, OwnedParameter, OwnedReceiveName, WasmVersion,
+        ContractEvent, ModuleReference, OwnedParameter, OwnedReceiveName,
     },
     transactions::{AccountAccessStructure, ExactSizeTransactionSigner, TransactionSigner},
 };
@@ -1461,7 +1464,7 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
             } => {
                 if let Some(end) = stack.pop() {
                     let tree = match contract_version {
-                        WasmVersion::V0 => ExecutionTree::V0(ExecutionTreeV0 {
+                        SmartContractVersion(0) => ExecutionTree::V0(ExecutionTreeV0 {
                             top_level: UpdateV0 {
                                 address,
                                 instigator,
@@ -1472,7 +1475,8 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
                             },
                             rest:      Vec::new(),
                         }),
-                        WasmVersion::V1 => ExecutionTree::V1(ExecutionTreeV1 {
+
+                        _ => ExecutionTree::V1(ExecutionTreeV1 {
                             address,
                             instigator,
                             amount,
@@ -1522,7 +1526,7 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
                 } else {
                     // no stack yet
                     match contract_version {
-                        WasmVersion::V0 => stack.push(Worker::V0(ExecutionTreeV0 {
+                        SmartContractVersion(0) => stack.push(Worker::V0(ExecutionTreeV0 {
                             top_level: UpdateV0 {
                                 address,
                                 instigator,
@@ -1533,7 +1537,8 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
                             },
                             rest:      Vec::new(),
                         })),
-                        WasmVersion::V1 => {
+
+                        _ => {
                             let tree = ExecutionTreeV1 {
                                 address,
                                 instigator,
@@ -2475,7 +2480,7 @@ pub struct EncryptedSelfAmountAddedEvent {
 #[serde(rename_all = "camelCase")]
 pub struct ContractInitializedEvent {
     #[serde(default)]
-    pub contract_version: smart_contracts::WasmVersion,
+    pub contract_version: SmartContractVersion,
     #[serde(rename = "ref")]
     /// Module with the source code of the contract.
     pub origin_ref:       smart_contracts::ModuleReference,
