@@ -7,6 +7,7 @@
   - `CommonRewardData`
 - Introduce `Upward<A>` for representing types, which might get extended in a future version of the Concordium Node API and allows the consumer of this library to decide how to handle some unknown future data, like new transaction types and chain events.
 - BREAKING: Change types related to gRPC API responses to wrap `Upward` for values which might be extended in a future version of the API of the Concordium Node.
+- Using a newly defined type `SmartContractVersion` defined in concordium-base in order to make the Smart contract version forwards compatible by storing it there as a u8.
 
   The changes are for:
   - Type `BlockItemSummary` field `details`.
