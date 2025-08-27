@@ -2228,10 +2228,18 @@ pub enum AccountTransactionEffects {
     DataRegistered { data: RegisteredData },
     /// A baker was configured. The details of what happened are contained in
     /// the list of [baker events](BakerEvent).
-    BakerConfigured { data: Vec<BakerEvent> },
+    ///
+    /// Note future versions of the Concordium Node API might introduce new
+    /// kinds of baker events, therefore each event is wrapped in [`Upward`]
+    /// potentially representing some future unknown data.
+    BakerConfigured { data: Vec<Upward<BakerEvent>> },
     /// An account configured delegation. The details of what happened are
     /// contained in the list of [delegation events](DelegationEvent).
-    DelegationConfigured { data: Vec<DelegationEvent> },
+    ///
+    /// Note future versions of the Concordium Node API might introduce new
+    /// kinds of delegation events, therefore each event is wrapped in
+    /// [`Upward`] potentially representing some future unknown data.
+    DelegationConfigured { data: Vec<Upward<DelegationEvent>> },
     /// Effect of a successful token update.
     TokenUpdate {
         /// Events produced by the update.
