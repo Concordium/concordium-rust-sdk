@@ -4,7 +4,6 @@
 use super::{generated::*, upward::Upward, Require};
 use crate::types::{
     queries::{ConcordiumBFTDetails, ProtocolVersionInt},
-    smart_contracts::SmartContractVersion,
     AccountReleaseSchedule, ActiveBakerPoolStatus, UpdateKeysCollectionSkeleton,
 };
 use chrono::TimeZone;
@@ -18,6 +17,7 @@ use concordium_base::{
             InitialCredentialDeploymentValues,
         },
     },
+    smart_contracts::WasmVersionInt,
     updates,
 };
 use cooldown::CooldownStatus;
@@ -1715,8 +1715,13 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
             account_transaction_effects::Effect::ContractInitialized(cie) => {
                 Ok(Self::ContractInitialized {
                     data: super::types::ContractInitializedEvent {
-                        contract_version: SmartContractVersion::try_from(cie.contract_version)
-                            .unwrap(),
+                        contract_version: u8::try_from(cie.contract_version)
+                            .map(WasmVersionInt)
+                            .map_err(|err| {
+                                tonic::Status::internal(format!(
+                                    "Could not map contract version from i32 to u8: {err}"
+                                ))
+                            })?,
                         origin_ref:       cie.origin_ref.require()?.try_into()?,
                         address:          cie.address.require()?.into(),
                         amount:           cie.amount.require()?.into(),
@@ -2118,7 +2123,13 @@ impl TryFrom<InstanceUpdatedEvent> for super::types::InstanceUpdatedEvent {
 
     fn try_from(value: InstanceUpdatedEvent) -> Result<Self, Self::Error> {
         Ok(Self {
-            contract_version: SmartContractVersion::try_from(value.contract_version).unwrap(),
+            contract_version: u8::try_from(value.contract_version)
+                .map(WasmVersionInt)
+                .map_err(|err| {
+                    tonic::Status::internal(format!(
+                        "Could not map contract version from i32 to u8: {err}"
+                    ))
+                })?,
             address:          value.address.require()?.into(),
             instigator:       value.instigator.require()?.try_into()?,
             amount:           value.amount.require()?.into(),
