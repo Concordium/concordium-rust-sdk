@@ -1615,7 +1615,7 @@ impl<Type> ContractClient<Type> {
 /// Users do not directly interact with values of this type.
 pub struct ContractUpdateInner {
     return_value: Option<ReturnValue>,
-    events:       Vec<ContractTraceElement>,
+    events:       Vec<Upward<ContractTraceElement>>,
 }
 
 /// A builder to simplify sending smart contract updates.
@@ -1639,7 +1639,11 @@ impl ContractUpdateBuilder {
     pub fn return_value(&self) -> Option<&ReturnValue> { self.inner.return_value.as_ref() }
 
     /// Get the events generated from the dry-run.
-    pub fn events(&self) -> &[ContractTraceElement] { &self.inner.events }
+    ///
+    /// Since newer versions of the Concordium Node API might introduce new
+    /// variants of [`ContractTraceElement`] the result might contain
+    /// [`Upward::Unknown`].
+    pub fn events(&self) -> &[Upward<ContractTraceElement>] { &self.inner.events }
 }
 
 /// A handle returned when sending a smart contract update transaction.

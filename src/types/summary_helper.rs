@@ -543,7 +543,10 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                         })
                     }
                     super::AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                        let events = effects.into_iter().map(Event::from).collect::<Vec<_>>();
+                        let events = effects
+                            .into_iter()
+                            .map(|element| element.known_or_err().map(Event::from))
+                            .collect::<Result<Vec<_>, _>>()?;
                         (Some(TransactionType::Update), BlockItemResult::Success {
                             events,
                         })
@@ -1044,7 +1047,7 @@ fn convert_account_transaction(
         TransactionType::Update => {
             let effects = events
                 .into_iter()
-                .map(super::ContractTraceElement::try_from)
+                .map(|event| super::ContractTraceElement::try_from(event).map(Upward::Known))
                 .collect::<Result<_, _>>()?;
             mk_success(super::AccountTransactionEffects::ContractUpdateIssued { effects })
         }
