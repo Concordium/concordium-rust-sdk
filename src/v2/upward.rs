@@ -208,3 +208,37 @@ where
 #[derive(Debug, thiserror::Error)]
 #[error("Encountered unknown data from the Node API, which is required to be known.")]
 pub struct UnknownDataError;
+
+impl<A> std::iter::FromIterator<Upward<A>> for Upward<Vec<A>> {
+    fn from_iter<T: IntoIterator<Item = Upward<A>>>(iter: T) -> Self {
+        let mut vec = Vec::new();
+        for a in iter {
+            if let Upward::Known(a) = a {
+                vec.push(a);
+            } else {
+                return Upward::Unknown;
+            }
+        }
+        Upward::Known(vec)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_upward_from_iterator_all_known() {
+        let list = vec![Upward::Known(42); 50];
+        let res = list.into_iter().collect::<Upward<_>>().unwrap();
+        assert_eq!(vec![42; 50], res)
+    }
+
+    #[test]
+    fn test_upward_from_iterator_some_unknown() {
+        let mut list = vec![Upward::Known(42); 50];
+        list[25] = Upward::Unknown;
+        let res = list.into_iter().collect::<Upward<_>>();
+        assert_eq!(Upward::Unknown, res)
+    }
+}
