@@ -1207,7 +1207,7 @@ impl BlockItemSummary {
     ///
     /// Returns [`Upward::Unknown`] when encountering unfamiliar data from newer
     /// versions of the node to stay forward-compatible.
-    pub fn affected_contracts(&self) -> Upward<Vec<ContractAddress>> {
+    pub fn affected_contracts(&self) -> Upward<Vec<Upward<ContractAddress>>> {
         self.details
             .as_ref()
             .and_then(BlockItemSummaryDetails::affected_contracts)
@@ -1465,6 +1465,10 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
     let mut elements = elements.into_iter();
     while let Some(element) = elements.next() {
         let Upward::Known(element) = element else {
+            // When we encounter some future unknown trace element, we extend the events of
+            // the current node in the execution tree. This assumes that the
+            // very first trace element is known and that future trace elements does not
+            // model control flow events interrupting with `Resumed` and `Interrupted`.
             let last = stack.last_mut()?;
             match last {
                 Worker::V0(v0) => v0.rest.push(Upward::Unknown),
@@ -1820,11 +1824,11 @@ impl BlockItemSummaryDetails {
     ///
     /// Returns [`Upward::Unknown`] when encountering unfamiliar data from newer
     /// versions of the node to stay forward-compatible.
-    fn affected_contracts(&self) -> Upward<Vec<ContractAddress>> {
+    fn affected_contracts(&self) -> Upward<Vec<Upward<ContractAddress>>> {
         if let Some(at) = self.as_account_transaction() {
             at.effects
                 .as_ref()
-                .and_then(AccountTransactionEffects::affected_contracts)
+                .map(AccountTransactionEffects::affected_contracts)
         } else {
             Upward::Known(Vec::new())
         }
@@ -2083,22 +2087,24 @@ impl AccountTransactionEffects {
         }
     }
 
-    fn affected_contracts(&self) -> Upward<Vec<ContractAddress>> {
+    fn affected_contracts(&self) -> Vec<Upward<ContractAddress>> {
         match self {
             AccountTransactionEffects::ContractInitialized { data } => {
-                Upward::Known(vec![data.address])
+                vec![Upward::Known(data.address)]
             }
             AccountTransactionEffects::ContractUpdateIssued { effects } => {
                 let mut seen = HashSet::new();
                 let mut addresses = Vec::new();
+
                 for effect in effects {
                     let Upward::Known(effect) = effect else {
-                        return Upward::Unknown;
+                        addresses.push(Upward::Unknown);
+                        continue;
                     };
                     match effect {
                         ContractTraceElement::Updated { data } => {
                             if seen.insert(data.address) {
-                                addresses.push(data.address);
+                                addresses.push(Upward::Known(data.address));
                             }
                         }
                         ContractTraceElement::Transferred { .. } => (),
@@ -2107,9 +2113,9 @@ impl AccountTransactionEffects {
                         ContractTraceElement::Upgraded { .. } => (),
                     }
                 }
-                Upward::Known(addresses)
+                addresses
             }
-            _ => Upward::Known(Vec::new()),
+            _ => Vec::new(),
         }
     }
 }
