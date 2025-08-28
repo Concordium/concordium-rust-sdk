@@ -48,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
                 if event
                     .affected_contracts()
                     .known_or_err()?
-                    .contains(&ContractAddress::new(866, 0))
+                    .contains(&v2::Upward::Known(ContractAddress::new(866, 0)))
                 {
                     println!(
                         "Transaction {} with sender {}.",
