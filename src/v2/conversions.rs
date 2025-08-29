@@ -542,11 +542,11 @@ impl TryFrom<BakerPoolInfo> for super::types::BakerPoolInfo {
     }
 }
 
-impl TryFrom<AccountStakingInfo> for super::types::AccountStakingInfo {
+impl TryFrom<account_staking_info::StakingInfo> for super::types::AccountStakingInfo {
     type Error = tonic::Status;
 
-    fn try_from(value: AccountStakingInfo) -> Result<Self, Self::Error> {
-        match value.staking_info.require()? {
+    fn try_from(value: account_staking_info::StakingInfo) -> Result<Self, Self::Error> {
+        match value {
             account_staking_info::StakingInfo::Baker(bsi) => {
                 let staked_amount = bsi.staked_amount.require()?.into();
                 let restake_earnings = bsi.restake_earnings;
@@ -919,14 +919,8 @@ impl TryFrom<Cooldown> for super::types::Cooldown {
 
     fn try_from(cd: Cooldown) -> Result<Self, Self::Error> {
         Ok(Self {
-            status:   CooldownStatus::try_from(cd.status)
-                .map_err(|_| {
-                    tonic::Status::invalid_argument(format!(
-                        "unknown cooldown status value {}",
-                        cd.status
-                    ))
-                })?
-                .into(),
+            status:   Upward::from(CooldownStatus::try_from(cd.status).ok())
+                .map(super::types::CooldownStatus::from),
             end_time: cd.end_time.require()?.into(),
             amount:   cd.amount.require()?.into(),
         })
@@ -959,8 +953,10 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
         let account_encrypted_amount = encrypted_balance.require()?.try_into()?;
         let account_encryption_key = encryption_key.require()?.try_into()?;
         let account_index = index.require()?.into();
-        let account_stake: Option<super::types::AccountStakingInfo> = match stake {
-            Some(stake) => Some(stake.try_into()?),
+        let account_stake: Option<Upward<super::types::AccountStakingInfo>> = match stake {
+            Some(stake) => Some(Upward::from(
+                stake.staking_info.map(TryInto::try_into).transpose()?,
+            )),
             None => None,
         };
         let account_address = address.require()?.try_into()?;
@@ -978,10 +974,11 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
         // fallback calculation and instead require the available balance field to
         // always be present.
         let available_balance = available_balance.map(|ab| ab.into()).unwrap_or_else(|| {
-            let active_stake = account_stake
-                .as_ref()
-                .map(|s| s.staked_amount())
-                .unwrap_or_default();
+            let active_stake = if let Some(Upward::Known(staking_info)) = &account_stake {
+                staking_info.staked_amount()
+            } else {
+                Default::default()
+            };
 
             let inactive_stake = cooldowns.iter().map(|cd| cd.amount).sum();
 

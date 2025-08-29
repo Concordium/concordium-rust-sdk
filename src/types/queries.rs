@@ -24,6 +24,7 @@ use std::net::IpAddr;
     derive_more::Display,
 )]
 #[display(fmt = "P{_0}")]
+#[serde(transparent)]
 #[repr(transparent)]
 pub struct ProtocolVersionInt(pub u64);
 
