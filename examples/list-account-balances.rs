@@ -112,16 +112,17 @@ async fn main() -> anyhow::Result<()> {
             let (acc, info) = res??;
             let is_baker = if let Some(account_stake) = info.account_stake {
                 match account_stake {
-                    AccountStakingInfo::Baker { staked_amount, .. } => {
+                    v2::Upward::Known(AccountStakingInfo::Baker { staked_amount, .. }) => {
                         num_bakers += 1;
                         total_staked_amount += staked_amount;
                         true
                     }
-                    AccountStakingInfo::Delegated { staked_amount, .. } => {
+                    v2::Upward::Known(AccountStakingInfo::Delegated { staked_amount, .. }) => {
                         total_delegated_amount += staked_amount;
 
                         false
                     }
+                    v2::Upward::Unknown => false,
                 }
             } else {
                 false
