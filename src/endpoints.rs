@@ -18,11 +18,15 @@ pub enum RPCError {
 }
 
 impl From<serde_json::Error> for RPCError {
-    fn from(x: serde_json::Error) -> Self { Self::ParseError(x.into()) }
+    fn from(x: serde_json::Error) -> Self {
+        Self::ParseError(x.into())
+    }
 }
 
 impl From<semver::Error> for RPCError {
-    fn from(x: semver::Error) -> Self { Self::ParseError(x.into()) }
+    fn from(x: semver::Error) -> Self {
+        Self::ParseError(x.into())
+    }
 }
 
 impl RPCError {
@@ -82,11 +86,15 @@ impl QueryError {
 }
 
 impl From<tonic::Status> for QueryError {
-    fn from(s: tonic::Status) -> Self { Self::RPCError(s.into()) }
+    fn from(s: tonic::Status) -> Self {
+        Self::RPCError(s.into())
+    }
 }
 
 impl From<InvalidMetadataValue> for QueryError {
-    fn from(s: InvalidMetadataValue) -> Self { Self::RPCError(s.into()) }
+    fn from(s: InvalidMetadataValue) -> Self {
+        Self::RPCError(s.into())
+    }
 }
 
 /// Result a GRPC query. This is a simple alias for [std::Result](https://doc.rust-lang.org/std/result/enum.Result.html)
@@ -110,10 +118,10 @@ pub enum BlocksAtHeightInput {
         /// Genesis index to start from.
         genesis_index: types::GenesisIndex,
         /// Height starting from the genesis block at the genesis index.
-        height:        types::BlockHeight,
+        height: types::BlockHeight,
         /// Whether to return results only from the specified genesis index
         /// (`true`), or allow results from more recent genesis indices
         /// as well (`false`).
-        restrict:      bool,
+        restrict: bool,
     },
 }

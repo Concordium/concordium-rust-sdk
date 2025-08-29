@@ -31,11 +31,11 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:20000"
     )]
-    endpoint:  v2::Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(long = "account", help = "Path to the account key file.")]
     keys_path: PathBuf,
     #[structopt(subcommand, help = "The action you want to perform.")]
-    action:    Action,
+    action: Action,
 }
 
 #[derive(StructOpt)]
@@ -48,7 +48,7 @@ enum Action {
     #[structopt(about = "Initialize the contract with the provided weather")]
     Init {
         #[structopt(long, help = "The initial weather.")]
-        weather:    Weather,
+        weather: Weather,
         #[structopt(
             long,
             help = "The module reference used for initializing the contract instance."
@@ -70,9 +70,9 @@ enum Action {
         #[structopt(long, help = "Path of the JSON parameter.")]
         parameter: PathBuf,
         #[structopt(long, help = "Path to the schema.")]
-        schema:    PathBuf,
+        schema: PathBuf,
         #[structopt(long, help = "The contract to update the weather on.")]
-        address:   ContractAddress,
+        address: ContractAddress,
     },
 }
 

@@ -29,13 +29,13 @@ struct App {
         long = "account",
         help = "Path to the account key file of the governance account."
     )]
-    account:  PathBuf,
+    account: PathBuf,
     #[structopt(long = "token", help = "Token to add/remove to/from allow/deny list.")]
     token_id: String,
     #[structopt(subcommand)]
-    cmd:      AddRemoveAllowDeny,
+    cmd: AddRemoveAllowDeny,
     #[structopt(long = "target", help = "Target address.")]
-    target:   String,
+    target: String,
 }
 
 /// Token allow/deny list operation

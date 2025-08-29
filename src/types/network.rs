@@ -4,6 +4,8 @@ use concordium_base::common::{SerdeDeserialize, SerdeSerialize};
 use derive_more::{Display, From, FromStr, Into};
 use std::{fmt, net::IpAddr, num::ParseIntError};
 
+use crate::v2::Upward;
+
 #[repr(transparent)]
 #[derive(Debug)]
 pub struct RemotePeerId {
@@ -22,7 +24,9 @@ impl std::str::FromStr for RemotePeerId {
 
 /// Display as a 0-padded hex value.
 impl std::fmt::Display for RemotePeerId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{:016x}", self.id) }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:016x}", self.id)
+    }
 }
 
 #[repr(transparent)]
@@ -58,13 +62,17 @@ pub struct PeerId(pub String);
 #[derive(Debug)]
 pub struct Peer {
     /// The id of the peer.
-    pub peer_id:        PeerId,
+    pub peer_id: PeerId,
     /// Catchup status of the peer.
-    pub consensus_info: PeerConsensusInfo,
+    ///
+    /// Since there might be new variants of [`PeerConsensusInfo`] in a future
+    /// version of the Concordium Node API this type is wrapped in
+    /// [`Upward`].
+    pub consensus_info: Upward<PeerConsensusInfo>,
     /// Network statistics for the peer.
-    pub network_stats:  NetworkStats,
+    pub network_stats: NetworkStats,
     /// The address of the peer
-    pub addr:           std::net::SocketAddr,
+    pub addr: std::net::SocketAddr,
 }
 
 /// Consensus info related to a peer.
@@ -74,7 +82,11 @@ pub enum PeerConsensusInfo {
     /// no catchup status.
     Bootstrapper,
     /// Regular nodes do have a catchup status.
-    Node(PeerCatchupStatus),
+    ///
+    /// Since there might be new variants of [`PeerCatchupStatus`] in a future
+    /// version of the Concordium Node API this type is wrapped in
+    /// [`Upward`].
+    Node(Upward<PeerCatchupStatus>),
 }
 
 /// The catch up status of the peer.
@@ -94,9 +106,9 @@ pub enum PeerCatchupStatus {
 #[derive(Debug)]
 pub struct NetworkStats {
     /// How many packets the peer has sent to the node.
-    pub packets_sent:     u64,
+    pub packets_sent: u64,
     /// How many packets the peer has received from the node.
     pub packets_received: u64,
     /// The connection latency aka. 'ping' time (measured in milliseconds).
-    pub latency:          u64,
+    pub latency: u64,
 }

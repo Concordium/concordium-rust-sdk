@@ -17,9 +17,9 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "index", help = "Index of the smart contract to query.")]
-    index:    common::ContractIndex,
+    index: common::ContractIndex,
     #[structopt(long = "block", help = "Hash of the block in which to query.")]
-    block:    Option<BlockHash>,
+    block: Option<BlockHash>,
 }
 
 #[tokio::main(flavor = "multi_thread")]

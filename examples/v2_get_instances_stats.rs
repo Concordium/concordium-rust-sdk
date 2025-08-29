@@ -25,7 +25,7 @@ struct App {
         long = "block",
         help = "Hash of the block in which to query. Defaults to the last finalized block."
     )]
-    block:    Option<BlockHash>,
+    block: Option<BlockHash>,
 }
 
 #[tokio::main(flavor = "multi_thread")]

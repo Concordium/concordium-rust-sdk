@@ -11,7 +11,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:20000"
     )]
-    endpoint:      v2::Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(long = "genesis-index", help = "The genesis index to query.")]
     genesis_index: Option<u32>,
 }

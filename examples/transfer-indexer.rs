@@ -22,13 +22,13 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "from", help = "Starting time. Defaults to genesis time.")]
-    from:     Option<chrono::DateTime<chrono::Utc>>,
+    from: Option<chrono::DateTime<chrono::Utc>>,
     #[structopt(
         long = "db-path",
         help = "Path to the location of the SQLITE database.",
         default_value = "./transfers-db.sqlite"
     )]
-    db_path:  std::path::PathBuf,
+    db_path: std::path::PathBuf,
 }
 
 /// A handler for storing transactions. This implements the
@@ -37,7 +37,7 @@ struct StoreTransfers {
     /// A database connection string, used for reconnects.
     conn_string: PathBuf,
     /// An active connection to the sqlite database.
-    db_conn:     sqlite::Connection,
+    db_conn: sqlite::Connection,
 }
 
 #[indexer::async_trait]
