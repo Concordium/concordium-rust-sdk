@@ -146,6 +146,17 @@ impl<A> Upward<A> {
     }
 }
 
+impl<A, E> Upward<Result<A, E>> {
+    /// Transposes an `Upward` of a [`Result`] into a [`Result`] of an `Upward`.
+    pub fn transpose(self) -> Result<Upward<A>, E> {
+        match self {
+            Upward::Known(Ok(x)) => Ok(Upward::Known(x)),
+            Upward::Known(Err(e)) => Err(e),
+            Upward::Unknown => Ok(Upward::Unknown),
+        }
+    }
+}
+
 impl<A> From<Option<A>> for Upward<A> {
     fn from(value: Option<A>) -> Self {
         if let Some(n) = value {

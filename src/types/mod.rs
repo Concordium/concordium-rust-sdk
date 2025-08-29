@@ -3128,7 +3128,11 @@ pub enum NodeDetails {
     Bootstrapper,
     /// The node is a regular node and is eligible for
     /// running the consensus protocol.
-    Node(NodeConsensusStatus),
+    ///
+    /// Since there might be new variants of [`NodeConsensusStatus`] in a future
+    /// version of the Concordium Node API this type is wrapped in
+    /// [`Upward`].
+    Node(Upward<NodeConsensusStatus>),
 }
 
 #[derive(Debug)]
@@ -3143,7 +3147,10 @@ pub struct NodeInfo {
     /// Information related to the network for the node.
     pub network_info: NetworkInfo,
     /// Information related to consensus for the node.
-    pub details:      NodeDetails,
+    ///
+    /// Since there might be new variants of [`NodeDetails`] in a future version
+    /// of the Concordium Node API this type is wrapped in [`Upward`].
+    pub details:      Upward<NodeDetails>,
 }
 
 /// A baker that has won a round in consensus version 1.

@@ -61,6 +61,10 @@
   - Function `execution_tree` parameter changed from `Vec<Upward<ContractTraceElement>>` to `Vec<ContractTraceElement>`.
   - Type `ExecutionTreeV0` field `rest` change from `Vec<TraceV0>` to `Vec<Upward<TraceV0>>`.
   - Type `ExecutionTreeV1` field `events` change from `Vec<TraceV1>` to `Vec<Upward<TraceV1>>`.
+  - Type `NodeDetails` variant `Node` is now wrapped in `Upward`.
+  - Type `NodeInfo` field `details` is now wrapped in `Upward`.
+  - Type `Peer` field `consensus_info` is now wrapped in `Upward`.
+  - Type `PeerConsensusInfo::Node` unnamed field is now wrapped in `Upward`.
 
 ## 7.0.0
 
