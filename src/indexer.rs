@@ -543,10 +543,12 @@ impl Indexer for AffectedContractIndexer {
     type Context = ();
     type Data = (
         BlockInfo,
-        Vec<(
-            ContractUpdateInfo,
-            BTreeMap<ContractAddress, BTreeSet<OwnedReceiveName>>,
-        )>,
+        Vec<
+            v2::Upward<(
+                ContractUpdateInfo,
+                BTreeMap<ContractAddress, BTreeSet<OwnedReceiveName>>,
+            )>,
+        >,
     );
 
     async fn on_connect<'a>(
@@ -579,6 +581,9 @@ impl Indexer for AffectedContractIndexer {
                         return Ok(None);
                     };
                     let affected_addresses = info.execution_tree.affected_addresses();
+                    let v2::Upward::Known(affected_addresses) = affected_addresses else {
+                        return Ok(Some(v2::Upward::Unknown));
+                    };
                     if (self.all
                         && self
                             .addresses
@@ -589,7 +594,7 @@ impl Indexer for AffectedContractIndexer {
                             .iter()
                             .any(|addr| affected_addresses.contains_key(addr))
                     {
-                        Ok(Some((info, affected_addresses)))
+                        Ok(Some(v2::Upward::Known((info, affected_addresses))))
                     } else {
                         Ok(None)
                     }

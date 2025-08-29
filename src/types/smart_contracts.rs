@@ -256,7 +256,7 @@ pub enum InvokeContractResult {
     Success {
         return_value: Option<ReturnValue>,
         #[serde(deserialize_with = "contract_trace_via_events::deserialize")]
-        events:       Vec<ContractTraceElement>,
+        events:       Vec<Upward<ContractTraceElement>>,
         used_energy:  Energy,
     },
     #[serde(rename = "failure", rename_all = "camelCase")]
@@ -282,10 +282,10 @@ mod contract_trace_via_events {
     use serde::de::Error;
     pub fn deserialize<'de, D: serde::Deserializer<'de>>(
         des: D,
-    ) -> Result<Vec<ContractTraceElement>, D::Error> {
+    ) -> Result<Vec<Upward<ContractTraceElement>>, D::Error> {
         let xs = Vec::<super::super::summary_helper::Event>::deserialize(des)?;
         xs.into_iter()
-            .map(ContractTraceElement::try_from)
+            .map(|event| ContractTraceElement::try_from(event).map(Upward::Known))
             .collect::<Result<_, _>>()
             .map_err(|e| D::Error::custom(format!("Conversion failure: {}", e)))
     }

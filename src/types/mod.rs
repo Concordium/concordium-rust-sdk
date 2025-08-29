@@ -1207,7 +1207,7 @@ impl BlockItemSummary {
     ///
     /// Returns [`Upward::Unknown`] when encountering unfamiliar data from newer
     /// versions of the node to stay forward-compatible.
-    pub fn affected_contracts(&self) -> Upward<Vec<ContractAddress>> {
+    pub fn affected_contracts(&self) -> Upward<Vec<Upward<ContractAddress>>> {
         self.details
             .as_ref()
             .and_then(BlockItemSummaryDetails::affected_contracts)
@@ -1230,8 +1230,9 @@ impl BlockItemSummary {
     /// logs that were produced.
     pub fn contract_update_logs(
         &self,
-    ) -> Option<impl Iterator<Item = (ContractAddress, &[smart_contracts::ContractEvent])> + '_>
-    {
+    ) -> Option<
+        impl Iterator<Item = Upward<(ContractAddress, &[smart_contracts::ContractEvent])>> + '_,
+    > {
         self.details.as_known()?.contract_update_logs()
     }
 
@@ -1299,7 +1300,12 @@ impl ExecutionTree {
     /// Return a set of contract addresses that appear in this execution
     /// tree, together with a set of [receive names](OwnedReceiveName) that
     /// were called for that contract address.
-    pub fn affected_addresses(&self) -> BTreeMap<ContractAddress, BTreeSet<OwnedReceiveName>> {
+    ///
+    /// Returns [`Upward::Unknown`] if any branch in the execution tree contains
+    /// [`Upward::Unknown`] data.
+    pub fn affected_addresses(
+        &self,
+    ) -> Upward<BTreeMap<ContractAddress, BTreeSet<OwnedReceiveName>>> {
         let mut addresses = BTreeMap::<ContractAddress, BTreeSet<_>>::new();
         let mut todo = vec![self];
         while let Some(head) = todo.pop() {
@@ -1310,6 +1316,9 @@ impl ExecutionTree {
                         .or_default()
                         .insert(v0.top_level.receive_name.clone());
                     for rest in &v0.rest {
+                        let Upward::Known(rest) = rest else {
+                            return Upward::Unknown;
+                        };
                         if let TraceV0::Call(call) = rest {
                             todo.push(call);
                         }
@@ -1321,6 +1330,9 @@ impl ExecutionTree {
                         .or_default()
                         .insert(v1.receive_name.clone());
                     for event in &v1.events {
+                        let Upward::Known(event) = event else {
+                            return Upward::Unknown;
+                        };
                         if let TraceV1::Call { call } = event {
                             todo.push(call);
                         }
@@ -1328,7 +1340,7 @@ impl ExecutionTree {
                 }
             }
         }
-        addresses
+        Upward::Known(addresses)
     }
 
     /// Get an iterator over the events logged by the contracts that were called
@@ -1339,11 +1351,11 @@ impl ExecutionTree {
     pub fn events(
         &self,
     ) -> impl Iterator<
-        Item = (
+        Item = Upward<(
             ContractAddress,
             EntrypointName<'_>,
             &[smart_contracts::ContractEvent],
-        ),
+        )>,
     > + '_ {
         // An auxiliary type used to store the list of next items produced by
         // the [`EventsIterator`]
@@ -1364,16 +1376,16 @@ impl ExecutionTree {
         }
 
         impl<'a> Iterator for LogsIterator<'a> {
-            type Item = (
+            type Item = Upward<(
                 ContractAddress,
                 EntrypointName<'a>,
                 &'a [smart_contracts::ContractEvent],
-            );
+            )>;
 
             fn next(&mut self) -> Option<Self::Item> {
                 while let Some(next) = self.next.pop() {
                     match next {
-                        LogsIteratorNext::Events(r) => return Some(r),
+                        LogsIteratorNext::Events(r) => return Some(Upward::Known(r)),
                         LogsIteratorNext::Tree(next) => match next {
                             ExecutionTree::V0(v0) => {
                                 let rv = (
@@ -1385,14 +1397,20 @@ impl ExecutionTree {
                                     &v0.top_level.events[..],
                                 );
                                 for rest in v0.rest.iter().rev() {
+                                    let Upward::Known(rest) = rest else {
+                                        return Some(Upward::Unknown);
+                                    };
                                     if let TraceV0::Call(call) = rest {
                                         self.next.push(LogsIteratorNext::Tree(call));
                                     }
                                 }
-                                return Some(rv);
+                                return Some(Upward::Known(rv));
                             }
                             ExecutionTree::V1(v1) => {
                                 for event in v1.events.iter().rev() {
+                                    let Upward::Known(event) = event else {
+                                        return Some(Upward::Unknown);
+                                    };
                                     match event {
                                         TraceV1::Events { events } => {
                                             self.next.push(LogsIteratorNext::Events((
@@ -1426,13 +1444,13 @@ impl ExecutionTree {
 /// This will fail if the list was not generated correctly, but if the list of
 /// trace elements is coming from the node it will always be in the correct
 /// format.
-pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTree> {
+pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<ExecutionTree> {
     #[derive(Debug)]
     struct PartialTree {
         address: ContractAddress,
         /// Whether the matching resume was seen for the interrupt.
         resumed: bool,
-        events:  Vec<TraceV1>,
+        events:  Vec<Upward<TraceV1>>,
     }
 
     #[derive(Debug)]
@@ -1446,6 +1464,20 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
     let mut stack: Vec<Worker> = Vec::new();
     let mut elements = elements.into_iter();
     while let Some(element) = elements.next() {
+        let Upward::Known(element) = element else {
+            // When we encounter some future unknown trace element, we extend the events of
+            // the current node in the execution tree. This assumes that the
+            // very first trace element is known and that future trace elements does not
+            // model control flow events interrupting with `Resumed` and `Interrupted`.
+            let last = stack.last_mut()?;
+            match last {
+                Worker::V0(v0) => v0.rest.push(Upward::Unknown),
+                Worker::Partial(partial) => {
+                    partial.events.push(Upward::Unknown);
+                }
+            }
+            continue;
+        };
         match element {
             ContractTraceElement::Updated {
                 data:
@@ -1478,12 +1510,12 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
                             amount,
                             message,
                             receive_name,
-                            events: vec![TraceV1::Events { events }],
+                            events: vec![Upward::Known(TraceV1::Events { events })],
                         }),
                     };
                     match end {
                         Worker::V0(mut v0) => {
-                            v0.rest.push(TraceV0::Call(tree));
+                            v0.rest.push(Upward::Known(TraceV0::Call(tree)));
                             stack.push(Worker::V0(v0));
                         }
                         Worker::Partial(mut partial) => {
@@ -1497,12 +1529,14 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
                                 if let Some(last) = stack.last_mut() {
                                     match last {
                                         Worker::V0(v0) => {
-                                            v0.rest.push(TraceV0::Call(ExecutionTree::V1(tree)));
+                                            v0.rest.push(Upward::Known(TraceV0::Call(
+                                                ExecutionTree::V1(tree),
+                                            )));
                                         }
                                         Worker::Partial(v0) => {
-                                            v0.events.push(TraceV1::Call {
+                                            v0.events.push(Upward::Known(TraceV1::Call {
                                                 call: ExecutionTree::V1(tree),
-                                            });
+                                            }));
                                         }
                                     }
                                 } else {
@@ -1514,7 +1548,9 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
                                     }
                                 }
                             } else {
-                                partial.events.push(TraceV1::Call { call: tree });
+                                partial
+                                    .events
+                                    .push(Upward::Known(TraceV1::Call { call: tree }));
                                 stack.push(Worker::Partial(partial));
                             }
                         }
@@ -1540,7 +1576,7 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
                                 amount,
                                 message,
                                 receive_name,
-                                events: vec![TraceV1::Events { events }],
+                                events: vec![Upward::Known(TraceV1::Events { events })],
                             };
                             // and return it.
                             if elements.next().is_none() {
@@ -1555,22 +1591,29 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
             ContractTraceElement::Transferred { from, amount, to } => {
                 let last = stack.last_mut()?;
                 match last {
-                    Worker::V0(v0) => v0.rest.push(TraceV0::Transfer { from, amount, to }),
+                    Worker::V0(v0) => {
+                        v0.rest
+                            .push(Upward::Known(TraceV0::Transfer { from, amount, to }))
+                    }
                     Worker::Partial(partial) => {
-                        partial.events.push(TraceV1::Transfer { from, amount, to });
+                        partial
+                            .events
+                            .push(Upward::Known(TraceV1::Transfer { from, amount, to }));
                     }
                 }
             }
             ContractTraceElement::Interrupted { address, events } => match stack.last_mut() {
                 Some(Worker::Partial(partial)) if partial.resumed => {
                     partial.resumed = false;
-                    partial.events.push(TraceV1::Events { events })
+                    partial
+                        .events
+                        .push(Upward::Known(TraceV1::Events { events }))
                 }
                 _ => {
                     stack.push(Worker::Partial(PartialTree {
                         address,
                         resumed: false,
-                        events: vec![TraceV1::Events { events }],
+                        events: vec![Upward::Known(TraceV1::Events { events })],
                     }));
                 }
             },
@@ -1583,9 +1626,9 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
                         let Worker::Partial(partial) = stack.last_mut()? else {
                             return None;
                         };
-                        partial.events.push(TraceV1::Call {
+                        partial.events.push(Upward::Known(TraceV1::Call {
                             call: ExecutionTree::V0(v0),
-                        });
+                        }));
                         partial.resumed = true;
                     }
                     Worker::Partial(mut partial) => {
@@ -1605,7 +1648,9 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
                     return None;
                 }
                 // Put an upgrade event to the list, and continue.
-                partial.events.push(TraceV1::Upgrade { from, to });
+                partial
+                    .events
+                    .push(Upward::Known(TraceV1::Upgrade { from, to }));
             }
         }
     }
@@ -1642,7 +1687,7 @@ pub struct UpdateV0 {
 /// generated by subsequent calls, not directly by the top-level call.
 pub struct ExecutionTreeV0 {
     pub top_level: UpdateV0,
-    pub rest:      Vec<TraceV0>,
+    pub rest:      Vec<Upward<TraceV0>>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -1677,7 +1722,7 @@ pub struct ExecutionTreeV1 {
     pub receive_name: OwnedReceiveName,
     /// A sequence of calls, transfers, etc. performed by the contract, in the
     /// order that they took effect.
-    pub events:       Vec<TraceV1>,
+    pub events:       Vec<Upward<TraceV1>>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -1779,7 +1824,7 @@ impl BlockItemSummaryDetails {
     ///
     /// Returns [`Upward::Unknown`] when encountering unfamiliar data from newer
     /// versions of the node to stay forward-compatible.
-    fn affected_contracts(&self) -> Upward<Vec<ContractAddress>> {
+    fn affected_contracts(&self) -> Upward<Vec<Upward<ContractAddress>>> {
         if let Some(at) = self.as_account_transaction() {
             at.effects
                 .as_ref()
@@ -1814,21 +1859,28 @@ impl BlockItemSummaryDetails {
     /// logs that were produced.
     pub fn contract_update_logs(
         &self,
-    ) -> Option<impl Iterator<Item = (ContractAddress, &[smart_contracts::ContractEvent])> + '_>
-    {
+    ) -> Option<
+        impl Iterator<Item = Upward<(ContractAddress, &[smart_contracts::ContractEvent])>> + '_,
+    > {
         match self.as_account_transaction()?.effects.as_known()? {
             AccountTransactionEffects::ContractInitialized { .. } => None,
             AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                let iter = effects.iter().flat_map(|effect| match effect {
-                    ContractTraceElement::Updated { data } => {
-                        Some((data.address, &data.events[..]))
+                let iter = effects.iter().flat_map(|effect| {
+                    let Upward::Known(effect) = effect else {
+                        return Some(Upward::Unknown);
+                    };
+
+                    match effect {
+                        ContractTraceElement::Updated { data } => {
+                            Some(Upward::Known((data.address, &data.events[..])))
+                        }
+                        ContractTraceElement::Transferred { .. } => None,
+                        ContractTraceElement::Interrupted { address, events } => {
+                            Some(Upward::Known((*address, &events[..])))
+                        }
+                        ContractTraceElement::Resumed { .. } => None,
+                        ContractTraceElement::Upgraded { .. } => None,
                     }
-                    ContractTraceElement::Transferred { .. } => None,
-                    ContractTraceElement::Interrupted { address, events } => {
-                        Some((*address, &events[..]))
-                    }
-                    ContractTraceElement::Resumed { .. } => None,
-                    ContractTraceElement::Upgraded { .. } => None,
                 });
                 Some(iter)
             }
@@ -1854,6 +1906,9 @@ impl BlockItemSummaryDetails {
                         seen.insert(at.sender);
                         let mut addresses = vec![at.sender];
                         for effect in effects {
+                            let Upward::Known(effect) = effect else {
+                                return Upward::Unknown;
+                            };
                             match effect {
                                 ContractTraceElement::Updated { .. } => (),
                                 ContractTraceElement::Transferred { to, .. } => {
@@ -2032,17 +2087,24 @@ impl AccountTransactionEffects {
         }
     }
 
-    fn affected_contracts(&self) -> Vec<ContractAddress> {
+    fn affected_contracts(&self) -> Vec<Upward<ContractAddress>> {
         match self {
-            AccountTransactionEffects::ContractInitialized { data } => vec![data.address],
+            AccountTransactionEffects::ContractInitialized { data } => {
+                vec![Upward::Known(data.address)]
+            }
             AccountTransactionEffects::ContractUpdateIssued { effects } => {
                 let mut seen = HashSet::new();
                 let mut addresses = Vec::new();
+
                 for effect in effects {
+                    let Upward::Known(effect) = effect else {
+                        addresses.push(Upward::Unknown);
+                        continue;
+                    };
                     match effect {
                         ContractTraceElement::Updated { data } => {
                             if seen.insert(data.address) {
-                                addresses.push(data.address);
+                                addresses.push(Upward::Known(data.address));
                             }
                         }
                         ContractTraceElement::Transferred { .. } => (),
@@ -2097,7 +2159,9 @@ pub enum AccountTransactionEffects {
     /// A contract update transaction was issued and produced the given trace.
     /// This is the result of [Update](transactions::Payload::Update)
     /// transaction.
-    ContractUpdateIssued { effects: Vec<ContractTraceElement> },
+    ContractUpdateIssued {
+        effects: Vec<Upward<ContractTraceElement>>,
+    },
     /// A simple account to account transfer occurred. This is the result of a
     /// successful [`Transfer`](transactions::Payload::Transfer) transaction.
     AccountTransfer {

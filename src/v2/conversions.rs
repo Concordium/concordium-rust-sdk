@@ -1730,7 +1730,14 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                 let effects = cui
                     .effects
                     .into_iter()
-                    .map(TryFrom::try_from)
+                    .map(|trace| {
+                        Ok(Upward::from(
+                            trace
+                                .element
+                                .map(super::types::ContractTraceElement::try_from)
+                                .transpose()?,
+                        ))
+                    })
                     .collect::<Result<_, tonic::Status>>()?;
                 Ok(Self::ContractUpdateIssued { effects })
             }
@@ -1878,11 +1885,11 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
     }
 }
 
-impl TryFrom<ContractTraceElement> for super::types::ContractTraceElement {
+impl TryFrom<contract_trace_element::Element> for super::types::ContractTraceElement {
     type Error = tonic::Status;
 
-    fn try_from(e: ContractTraceElement) -> Result<Self, Self::Error> {
-        Ok(match e.element.require()? {
+    fn try_from(element: contract_trace_element::Element) -> Result<Self, Self::Error> {
+        Ok(match element {
             contract_trace_element::Element::Updated(u) => {
                 super::types::ContractTraceElement::Updated {
                     data: u.try_into()?,
@@ -2422,7 +2429,14 @@ impl TryFrom<InvokeInstanceResponse> for super::types::smart_contracts::InvokeCo
                 events:       value
                     .effects
                     .into_iter()
-                    .map(TryFrom::try_from)
+                    .map(|trace| {
+                        Ok(Upward::from(
+                            trace
+                                .element
+                                .map(super::types::ContractTraceElement::try_from)
+                                .transpose()?,
+                        ))
+                    })
                     .collect::<Result<_, tonic::Status>>()?,
                 used_energy:  value.used_energy.require()?.into(),
             },

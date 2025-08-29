@@ -48,6 +48,19 @@
   - Method `UpdateDetails::update_type` return type is wrapped.
   - Type `AccountTransactionEffects::BakerConfigured` field `data` from `Vec<BakerEvent>` to `Vec<Upward<BakerEvent>>`.
   - Type `AccountTransactionEffects::DelegationConfigured` field `data` from `Vec<DelegationEvent>` to `Vec<Upward<DelegationEvent>>`.
+  - Type `InvokeContractResult` field `events` of `Success` variant is now `Vec<Upward<ContractTraceElement>>`.
+  - Type `InvokeInstanceSuccess` field `events` is now `Vec<Upward<ContractTraceElement>>`.
+  - Method `ContractUpdateBuilder::events` return type from `&[ContractTraceElement]` to `&[Upward<ContractTraceElement>]`.
+  - Associated type `Indexer::Data` for `AffectedContractIndexer` now wraps the affected contract addresses in `Upward`.
+  - Type `AccountTransactionEffects` field `effects` of `ContractUpdateIssued` variant is now `Vec<Upward<ContractTraceElement>>`.
+  - Method `BlockItemSummary::contract_update_logs` now wraps the iterator items in `Upward`.
+  - Method `BlockItemSummaryDetails::contract_update_logs` now wraps the iterator items in `Upward`.
+  - Method `AccountTransactionEffects::affected_addresses` now wraps the return type in `Upward`.
+  - Method `ExecutionTree::affected_addresses` now wraps the return type in `Upward`.
+  - Method `ExecutionTree::events` now wraps the `Iterator::Item` in `Upward`.
+  - Function `execution_tree` parameter changed from `Vec<Upward<ContractTraceElement>>` to `Vec<ContractTraceElement>`.
+  - Type `ExecutionTreeV0` field `rest` change from `Vec<TraceV0>` to `Vec<Upward<TraceV0>>`.
+  - Type `ExecutionTreeV1` field `events` change from `Vec<TraceV1>` to `Vec<Upward<TraceV1>>`.
 
 ## 7.0.0
 
