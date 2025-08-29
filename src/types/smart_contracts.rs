@@ -24,18 +24,18 @@ use std::convert::TryFrom;
 /// Information about an existing smart contract instance.
 pub enum InstanceInfo {
     V0 {
-        model:         Vec<u8>,
-        owner:         AccountAddress,
-        amount:        Amount,
-        methods:       std::collections::BTreeSet<OwnedReceiveName>,
-        name:          OwnedContractName,
+        model: Vec<u8>,
+        owner: AccountAddress,
+        amount: Amount,
+        methods: std::collections::BTreeSet<OwnedReceiveName>,
+        name: OwnedContractName,
         source_module: ModuleReference,
     },
     V1 {
-        owner:         AccountAddress,
-        amount:        Amount,
-        methods:       std::collections::BTreeSet<OwnedReceiveName>,
-        name:          OwnedContractName,
+        owner: AccountAddress,
+        amount: Amount,
+        methods: std::collections::BTreeSet<OwnedReceiveName>,
+        name: OwnedContractName,
         source_module: ModuleReference,
     },
 }
@@ -83,12 +83,12 @@ mod instance_parser {
     /// Helper struct to derive JSON instances for super::InstanceInfo.
     pub struct InstanceInfoHelper {
         #[serde(default)]
-        version:       WasmVersion,
-        model:         Option<String>,
-        owner:         AccountAddress,
-        amount:        Amount,
-        methods:       std::collections::BTreeSet<OwnedReceiveName>,
-        name:          OwnedContractName,
+        version: WasmVersion,
+        model: Option<String>,
+        owner: AccountAddress,
+        amount: Amount,
+        methods: std::collections::BTreeSet<OwnedReceiveName>,
+        name: OwnedContractName,
         source_module: ModuleReference,
     }
 
@@ -151,10 +151,10 @@ mod instance_parser {
                     }
                 }
                 WasmVersion::V1 => Ok(Self::V1 {
-                    owner:         value.owner,
-                    amount:        value.amount,
-                    methods:       value.methods,
-                    name:          value.name,
+                    owner: value.owner,
+                    amount: value.amount,
+                    methods: value.methods,
+                    name: value.name,
                     source_module: value.source_module,
                 }),
             }
@@ -169,20 +169,20 @@ pub struct ContractContext {
     /// be invoked, by an account with address 0, no credentials and
     /// sufficient amount of CCD to cover the transfer amount. If given, the
     /// relevant address must exist in the blockstate.
-    pub invoker:   Option<Address>,
+    pub invoker: Option<Address>,
     /// Contract to invoke.
-    pub contract:  ContractAddress,
+    pub contract: ContractAddress,
     /// Amount to invoke the contract with.
     #[serde(default = "return_zero_amount")]
-    pub amount:    Amount,
+    pub amount: Amount,
     /// Which entrypoint to invoke.
-    pub method:    OwnedReceiveName,
+    pub method: OwnedReceiveName,
     /// And with what parameter.
     #[serde(default)]
     pub parameter: OwnedParameter,
     /// The energy to allow for execution. If not set the node decides on the
     /// maximum amount.
-    pub energy:    Option<Energy>,
+    pub energy: Option<Energy>,
 }
 
 pub const DEFAULT_INVOKE_ENERGY: Energy = Energy { energy: 10_000_000 };
@@ -217,17 +217,19 @@ impl ContractContext {
         payload: UpdateContractPayload,
     ) -> Self {
         Self {
-            invoker:   Some(sender.into()),
-            contract:  payload.address,
-            amount:    payload.amount,
-            method:    payload.receive_name,
+            invoker: Some(sender.into()),
+            contract: payload.address,
+            amount: payload.amount,
+            method: payload.receive_name,
             parameter: payload.message,
-            energy:    energy.into(),
+            energy: energy.into(),
         }
     }
 }
 
-fn return_zero_amount() -> Amount { Amount::from_micro_ccd(0) }
+fn return_zero_amount() -> Amount {
+    Amount::from_micro_ccd(0)
+}
 
 #[derive(SerdeDeserialize, SerdeSerialize, Debug, Clone, Into, From)]
 #[serde(transparent)]
@@ -254,14 +256,14 @@ pub enum InvokeContractResult {
     Success {
         return_value: Option<ReturnValue>,
         #[serde(deserialize_with = "contract_trace_via_events::deserialize")]
-        events:       Vec<ContractTraceElement>,
-        used_energy:  Energy,
+        events: Vec<ContractTraceElement>,
+        used_energy: Energy,
     },
     #[serde(rename = "failure", rename_all = "camelCase")]
     Failure {
         return_value: Option<ReturnValue>,
-        reason:       RejectReason,
-        used_energy:  Energy,
+        reason: RejectReason,
+        used_energy: Energy,
     },
 }
 

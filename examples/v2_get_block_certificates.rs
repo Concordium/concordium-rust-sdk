@@ -14,7 +14,7 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "block", help = "Block to query", default_value = "lastfinal")]
-    bi:       v2::BlockIdentifier,
+    bi: v2::BlockIdentifier,
 }
 
 #[tokio::main(flavor = "multi_thread")]

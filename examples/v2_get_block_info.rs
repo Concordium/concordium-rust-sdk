@@ -14,7 +14,7 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "block", help = "Block identifier.", default_value = "best")]
-    block:    BlockIdentifier,
+    block: BlockIdentifier,
 }
 
 #[tokio::main(flavor = "multi_thread")]

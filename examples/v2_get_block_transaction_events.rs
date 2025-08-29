@@ -21,7 +21,7 @@ struct App {
         help = "Starting height, defaults to 0.",
         default_value = "0"
     )]
-    height:   AbsoluteBlockHeight,
+    height: AbsoluteBlockHeight,
 }
 
 #[tokio::main(flavor = "multi_thread")]

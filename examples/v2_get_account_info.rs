@@ -14,9 +14,9 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "address", help = "Account address to query.")]
-    address:  AccountIndex,
+    address: AccountIndex,
     #[structopt(long = "block", help = "Block to query the account in.")]
-    block:    Option<BlockHash>,
+    block: Option<BlockHash>,
 }
 
 #[tokio::main(flavor = "multi_thread")]

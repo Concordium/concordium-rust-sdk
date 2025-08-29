@@ -24,11 +24,11 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "sender", help = "Path to the sender account key file.")]
-    account:  PathBuf,
+    account: PathBuf,
     #[structopt(long = "token", help = "Token id of the token.")]
     token_id: String,
     #[structopt(subcommand)]
-    cmd:      Action,
+    cmd: Action,
 }
 
 /// TokenClient operations
@@ -46,7 +46,7 @@ enum Action {
         #[structopt(long = "receiver", help = "Target account address.")]
         receiver: String,
         #[structopt(long = "amount", help = "Amount of token to transfer.")]
-        amount:   Decimal,
+        amount: Decimal,
     },
     AddAllow {
         #[structopt(long = "target", help = "Account address to add to allow list.")]
@@ -145,9 +145,9 @@ async fn main() -> anyhow::Result<()> {
             let target_address = AccountAddress::from_str(&receiver)?;
 
             let payload = TransferTokens {
-                amount:    token_amount,
+                amount: token_amount,
                 recipient: target_address,
-                memo:      None,
+                memo: None,
             };
             // manually validating the transfer operation
             token_client

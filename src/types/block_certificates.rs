@@ -22,13 +22,13 @@ pub struct QuorumSignature(
 pub struct QuorumCertificate {
     /// [`BlockHash`] of the block that this [`QuorumCertificate`]
     /// certifies.
-    pub block_hash:          BlockHash,
+    pub block_hash: BlockHash,
     /// [`Round`] of the block that this [`QuorumCertificate`]
     /// certifies.
-    pub round:               Round,
+    pub round: Round,
     /// [`Epoch`] of the block that this [`QuorumCertificate`]
     /// certifies.
-    pub epoch:               Epoch,
+    pub epoch: Epoch,
     /// The aggregate signature on the block identified by the
     /// `block_hash` which serves as a proof that the block
     /// was accepted on the chain by a quorum of the finalization
@@ -37,7 +37,7 @@ pub struct QuorumCertificate {
     /// The baker ids of the finalizers that formed
     /// the `aggregate_signature`.
     /// Note that the signatories are sorted in ascending order of [`BakerId`].
-    pub signatories:         BTreeSet<BakerId>,
+    pub signatories: BTreeSet<BakerId>,
 }
 
 /// A map from a [`Round`] to the set of finalizers
@@ -46,7 +46,7 @@ pub struct QuorumCertificate {
 #[derive(Debug)]
 pub struct FinalizerRound {
     /// The round which was signed off.
-    pub round:      Round,
+    pub round: Round,
     /// The set of finalizers who signed off.
     /// (identified by their [`BakerId`])
     /// Note that the baker ids are sorted in ascending order and are
@@ -69,20 +69,20 @@ pub struct TimeoutSignature(
 #[derive(Debug)]
 pub struct TimeoutCertificate {
     /// The round that timed out.
-    pub round:                  Round,
+    pub round: Round,
     /// The minimum epoch of which signatures are included in
     /// the signature for the certificate.
-    pub min_epoch:              Epoch,
+    pub min_epoch: Epoch,
     /// The rounds of which finalizers have their best quorum
     /// certificates in the [`Epoch`] `min_epoch`.
-    pub qc_rounds_first_epoch:  Vec<FinalizerRound>,
+    pub qc_rounds_first_epoch: Vec<FinalizerRound>,
     /// The rounds of which finalizers have their best quorum
     /// certificates in the [`Epoch`] `min_epoch` + 1.
     pub qc_rounds_second_epoch: Vec<FinalizerRound>,
     /// The aggregate signature by the finalization committee which
     /// serves as a proof that the [`Round`] timed out, hence
     /// no block was added to the chain.
-    pub aggregate_signature:    TimeoutSignature,
+    pub aggregate_signature: TimeoutSignature,
 }
 
 /// The epoch finalization entry serves as a proof that
@@ -91,10 +91,10 @@ pub struct TimeoutCertificate {
 #[derive(Debug)]
 pub struct EpochFinalizationEntry {
     /// The [`QuorumCertificate`] of the finalized block.
-    pub finalized_qc:    QuorumCertificate,
+    pub finalized_qc: QuorumCertificate,
     /// The [`QuorumCertificate`] of the immediate successor
     /// of the block indicated by `finalized_qc`.
-    pub successor_qc:    QuorumCertificate,
+    pub successor_qc: QuorumCertificate,
     /// The witness that proves that the block of the `successor_qc`
     /// is an immediate decendant of the block of the `finalized_qc`.
     pub successor_proof: hashes::SuccessorProof,
@@ -105,10 +105,10 @@ pub struct BlockCertificates {
     /// The [`QuorumCertificate`] of a block.
     /// Note that this will be [`None`] in the case
     /// where the block is a genesis block.
-    pub quorum_certificate:       Option<QuorumCertificate>,
+    pub quorum_certificate: Option<QuorumCertificate>,
     /// The [`TimeoutCertificate`] is present if and only if
     /// the previous round of the block timed out.
-    pub timeout_certificate:      Option<TimeoutCertificate>,
+    pub timeout_certificate: Option<TimeoutCertificate>,
     /// The [`EpochFinalizationEntry`] is present if and only if
     /// the block is the first block of a new [`Epoch`].
     pub epoch_finalization_entry: Option<EpochFinalizationEntry>,
@@ -134,7 +134,9 @@ pub mod raw {
     }
 
     impl From<FinalizerIndex> for usize {
-        fn from(value: FinalizerIndex) -> Self { value.index as usize }
+        fn from(value: FinalizerIndex) -> Self {
+            value.index as usize
+        }
     }
 
     /// The message that is multicast by a finalizer when validating and signing
@@ -144,13 +146,13 @@ pub mod raw {
         /// Signature on the relevant quorum signature message.
         pub signature: QuorumSignature,
         /// Hash of the block that is signed.
-        pub block:     BlockHash,
+        pub block: BlockHash,
         /// Index of the finalizer signing the message.
         pub finalizer: FinalizerIndex,
         /// Round of the block.
-        pub round:     Round,
+        pub round: Round,
         /// Epoch of the block.
-        pub epoch:     Epoch,
+        pub epoch: Epoch,
     }
 
     /// A quorum certificate on a block. This certifies that 2/3 of the
@@ -158,11 +160,11 @@ pub mod raw {
     #[derive(Clone, Debug)]
     pub struct QuorumCertificate {
         /// The hash of the block that is certified.
-        pub block_hash:          BlockHash,
+        pub block_hash: BlockHash,
         /// The round of the block that is certified.
-        pub round:               Round,
+        pub round: Round,
         /// The epoch of the block that is certified.
-        pub epoch:               Epoch,
+        pub epoch: Epoch,
         /// The aggregated signature of the finalization committee
         /// on the block that is certified.
         pub aggregate_signature: QuorumSignature,
@@ -170,7 +172,7 @@ pub mod raw {
         /// i.e., the ones who have contributed to the aggregate signature.
         /// The finalizers are identified by their finalizer index, which refers
         /// to the finalization committee for the epoch.
-        pub signatories:         Vec<FinalizerIndex>,
+        pub signatories: Vec<FinalizerIndex>,
     }
 
     /// A (non-aggregate) signature of a validator. This is used for the
@@ -183,26 +185,26 @@ pub mod raw {
     #[derive(Clone, Debug)]
     pub struct TimeoutMessage {
         /// Index of the finalizer signing the message.
-        pub finalizer:          FinalizerIndex,
+        pub finalizer: FinalizerIndex,
         /// Index of the round that timed out.
-        pub round:              Round,
+        pub round: Round,
         /// Current epoch number of the finalizer sending the timeout message.
         /// This can be different from the epoch of the quorum certificate.
-        pub epoch:              Epoch,
+        pub epoch: Epoch,
         /// Highest quorum certificate known to the finalizer at the time of
         /// timeout.
         pub quorum_certificate: QuorumCertificate,
         /// Signature on the appropriate timeout signature message.
-        pub signature:          TimeoutSignature,
+        pub signature: TimeoutSignature,
         /// Signature of the finalizer on the timeout message as a whole.
-        pub message_signature:  BlockSignature,
+        pub message_signature: BlockSignature,
     }
 
     /// The set of finalizers that signed in a particular round.
     #[derive(Clone, Debug)]
     pub struct FinalizerRound {
         /// The round for which the finalizers signed.
-        pub round:      Round,
+        pub round: Round,
         /// The finalizers that signed for the round.
         pub finalizers: Vec<FinalizerIndex>,
     }
@@ -215,31 +217,31 @@ pub mod raw {
     #[derive(Clone, Debug)]
     pub struct TimeoutCertificate {
         /// The round that timed out.
-        pub round:                  Round,
+        pub round: Round,
         /// The minimum epoch of which signatures are included in
         /// the signature for the certificate.
-        pub min_epoch:              Epoch,
+        pub min_epoch: Epoch,
         /// The rounds of which finalizers have their best quorum
         /// certificates in the [`Epoch`] `min_epoch`.
-        pub qc_rounds_first_epoch:  Vec<FinalizerRound>,
+        pub qc_rounds_first_epoch: Vec<FinalizerRound>,
         /// The rounds of which finalizers have their best quorum
         /// certificates in the [`Epoch`] `min_epoch` + 1.
         pub qc_rounds_second_epoch: Vec<FinalizerRound>,
         /// The aggregate signature by the finalization committee which
         /// serves as a proof that the [`Round`] timed out, hence
         /// no block was added to the chain.
-        pub aggregate_signature:    TimeoutSignature,
+        pub aggregate_signature: TimeoutSignature,
     }
 
     /// A finalization entry that proves that a block is finalized.
     #[derive(Clone, Debug)]
     pub struct FinalizationEntry {
         /// The quorum certificate of the finalized block.
-        pub finalized_qc:    QuorumCertificate,
+        pub finalized_qc: QuorumCertificate,
         /// The quorum certificate of the immediate successor of the block
         /// indicated by `finalized_qc`. This block must be in the same epoch
         /// and the next round as that of `finalized_qc`.
-        pub successor_qc:    QuorumCertificate,
+        pub successor_qc: QuorumCertificate,
         /// The witness that proves that the block of the `successor_qc`
         /// is an immediate decendant of the block of the `finalized_qc`.
         pub successor_proof: super::hashes::SuccessorProof,
@@ -249,10 +251,10 @@ pub mod raw {
     #[derive(Clone, Debug)]
     pub struct TimeoutMessages {
         /// The first epoch for which timeout messsages are present.
-        pub first_epoch:           Epoch,
+        pub first_epoch: Epoch,
         /// The timeout messages for the first epoch.
         /// There should always be at least one.
-        pub first_epoch_timeouts:  Vec<TimeoutMessage>,
+        pub first_epoch_timeouts: Vec<TimeoutMessage>,
         /// The timeout messages for the second epoch.
         pub second_epoch_timeouts: Vec<TimeoutMessage>,
     }

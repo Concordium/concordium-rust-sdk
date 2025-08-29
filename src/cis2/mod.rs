@@ -114,13 +114,17 @@ pub enum Cis2QueryError {
 // This is implemented manually, since deriving it using thiserror requires
 // `RejectReason` to implement std::error::Error.
 impl From<sdk_types::RejectReason> for Cis2QueryError {
-    fn from(err: sdk_types::RejectReason) -> Self { Self::NodeRejected(err) }
+    fn from(err: sdk_types::RejectReason) -> Self {
+        Self::NodeRejected(err)
+    }
 }
 
 // This is implemented manually, since deriving it using thiserror requires
 // `RejectReason` to implement std::error::Error.
 impl From<sdk_types::RejectReason> for Cis2DryRunError {
-    fn from(err: sdk_types::RejectReason) -> Self { Self::NodeRejected(err) }
+    fn from(err: sdk_types::RejectReason) -> Self {
+        Self::NodeRejected(err)
+    }
 }
 
 /// Transaction metadata for CIS-2
@@ -332,10 +336,11 @@ impl Cis2Contract {
         operator: Address,
         update: OperatorUpdate,
     ) -> anyhow::Result<sdk_types::hashes::TransactionHash, Cis2TransactionError> {
-        self.update_operator(signer, transaction_metadata, vec![UpdateOperator {
-            update,
-            operator,
-        }])
+        self.update_operator(
+            signer,
+            transaction_metadata,
+            vec![UpdateOperator { update, operator }],
+        )
         .await
     }
 
@@ -348,10 +353,11 @@ impl Cis2Contract {
         operator: Address,
         update: OperatorUpdate,
     ) -> anyhow::Result<AccountTransaction<EncodedPayload>, Cis2TransactionError> {
-        self.make_update_operator(signer, transaction_metadata, vec![UpdateOperator {
-            update,
-            operator,
-        }])
+        self.make_update_operator(
+            signer,
+            transaction_metadata,
+            vec![UpdateOperator { update, operator }],
+        )
     }
 
     /// Invoke the CIS2 balanceOf query given a list of BalanceOfQuery.
@@ -421,10 +427,13 @@ impl Cis2Contract {
         operator: Address,
     ) -> Result<bool, Cis2QueryError> {
         let res = self
-            .operator_of(bi, vec![OperatorOfQuery {
-                owner,
-                address: operator,
-            }])
+            .operator_of(
+                bi,
+                vec![OperatorOfQuery {
+                    owner,
+                    address: operator,
+                }],
+            )
             .await?;
         only_one(res)
     }
@@ -468,7 +477,8 @@ impl Cis2Contract {
 /// element. Otherwise raise a parse error.
 fn only_one<A, V: AsRef<Vec<A>>>(res: V) -> Result<A, Cis2QueryError>
 where
-    Vec<A>: From<V>, {
+    Vec<A>: From<V>,
+{
     let err = Cis2QueryError::ResponseParseError(concordium_contracts_common::ParseError {});
     if res.as_ref().len() > 1 {
         Err(err)

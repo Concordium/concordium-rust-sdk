@@ -19,7 +19,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:20000"
     )]
-    endpoint:  v2::Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(long = "account", help = "Path to the account key file.")]
     keys_path: PathBuf,
     #[structopt(

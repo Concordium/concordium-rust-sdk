@@ -31,12 +31,12 @@ struct App {
         long = "from",
         help = "Starting time (format 2023-06-22T14:00:00+0200). Defaults to genesis time."
     )]
-    from:     Option<chrono::DateTime<chrono::Utc>>,
+    from: Option<chrono::DateTime<chrono::Utc>>,
     #[structopt(
         long = "to",
         help = "End time (format 2023-06-22T14:00:00+0200). Defaults to the time the tool has run."
     )]
-    to:       Option<chrono::DateTime<Utc>>,
+    to: Option<chrono::DateTime<Utc>>,
 }
 
 #[tokio::main(flavor = "multi_thread")]

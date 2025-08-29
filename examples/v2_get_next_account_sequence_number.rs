@@ -13,7 +13,7 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "account", help = "Address of the account to query.")]
-    account:  AccountAddress,
+    account: AccountAddress,
 }
 
 #[tokio::main(flavor = "multi_thread")]

@@ -20,14 +20,14 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:20000"
     )]
-    endpoint:  v2::Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(long = "account", help = "Path to the account key file.")]
     keys_path: PathBuf,
     #[structopt(
         long = "memo",
         help = "Optional memo to be included in the transaction."
     )]
-    memo:      Option<String>,
+    memo: Option<String>,
 }
 
 #[tokio::main(flavor = "multi_thread")]
