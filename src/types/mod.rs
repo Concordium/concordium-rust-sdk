@@ -14,7 +14,7 @@ use crate::{constants::*, protocol_level_tokens, v2::upward::Upward};
 pub use concordium_base::{
     base::*,
     id::types::CredentialType,
-    smart_contracts::{wasm_version_fallback, ContractTraceElement, InstanceUpdatedEvent},
+    smart_contracts::{ContractTraceElement, InstanceUpdatedEvent},
 };
 
 use concordium_base::{
@@ -2499,7 +2499,7 @@ pub struct EncryptedSelfAmountAddedEvent {
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ContractInitializedEvent {
-    #[serde(default = "smart_contracts::wasm_version_fallback")]
+    #[serde(default = "WasmVersionInt::zero_version")]
     pub contract_version: WasmVersionInt,
     #[serde(rename = "ref")]
     /// Module with the source code of the contract.
