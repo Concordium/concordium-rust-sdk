@@ -973,7 +973,7 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
         // If we up the minimum supported node version to version 7, we can remove this
         // fallback calculation and instead require the available balance field to
         // always be present.
-        let available_balance = available_balance.map(|ab| ab.into()).unwrap_or({
+        let available_balance = available_balance.map(|ab| ab.into()).unwrap_or_else(|| {
             let active_stake = if let Some(Upward::Known(staking_info)) = &account_stake {
                 staking_info.staked_amount()
             } else {
