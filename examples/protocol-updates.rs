@@ -29,7 +29,7 @@ struct App {
     )]
     endpoint: Endpoint,
     #[structopt(long = "key", help = "Path to update keys to use.")]
-    keys:     Vec<PathBuf>,
+    keys: Vec<PathBuf>,
 }
 
 /// Parameter data type for the 'P3' to 'P4' protocol update.
@@ -63,11 +63,11 @@ struct ProtocolUpdateDataP4 {
 #[serde(rename_all = "camelCase")]
 struct ProtocolUpdateDataP6 {
     /// Parameters controlling round timeouts.
-    pub timeout_parameters:    TimeoutParameters,
+    pub timeout_parameters: TimeoutParameters,
     /// Minimum time interval between blocks.
-    pub min_block_time:        Duration,
+    pub min_block_time: Duration,
     /// Maximum energy allowed per block.
-    pub block_energy_limit:    Energy,
+    pub block_energy_limit: Energy,
     /// Parameters for the finalization committee.
     pub finalization_commitee: FinalizationCommitteeParameters,
 }
@@ -137,8 +137,8 @@ async fn main() -> anyhow::Result<()> {
     let params_p4 = ProtocolUpdateDataP4 {
         update_default_commission_rate: CommissionRates {
             finalization: "1".parse().unwrap(),
-            baking:       "0.1".parse().unwrap(),
-            transaction:  "0.1".parse().unwrap(),
+            baking: "0.1".parse().unwrap(),
+            transaction: "0.1".parse().unwrap(),
         },
         update_default_pool_state: OpenStatus::OpenForAll,
         update_cooldown_parameters_access_structure: summary
@@ -151,33 +151,33 @@ async fn main() -> anyhow::Result<()> {
             .clone(),
         update_cooldown_parameters: CooldownParameters {
             pool_owner_cooldown: 1800.into(),
-            delegator_cooldown:  900.into(),
+            delegator_cooldown: 900.into(),
         },
         update_time_parameters: TimeParameters {
             reward_period_length: Epoch::from(4u64).into(),
-            mint_per_payday:      "0.00035997".parse().unwrap(),
+            mint_per_payday: "0.00035997".parse().unwrap(),
         },
         update_pool_parameters: PoolParameters {
             passive_finalization_commission: "1".parse()?,
-            passive_baking_commission:       "0.12".parse()?,
-            passive_transaction_commission:  "0.12".parse()?,
-            commission_bounds:               CommissionRanges {
+            passive_baking_commission: "0.12".parse()?,
+            passive_transaction_commission: "0.12".parse()?,
+            commission_bounds: CommissionRanges {
                 finalization: InclusiveRange {
                     min: "1".parse()?,
                     max: "1".parse()?,
                 },
-                baking:       InclusiveRange {
+                baking: InclusiveRange {
                     min: "0.1".parse()?,
                     max: "0.1".parse()?,
                 },
-                transaction:  InclusiveRange {
+                transaction: InclusiveRange {
                     min: "0.1".parse()?,
                     max: "0.1".parse()?,
                 },
             },
-            minimum_equity_capital:          Amount::from_ccd(100),
-            capital_bound:                   "0.1".parse()?,
-            leverage_bound:                  LeverageFactor::new_integral(3),
+            minimum_equity_capital: Amount::from_ccd(100),
+            capital_bound: "0.1".parse()?,
+            leverage_bound: LeverageFactor::new_integral(3),
         },
     };
 
@@ -209,13 +209,13 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let params_p6 = ProtocolUpdateDataP6 {
-        timeout_parameters:    TimeoutParameters {
-            base:     Duration::from_seconds(10),
+        timeout_parameters: TimeoutParameters {
+            base: Duration::from_seconds(10),
             increase: Ratio::new(6, 5)?,
             decrease: Ratio::new(3, 4)?,
         },
-        min_block_time:        Duration::from_millis(2000),
-        block_energy_limit:    Energy { energy: 3_000_000 },
+        min_block_time: Duration::from_millis(2000),
+        block_energy_limit: Energy { energy: 3_000_000 },
         finalization_commitee: FinalizationCommitteeParameters {
             min_finalizers: 40,
             max_finalizers: 1000,

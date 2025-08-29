@@ -13,7 +13,7 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "address", help = "Contract address to query.")]
-    address:  ContractAddress,
+    address: ContractAddress,
 }
 
 #[tokio::main(flavor = "multi_thread")]

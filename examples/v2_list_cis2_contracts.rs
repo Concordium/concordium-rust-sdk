@@ -21,13 +21,13 @@ struct App {
         long = "block",
         help = "Block to query the data in. Defaults to last finalized block."
     )]
-    block:    Option<BlockHash>,
+    block: Option<BlockHash>,
     #[structopt(
         long = "num",
         help = "How many queries to make in parallel.",
         default_value = "8"
     )]
-    num:      usize,
+    num: usize,
 }
 
 #[tokio::main(flavor = "multi_thread")]

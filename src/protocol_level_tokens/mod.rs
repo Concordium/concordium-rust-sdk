@@ -58,7 +58,9 @@ impl TryFrom<generated::plt::TokenModuleRef> for TokenModuleRef {
 }
 
 impl From<generated::plt::CBor> for RawCbor {
-    fn from(wrapper: generated::plt::CBor) -> Self { wrapper.value.into() }
+    fn from(wrapper: generated::plt::CBor) -> Self {
+        wrapper.value.into()
+    }
 }
 
 impl TryFrom<generated::plt::TokenEvent> for TokenEvent {
@@ -67,7 +69,7 @@ impl TryFrom<generated::plt::TokenEvent> for TokenEvent {
     fn try_from(token_event: generated::plt::TokenEvent) -> Result<Self, Self::Error> {
         Ok(Self {
             token_id: token_event.token_id.require()?.try_into()?,
-            event:    token_event.event.require()?.try_into()?,
+            event: token_event.event.require()?.try_into()?,
         })
     }
 }
@@ -104,7 +106,7 @@ impl TryFrom<generated::plt::TokenModuleEvent> for TokenModuleEvent {
                 event.r#type,
             )
             .map_err(|err| tonic::Status::internal(err.to_string()))?,
-            details:    event.details.require()?.into(),
+            details: event.details.require()?.into(),
         })
     }
 }
@@ -114,10 +116,10 @@ impl TryFrom<generated::plt::TokenTransferEvent> for TokenTransferEvent {
 
     fn try_from(event: generated::plt::TokenTransferEvent) -> Result<Self, Self::Error> {
         Ok(Self {
-            from:   event.from.require()?.try_into()?,
-            to:     event.to.require()?.try_into()?,
+            from: event.from.require()?.try_into()?,
+            to: event.to.require()?.try_into()?,
             amount: event.amount.require()?.try_into()?,
-            memo:   event
+            memo: event
                 .memo
                 .map(concordium_base::transactions::Memo::try_from)
                 .transpose()?,
@@ -154,12 +156,12 @@ impl TryFrom<generated::plt::TokenModuleRejectReason> for TokenModuleRejectReaso
 
     fn try_from(value: generated::plt::TokenModuleRejectReason) -> Result<Self, Self::Error> {
         Ok(Self {
-            token_id:    value.token_id.require()?.try_into()?,
+            token_id: value.token_id.require()?.try_into()?,
             reason_type: protocol_level_tokens::TokenModuleCborTypeDiscriminator::try_from(
                 value.r#type,
             )
             .map_err(|err| tonic::Status::internal(err.to_string()))?,
-            details:     value.details.map(|d| d.into()),
+            details: value.details.map(|d| d.into()),
         })
     }
 }

@@ -25,17 +25,17 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "account", help = "Account keys of the governance account.")]
-    account:  PathBuf,
+    account: PathBuf,
     #[structopt(long = "token", help = "Token to mint or burn.")]
     token_id: String,
     #[structopt(subcommand)]
-    cmd:      MintOrBurn,
+    cmd: MintOrBurn,
     #[structopt(
         long = "amount",
         help = "Amount to mint/burn.",
         default_value = "100.0"
     )]
-    amount:   Decimal,
+    amount: Decimal,
 }
 
 #[derive(StructOpt)]

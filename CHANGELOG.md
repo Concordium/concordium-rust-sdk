@@ -1,4 +1,9 @@
 ## Unreleased changes
+- Removed authorization from `TokenClient` validation.
+- Added `validate_mint`, `validate_burn`, `validate_allow_list_update`, `validate_deny_list_update` methods to `TokenClient`.
+- Added `update_token_info` method to `TokenClient`.
+- Added `Validation` as a separate enum for `TokenClient` operations.
+- Remove use of `CborTokenHolder` wrapper.
 
 - Introduce `ProtocolVersionInt` newtype, wrapping the `u64` representation of the `ProtocolVersion`. This type is forward-compatible, meaning future protocol versions can be represented using this type.
 - BREAKING: Change type `ProtocolVersion` to  `ProtocolVersionInt` for field `protocol_version` in the types listed below. Now introducing new protocol versions in `ProtocolVersion` does not result in RPC parsing errors, and consumers of this library can write more applications that are more forward-compatible.

@@ -15,7 +15,7 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "peer", help = "peer to connect to")]
-    peer:     SocketAddr,
+    peer: SocketAddr,
 }
 
 #[tokio::main(flavor = "multi_thread")]

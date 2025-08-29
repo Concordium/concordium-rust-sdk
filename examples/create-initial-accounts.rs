@@ -42,9 +42,9 @@ struct App {
     )]
     endpoint: Endpoint,
     #[structopt(long = "identity-provider")]
-    idp:      PathBuf,
+    idp: PathBuf,
     #[structopt(long = "tps")]
-    tps:      u16,
+    tps: u16,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -87,7 +87,7 @@ async fn main() -> anyhow::Result<()> {
             let created_at = YearMonth::now();
             let alist = AttributeList {
                 valid_to: YearMonth {
-                    year:  created_at.year + 1,
+                    year: created_at.year + 1,
                     month: created_at.month,
                 },
                 created_at,
@@ -108,7 +108,7 @@ async fn main() -> anyhow::Result<()> {
             let data = {
                 let mut csprng = thread_rng();
                 let cdata = CredentialData {
-                    keys:      vec![(
+                    keys: vec![(
                         KeyIndex::from(0),
                         common::types::KeyPair::generate(&mut csprng),
                     )]
@@ -130,9 +130,9 @@ async fn main() -> anyhow::Result<()> {
 
                 let pub_info_for_ip = PublicInformationForIp {
                     id_cred_pub: ArCurve::generate(&mut csprng),
-                    reg_id:      cred_id,
-                    vk_acc:      CredentialPublicKeys {
-                        keys:      cdata.get_public_keys(),
+                    reg_id: cred_id,
+                    vk_acc: CredentialPublicKeys {
+                        keys: cdata.get_public_keys(),
                         threshold: cdata.get_threshold(),
                     },
                 };
@@ -148,7 +148,7 @@ async fn main() -> anyhow::Result<()> {
                 let keys = AccountKeys::from(cdata);
                 let item = BlockItem::<Payload>::from(AccountCredentialMessage {
                     message_expiry: expiry,
-                    credential:     AccountCredential::Initial { icdi },
+                    credential: AccountCredential::Initial { icdi },
                 });
                 (address, item, keys, cred_id_exponent)
             };

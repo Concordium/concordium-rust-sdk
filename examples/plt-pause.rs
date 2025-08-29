@@ -25,11 +25,11 @@ struct App {
         long = "account",
         help = "Path to the account keys file of the governance account."
     )]
-    account:  PathBuf,
+    account: PathBuf,
     #[structopt(long = "token", help = "Token to pause or unpause.")]
     token_id: String,
     #[structopt(subcommand)]
-    cmd:      Status,
+    cmd: Status,
 }
 
 #[derive(StructOpt)]

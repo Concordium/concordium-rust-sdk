@@ -26,17 +26,17 @@ struct App {
         help = "How many queries to make in parallel.",
         default_value = "1"
     )]
-    num:      usize,
+    num: usize,
     #[structopt(long = "from", help = "Starting time. Defaults to genesis time.")]
-    from:     Option<chrono::DateTime<chrono::Utc>>,
+    from: Option<chrono::DateTime<chrono::Utc>>,
     #[structopt(long = "to", help = "End time. Defaults to infinity.")]
-    to:       Option<chrono::DateTime<Utc>>,
+    to: Option<chrono::DateTime<Utc>>,
     #[structopt(
         long = "only",
         help = "Only display the given transaction type(s). If no specific types are given all \
                 types are displayed."
     )]
-    types:    Vec<String>,
+    types: Vec<String>,
 }
 
 #[tokio::main(flavor = "multi_thread")]

@@ -18,20 +18,20 @@ struct App {
         long = "start",
         help = "Timestamp to start at. This is inclusive and defaults to genesis time."
     )]
-    from:     Option<chrono::DateTime<chrono::Utc>>,
+    from: Option<chrono::DateTime<chrono::Utc>>,
     #[structopt(long = "end", help = "Timestamp to end. This is exclusive.")]
-    to:       Option<chrono::DateTime<chrono::Utc>>,
+    to: Option<chrono::DateTime<chrono::Utc>>,
     #[structopt(
         long = "num",
         help = "Number of parallel queries to make.",
         default_value = "8"
     )]
-    num:      usize,
+    num: usize,
     #[structopt(
         long = "initial",
         help = "File to output the list of initial accounts to."
     )]
-    initial:  PathBuf,
+    initial: PathBuf,
 }
 
 #[tokio::main(flavor = "multi_thread")]

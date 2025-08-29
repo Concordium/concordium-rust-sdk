@@ -24,7 +24,9 @@ pub enum SupportResult {
 
 impl SupportResult {
     /// Return whether the result is [`Support`](Self::Support) or not.
-    pub fn is_support(&self) -> bool { matches!(self, &Self::Support) }
+    pub fn is_support(&self) -> bool {
+        matches!(self, &Self::Support)
+    }
 }
 
 impl contracts_common::Serial for SupportResult {
@@ -254,7 +256,7 @@ pub async fn supports(
     if let Some(r) = response.response.results.pop() {
         Ok(QueryResponse {
             block_hash: response.block_hash,
-            response:   r,
+            response: r,
         })
     } else {
         Err(SupportsError::InvalidResponse)

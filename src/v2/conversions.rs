@@ -49,7 +49,7 @@ impl TryFrom<AccountAddress> for super::AccountAddress {
 impl From<super::ContractAddress> for ContractAddress {
     fn from(value: super::ContractAddress) -> Self {
         Self {
-            index:    value.index,
+            index: value.index,
             subindex: value.subindex,
         }
     }
@@ -86,7 +86,9 @@ impl From<ContractAddress> for super::ContractAddress {
 }
 
 impl From<Slot> for super::types::Slot {
-    fn from(value: Slot) -> Self { super::types::Slot { slot: value.value } }
+    fn from(value: Slot) -> Self {
+        super::types::Slot { slot: value.value }
+    }
 }
 
 impl TryFrom<VersionedModuleSource> for super::types::smart_contracts::WasmModule {
@@ -99,13 +101,13 @@ impl TryFrom<VersionedModuleSource> for super::types::smart_contracts::WasmModul
                 value,
             }) => super::types::smart_contracts::WasmModule {
                 version: WasmVersion::V0,
-                source:  value.into(),
+                source: value.into(),
             },
             versioned_module_source::Module::V1(versioned_module_source::ModuleSourceV1 {
                 value,
             }) => super::types::smart_contracts::WasmModule {
                 version: WasmVersion::V1,
-                source:  value.into(),
+                source: value.into(),
             },
         };
         Ok(module)
@@ -130,26 +132,26 @@ impl TryFrom<InstanceInfo> for super::InstanceInfo {
     fn try_from(value: InstanceInfo) -> Result<Self, Self::Error> {
         match value.version.require()? {
             instance_info::Version::V0(v0) => Ok(Self::V0 {
-                model:         v0.model.require()?.value,
-                owner:         v0.owner.require()?.try_into()?,
-                amount:        v0.amount.require()?.into(),
-                methods:       v0
+                model: v0.model.require()?.value,
+                owner: v0.owner.require()?.try_into()?,
+                amount: v0.amount.require()?.into(),
+                methods: v0
                     .methods
                     .into_iter()
                     .map(TryFrom::try_from)
                     .collect::<Result<_, tonic::Status>>()?,
-                name:          v0.name.require()?.try_into()?,
+                name: v0.name.require()?.try_into()?,
                 source_module: v0.source_module.require()?.try_into()?,
             }),
             instance_info::Version::V1(v1) => Ok(Self::V1 {
-                owner:         v1.owner.require()?.try_into()?,
-                amount:        v1.amount.require()?.into(),
-                methods:       v1
+                owner: v1.owner.require()?.try_into()?,
+                amount: v1.amount.require()?.into(),
+                methods: v1
                     .methods
                     .into_iter()
                     .map(TryFrom::try_from)
                     .collect::<Result<_, tonic::Status>>()?,
-                name:          v1.name.require()?.try_into()?,
+                name: v1.name.require()?.try_into()?,
                 source_module: v1.source_module.require()?.try_into()?,
             }),
         }
@@ -251,53 +253,73 @@ impl TryFrom<LeadershipElectionNonce> for super::hashes::LeadershipElectionNonce
 }
 
 impl From<AbsoluteBlockHeight> for super::AbsoluteBlockHeight {
-    fn from(abh: AbsoluteBlockHeight) -> Self { Self { height: abh.value } }
+    fn from(abh: AbsoluteBlockHeight) -> Self {
+        Self { height: abh.value }
+    }
 }
 
 impl From<BlockHeight> for super::types::BlockHeight {
-    fn from(bh: BlockHeight) -> Self { Self { height: bh.value } }
+    fn from(bh: BlockHeight) -> Self {
+        Self { height: bh.value }
+    }
 }
 
 impl From<super::AbsoluteBlockHeight> for AbsoluteBlockHeight {
-    fn from(abh: super::AbsoluteBlockHeight) -> Self { Self { value: abh.height } }
+    fn from(abh: super::AbsoluteBlockHeight) -> Self {
+        Self { value: abh.height }
+    }
 }
 
 impl From<super::RelativeBlockHeight> for block_hash_input::RelativeHeight {
     fn from(relative_block_height: super::RelativeBlockHeight) -> Self {
         Self {
             genesis_index: Some(relative_block_height.genesis_index.into()),
-            height:        Some(relative_block_height.height.into()),
-            restrict:      relative_block_height.restrict,
+            height: Some(relative_block_height.height.into()),
+            restrict: relative_block_height.restrict,
         }
     }
 }
 
 impl From<super::types::BlockHeight> for BlockHeight {
-    fn from(bh: super::types::BlockHeight) -> Self { Self { value: bh.height } }
+    fn from(bh: super::types::BlockHeight) -> Self {
+        Self { value: bh.height }
+    }
 }
 
 impl From<SequenceNumber> for super::types::Nonce {
-    fn from(n: SequenceNumber) -> Self { Self { nonce: n.value } }
+    fn from(n: SequenceNumber) -> Self {
+        Self { nonce: n.value }
+    }
 }
 
 impl From<Amount> for super::super::common::types::Amount {
-    fn from(n: Amount) -> Self { Self { micro_ccd: n.value } }
+    fn from(n: Amount) -> Self {
+        Self { micro_ccd: n.value }
+    }
 }
 
 impl From<AccountIndex> for super::types::AccountIndex {
-    fn from(n: AccountIndex) -> Self { Self { index: n.value } }
+    fn from(n: AccountIndex) -> Self {
+        Self { index: n.value }
+    }
 }
 
 impl From<super::types::AccountIndex> for AccountIndex {
-    fn from(n: super::types::AccountIndex) -> Self { Self { value: n.index } }
+    fn from(n: super::types::AccountIndex) -> Self {
+        Self { value: n.index }
+    }
 }
 
 impl From<BakerId> for super::types::BakerId {
-    fn from(n: BakerId) -> Self { Self { id: n.value.into() } }
+    fn from(n: BakerId) -> Self {
+        Self { id: n.value.into() }
+    }
 }
 
 impl From<super::types::BakerId> for BakerId {
-    fn from(n: super::types::BakerId) -> Self { Self { value: n.id.into() } }
+    fn from(n: super::types::BakerId) -> Self {
+        Self { value: n.id.into() }
+    }
 }
 
 impl TryFrom<DelegationTarget> for super::types::DelegationTarget {
@@ -316,13 +338,17 @@ impl TryFrom<DelegationTarget> for super::types::DelegationTarget {
 impl TryFrom<EncryptionKey> for crate::id::elgamal::PublicKey<ArCurve> {
     type Error = tonic::Status;
 
-    fn try_from(value: EncryptionKey) -> Result<Self, Self::Error> { consume(&value.value) }
+    fn try_from(value: EncryptionKey) -> Result<Self, Self::Error> {
+        consume(&value.value)
+    }
 }
 
 impl TryFrom<ar_info::ArPublicKey> for crate::id::elgamal::PublicKey<ArCurve> {
     type Error = tonic::Status;
 
-    fn try_from(value: ar_info::ArPublicKey) -> Result<Self, Self::Error> { consume(&value.value) }
+    fn try_from(value: ar_info::ArPublicKey) -> Result<Self, Self::Error> {
+        consume(&value.value)
+    }
 }
 
 impl TryFrom<AccountThreshold> for super::types::AccountThreshold {
@@ -340,7 +366,9 @@ impl TryFrom<AccountThreshold> for super::types::AccountThreshold {
 impl TryFrom<EncryptedAmount> for crate::encrypted_transfers::types::EncryptedAmount<ArCurve> {
     type Error = tonic::Status;
 
-    fn try_from(value: EncryptedAmount) -> Result<Self, Self::Error> { consume(&value.value) }
+    fn try_from(value: EncryptedAmount) -> Result<Self, Self::Error> {
+        consume(&value.value)
+    }
 }
 
 impl TryFrom<BakerElectionVerifyKey> for super::types::BakerElectionVerifyKey {
@@ -421,7 +449,9 @@ impl From<Duration> for concordium_base::contracts_common::Duration {
 }
 
 impl From<GenesisIndex> for super::types::GenesisIndex {
-    fn from(value: GenesisIndex) -> Self { value.value.into() }
+    fn from(value: GenesisIndex) -> Self {
+        value.value.into()
+    }
 }
 
 impl From<super::types::GenesisIndex> for GenesisIndex {
@@ -470,7 +500,7 @@ impl TryFrom<StakePendingChange> for super::types::StakePendingChange {
     fn try_from(value: StakePendingChange) -> Result<Self, Self::Error> {
         match value.change.require()? {
             stake_pending_change::Change::Reduce(rs) => Ok(Self::ReduceStake {
-                new_stake:      rs.new_stake.require()?.into(),
+                new_stake: rs.new_stake.require()?.into(),
                 effective_time: rs.effective_time.require()?.try_into()?,
             }),
             stake_pending_change::Change::Remove(rs) => {
@@ -486,9 +516,9 @@ impl TryFrom<BakerInfo> for super::types::BakerInfo {
 
     fn try_from(value: BakerInfo) -> Result<Self, Self::Error> {
         Ok(Self {
-            baker_id:                     value.baker_id.require()?.into(),
-            baker_election_verify_key:    value.election_key.require()?.try_into()?,
-            baker_signature_verify_key:   value.signature_key.require()?.try_into()?,
+            baker_id: value.baker_id.require()?.into(),
+            baker_election_verify_key: value.election_key.require()?.try_into()?,
+            baker_signature_verify_key: value.signature_key.require()?.try_into()?,
             baker_aggregation_verify_key: value.aggregation_key.require()?.try_into()?,
         })
     }
@@ -505,11 +535,15 @@ impl From<OpenStatus> for super::types::OpenStatus {
 }
 
 impl From<AmountFraction> for super::types::AmountFraction {
-    fn from(af: AmountFraction) -> Self { Self::new_unchecked(af.parts_per_hundred_thousand) }
+    fn from(af: AmountFraction) -> Self {
+        Self::new_unchecked(af.parts_per_hundred_thousand)
+    }
 }
 
 impl From<AmountFraction> for super::types::PartsPerHundredThousands {
-    fn from(af: AmountFraction) -> Self { Self::new_unchecked(af.parts_per_hundred_thousand) }
+    fn from(af: AmountFraction) -> Self {
+        Self::new_unchecked(af.parts_per_hundred_thousand)
+    }
 }
 
 impl TryFrom<CommissionRates> for super::types::CommissionRates {
@@ -518,8 +552,8 @@ impl TryFrom<CommissionRates> for super::types::CommissionRates {
     fn try_from(value: CommissionRates) -> Result<Self, Self::Error> {
         Ok(Self {
             finalization: value.finalization.require()?.into(),
-            baking:       value.baking.require()?.into(),
-            transaction:  value.transaction.require()?.into(),
+            baking: value.baking.require()?.into(),
+            transaction: value.transaction.require()?.into(),
         })
     }
 }
@@ -593,8 +627,8 @@ impl TryFrom<Release> for super::types::Release {
 
     fn try_from(value: Release) -> Result<Self, Self::Error> {
         Ok(Self {
-            timestamp:    value.timestamp.require()?.try_into()?,
-            amount:       value.amount.require()?.into(),
+            timestamp: value.timestamp.require()?.try_into()?,
+            amount: value.amount.require()?.into(),
             transactions: value
                 .transactions
                 .into_iter()
@@ -609,7 +643,7 @@ impl TryFrom<ReleaseSchedule> for super::types::AccountReleaseSchedule {
 
     fn try_from(value: ReleaseSchedule) -> Result<Self, Self::Error> {
         Ok(Self {
-            total:    value.total.require()?.into(),
+            total: value.total.require()?.into(),
             schedule: value
                 .schedules
                 .into_iter()
@@ -640,7 +674,9 @@ impl TryFrom<ip_info::IpCdiVerifyKey> for ed25519_dalek::VerifyingKey {
 impl TryFrom<ip_info::IpVerifyKey> for crate::id::ps_sig::PublicKey<IpPairing> {
     type Error = tonic::Status;
 
-    fn try_from(value: ip_info::IpVerifyKey) -> Result<Self, Self::Error> { consume(&value.value) }
+    fn try_from(value: ip_info::IpVerifyKey) -> Result<Self, Self::Error> {
+        consume(&value.value)
+    }
 }
 
 impl TryFrom<UpdatePublicKey> for super::types::UpdatePublicKey {
@@ -687,7 +723,7 @@ impl TryFrom<CredentialPublicKeys> for crate::id::types::CredentialPublicKeys {
 
     fn try_from(value: CredentialPublicKeys) -> Result<Self, Self::Error> {
         Ok(Self {
-            keys:      value
+            keys: value
                 .keys
                 .into_iter()
                 .map(|(k, v)| {
@@ -722,7 +758,9 @@ impl TryFrom<CredentialRegistrationId> for ArCurve {
 }
 
 impl From<IdentityProviderIdentity> for crate::id::types::IpIdentity {
-    fn from(v: IdentityProviderIdentity) -> Self { Self(v.value) }
+    fn from(v: IdentityProviderIdentity) -> Self {
+        Self(v.value)
+    }
 }
 
 impl TryFrom<YearMonth> for crate::id::types::YearMonth {
@@ -730,7 +768,7 @@ impl TryFrom<YearMonth> for crate::id::types::YearMonth {
 
     fn try_from(value: YearMonth) -> Result<Self, Self::Error> {
         Ok(Self {
-            year:  value
+            year: value
                 .year
                 .try_into()
                 .map_err(|_| tonic::Status::internal("Unexpected year."))?,
@@ -747,7 +785,7 @@ impl TryFrom<Policy> for crate::id::types::Policy<ArCurve, AttributeKind> {
 
     fn try_from(value: Policy) -> Result<Self, Self::Error> {
         Ok(Self {
-            valid_to:   value.valid_to.require()?.try_into()?,
+            valid_to: value.valid_to.require()?.try_into()?,
             created_at: value.created_at.require()?.try_into()?,
             policy_vec: value
                 .attributes
@@ -763,7 +801,7 @@ impl TryFrom<Policy> for crate::id::types::Policy<ArCurve, AttributeKind> {
                     Ok((k, v))
                 })
                 .collect::<Result<_, tonic::Status>>()?,
-            _phantom:   std::marker::PhantomData,
+            _phantom: std::marker::PhantomData,
         })
     }
 }
@@ -779,7 +817,9 @@ impl TryFrom<ChainArData> for crate::id::types::ChainArData<ArCurve> {
 impl TryFrom<Commitment> for crate::id::pedersen_commitment::Commitment<ArCurve> {
     type Error = tonic::Status;
 
-    fn try_from(value: Commitment) -> Result<Self, Self::Error> { consume(&value.value) }
+    fn try_from(value: Commitment) -> Result<Self, Self::Error> {
+        consume(&value.value)
+    }
 }
 
 impl TryFrom<CredentialCommitments> for crate::id::types::CredentialDeploymentCommitments<ArCurve> {
@@ -819,19 +859,19 @@ impl TryFrom<AccountCredential> for AccountCredentialWithoutProofs<ArCurve, Attr
             account_credential::CredentialValues::Initial(ic) => {
                 let icdv = InitialCredentialDeploymentValues {
                     cred_account: ic.keys.require()?.try_into()?,
-                    reg_id:       ic.cred_id.require()?.try_into()?,
-                    ip_identity:  ic.ip_id.require()?.into(),
-                    policy:       ic.policy.require()?.try_into()?,
+                    reg_id: ic.cred_id.require()?.try_into()?,
+                    ip_identity: ic.ip_id.require()?.into(),
+                    policy: ic.policy.require()?.try_into()?,
                 };
                 Ok(Self::Initial { icdv })
             }
             account_credential::CredentialValues::Normal(nc) => {
                 let cdv = CredentialDeploymentValues {
                     cred_key_info: nc.keys.require()?.try_into()?,
-                    cred_id:       nc.cred_id.require()?.try_into()?,
-                    ip_identity:   nc.ip_id.require()?.into(),
-                    threshold:     nc.ar_threshold.require()?.try_into()?,
-                    ar_data:       nc
+                    cred_id: nc.cred_id.require()?.try_into()?,
+                    ip_identity: nc.ip_id.require()?.into(),
+                    threshold: nc.ar_threshold.require()?.try_into()?,
+                    ar_data: nc
                         .ar_data
                         .into_iter()
                         .map(|(k, v)| {
@@ -842,7 +882,7 @@ impl TryFrom<AccountCredential> for AccountCredentialWithoutProofs<ArCurve, Attr
                             Ok((k, v))
                         })
                         .collect::<Result<_, tonic::Status>>()?,
-                    policy:        nc.policy.require()?.try_into()?,
+                    policy: nc.policy.require()?.try_into()?,
                 };
                 let commitments = nc.commitments.require()?.try_into()?;
                 Ok(Self::Normal { cdv, commitments })
@@ -852,7 +892,9 @@ impl TryFrom<AccountCredential> for AccountCredentialWithoutProofs<ArCurve, Attr
 }
 
 impl From<Timestamp> for concordium_base::common::types::Timestamp {
-    fn from(value: Timestamp) -> Self { value.value.into() }
+    fn from(value: Timestamp) -> Self {
+        value.value.into()
+    }
 }
 
 impl From<concordium_base::common::types::Timestamp> for Timestamp {
@@ -883,8 +925,8 @@ impl TryFrom<DelegatorInfo> for super::types::DelegatorInfo {
 
     fn try_from(delegator: DelegatorInfo) -> Result<Self, Self::Error> {
         Ok(Self {
-            account:        delegator.account.require()?.try_into()?,
-            stake:          delegator.stake.require()?.into(),
+            account: delegator.account.require()?.try_into()?,
+            stake: delegator.stake.require()?.into(),
             pending_change: delegator
                 .pending_change
                 .map(TryFrom::try_from)
@@ -899,7 +941,7 @@ impl TryFrom<DelegatorRewardPeriodInfo> for super::types::DelegatorRewardPeriodI
     fn try_from(delegator: DelegatorRewardPeriodInfo) -> Result<Self, Self::Error> {
         Ok(Self {
             account: delegator.account.require()?.try_into()?,
-            stake:   delegator.stake.require()?.into(),
+            stake: delegator.stake.require()?.into(),
         })
     }
 }
@@ -919,10 +961,10 @@ impl TryFrom<Cooldown> for super::types::Cooldown {
 
     fn try_from(cd: Cooldown) -> Result<Self, Self::Error> {
         Ok(Self {
-            status:   Upward::from(CooldownStatus::try_from(cd.status).ok())
+            status: Upward::from(CooldownStatus::try_from(cd.status).ok())
                 .map(super::types::CooldownStatus::from),
             end_time: cd.end_time.require()?.into(),
-            amount:   cd.amount.require()?.into(),
+            amount: cd.amount.require()?.into(),
         })
     }
 }
@@ -1069,13 +1111,13 @@ impl TryFrom<AccountTransactionPayload> for concordium_base::transactions::Encod
                     versioned_module_source::Module::V0(source) => {
                         concordium_base::smart_contracts::WasmModule {
                             version: concordium_base::smart_contracts::WasmVersion::V0,
-                            source:  source.value.into(),
+                            source: source.value.into(),
                         }
                     }
                     versioned_module_source::Module::V1(source) => {
                         concordium_base::smart_contracts::WasmModule {
                             version: concordium_base::smart_contracts::WasmVersion::V1,
-                            source:  source.value.into(),
+                            source: source.value.into(),
                         }
                     }
                 };
@@ -1083,34 +1125,34 @@ impl TryFrom<AccountTransactionPayload> for concordium_base::transactions::Encod
             }
             account_transaction_payload::Payload::InitContract(ic) => {
                 let payload = concordium_base::transactions::InitContractPayload {
-                    amount:    ic.amount.require()?.into(),
-                    mod_ref:   ic.module_ref.require()?.try_into()?,
+                    amount: ic.amount.require()?.into(),
+                    mod_ref: ic.module_ref.require()?.try_into()?,
                     init_name: ic.init_name.require()?.try_into()?,
-                    param:     ic.parameter.require()?.try_into()?,
+                    param: ic.parameter.require()?.try_into()?,
                 };
                 Ok(concordium_base::transactions::Payload::InitContract { payload }.encode())
             }
             account_transaction_payload::Payload::UpdateContract(uc) => {
                 let payload = concordium_base::transactions::UpdateContractPayload {
-                    amount:       uc.amount.require()?.into(),
-                    address:      uc.address.require()?.into(),
+                    amount: uc.amount.require()?.into(),
+                    address: uc.address.require()?.into(),
                     receive_name: uc.receive_name.require()?.try_into()?,
-                    message:      uc.parameter.require()?.try_into()?,
+                    message: uc.parameter.require()?.try_into()?,
                 };
                 Ok(concordium_base::transactions::Payload::Update { payload }.encode())
             }
             account_transaction_payload::Payload::Transfer(t) => {
                 let payload = concordium_base::transactions::Payload::Transfer {
                     to_address: t.receiver.require()?.try_into()?,
-                    amount:     t.amount.require()?.into(),
+                    amount: t.amount.require()?.into(),
                 };
                 Ok(payload.encode())
             }
             account_transaction_payload::Payload::TransferWithMemo(t) => {
                 let payload = concordium_base::transactions::Payload::TransferWithMemo {
                     to_address: t.receiver.require()?.try_into()?,
-                    amount:     t.amount.require()?.into(),
-                    memo:       t.memo.require()?.try_into()?,
+                    amount: t.amount.require()?.into(),
+                    memo: t.memo.require()?.try_into()?,
                 };
                 Ok(payload.encode())
             }
@@ -1242,12 +1284,12 @@ impl TryFrom<UpdateInstruction> for concordium_base::updates::UpdateInstruction 
         let update_instruction_payload::Payload::RawPayload(payload) =
             value.payload.require()?.payload.require()?;
         let header = concordium_base::updates::UpdateHeader {
-            seq_number:     header.sequence_number.require()?.into(),
+            seq_number: header.sequence_number.require()?.into(),
             effective_time: header.effective_time.require()?.into(),
-            timeout:        header.timeout.require()?.into(),
-            payload_size:   (payload.len() as u32).into(), /* as is safe since
-                                                            * this is coming from the node, from
-                                                            * a block */
+            timeout: header.timeout.require()?.into(),
+            payload_size: (payload.len() as u32).into(), /* as is safe since
+                                                          * this is coming from the node, from
+                                                          * a block */
         };
         let signatures: concordium_base::updates::UpdateInstructionSignature =
             value.signatures.require()?.try_into()?;
@@ -1302,8 +1344,8 @@ impl TryFrom<AccountTransactionDetails> for super::types::AccountTransactionDeta
 
     fn try_from(v: AccountTransactionDetails) -> Result<Self, Self::Error> {
         Ok(Self {
-            cost:    v.cost.require()?.into(),
-            sender:  v.sender.require()?.try_into()?,
+            cost: v.cost.require()?.into(),
+            sender: v.sender.require()?.try_into()?,
             effects: Upward::from(v.effects.map(TryFrom::try_from).transpose()?),
         })
     }
@@ -1314,10 +1356,10 @@ impl TryFrom<BlockItemSummary> for super::types::BlockItemSummary {
 
     fn try_from(value: BlockItemSummary) -> Result<Self, Self::Error> {
         Ok(Self {
-            index:       value.index.require()?.into(),
+            index: value.index.require()?.into(),
             energy_cost: value.energy_cost.require()?.into(),
-            hash:        value.hash.require()?.try_into()?,
-            details:     Upward::from(value.details.map(TryFrom::try_from).transpose()?),
+            hash: value.hash.require()?.try_into()?,
+            details: Upward::from(value.details.map(TryFrom::try_from).transpose()?),
         })
     }
 }
@@ -1334,15 +1376,15 @@ impl TryFrom<block_item_summary::Details> for super::types::BlockItemSummaryDeta
                 super::types::BlockItemSummaryDetails::AccountCreation(
                     super::types::AccountCreationDetails {
                         credential_type: v.credential_type().into(),
-                        address:         v.address.require()?.try_into()?,
-                        reg_id:          v.reg_id.require()?.try_into()?,
+                        address: v.address.require()?.try_into()?,
+                        reg_id: v.reg_id.require()?.try_into()?,
                     },
                 )
             }
             block_item_summary::Details::Update(v) => {
                 super::types::BlockItemSummaryDetails::Update(super::types::UpdateDetails {
                     effective_time: v.effective_time.require()?.into(),
-                    payload:        Upward::from(
+                    payload: Upward::from(
                         v.payload
                             .map(super::types::UpdatePayload::try_from)
                             .transpose()?,
@@ -1353,7 +1395,7 @@ impl TryFrom<block_item_summary::Details> for super::types::BlockItemSummaryDeta
                 super::types::BlockItemSummaryDetails::TokenCreationDetails(
                     super::types::TokenCreationDetails {
                         create_plt: v.create_plt.require()?.try_into()?,
-                        events:     v
+                        events: v
                             .events
                             .into_iter()
                             .map(TryInto::try_into)
@@ -1475,9 +1517,9 @@ impl TryFrom<super::generated::plt::CreatePlt> for concordium_base::updates::Cre
 
     fn try_from(value: super::generated::plt::CreatePlt) -> Result<Self, Self::Error> {
         Ok(Self {
-            token_id:                  value.token_id.require()?.try_into()?,
-            token_module:              value.token_module.require()?.try_into()?,
-            decimals:                  value.decimals.try_into().map_err(|_| {
+            token_id: value.token_id.require()?.try_into()?,
+            token_module: value.token_module.require()?.try_into()?,
+            decimals: value.decimals.try_into().map_err(|_| {
                 tonic::Status::internal("Unexpected integer size for token decimals.")
             })?,
             initialization_parameters: value.initialization_parameters.require()?.into(),
@@ -1526,9 +1568,9 @@ impl TryFrom<IpInfo> for crate::id::types::IpInfo<IpPairing> {
 
     fn try_from(value: IpInfo) -> Result<Self, Self::Error> {
         Ok(Self {
-            ip_identity:       crate::id::types::IpIdentity(value.identity.require()?.value),
-            ip_description:    value.description.require()?.into(),
-            ip_verify_key:     value.verify_key.require()?.try_into()?,
+            ip_identity: crate::id::types::IpIdentity(value.identity.require()?.value),
+            ip_description: value.description.require()?.into(),
+            ip_verify_key: value.verify_key.require()?.try_into()?,
             ip_cdi_verify_key: value.cdi_verify_key.require()?.try_into()?,
         })
     }
@@ -1539,10 +1581,10 @@ impl TryFrom<ArInfo> for crate::id::types::ArInfo<ArCurve> {
 
     fn try_from(value: ArInfo) -> Result<Self, Self::Error> {
         Ok(Self {
-            ar_identity:    crate::id::types::ArIdentity::try_from(value.identity.require()?.value)
+            ar_identity: crate::id::types::ArIdentity::try_from(value.identity.require()?.value)
                 .map_err(tonic::Status::internal)?,
             ar_description: value.description.require()?.into(),
-            ar_public_key:  value.public_key.require()?.try_into()?,
+            ar_public_key: value.public_key.require()?.try_into()?,
         })
     }
 }
@@ -1550,8 +1592,8 @@ impl TryFrom<ArInfo> for crate::id::types::ArInfo<ArCurve> {
 impl From<Description> for crate::id::types::Description {
     fn from(value: Description) -> Self {
         Self {
-            name:        value.name,
-            url:         value.url,
+            name: value.name,
+            url: value.url,
             description: value.description,
         }
     }
@@ -1591,10 +1633,10 @@ impl TryFrom<AuthorizationsV1> for super::types::AuthorizationsV1 {
 
     fn try_from(value: AuthorizationsV1) -> Result<Self, Self::Error> {
         Ok(Self {
-            v0:                  value.v0.require()?.try_into()?,
+            v0: value.v0.require()?.try_into()?,
             cooldown_parameters: value.parameter_cooldown.require()?.try_into()?,
-            time_parameters:     value.parameter_time.require()?.try_into()?,
-            create_plt:          value.create_plt.map(|x| x.try_into()).transpose()?,
+            time_parameters: value.parameter_time.require()?.try_into()?,
+            create_plt: value.create_plt.map(|x| x.try_into()).transpose()?,
         })
     }
 }
@@ -1687,7 +1729,7 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                         ),
                     }
                 },
-                reject_reason:    n
+                reject_reason: n
                     .reject_reason
                     .map(super::types::RejectReason::try_from)
                     .transpose()?
@@ -1714,12 +1756,12 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                 Ok(Self::ContractInitialized {
                     data: super::types::ContractInitializedEvent {
                         contract_version: cie.contract_version().into(),
-                        origin_ref:       cie.origin_ref.require()?.try_into()?,
-                        address:          cie.address.require()?.into(),
-                        amount:           cie.amount.require()?.into(),
-                        init_name:        cie.init_name.require()?.try_into()?,
-                        events:           cie.events.into_iter().map(Into::into).collect(),
-                        parameter:        cie.parameter.map(TryInto::try_into).transpose()?,
+                        origin_ref: cie.origin_ref.require()?.try_into()?,
+                        address: cie.address.require()?.into(),
+                        amount: cie.amount.require()?.into(),
+                        init_name: cie.init_name.require()?.try_into()?,
+                        events: cie.events.into_iter().map(Into::into).collect(),
+                        parameter: cie.parameter.map(TryInto::try_into).transpose()?,
                     },
                 })
             }
@@ -1740,8 +1782,8 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
             }
             account_transaction_effects::Effect::BakerAdded(ba) => {
                 let baker_added_event = super::types::BakerAddedEvent {
-                    keys_event:       ba.keys_event.require()?.try_into()?,
-                    stake:            ba.stake.require()?.into(),
+                    keys_event: ba.keys_event.require()?.try_into()?,
+                    stake: ba.stake.require()?.into(),
                     restake_earnings: ba.restake_earnings,
                 };
                 Ok(Self::BakerAdded {
@@ -1755,7 +1797,7 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                 let data = match bsu.update {
                     None => None,
                     Some(d) => Some(super::types::BakerStakeUpdatedData {
-                        baker_id:  d.baker_id.require()?.into(),
+                        baker_id: d.baker_id.require()?.into(),
                         new_stake: d.new_stake.require()?.into(),
                         increased: d.increased,
                     }),
@@ -1764,7 +1806,7 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
             }
             account_transaction_effects::Effect::BakerRestakeEarningsUpdated(breu) => {
                 Ok(Self::BakerRestakeEarningsUpdated {
-                    baker_id:         breu.baker_id.require()?.into(),
+                    baker_id: breu.baker_id.require()?.into(),
                     restake_earnings: breu.restake_earnings,
                 })
             }
@@ -1788,16 +1830,16 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
             account_transaction_effects::Effect::TransferredToEncrypted(esaae) => {
                 Ok(Self::TransferredToEncrypted {
                     data: Box::new(super::types::EncryptedSelfAmountAddedEvent {
-                        account:    esaae.account.require()?.try_into()?,
+                        account: esaae.account.require()?.try_into()?,
                         new_amount: esaae.new_amount.require()?.try_into()?,
-                        amount:     esaae.amount.require()?.into(),
+                        amount: esaae.amount.require()?.into(),
                     }),
                 })
             }
             account_transaction_effects::Effect::TransferredToPublic(ttp) => {
                 Ok(Self::TransferredToPublic {
                     removed: Box::new(ttp.removed.require()?.try_into()?),
-                    amount:  ttp.amount.require()?.into(),
+                    amount: ttp.amount.require()?.into(),
                 })
             }
             account_transaction_effects::Effect::TransferredWithSchedule(tws) => {
@@ -1823,7 +1865,7 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
             }
             account_transaction_effects::Effect::CredentialsUpdated(cu) => {
                 Ok(Self::CredentialsUpdated {
-                    new_cred_ids:     cu
+                    new_cred_ids: cu
                         .new_cred_ids
                         .into_iter()
                         .map(TryInto::try_into)
@@ -1833,7 +1875,7 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                         .into_iter()
                         .map(TryInto::try_into)
                         .collect::<Result<_, tonic::Status>>()?,
-                    new_threshold:    cu.new_threshold.require()?.try_into()?,
+                    new_threshold: cu.new_threshold.require()?.try_into()?,
                 })
             }
             account_transaction_effects::Effect::DataRegistered(rd) => Ok(Self::DataRegistered {
@@ -1894,15 +1936,15 @@ impl TryFrom<contract_trace_element::Element> for super::types::ContractTraceEle
             }
             contract_trace_element::Element::Transferred(t) => {
                 super::types::ContractTraceElement::Transferred {
-                    from:   t.sender.require()?.into(),
+                    from: t.sender.require()?.into(),
                     amount: t.amount.require()?.into(),
-                    to:     t.receiver.require()?.try_into()?,
+                    to: t.receiver.require()?.try_into()?,
                 }
             }
             contract_trace_element::Element::Interrupted(i) => {
                 super::types::ContractTraceElement::Interrupted {
                     address: i.address.require()?.into(),
-                    events:  i.events.into_iter().map(Into::into).collect(),
+                    events: i.events.into_iter().map(Into::into).collect(),
                 }
             }
             contract_trace_element::Element::Resumed(r) => {
@@ -1914,8 +1956,8 @@ impl TryFrom<contract_trace_element::Element> for super::types::ContractTraceEle
             contract_trace_element::Element::Upgraded(r) => {
                 super::types::ContractTraceElement::Upgraded {
                     address: r.address.require()?.into(),
-                    from:    r.from.require()?.try_into()?,
-                    to:      r.to.require()?.try_into()?,
+                    from: r.from.require()?.try_into()?,
+                    to: r.to.require()?.try_into()?,
                 }
             }
         })
@@ -1930,24 +1972,24 @@ impl TryFrom<delegation_event::Event> for super::types::DelegationEvent {
             delegation_event::Event::DelegationStakeIncreased(v) => {
                 Self::DelegationStakeIncreased {
                     delegator_id: v.delegator_id.require()?.try_into()?,
-                    new_stake:    v.new_stake.require()?.into(),
+                    new_stake: v.new_stake.require()?.into(),
                 }
             }
             delegation_event::Event::DelegationStakeDecreased(v) => {
                 Self::DelegationStakeDecreased {
                     delegator_id: v.delegator_id.require()?.try_into()?,
-                    new_stake:    v.new_stake.require()?.into(),
+                    new_stake: v.new_stake.require()?.into(),
                 }
             }
             delegation_event::Event::DelegationSetRestakeEarnings(v) => {
                 Self::DelegationSetRestakeEarnings {
-                    delegator_id:     v.delegator_id.require()?.try_into()?,
+                    delegator_id: v.delegator_id.require()?.try_into()?,
                     restake_earnings: v.restake_earnings,
                 }
             }
             delegation_event::Event::DelegationSetDelegationTarget(v) => {
                 Self::DelegationSetDelegationTarget {
-                    delegator_id:      v.delegator_id.require()?.try_into()?,
+                    delegator_id: v.delegator_id.require()?.try_into()?,
                     delegation_target: v.delegation_target.require()?.try_into()?,
                 }
             }
@@ -1981,23 +2023,23 @@ impl TryFrom<baker_event::Event> for super::types::BakerEvent {
         Ok(match value {
             baker_event::Event::BakerAdded(v) => Self::BakerAdded {
                 data: Box::new(super::types::BakerAddedEvent {
-                    keys_event:       v.keys_event.require()?.try_into()?,
-                    stake:            v.stake.require()?.into(),
+                    keys_event: v.keys_event.require()?.try_into()?,
+                    stake: v.stake.require()?.into(),
                     restake_earnings: v.restake_earnings,
                 }),
             },
             baker_event::Event::BakerRemoved(v) => Self::BakerRemoved { baker_id: v.into() },
             baker_event::Event::BakerStakeIncreased(v) => Self::BakerStakeIncreased {
-                baker_id:  v.baker_id.require()?.into(),
+                baker_id: v.baker_id.require()?.into(),
                 new_stake: v.new_stake.require()?.into(),
             },
             baker_event::Event::BakerStakeDecreased(v) => Self::BakerStakeDecreased {
-                baker_id:  v.baker_id.require()?.into(),
+                baker_id: v.baker_id.require()?.into(),
                 new_stake: v.new_stake.require()?.into(),
             },
             baker_event::Event::BakerRestakeEarningsUpdated(v) => {
                 Self::BakerRestakeEarningsUpdated {
-                    baker_id:         v.baker_id.require()?.into(),
+                    baker_id: v.baker_id.require()?.into(),
                     restake_earnings: v.restake_earnings,
                 }
             }
@@ -2012,20 +2054,20 @@ impl TryFrom<baker_event::Event> for super::types::BakerEvent {
                 }
             }
             baker_event::Event::BakerSetMetadataUrl(v) => Self::BakerSetMetadataURL {
-                baker_id:     v.baker_id.require()?.into(),
+                baker_id: v.baker_id.require()?.into(),
                 metadata_url: v.url.try_into().map_err(|e| {
                     tonic::Status::invalid_argument(format!("Invalid argument: {}", e))
                 })?,
             },
             baker_event::Event::BakerSetTransactionFeeCommission(v) => {
                 Self::BakerSetTransactionFeeCommission {
-                    baker_id:                   v.baker_id.require()?.into(),
+                    baker_id: v.baker_id.require()?.into(),
                     transaction_fee_commission: v.transaction_fee_commission.require()?.into(),
                 }
             }
             baker_event::Event::BakerSetBakingRewardCommission(v) => {
                 Self::BakerSetBakingRewardCommission {
-                    baker_id:                 v.baker_id.require()?.into(),
+                    baker_id: v.baker_id.require()?.into(),
                     baking_reward_commission: v.baking_reward_commission.require()?.into(),
                 }
             }
@@ -2083,10 +2125,10 @@ impl TryFrom<EncryptedAmountRemovedEvent> for super::types::EncryptedAmountRemov
 
     fn try_from(value: EncryptedAmountRemovedEvent) -> Result<Self, Self::Error> {
         Ok(Self {
-            account:      value.account.require()?.try_into()?,
-            new_amount:   value.new_amount.require()?.try_into()?,
+            account: value.account.require()?.try_into()?,
+            new_amount: value.new_amount.require()?.try_into()?,
             input_amount: value.input_amount.require()?.try_into()?,
-            up_to_index:  crate::encrypted_transfers::types::EncryptedAmountAggIndex {
+            up_to_index: crate::encrypted_transfers::types::EncryptedAmountAggIndex {
                 index: value.up_to_index,
             },
         })
@@ -2098,8 +2140,8 @@ impl TryFrom<NewEncryptedAmountEvent> for super::types::NewEncryptedAmountEvent 
 
     fn try_from(value: NewEncryptedAmountEvent) -> Result<Self, Self::Error> {
         Ok(Self {
-            receiver:         value.receiver.require()?.try_into()?,
-            new_index:        crate::encrypted_transfers::types::EncryptedAmountIndex {
+            receiver: value.receiver.require()?.try_into()?,
+            new_index: crate::encrypted_transfers::types::EncryptedAmountIndex {
                 index: value.new_index,
             },
             encrypted_amount: value.encrypted_amount.require()?.try_into()?,
@@ -2122,10 +2164,10 @@ impl TryFrom<BakerKeysEvent> for super::types::BakerKeysEvent {
 
     fn try_from(value: BakerKeysEvent) -> Result<Self, Self::Error> {
         Ok(Self {
-            baker_id:        value.baker_id.require()?.into(),
-            account:         value.account.require()?.try_into()?,
-            sign_key:        value.sign_key.require()?.try_into()?,
-            election_key:    value.election_key.require()?.try_into()?,
+            baker_id: value.baker_id.require()?.into(),
+            account: value.account.require()?.try_into()?,
+            sign_key: value.sign_key.require()?.try_into()?,
+            election_key: value.election_key.require()?.try_into()?,
             aggregation_key: value.aggregation_key.require()?.try_into()?,
         })
     }
@@ -2137,12 +2179,12 @@ impl TryFrom<InstanceUpdatedEvent> for super::types::InstanceUpdatedEvent {
     fn try_from(value: InstanceUpdatedEvent) -> Result<Self, Self::Error> {
         Ok(Self {
             contract_version: value.contract_version().into(),
-            address:          value.address.require()?.into(),
-            instigator:       value.instigator.require()?.try_into()?,
-            amount:           value.amount.require()?.into(),
-            message:          value.parameter.require()?.try_into()?,
-            receive_name:     value.receive_name.require()?.try_into()?,
-            events:           value.events.into_iter().map(Into::into).collect(),
+            address: value.address.require()?.into(),
+            instigator: value.instigator.require()?.try_into()?,
+            amount: value.amount.require()?.into(),
+            message: value.parameter.require()?.try_into()?,
+            receive_name: value.receive_name.require()?.try_into()?,
+            events: value.events.into_iter().map(Into::into).collect(),
         })
     }
 }
@@ -2157,7 +2199,9 @@ impl From<ContractVersion> for super::types::smart_contracts::WasmVersion {
 }
 
 impl From<ContractEvent> for super::types::smart_contracts::ContractEvent {
-    fn from(value: ContractEvent) -> Self { value.value.into() }
+    fn from(value: ContractEvent) -> Self {
+        value.value.into()
+    }
 }
 
 impl TryFrom<RejectReason> for super::types::RejectReason {
@@ -2200,10 +2244,10 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
                 reject_reason: v.reject_reason,
             },
             reject_reason::Reason::RejectedReceive(v) => Self::RejectedReceive {
-                reject_reason:    v.reject_reason,
+                reject_reason: v.reject_reason,
                 contract_address: v.contract_address.require()?.into(),
-                receive_name:     v.receive_name.require()?.try_into()?,
-                parameter:        v.parameter.require()?.try_into()?,
+                receive_name: v.receive_name.require()?.try_into()?,
+                parameter: v.parameter.require()?.try_into()?,
             },
             reject_reason::Reason::InvalidProof(_) => Self::InvalidProof,
             reject_reason::Reason::AlreadyABaker(v) => Self::AlreadyABaker { contents: v.into() },
@@ -2327,14 +2371,16 @@ impl TryFrom<NextAccountSequenceNumber> for super::types::queries::AccountNonceR
 
     fn try_from(value: NextAccountSequenceNumber) -> Result<Self, Self::Error> {
         Ok(Self {
-            nonce:     value.sequence_number.require()?.into(),
+            nonce: value.sequence_number.require()?.into(),
             all_final: value.all_final,
         })
     }
 }
 
 impl From<block_item_summary::TransactionIndex> for super::types::TransactionIndex {
-    fn from(value: block_item_summary::TransactionIndex) -> Self { Self { index: value.value } }
+    fn from(value: block_item_summary::TransactionIndex) -> Self {
+        Self { index: value.value }
+    }
 }
 
 impl From<Energy> for super::types::Energy {
@@ -2401,9 +2447,9 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
                         .current_timeout_duration
                         .require()?
                         .try_into()?,
-                    current_round:            value.current_round.require()?.into(),
-                    current_epoch:            value.current_epoch.require()?.into(),
-                    trigger_block_time:       value.trigger_block_time.require()?.try_into()?,
+                    current_round: value.current_round.require()?.into(),
+                    current_epoch: value.current_epoch.require()?.into(),
+                    trigger_block_time: value.trigger_block_time.require()?.try_into()?,
                 })
             },
         })
@@ -2418,12 +2464,12 @@ impl TryFrom<InvokeInstanceResponse> for super::types::smart_contracts::InvokeCo
         let result = match response.result.require()? {
             invoke_instance_response::Result::Failure(value) => InvokeContractResult::Failure {
                 return_value: value.return_value.map(|b| ReturnValue { value: b }),
-                reason:       Upward::from(value.reason.map(TryFrom::try_from).transpose()?),
-                used_energy:  value.used_energy.require()?.into(),
+                reason: Upward::from(value.reason.map(TryFrom::try_from).transpose()?),
+                used_energy: value.used_energy.require()?.into(),
             },
             invoke_instance_response::Result::Success(value) => InvokeContractResult::Success {
                 return_value: value.return_value.map(|b| ReturnValue { value: b }),
-                events:       value
+                events: value
                     .effects
                     .into_iter()
                     .map(|trace| {
@@ -2435,7 +2481,7 @@ impl TryFrom<InvokeInstanceResponse> for super::types::smart_contracts::InvokeCo
                         ))
                     })
                     .collect::<Result<_, tonic::Status>>()?,
-                used_energy:  value.used_energy.require()?.into(),
+                used_energy: value.used_energy.require()?.into(),
             },
         };
         Ok(result)
@@ -2447,7 +2493,7 @@ impl TryFrom<CryptographicParameters> for super::types::CryptographicParameters 
 
     fn try_from(value: CryptographicParameters) -> Result<Self, Self::Error> {
         Ok(Self {
-            genesis_string:          value.genesis_string,
+            genesis_string: value.genesis_string,
             on_chain_commitment_key: concordium_base::common::from_bytes(
                 &mut std::io::Cursor::new(&value.on_chain_commitment_key),
             )
@@ -2492,7 +2538,7 @@ impl TryFrom<ChainParametersV0> for super::ChainParametersV0 {
             foundation_account: value.foundation_account.require()?.try_into()?,
             minimum_threshold_for_baking: value.minimum_threshold_for_baking.require()?.into(),
             keys: UpdateKeysCollectionSkeleton {
-                root_keys:    value.root_keys.require()?.try_into()?,
+                root_keys: value.root_keys.require()?.try_into()?,
                 level_1_keys: value.level1_keys.require()?.try_into()?,
                 level_2_keys: value.level2_keys.require()?.try_into()?,
             },
@@ -2520,7 +2566,7 @@ impl TryFrom<ChainParametersV1> for super::ChainParametersV1 {
             time_parameters: value.time_parameters.require()?.try_into()?,
             cooldown_parameters: value.cooldown_parameters.require()?.try_into()?,
             keys: UpdateKeysCollectionSkeleton {
-                root_keys:    value.root_keys.require()?.try_into()?,
+                root_keys: value.root_keys.require()?.try_into()?,
                 level_1_keys: value.level1_keys.require()?.try_into()?,
                 level_2_keys: value.level2_keys.require()?.try_into()?,
             },
@@ -2559,7 +2605,7 @@ impl TryFrom<ChainParametersV2> for super::ChainParametersV2 {
                 .require()?
                 .try_into()?,
             keys: UpdateKeysCollectionSkeleton {
-                root_keys:    value.root_keys.require()?.try_into()?,
+                root_keys: value.root_keys.require()?.try_into()?,
                 level_1_keys: value.level1_keys.require()?.try_into()?,
                 level_2_keys: value.level2_keys.require()?.try_into()?,
             },
@@ -2599,7 +2645,7 @@ impl TryFrom<ChainParametersV3> for super::ChainParametersV3 {
                 .try_into()?,
             validator_score_parameters: value.validator_score_parameters.require()?.try_into()?,
             keys: UpdateKeysCollectionSkeleton {
-                root_keys:    value.root_keys.require()?.try_into()?,
+                root_keys: value.root_keys.require()?.try_into()?,
                 level_1_keys: value.level1_keys.require()?.try_into()?,
                 level_2_keys: value.level2_keys.require()?.try_into()?,
             },
@@ -2626,14 +2672,16 @@ impl TryFrom<FinalizationSummaryParty> for super::types::FinalizationSummaryPart
     fn try_from(value: FinalizationSummaryParty) -> Result<Self, Self::Error> {
         Ok(Self {
             baker_id: value.baker.require()?.into(),
-            weight:   value.weight,
-            signed:   value.signed,
+            weight: value.weight,
+            signed: value.signed,
         })
     }
 }
 
 impl From<FinalizationIndex> for super::types::FinalizationIndex {
-    fn from(value: FinalizationIndex) -> Self { value.value.into() }
+    fn from(value: FinalizationIndex) -> Self {
+        value.value.into()
+    }
 }
 
 impl TryFrom<BlockFinalizationSummary> for Option<super::types::FinalizationSummary> {
@@ -2645,9 +2693,9 @@ impl TryFrom<BlockFinalizationSummary> for Option<super::types::FinalizationSumm
             block_finalization_summary::Summary::Record(r) => {
                 Ok(Some(super::types::FinalizationSummary {
                     block_pointer: r.block.require()?.try_into()?,
-                    index:         r.index.require()?.into(),
-                    delay:         r.delay.require()?.into(),
-                    finalizers:    r
+                    index: r.index.require()?.into(),
+                    delay: r.delay.require()?.into(),
+                    finalizers: r
                         .finalizers
                         .into_iter()
                         .map(super::types::FinalizationSummaryParty::try_from)
@@ -2712,10 +2760,10 @@ impl TryFrom<PoolInfoResponse> for super::types::BakerPoolStatus {
         let active_baker_pool_status = match value.pool_info {
             None => None,
             Some(pi) => Some(ActiveBakerPoolStatus {
-                baker_equity_capital:       value.equity_capital.require()?.into(),
-                delegated_capital:          value.delegated_capital.require()?.into(),
-                delegated_capital_cap:      value.delegated_capital_cap.require()?.into(),
-                pool_info:                  pi.try_into()?,
+                baker_equity_capital: value.equity_capital.require()?.into(),
+                delegated_capital: value.delegated_capital.require()?.into(),
+                delegated_capital_cap: value.delegated_capital_cap.require()?.into(),
+                pool_info: pi.try_into()?,
                 baker_stake_pending_change: value.equity_pending_change.try_into()?,
             }),
         };
@@ -2742,7 +2790,7 @@ impl TryFrom<Option<PoolPendingChange>> for super::types::PoolPendingChange {
             match value.change.require()? {
                 pool_pending_change::Change::Reduce(rs) => Ok(Self::ReduceBakerCapital {
                     baker_equity_capital: rs.reduced_equity_capital.require()?.into(),
-                    effective_time:       rs.effective_time.require()?.try_into()?,
+                    effective_time: rs.effective_time.require()?.try_into()?,
                 }),
                 pool_pending_change::Change::Remove(rs) => Ok(Self::RemovePool {
                     effective_time: rs.effective_time.require()?.try_into()?,
@@ -2759,14 +2807,14 @@ impl TryFrom<PoolCurrentPaydayInfo> for super::types::CurrentPaydayBakerPoolStat
 
     fn try_from(value: PoolCurrentPaydayInfo) -> Result<Self, Self::Error> {
         Ok(Self {
-            blocks_baked:            value.blocks_baked,
-            finalization_live:       value.finalization_live,
+            blocks_baked: value.blocks_baked,
+            finalization_live: value.finalization_live,
             transaction_fees_earned: value.transaction_fees_earned.require()?.into(),
-            effective_stake:         value.effective_stake.require()?.into(),
-            lottery_power:           value.lottery_power,
-            baker_equity_capital:    value.baker_equity_capital.require()?.into(),
-            delegated_capital:       value.delegated_capital.require()?.into(),
-            commission_rates:        value.commission_rates.require()?.try_into()?,
+            effective_stake: value.effective_stake.require()?.into(),
+            lottery_power: value.lottery_power,
+            baker_equity_capital: value.baker_equity_capital.require()?.into(),
+            delegated_capital: value.delegated_capital.require()?.into(),
+            commission_rates: value.commission_rates.require()?.try_into()?,
         })
     }
 }
@@ -2827,36 +2875,36 @@ impl TryFrom<TokenomicsInfo> for super::types::RewardsOverview {
         match value.tokenomics.require()? {
             tokenomics_info::Tokenomics::V0(value) => Ok(Self::V0 {
                 data: super::types::CommonRewardData {
-                    protocol_version:            ProtocolVersionInt(
+                    protocol_version: ProtocolVersionInt(
                         u64::try_from(value.protocol_version).map_err(|err| {
                             tonic::Status::internal(format!("Invalid protocol version: {err}"))
                         })?,
                     ),
-                    total_amount:                value.total_amount.require()?.into(),
-                    total_encrypted_amount:      value.total_encrypted_amount.require()?.into(),
-                    baking_reward_account:       value.baking_reward_account.require()?.into(),
+                    total_amount: value.total_amount.require()?.into(),
+                    total_encrypted_amount: value.total_encrypted_amount.require()?.into(),
+                    baking_reward_account: value.baking_reward_account.require()?.into(),
                     finalization_reward_account: value
                         .finalization_reward_account
                         .require()?
                         .into(),
-                    gas_account:                 value.gas_account.require()?.into(),
+                    gas_account: value.gas_account.require()?.into(),
                 },
             }),
             tokenomics_info::Tokenomics::V1(value) => Ok(Self::V1 {
                 common: super::types::CommonRewardData {
-                    protocol_version:            ProtocolVersionInt(
+                    protocol_version: ProtocolVersionInt(
                         u64::try_from(value.protocol_version).map_err(|err| {
                             tonic::Status::internal(format!("Invalid protocol version: {err}"))
                         })?,
                     ),
-                    total_amount:                value.total_amount.require()?.into(),
-                    total_encrypted_amount:      value.total_encrypted_amount.require()?.into(),
-                    baking_reward_account:       value.baking_reward_account.require()?.into(),
+                    total_amount: value.total_amount.require()?.into(),
+                    total_encrypted_amount: value.total_encrypted_amount.require()?.into(),
+                    baking_reward_account: value.baking_reward_account.require()?.into(),
                     finalization_reward_account: value
                         .finalization_reward_account
                         .require()?
                         .into(),
-                    gas_account:                 value.gas_account.require()?.into(),
+                    gas_account: value.gas_account.require()?.into(),
                 },
                 foundation_transaction_rewards: value
                     .foundation_transaction_rewards
@@ -2914,9 +2962,9 @@ impl TryFrom<election_info::Baker> for super::types::BirkBaker {
 
     fn try_from(info: election_info::Baker) -> Result<Self, Self::Error> {
         Ok(Self {
-            baker_id:            info.baker.require()?.into(),
+            baker_id: info.baker.require()?.into(),
             baker_lottery_power: info.lottery_power,
-            baker_account:       info.account.require()?.try_into()?,
+            baker_account: info.account.require()?.try_into()?,
         })
     }
 }
@@ -2927,8 +2975,8 @@ impl TryFrom<ElectionInfo> for super::types::BirkParameters {
     fn try_from(info: ElectionInfo) -> Result<Self, Self::Error> {
         Ok(Self {
             election_difficulty: info.election_difficulty.map(|x| x.try_into()).transpose()?,
-            election_nonce:      info.election_nonce.require()?.try_into()?,
-            bakers:              info
+            election_nonce: info.election_nonce.require()?.try_into()?,
+            bakers: info
                 .baker_election_info
                 .into_iter()
                 .map(|c| c.try_into())
@@ -2967,28 +3015,28 @@ impl TryFrom<block_special_event::Event> for super::types::SpecialTransactionOut
         let event = match special_event {
             block_special_event::Event::BakingRewards(event) => Self::BakingRewards {
                 baker_rewards: event.baker_rewards.require()?.try_into()?,
-                remainder:     event.remainder.require()?.into(),
+                remainder: event.remainder.require()?.into(),
             },
             block_special_event::Event::Mint(event) => Self::Mint {
-                mint_baking_reward:               event.mint_baking_reward.require()?.into(),
-                mint_finalization_reward:         event.mint_finalization_reward.require()?.into(),
+                mint_baking_reward: event.mint_baking_reward.require()?.into(),
+                mint_finalization_reward: event.mint_finalization_reward.require()?.into(),
                 mint_platform_development_charge: event
                     .mint_platform_development_charge
                     .require()?
                     .into(),
-                foundation_account:               event.foundation_account.require()?.try_into()?,
+                foundation_account: event.foundation_account.require()?.try_into()?,
             },
             block_special_event::Event::FinalizationRewards(event) => Self::FinalizationRewards {
                 finalization_rewards: event.finalization_rewards.require()?.try_into()?,
-                remainder:            event.remainder.require()?.into(),
+                remainder: event.remainder.require()?.into(),
             },
             block_special_event::Event::BlockReward(event) => Self::BlockReward {
-                transaction_fees:   event.transaction_fees.require()?.into(),
-                old_gas_account:    event.old_gas_account.require()?.into(),
-                new_gas_account:    event.new_gas_account.require()?.into(),
-                baker_reward:       event.baker_reward.require()?.into(),
-                foundation_charge:  event.foundation_charge.require()?.into(),
-                baker:              event.baker.require()?.try_into()?,
+                transaction_fees: event.transaction_fees.require()?.into(),
+                old_gas_account: event.old_gas_account.require()?.into(),
+                new_gas_account: event.new_gas_account.require()?.into(),
+                baker_reward: event.baker_reward.require()?.into(),
+                foundation_charge: event.foundation_charge.require()?.into(),
+                baker: event.baker.require()?.try_into()?,
                 foundation_account: event.foundation_account.require()?.try_into()?,
             },
             block_special_event::Event::PaydayFoundationReward(event) => {
@@ -2998,34 +3046,34 @@ impl TryFrom<block_special_event::Event> for super::types::SpecialTransactionOut
                 }
             }
             block_special_event::Event::PaydayAccountReward(event) => Self::PaydayAccountReward {
-                account:             event.account.require()?.try_into()?,
-                transaction_fees:    event.transaction_fees.require()?.into(),
-                baker_reward:        event.baker_reward.require()?.into(),
+                account: event.account.require()?.try_into()?,
+                transaction_fees: event.transaction_fees.require()?.into(),
+                baker_reward: event.baker_reward.require()?.into(),
                 finalization_reward: event.finalization_reward.require()?.into(),
             },
             block_special_event::Event::BlockAccrueReward(event) => Self::BlockAccrueReward {
-                transaction_fees:  event.transaction_fees.require()?.into(),
-                old_gas_account:   event.old_gas_account.require()?.into(),
-                new_gas_account:   event.new_gas_account.require()?.into(),
-                baker_reward:      event.baker_reward.require()?.into(),
-                passive_reward:    event.passive_reward.require()?.into(),
+                transaction_fees: event.transaction_fees.require()?.into(),
+                old_gas_account: event.old_gas_account.require()?.into(),
+                new_gas_account: event.new_gas_account.require()?.into(),
+                baker_reward: event.baker_reward.require()?.into(),
+                passive_reward: event.passive_reward.require()?.into(),
                 foundation_charge: event.foundation_charge.require()?.into(),
-                baker_id:          event.baker.require()?.into(),
+                baker_id: event.baker.require()?.into(),
             },
             block_special_event::Event::PaydayPoolReward(event) => Self::PaydayPoolReward {
-                pool_owner:          event.pool_owner.map(|b| b.into()),
-                transaction_fees:    event.transaction_fees.require()?.into(),
-                baker_reward:        event.baker_reward.require()?.into(),
+                pool_owner: event.pool_owner.map(|b| b.into()),
+                transaction_fees: event.transaction_fees.require()?.into(),
+                baker_reward: event.baker_reward.require()?.into(),
                 finalization_reward: event.finalization_reward.require()?.into(),
             },
             block_special_event::Event::ValidatorSuspended(event) => Self::ValidatorSuspended {
                 baker_id: event.baker_id.require()?.into(),
-                account:  event.account.require()?.try_into()?,
+                account: event.account.require()?.try_into()?,
             },
             block_special_event::Event::ValidatorPrimedForSuspension(event) => {
                 Self::ValidatorPrimedForSuspension {
                     baker_id: event.baker_id.require()?.into(),
-                    account:  event.account.require()?.try_into()?,
+                    account: event.account.require()?.try_into()?,
                 }
             }
         };
@@ -3050,13 +3098,13 @@ impl<K> TryFrom<HigherLevelKeys> for updates::HigherLevelAccessStructure<K> {
 
     fn try_from(message: HigherLevelKeys) -> Result<Self, Self::Error> {
         Ok(Self {
-            keys:      message
+            keys: message
                 .keys
                 .into_iter()
                 .map(TryFrom::try_from)
                 .collect::<Result<_, _>>()?,
             threshold: message.threshold.require()?.try_into()?,
-            _phantom:  Default::default(),
+            _phantom: Default::default(),
         })
     }
 }
@@ -3093,8 +3141,8 @@ impl TryFrom<MintDistributionCpv0> for base::MintDistributionV0 {
 
     fn try_from(value: MintDistributionCpv0) -> Result<Self, Self::Error> {
         Ok(Self {
-            mint_per_slot:       value.mint_per_slot.require()?.try_into()?,
-            baking_reward:       value.baking_reward.require()?.into(),
+            mint_per_slot: value.mint_per_slot.require()?.try_into()?,
+            baking_reward: value.baking_reward.require()?.into(),
             finalization_reward: value.finalization_reward.require()?.into(),
         })
     }
@@ -3105,7 +3153,7 @@ impl TryFrom<MintDistributionCpv1> for base::MintDistributionV1 {
 
     fn try_from(value: MintDistributionCpv1) -> Result<Self, Self::Error> {
         Ok(Self {
-            baking_reward:       value.baking_reward.require()?.into(),
+            baking_reward: value.baking_reward.require()?.into(),
             finalization_reward: value.finalization_reward.require()?.into(),
         })
     }
@@ -3116,7 +3164,7 @@ impl TryFrom<TransactionFeeDistribution> for updates::TransactionFeeDistribution
 
     fn try_from(value: TransactionFeeDistribution) -> Result<Self, Self::Error> {
         Ok(Self {
-            baker:       value.baker.require()?.into(),
+            baker: value.baker.require()?.into(),
             gas_account: value.gas_account.require()?.into(),
         })
     }
@@ -3127,10 +3175,10 @@ impl TryFrom<GasRewards> for updates::GASRewards {
 
     fn try_from(value: GasRewards) -> Result<Self, Self::Error> {
         Ok(Self {
-            baker:              value.baker.require()?.into(),
+            baker: value.baker.require()?.into(),
             finalization_proof: value.finalization_proof.require()?.into(),
-            account_creation:   value.account_creation.require()?.into(),
-            chain_update:       value.chain_update.require()?.into(),
+            account_creation: value.account_creation.require()?.into(),
+            chain_update: value.chain_update.require()?.into(),
         })
     }
 }
@@ -3140,9 +3188,9 @@ impl TryFrom<GasRewardsCpv2> for updates::GASRewardsV1 {
 
     fn try_from(value: GasRewardsCpv2) -> Result<Self, Self::Error> {
         Ok(Self {
-            baker:            value.baker.require()?.into(),
+            baker: value.baker.require()?.into(),
             account_creation: value.account_creation.require()?.into(),
-            chain_update:     value.chain_update.require()?.into(),
+            chain_update: value.chain_update.require()?.into(),
         })
     }
 }
@@ -3201,12 +3249,12 @@ impl TryFrom<PoolParametersCpv1> for updates::PoolParameters {
                 .passive_finalization_commission
                 .require()?
                 .into(),
-            passive_baking_commission:       value.passive_baking_commission.require()?.into(),
-            passive_transaction_commission:  value.passive_transaction_commission.require()?.into(),
-            commission_bounds:               value.commission_bounds.require()?.try_into()?,
-            minimum_equity_capital:          value.minimum_equity_capital.require()?.into(),
-            capital_bound:                   value.capital_bound.require()?.try_into()?,
-            leverage_bound:                  value.leverage_bound.require()?.try_into()?,
+            passive_baking_commission: value.passive_baking_commission.require()?.into(),
+            passive_transaction_commission: value.passive_transaction_commission.require()?.into(),
+            commission_bounds: value.commission_bounds.require()?.try_into()?,
+            minimum_equity_capital: value.minimum_equity_capital.require()?.into(),
+            capital_bound: value.capital_bound.require()?.try_into()?,
+            leverage_bound: value.leverage_bound.require()?.try_into()?,
         })
     }
 }
@@ -3227,8 +3275,8 @@ impl TryFrom<CommissionRanges> for super::types::CommissionRanges {
     fn try_from(value: CommissionRanges) -> Result<Self, Self::Error> {
         Ok(Self {
             finalization: value.finalization.require()?.try_into()?,
-            baking:       value.baking.require()?.try_into()?,
-            transaction:  value.transaction.require()?.try_into()?,
+            baking: value.baking.require()?.try_into()?,
+            transaction: value.transaction.require()?.try_into()?,
         })
     }
 }
@@ -3249,7 +3297,7 @@ impl TryFrom<CooldownParametersCpv1> for updates::CooldownParameters {
     fn try_from(value: CooldownParametersCpv1) -> Result<Self, Self::Error> {
         Ok(Self {
             pool_owner_cooldown: value.pool_owner_cooldown.require()?.into(),
-            delegator_cooldown:  value.delegator_cooldown.require()?.into(),
+            delegator_cooldown: value.delegator_cooldown.require()?.into(),
         })
     }
 }
@@ -3260,7 +3308,7 @@ impl TryFrom<TimeParametersCpv1> for updates::TimeParameters {
     fn try_from(value: TimeParametersCpv1) -> Result<Self, Self::Error> {
         Ok(Self {
             reward_period_length: value.reward_period_length.require()?.try_into()?,
-            mint_per_payday:      value.mint_per_payday.require()?.try_into()?,
+            mint_per_payday: value.mint_per_payday.require()?.try_into()?,
         })
     }
 }
@@ -3274,11 +3322,15 @@ impl TryFrom<RewardPeriodLength> for updates::RewardPeriodLength {
 }
 
 impl From<Epoch> for base::Epoch {
-    fn from(value: Epoch) -> Self { Self { epoch: value.value } }
+    fn from(value: Epoch) -> Self {
+        Self { epoch: value.value }
+    }
 }
 
 impl From<Round> for base::Round {
-    fn from(value: Round) -> Self { Self { round: value.value } }
+    fn from(value: Round) -> Self {
+        Self { round: value.value }
+    }
 }
 
 impl TryFrom<PendingUpdate> for super::types::queries::PendingUpdate {
@@ -3381,11 +3433,15 @@ impl TryFrom<pending_update::Effect> for super::types::queries::PendingUpdateEff
 }
 
 impl From<SequenceNumber> for super::types::UpdateSequenceNumber {
-    fn from(message: SequenceNumber) -> Self { message.value.into() }
+    fn from(message: SequenceNumber) -> Self {
+        message.value.into()
+    }
 }
 
 impl From<UpdateSequenceNumber> for super::types::UpdateSequenceNumber {
-    fn from(message: UpdateSequenceNumber) -> Self { message.value.into() }
+    fn from(message: UpdateSequenceNumber) -> Self {
+        message.value.into()
+    }
 }
 
 impl TryFrom<NextUpdateSequenceNumbers> for super::types::queries::NextUpdateSequenceNumbers {
@@ -3431,7 +3487,9 @@ impl TryFrom<NextUpdateSequenceNumbers> for super::types::queries::NextUpdateSeq
 impl TryFrom<QuorumSignature> for super::types::block_certificates::QuorumSignature {
     type Error = tonic::Status;
 
-    fn try_from(message: QuorumSignature) -> Result<Self, Self::Error> { consume(&message.value) }
+    fn try_from(message: QuorumSignature) -> Result<Self, Self::Error> {
+        consume(&message.value)
+    }
 }
 
 impl TryFrom<QuorumCertificate> for super::types::block_certificates::QuorumCertificate {
@@ -3439,11 +3497,11 @@ impl TryFrom<QuorumCertificate> for super::types::block_certificates::QuorumCert
 
     fn try_from(message: QuorumCertificate) -> Result<Self, Self::Error> {
         Ok(Self {
-            block_hash:          message.block_hash.require()?.try_into()?,
-            round:               message.round.require()?.into(),
-            epoch:               message.epoch.require()?.into(),
+            block_hash: message.block_hash.require()?.try_into()?,
+            round: message.round.require()?.into(),
+            epoch: message.epoch.require()?.into(),
             aggregate_signature: message.aggregate_signature.require()?.try_into()?,
-            signatories:         message
+            signatories: message
                 .signatories
                 .into_iter()
                 .map(From::from)
@@ -3470,8 +3528,8 @@ impl TryFrom<EpochFinalizationEntry> for super::types::block_certificates::Epoch
 
     fn try_from(message: EpochFinalizationEntry) -> Result<Self, Self::Error> {
         Ok(Self {
-            finalized_qc:    message.finalized_qc.require()?.try_into()?,
-            successor_qc:    message.successor_qc.require()?.try_into()?,
+            finalized_qc: message.finalized_qc.require()?.try_into()?,
+            successor_qc: message.successor_qc.require()?.try_into()?,
             successor_proof: message.successor_proof.require()?.try_into()?,
         })
     }
@@ -3482,7 +3540,7 @@ impl TryFrom<FinalizerRound> for super::types::block_certificates::FinalizerRoun
 
     fn try_from(message: FinalizerRound) -> Result<Self, Self::Error> {
         Ok(Self {
-            round:      message.round.require()?.into(),
+            round: message.round.require()?.into(),
             finalizers: message
                 .finalizers
                 .into_iter()
@@ -3495,7 +3553,9 @@ impl TryFrom<FinalizerRound> for super::types::block_certificates::FinalizerRoun
 impl TryFrom<TimeoutSignature> for super::types::block_certificates::TimeoutSignature {
     type Error = tonic::Status;
 
-    fn try_from(message: TimeoutSignature) -> Result<Self, Self::Error> { consume(&message.value) }
+    fn try_from(message: TimeoutSignature) -> Result<Self, Self::Error> {
+        consume(&message.value)
+    }
 }
 
 impl TryFrom<TimeoutCertificate> for super::types::block_certificates::TimeoutCertificate {
@@ -3504,8 +3564,8 @@ impl TryFrom<TimeoutCertificate> for super::types::block_certificates::TimeoutCe
     fn try_from(message: TimeoutCertificate) -> Result<Self, Self::Error> {
         Ok(
             Self {
-                round:                  message.round.require()?.into(),
-                min_epoch:              message.min_epoch.require()?.into(),
+                round: message.round.require()?.into(),
+                min_epoch: message.min_epoch.require()?.into(),
                 qc_rounds_first_epoch:
                     message
                         .qc_rounds_first_epoch
@@ -3524,7 +3584,7 @@ impl TryFrom<TimeoutCertificate> for super::types::block_certificates::TimeoutCe
                             Vec<super::types::block_certificates::FinalizerRound>,
                             tonic::Status,
                         >>()?,
-                aggregate_signature:    message.aggregate_signature.require()?.try_into()?,
+                aggregate_signature: message.aggregate_signature.require()?.try_into()?,
             },
         )
     }
@@ -3535,11 +3595,11 @@ impl TryFrom<BlockCertificates> for super::types::block_certificates::BlockCerti
 
     fn try_from(message: BlockCertificates) -> Result<Self, Self::Error> {
         Ok(Self {
-            quorum_certificate:       message
+            quorum_certificate: message
                 .quorum_certificate
                 .map(TryFrom::try_from)
                 .transpose()?,
-            timeout_certificate:      message
+            timeout_certificate: message
                 .timeout_certificate
                 .map(TryFrom::try_from)
                 .transpose()?,
@@ -3556,8 +3616,8 @@ impl TryFrom<WinningBaker> for super::types::WinningBaker {
 
     fn try_from(wb: WinningBaker) -> Result<Self, Self::Error> {
         Ok(Self {
-            round:   wb.round.require()?.value.into(),
-            winner:  super::types::BakerId {
+            round: wb.round.require()?.value.into(),
+            winner: super::types::BakerId {
                 id: wb.winner.require()?.value.into(),
             },
             present: wb.present,
@@ -3570,7 +3630,7 @@ impl TryFrom<AccountPending> for super::types::AccountPending {
 
     fn try_from(pending: AccountPending) -> Result<Self, Self::Error> {
         Ok(Self {
-            account_index:   pending.account_index.require()?.into(),
+            account_index: pending.account_index.require()?.into(),
             first_timestamp: pending.first_timestamp.require()?.into(),
         })
     }
@@ -3581,18 +3641,20 @@ impl TryFrom<BakerRewardPeriodInfo> for super::types::BakerRewardPeriodInfo {
 
     fn try_from(message: BakerRewardPeriodInfo) -> Result<Self, Self::Error> {
         Ok(Self {
-            baker:             message.baker.require()?.try_into()?,
-            effective_stake:   message.effective_stake.require()?.into(),
-            commission_rates:  message.commission_rates.require()?.try_into()?,
-            equity_capital:    message.equity_capital.require()?.into(),
+            baker: message.baker.require()?.try_into()?,
+            effective_stake: message.effective_stake.require()?.into(),
+            commission_rates: message.commission_rates.require()?.try_into()?,
+            equity_capital: message.equity_capital.require()?.into(),
             delegated_capital: message.delegated_capital.require()?.into(),
-            is_finalizer:      message.is_finalizer,
+            is_finalizer: message.is_finalizer,
         })
     }
 }
 
 impl From<FinalizerIndex> for super::types::block_certificates::raw::FinalizerIndex {
-    fn from(value: FinalizerIndex) -> Self { Self { index: value.value } }
+    fn from(value: FinalizerIndex) -> Self {
+        Self { index: value.value }
+    }
 }
 
 impl TryFrom<QuorumMessage> for super::types::block_certificates::raw::QuorumMessage {
@@ -3601,10 +3663,10 @@ impl TryFrom<QuorumMessage> for super::types::block_certificates::raw::QuorumMes
     fn try_from(message: QuorumMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             signature: message.signature.require()?.try_into()?,
-            block:     message.block.require()?.try_into()?,
+            block: message.block.require()?.try_into()?,
             finalizer: message.finalizer.require()?.into(),
-            round:     message.round.require()?.into(),
-            epoch:     message.epoch.require()?.into(),
+            round: message.round.require()?.into(),
+            epoch: message.epoch.require()?.into(),
         })
     }
 }
@@ -3614,11 +3676,11 @@ impl TryFrom<RawQuorumCertificate> for super::types::block_certificates::raw::Qu
 
     fn try_from(value: RawQuorumCertificate) -> Result<Self, Self::Error> {
         Ok(Self {
-            block_hash:          value.block_hash.require()?.try_into()?,
-            round:               value.round.require()?.into(),
-            epoch:               value.epoch.require()?.into(),
+            block_hash: value.block_hash.require()?.try_into()?,
+            round: value.round.require()?.into(),
+            epoch: value.epoch.require()?.into(),
             aggregate_signature: value.aggregate_signature.require()?.try_into()?,
-            signatories:         value.signatories.into_iter().map(From::from).collect(),
+            signatories: value.signatories.into_iter().map(From::from).collect(),
         })
     }
 }
@@ -3628,9 +3690,9 @@ impl TryFrom<RawTimeoutCertificate> for super::types::block_certificates::raw::T
 
     fn try_from(value: RawTimeoutCertificate) -> Result<Self, Self::Error> {
         Ok(Self {
-            round:                  value.round.require()?.into(),
-            min_epoch:              value.min_epoch.require()?.into(),
-            qc_rounds_first_epoch:  value
+            round: value.round.require()?.into(),
+            min_epoch: value.min_epoch.require()?.into(),
+            qc_rounds_first_epoch: value
                 .qc_rounds_first_epoch
                 .into_iter()
                 .map(TryFrom::try_from)
@@ -3640,7 +3702,7 @@ impl TryFrom<RawTimeoutCertificate> for super::types::block_certificates::raw::T
                 .into_iter()
                 .map(TryFrom::try_from)
                 .collect::<Result<_, _>>()?,
-            aggregate_signature:    value.aggregate_signature.require()?.try_into()?,
+            aggregate_signature: value.aggregate_signature.require()?.try_into()?,
         })
     }
 }
@@ -3650,7 +3712,7 @@ impl TryFrom<RawFinalizerRound> for super::types::block_certificates::raw::Final
 
     fn try_from(value: RawFinalizerRound) -> Result<Self, Self::Error> {
         Ok(Self {
-            round:      value.round.require()?.into(),
+            round: value.round.require()?.into(),
             finalizers: value.finalizers.into_iter().map(From::from).collect(),
         })
     }
@@ -3659,7 +3721,9 @@ impl TryFrom<RawFinalizerRound> for super::types::block_certificates::raw::Final
 impl TryFrom<BlockSignature> for super::types::block_certificates::raw::BlockSignature {
     type Error = tonic::Status;
 
-    fn try_from(message: BlockSignature) -> Result<Self, Self::Error> { consume(&message.value) }
+    fn try_from(message: BlockSignature) -> Result<Self, Self::Error> {
+        consume(&message.value)
+    }
 }
 
 impl TryFrom<TimeoutMessage> for super::types::block_certificates::raw::TimeoutMessage {
@@ -3667,12 +3731,12 @@ impl TryFrom<TimeoutMessage> for super::types::block_certificates::raw::TimeoutM
 
     fn try_from(value: TimeoutMessage) -> Result<Self, Self::Error> {
         Ok(Self {
-            finalizer:          value.finalizer.require()?.into(),
-            round:              value.round.require()?.into(),
-            epoch:              value.epoch.require()?.into(),
+            finalizer: value.finalizer.require()?.into(),
+            round: value.round.require()?.into(),
+            epoch: value.epoch.require()?.into(),
             quorum_certificate: value.quorum_certificate.require()?.try_into()?,
-            signature:          value.signature.require()?.try_into()?,
-            message_signature:  value.message_signature.require()?.try_into()?,
+            signature: value.signature.require()?.try_into()?,
+            message_signature: value.message_signature.require()?.try_into()?,
         })
     }
 }
@@ -3682,8 +3746,8 @@ impl TryFrom<RawFinalizationEntry> for super::types::block_certificates::raw::Fi
 
     fn try_from(value: RawFinalizationEntry) -> Result<Self, Self::Error> {
         Ok(Self {
-            finalized_qc:    value.finalized_qc.require()?.try_into()?,
-            successor_qc:    value.successor_qc.require()?.try_into()?,
+            finalized_qc: value.finalized_qc.require()?.try_into()?,
+            successor_qc: value.successor_qc.require()?.try_into()?,
             successor_proof: value.successor_proof.require()?.try_into()?,
         })
     }
@@ -3694,8 +3758,8 @@ impl TryFrom<TimeoutMessages> for super::types::block_certificates::raw::Timeout
 
     fn try_from(value: TimeoutMessages) -> Result<Self, Self::Error> {
         Ok(Self {
-            first_epoch:           value.first_epoch.require()?.into(),
-            first_epoch_timeouts:  value
+            first_epoch: value.first_epoch.require()?.into(),
+            first_epoch_timeouts: value
                 .first_epoch_timeouts
                 .into_iter()
                 .map(TryFrom::try_from)
@@ -3714,7 +3778,7 @@ impl TryFrom<PersistentRoundStatus> for super::types::queries::PersistentRoundSt
 
     fn try_from(value: PersistentRoundStatus) -> Result<Self, Self::Error> {
         Ok(Self {
-            last_signed_quorum_message:  value
+            last_signed_quorum_message: value
                 .last_signed_quorum_message
                 .map(TryFrom::try_from)
                 .transpose()?,
@@ -3722,8 +3786,8 @@ impl TryFrom<PersistentRoundStatus> for super::types::queries::PersistentRoundSt
                 .last_signed_timeout_message
                 .map(TryFrom::try_from)
                 .transpose()?,
-            last_baked_round:            value.last_baked_round.require()?.into(),
-            latest_timeout:              value.latest_timeout.map(TryFrom::try_from).transpose()?,
+            last_baked_round: value.last_baked_round.require()?.into(),
+            latest_timeout: value.latest_timeout.map(TryFrom::try_from).transpose()?,
         })
     }
 }
@@ -3734,7 +3798,7 @@ impl TryFrom<RoundTimeout> for super::types::queries::RoundTimeout {
     fn try_from(value: RoundTimeout) -> Result<Self, Self::Error> {
         Ok(Self {
             timeout_certificate: value.timeout_certificate.require()?.try_into()?,
-            quorum_certificate:  value.quorum_certificate.require()?.try_into()?,
+            quorum_certificate: value.quorum_certificate.require()?.try_into()?,
         })
     }
 }
@@ -3744,19 +3808,19 @@ impl TryFrom<RoundStatus> for super::types::queries::RoundStatus {
 
     fn try_from(value: RoundStatus) -> Result<Self, Self::Error> {
         Ok(Self {
-            current_round:                 value.current_round.require()?.into(),
-            highest_certified_block:       value.highest_certified_block.require()?.try_into()?,
-            previous_round_timeout:        value
+            current_round: value.current_round.require()?.into(),
+            highest_certified_block: value.highest_certified_block.require()?.try_into()?,
+            previous_round_timeout: value
                 .previous_round_timeout
                 .map(TryFrom::try_from)
                 .transpose()?,
-            round_eligible_to_bake:        value.round_eligible_to_bake,
-            current_epoch:                 value.current_epoch.require()?.into(),
+            round_eligible_to_bake: value.round_eligible_to_bake,
+            current_epoch: value.current_epoch.require()?.into(),
             last_epoch_finalization_entry: value
                 .last_epoch_finalization_entry
                 .map(TryFrom::try_from)
                 .transpose()?,
-            current_timeout:               value.current_timeout.require()?.into(),
+            current_timeout: value.current_timeout.require()?.into(),
         })
     }
 }
@@ -3767,7 +3831,7 @@ impl TryFrom<BlockTableSummary> for super::types::queries::BlockTableSummary {
     fn try_from(value: BlockTableSummary) -> Result<Self, Self::Error> {
         Ok(Self {
             dead_block_cache_size: value.dead_block_cache_size,
-            live_blocks:           value
+            live_blocks: value
                 .live_blocks
                 .into_iter()
                 .map(TryFrom::try_from)
@@ -3804,11 +3868,11 @@ impl TryFrom<FullBakerInfo> for super::types::queries::FullBakerInfo {
 
     fn try_from(value: FullBakerInfo) -> Result<Self, Self::Error> {
         Ok(Self {
-            baker_identity:         value.baker_identity.require()?.into(),
-            election_verify_key:    value.election_verify_key.require()?.try_into()?,
-            signature_verify_key:   value.signature_verify_key.require()?.try_into()?,
+            baker_identity: value.baker_identity.require()?.into(),
+            election_verify_key: value.election_verify_key.require()?.try_into()?,
+            signature_verify_key: value.signature_verify_key.require()?.try_into()?,
             aggregation_verify_key: value.aggregation_verify_key.require()?.try_into()?,
-            stake:                  value.stake.require()?.into(),
+            stake: value.stake.require()?.into(),
         })
     }
 }
@@ -3850,12 +3914,12 @@ impl TryFrom<EpochBakers> for super::types::queries::EpochBakers {
     fn try_from(value: EpochBakers) -> Result<Self, Self::Error> {
         Ok(Self {
             previous_epoch_bakers: value.previous_epoch_bakers.require()?.try_into()?,
-            current_epoch_bakers:  value
+            current_epoch_bakers: value
                 .current_epoch_bakers
                 .map(TryFrom::try_from)
                 .transpose()?,
-            next_epoch_bakers:     value.next_epoch_bakers.map(TryFrom::try_from).transpose()?,
-            next_payday:           value.next_payday.require()?.into(),
+            next_epoch_bakers: value.next_epoch_bakers.map(TryFrom::try_from).transpose()?,
+            next_payday: value.next_payday.require()?.into(),
         })
     }
 }
@@ -3924,22 +3988,22 @@ mod test {
             block_hash: Some(BlockHash {
                 value: vec![0u8; 32],
             }),
-            children:   vec![
+            children: vec![
                 Branch {
                     block_hash: Some(BlockHash {
                         value: vec![1u8; 32],
                     }),
-                    children:   vec![],
+                    children: vec![],
                 },
                 Branch {
                     block_hash: Some(BlockHash {
                         value: vec![2u8; 32],
                     }),
-                    children:   vec![Branch {
+                    children: vec![Branch {
                         block_hash: Some(BlockHash {
                             value: vec![3u8; 32],
                         }),
-                        children:   vec![],
+                        children: vec![],
                     }],
                 },
             ],
@@ -3947,17 +4011,17 @@ mod test {
 
         let to_target = QBranch {
             block_hash: [0u8; 32].into(),
-            children:   vec![
+            children: vec![
                 QBranch {
                     block_hash: [2u8; 32].into(),
-                    children:   vec![QBranch {
+                    children: vec![QBranch {
                         block_hash: [3u8; 32].into(),
-                        children:   vec![],
+                        children: vec![],
                     }],
                 },
                 QBranch {
                     block_hash: [1u8; 32].into(),
-                    children:   vec![],
+                    children: vec![],
                 },
             ],
         };
