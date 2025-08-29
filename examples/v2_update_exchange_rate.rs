@@ -22,7 +22,7 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "key", help = "Path to update keys to use.")]
-    keys:     Vec<PathBuf>,
+    keys: Vec<PathBuf>,
 }
 
 #[tokio::main(flavor = "multi_thread")]

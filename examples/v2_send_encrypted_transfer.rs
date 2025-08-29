@@ -20,8 +20,8 @@ use structopt::*;
 /// Account address and keys that will be supplied in a JSON file.
 /// The transaction will be signed with the given keys.
 struct AccountData {
-    account_keys:          AccountKeys,
-    address:               AccountAddress,
+    account_keys: AccountKeys,
+    address: AccountAddress,
     encryption_secret_key: id::elgamal::SecretKey<id::constants::ArCurve>,
 }
 
@@ -50,7 +50,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:20000"
     )]
-    endpoint:  v2::Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(long = "account", help = "Path to the account key file.")]
     keys_path: PathBuf,
     #[structopt(
@@ -58,12 +58,12 @@ struct App {
         help = "Amount to send or encrypt/decrypt.",
         default_value = "1.0"
     )]
-    amount:    Amount,
+    amount: Amount,
     #[structopt(
         long = "receiver",
         help = "Receiver, one of `encrypt`, `decrypt` or an account address."
     )]
-    receiver:  Receiver,
+    receiver: Receiver,
 }
 
 #[tokio::main(flavor = "multi_thread")]

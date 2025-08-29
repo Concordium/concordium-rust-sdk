@@ -17,9 +17,9 @@ struct App {
         long = "block_hash",
         help = "Block hash to query. Default: \"best\" block."
     )]
-    block:    Option<BlockHash>,
+    block: Option<BlockHash>,
     #[structopt(long = "amount", help = "Maximum amount of ancestors to be returned.")]
-    amount:   u64,
+    amount: u64,
 }
 
 #[tokio::main(flavor = "multi_thread")]

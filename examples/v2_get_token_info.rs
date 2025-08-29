@@ -13,9 +13,9 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "token", help = "ID of the token to query")]
-    token:    protocol_level_tokens::TokenId,
+    token: protocol_level_tokens::TokenId,
     #[structopt(long = "block", help = "Block to query the token info in.")]
-    block:    Option<v2::BlockIdentifier>,
+    block: Option<v2::BlockIdentifier>,
 }
 
 #[tokio::main(flavor = "multi_thread")]

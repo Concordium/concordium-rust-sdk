@@ -22,16 +22,16 @@ struct App {
         help = "V2 GRPC interface of the node.",
         default_value = "http://localhost:20000"
     )]
-    endpoint:  v2::Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(long = "sender", help = "Account keys of the sender.")]
-    account:   PathBuf,
+    account: PathBuf,
     #[structopt(
         long = "receivers",
         help = "File with a list of receivers. One account address per line."
     )]
     receivers: PathBuf,
     #[structopt(long = "amount", help = "Amount to send.", default_value = "100.0")]
-    amount:    Amount,
+    amount: Amount,
 }
 
 #[tokio::main(flavor = "multi_thread")]

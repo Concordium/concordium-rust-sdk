@@ -14,7 +14,7 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "block", help = "Block to query in.")]
-    block:    Option<BlockHash>,
+    block: Option<BlockHash>,
     #[structopt(long = "baker-id", help = "Pool identifier.")]
     baker_id: BakerId,
 }

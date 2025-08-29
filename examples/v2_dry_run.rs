@@ -62,7 +62,7 @@ async fn test_all(endpoint: v2::Endpoint) -> anyhow::Result<()> {
     println!("Account 0: {}", res3.inner.account_address);
     // Get contract info for contract at address <0,0>.
     let contract_addr = ContractAddress {
-        index:    0,
+        index: 0,
         subindex: 0,
     };
     let res4 = dry_run.get_instance_info(&contract_addr).await?;
@@ -78,12 +78,12 @@ async fn test_all(endpoint: v2::Endpoint) -> anyhow::Result<()> {
     )?;
     let parameter = OwnedParameter::empty();
     let context = ContractContext {
-        invoker:   Some(Address::Account(res3.inner.account_address)),
-        contract:  contract_addr,
-        amount:    Amount::zero(),
-        method:    invoke_target.clone(),
+        invoker: Some(Address::Account(res3.inner.account_address)),
+        contract: contract_addr,
+        amount: Amount::zero(),
+        method: invoke_target.clone(),
         parameter: parameter.clone(),
-        energy:    None,
+        energy: None,
     };
     let res5 = dry_run.invoke_instance(&context).await;
     println!("Invoked view on {contract_addr}: {:?}", res5);

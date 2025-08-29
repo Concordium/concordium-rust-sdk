@@ -13,7 +13,7 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:20000"
     )]
-    endpoint:    v2::Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(long = "transaction", help = "Transaction hash to query.")]
     transaction: TransactionHash,
 }

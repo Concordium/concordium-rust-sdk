@@ -22,13 +22,13 @@ struct App {
         long = "lastfinal",
         help = "Block to query the data in. Defaults to last finalized block."
     )]
-    block:    BlockIdentifier,
+    block: BlockIdentifier,
     #[structopt(
         long = "num",
         help = "How many queries to make in parallel.",
         default_value = "1"
     )]
-    num:      usize,
+    num: usize,
 }
 
 async fn make_queries<
@@ -44,7 +44,8 @@ async fn make_queries<
 ) -> (tokio::task::JoinHandle<()>, tokio::sync::mpsc::Receiver<A>)
 where
     Chunks::IntoIter: Send,
-    I::IntoIter: Send, {
+    I::IntoIter: Send,
+{
     let (sender, receiver) = tokio::sync::mpsc::channel::<A>(n);
     let sender = async move {
         'outer: for chunk in iter {
