@@ -25,31 +25,25 @@ pub enum SignatureError {
         "Indices do not exist on chain for credential index `{credential_index}` and key index \
          `{key_index}`"
     )]
-    MissingIndicesOnChain {
-        credential_index: u8,
-        key_index:        u8,
-    },
+    MissingIndicesOnChain { credential_index: u8, key_index: u8 },
     #[error("The indices in the maps do not match")]
     MismatchMapIndices,
     #[error(
         "The public key and the private key in the `account_keys` map do not match for credential \
          index `{credential_index}` and key index `{key_index}`"
     )]
-    MismatchPublicPrivateKeys {
-        credential_index: u8,
-        key_index:        u8,
-    },
+    MismatchPublicPrivateKeys { credential_index: u8, key_index: u8 },
     #[error(
         "The public key on chain `{expected_public_key:?}` and the public key \
          `{actual_public_key:?}` in the signature map do not match for credential index \
          `{credential_index}` and key index `{key_index}`"
     )]
     MismatchPublicKeyOnChain {
-        credential_index:    u8,
-        key_index:           u8,
+        credential_index: u8,
+        key_index: u8,
         // Because of a clippy warning that this enum variant is quite large, `Box` is used.
         expected_public_key: Box<VerifyingKey>,
-        actual_public_key:   Box<VerifyingKey>,
+        actual_public_key: Box<VerifyingKey>,
     },
 }
 
@@ -111,7 +105,7 @@ pub struct CredentialSignaturesVerificationData {
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct AccountSignaturesVerificationEntry {
-    pub signature:  Signature,
+    pub signature: Signature,
     pub public_key: VerifyKey,
 }
 
@@ -124,10 +118,13 @@ impl AccountSignaturesVerificationData {
     /// element in the maps.
     pub fn singleton(signature: Signature, public_key: VerifyKey) -> Self {
         let credential_map = CredentialSignaturesVerificationData {
-            data: [(0, AccountSignaturesVerificationEntry {
-                signature,
-                public_key,
-            })]
+            data: [(
+                0,
+                AccountSignaturesVerificationEntry {
+                    signature,
+                    public_key,
+                },
+            )]
             .into(),
         };
 
@@ -179,16 +176,20 @@ impl AccountSignaturesVerificationData {
                     if inner_key != key_index.0 {
                         return Err(SignatureError::MismatchMapIndices);
                     }
-                    Ok((inner_key, AccountSignaturesVerificationEntry {
-                        signature,
-                        public_key,
-                    }))
+                    Ok((
+                        inner_key,
+                        AccountSignaturesVerificationEntry {
+                            signature,
+                            public_key,
+                        },
+                    ))
                 })
                 .collect();
 
-            outer_map.insert(outer_key, CredentialSignaturesVerificationData {
-                data: inner_map?,
-            });
+            outer_map.insert(
+                outer_key,
+                CredentialSignaturesVerificationData { data: inner_map? },
+            );
         }
 
         Ok(AccountSignaturesVerificationData { data: outer_map })
@@ -230,7 +231,7 @@ fn check_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C
             .ok_or(SignatureError::MissingIndicesOnChain {
                 credential_index: *outer_key,
                 // The key_index does not exist in this context, use the default value.
-                key_index:        0u8,
+                key_index: 0u8,
             })?;
 
         // Ensure that the inner-level keys in the signatures map exist in the
@@ -244,7 +245,7 @@ fn check_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C
             if !map.contains_key(&KeyIndex(*inner_key)) {
                 return Err(SignatureError::MissingIndicesOnChain {
                     credential_index: *outer_key,
-                    key_index:        *inner_key,
+                    key_index: *inner_key,
                 });
             }
         }
@@ -429,7 +430,7 @@ pub async fn sign_as_account(
                 .get(&credential_index)
                 .ok_or(SignatureError::MissingIndicesOnChain {
                     credential_index: credential_index.index,
-                    key_index:        key_index.0,
+                    key_index: key_index.0,
                 })?
                 .value;
 
@@ -443,7 +444,7 @@ pub async fn sign_as_account(
                     .get(&key_index)
                     .ok_or(SignatureError::MissingIndicesOnChain {
                         credential_index: credential_index.index,
-                        key_index:        key_index.0,
+                        key_index: key_index.0,
                     })?;
 
             let VerifyKey::Ed25519VerifyKey(public_key) = *on_chain_public_key;
@@ -452,10 +453,10 @@ pub async fn sign_as_account(
             // chain.
             if signing_key.public() != public_key {
                 return Err(SignatureError::MismatchPublicKeyOnChain {
-                    credential_index:    credential_index.index,
-                    key_index:           key_index.0,
+                    credential_index: credential_index.index,
+                    key_index: key_index.0,
                     expected_public_key: Box::new(public_key),
-                    actual_public_key:   Box::new(signing_key.public()),
+                    actual_public_key: Box::new(signing_key.public()),
                 });
             };
 
@@ -467,7 +468,7 @@ pub async fn sign_as_account(
             if !VerifyKey::from(public_key).verify(message_hash, &Signature::from(signature)) {
                 return Err(SignatureError::MismatchPublicPrivateKeys {
                     credential_index: credential_index.index,
-                    key_index:        key_index.0,
+                    key_index: key_index.0,
                 });
             }
 
@@ -498,7 +499,7 @@ pub async fn sign_as_single_signer_account(
     let keypair: KeyPair = KeyPair::from(signing_key);
     // Generate account keys that have one keypair at index 0 in both maps.
     let keypairs = AccountKeys::from(InitialAccountData {
-        keys:      [(KeyIndex(0), keypair)].into(),
+        keys: [(KeyIndex(0), keypair)].into(),
         threshold: SignatureThreshold::ONE,
     });
     let mut signature = sign_as_account(client, signer, keypairs, message, bi).await?;
@@ -556,7 +557,7 @@ pub fn sign_as_single_signer_account_unchecked(
     let keypair: KeyPair = KeyPair::from(signing_key);
     // Generate account keys that have one keypair at index 0 in both maps.
     let keypairs = AccountKeys::from(InitialAccountData {
-        keys:      [(KeyIndex(0), keypair)].into(),
+        keys: [(KeyIndex(0), keypair)].into(),
         threshold: SignatureThreshold::ONE,
     });
     let signature = sign_as_account_unchecked(signer, &keypairs, message);
@@ -712,7 +713,7 @@ mod tests {
 
         // Generate account keys that have one keypair at index 0 in both maps.
         let keypairs = AccountKeys::from(InitialAccountData {
-            keys:      [(KeyIndex(0), keypair)].into(),
+            keys: [(KeyIndex(0), keypair)].into(),
             threshold: SignatureThreshold::ONE,
         });
 
@@ -776,7 +777,7 @@ mod tests {
 
         // Generate account keys that have one keypair at index 0 in both maps.
         let keypairs = AccountKeys::from(InitialAccountData {
-            keys:      [(KeyIndex(0), keypair)].into(),
+            keys: [(KeyIndex(0), keypair)].into(),
             threshold: SignatureThreshold::ONE,
         });
         let single_key = keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)].clone();
@@ -910,7 +911,7 @@ mod tests {
 
         // Generate account keys that have one keypair at index 0 in both maps.
         let keypairs = AccountKeys::from(InitialAccountData {
-            keys:      [(KeyIndex(0), keypair)].into(),
+            keys: [(KeyIndex(0), keypair)].into(),
             threshold: SignatureThreshold::ONE,
         });
 
@@ -973,7 +974,7 @@ mod tests {
 
         // Generate account keys that have one keypair at index 0 in both maps.
         let keypairs = AccountKeys::from(InitialAccountData {
-            keys:      [(KeyIndex(0), keypair)].into(),
+            keys: [(KeyIndex(0), keypair)].into(),
             threshold: SignatureThreshold::ONE,
         });
         let single_key = keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)].clone();
@@ -1030,43 +1031,49 @@ mod tests {
 
         // Create a multi-sig account from the above keypairs.
         let credential_map = [
-            (CredentialIndex { index: 0 }, CredentialData {
-                keys:      [
-                    (
-                        KeyIndex(0u8),
-                        single_keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)]
-                            .clone(),
-                    ),
-                    (
-                        KeyIndex(1u8),
-                        single_keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)]
-                            .clone(),
-                    ),
-                ]
-                .into(),
-                threshold: SignatureThreshold::TWO,
-            }),
-            (CredentialIndex { index: 1 }, CredentialData {
-                keys:      [
-                    (
-                        KeyIndex(0u8),
-                        single_keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)]
-                            .clone(),
-                    ),
-                    (
-                        KeyIndex(1u8),
-                        single_keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)]
-                            .clone(),
-                    ),
-                ]
-                .into(),
-                threshold: SignatureThreshold::TWO,
-            }),
+            (
+                CredentialIndex { index: 0 },
+                CredentialData {
+                    keys: [
+                        (
+                            KeyIndex(0u8),
+                            single_keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)]
+                                .clone(),
+                        ),
+                        (
+                            KeyIndex(1u8),
+                            single_keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)]
+                                .clone(),
+                        ),
+                    ]
+                    .into(),
+                    threshold: SignatureThreshold::TWO,
+                },
+            ),
+            (
+                CredentialIndex { index: 1 },
+                CredentialData {
+                    keys: [
+                        (
+                            KeyIndex(0u8),
+                            single_keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)]
+                                .clone(),
+                        ),
+                        (
+                            KeyIndex(1u8),
+                            single_keypairs.keys[&CredentialIndex { index: 0 }].keys[&KeyIndex(0)]
+                                .clone(),
+                        ),
+                    ]
+                    .into(),
+                    threshold: SignatureThreshold::TWO,
+                },
+            ),
         ]
         .into();
 
         let keypairs_multi_sig_account = AccountKeys {
-            keys:      credential_map,
+            keys: credential_map,
             threshold: AccountThreshold::TWO,
         };
 
@@ -1133,7 +1140,7 @@ mod tests {
 
         // Generate account keys of multi-sig account.
         let keypairs = AccountKeys::from(InitialAccountData {
-            keys:      [
+            keys: [
                 (KeyIndex(0), keypair1.clone()),
                 (KeyIndex(1), keypair2.clone()),
             ]

@@ -39,19 +39,25 @@ impl<A> Upward<A> {
     /// Transforms `Upward<T>` into a [`Option<T>`] where [`Option::Some`]
     /// represents [`Upward::Known`] and [`Option::None`] represents
     /// [`Upward::Unknown`].
-    pub fn known(self) -> Option<A> { Option::from(self) }
+    pub fn known(self) -> Option<A> {
+        Option::from(self)
+    }
 
     /// Borrow `Upward<T>` aa [`Option<&T>`] where [`Option::Some`]
     /// represents [`Upward::Known`] and [`Option::None`] represents
     /// [`Upward::Unknown`].
-    pub fn as_known(&self) -> Option<&A> { Option::from(self.as_ref()) }
+    pub fn as_known(&self) -> Option<&A> {
+        Option::from(self.as_ref())
+    }
 
     /// Require the data to be known, converting it from `Upward<A>` to
     /// `Result<A, UnknownDataError>`.
     ///
     /// This is effectively opt out of forward-compatibility, forcing the
     /// library to be up to date with the node version.
-    pub fn known_or_err(self) -> Result<A, UnknownDataError> { self.known_or(UnknownDataError) }
+    pub fn known_or_err(self) -> Result<A, UnknownDataError> {
+        self.known_or(UnknownDataError)
+    }
 
     /// Transforms the `Upward<T>` into a [`Result<T, E>`], mapping
     /// [`Known(v)`] to [`Ok(v)`] and [`Upward::Unknown`] to [`Err(err)`].
@@ -64,7 +70,9 @@ impl<A> Upward<A> {
     /// [`Err(err)`]: Err
     /// [`Known(v)`]: Upward::Known
     /// [`known_or_else`]: Upward::known_or_else
-    pub fn known_or<E>(self, error: E) -> Result<A, E> { Option::from(self).ok_or(error) }
+    pub fn known_or<E>(self, error: E) -> Result<A, E> {
+        Option::from(self).ok_or(error)
+    }
 
     /// Transforms the `Upward<T>` into a [`Result<T, E>`], mapping
     /// [`Known(v)`] to [`Ok(v)`] and [`Upward::Unknown`] to [`Err(err())`].
@@ -74,7 +82,8 @@ impl<A> Upward<A> {
     /// [`Known(v)`]: Upward::Known
     pub fn known_or_else<E, F>(self, error: F) -> Result<A, E>
     where
-        F: FnOnce() -> E, {
+        F: FnOnce() -> E,
+    {
         Option::from(self).ok_or_else(error)
     }
 
@@ -88,7 +97,8 @@ impl<A> Upward<A> {
     /// value (if `Known`) or returns `Unknown` (if `Unknown`).
     pub fn map<U, F>(self, f: F) -> Upward<U>
     where
-        F: FnOnce(A) -> U, {
+        F: FnOnce(A) -> U,
+    {
         match self {
             Self::Known(x) => Upward::Known(f(x)),
             Self::Unknown => Upward::Unknown,
@@ -106,7 +116,8 @@ impl<A> Upward<A> {
     #[must_use = "if you don't need the returned value, use `if let` instead"]
     pub fn map_or<U, F>(self, default: U, f: F) -> U
     where
-        F: FnOnce(A) -> U, {
+        F: FnOnce(A) -> U,
+    {
         match self {
             Upward::Known(a) => f(a),
             Upward::Unknown => default,
@@ -119,7 +130,8 @@ impl<A> Upward<A> {
     pub fn map_or_else<U, D, F>(self, default: D, f: F) -> U
     where
         D: FnOnce() -> U,
-        F: FnOnce(A) -> U, {
+        F: FnOnce(A) -> U,
+    {
         match self {
             Upward::Known(t) => f(t),
             Upward::Unknown => default(),
@@ -138,10 +150,22 @@ impl<A> Upward<A> {
     /// otherwise calls `f` with the wrapped value and returns the result.
     pub fn and_then<U, F>(self, f: F) -> Upward<U>
     where
-        F: FnOnce(A) -> Upward<U>, {
+        F: FnOnce(A) -> Upward<U>,
+    {
         match self {
             Upward::Unknown => Upward::Unknown,
             Upward::Known(x) => f(x),
+        }
+    }
+}
+
+impl<A, E> Upward<Result<A, E>> {
+    /// Transposes an `Upward` of a [`Result`] into a [`Result`] of an `Upward`.
+    pub fn transpose(self) -> Result<Upward<A>, E> {
+        match self {
+            Upward::Known(Ok(x)) => Ok(Upward::Known(x)),
+            Upward::Known(Err(e)) => Err(e),
+            Upward::Unknown => Ok(Upward::Unknown),
         }
     }
 }
@@ -172,7 +196,8 @@ where
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>, {
+        D: serde::Deserializer<'de>,
+    {
         A::deserialize(deserializer).map(Upward::Known)
     }
 }
@@ -183,7 +208,8 @@ where
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer, {
+        S: serde::Serializer,
+    {
         if let Upward::Known(a) = self {
             a.serialize(serializer)
         } else {
@@ -197,3 +223,37 @@ where
 #[derive(Debug, thiserror::Error)]
 #[error("Encountered unknown data from the Node API, which is required to be known.")]
 pub struct UnknownDataError;
+
+impl<A> std::iter::FromIterator<Upward<A>> for Upward<Vec<A>> {
+    fn from_iter<T: IntoIterator<Item = Upward<A>>>(iter: T) -> Self {
+        let mut vec = Vec::new();
+        for a in iter {
+            if let Upward::Known(a) = a {
+                vec.push(a);
+            } else {
+                return Upward::Unknown;
+            }
+        }
+        Upward::Known(vec)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_upward_from_iterator_all_known() {
+        let list = vec![Upward::Known(42); 50];
+        let res = list.into_iter().collect::<Upward<_>>().unwrap();
+        assert_eq!(vec![42; 50], res)
+    }
+
+    #[test]
+    fn test_upward_from_iterator_some_unknown() {
+        let mut list = vec![Upward::Known(42); 50];
+        list[25] = Upward::Unknown;
+        let res = list.into_iter().collect::<Upward<_>>();
+        assert_eq!(Upward::Unknown, res)
+    }
+}

@@ -28,13 +28,13 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "sender", help = "Path to the sender account key file.")]
-    account:  PathBuf,
+    account: PathBuf,
     #[structopt(long = "receiver", help = "Receiver address.")]
     receiver: String,
     #[structopt(long = "token", help = "Token id of token.")]
     token_id: String,
     #[structopt(long = "amount", help = "Amount to send.", default_value = "100.0")]
-    amount:   Decimal,
+    amount: Decimal,
 }
 
 #[tokio::main(flavor = "multi_thread")]

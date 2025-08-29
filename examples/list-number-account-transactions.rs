@@ -27,7 +27,7 @@ struct App {
         long = "start-time",
         help = "Start time. If not given take the genesis time."
     )]
-    block:    Option<chrono::DateTime<chrono::Utc>>,
+    block: Option<chrono::DateTime<chrono::Utc>>,
     #[structopt(
         long = "interval",
         help = "Interval duration in seconds.",
@@ -39,22 +39,28 @@ struct App {
         help = "How many queries to make in parallel.",
         default_value = "8"
     )]
-    num:      usize,
+    num: usize,
 }
 
 #[derive(Eq)]
 struct Aliased(AccountAddress);
 
 impl Ord for Aliased {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering { self.0 .0[..29].cmp(&other.0 .0[..29]) }
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0 .0[..29].cmp(&other.0 .0[..29])
+    }
 }
 
 impl PartialEq for Aliased {
-    fn eq(&self, other: &Self) -> bool { self.0.is_alias(&other.0) }
+    fn eq(&self, other: &Self) -> bool {
+        self.0.is_alias(&other.0)
+    }
 }
 
 impl PartialOrd for Aliased {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { Some(self.cmp(other)) }
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 #[tokio::main(flavor = "multi_thread")]

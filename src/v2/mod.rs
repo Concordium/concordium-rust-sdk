@@ -113,11 +113,13 @@ pub struct QueryResponse<A> {
     /// Block hash for which the query applies.
     pub block_hash: BlockHash,
     /// The result of the query.
-    pub response:   A,
+    pub response: A,
 }
 
 impl<A> AsRef<A> for QueryResponse<A> {
-    fn as_ref(&self) -> &A { &self.response }
+    fn as_ref(&self) -> &A {
+        &self.response
+    }
 }
 
 /// A block identifier used in queries.
@@ -230,11 +232,11 @@ pub struct RelativeBlockHeight {
     /// Genesis index to start from.
     pub genesis_index: types::GenesisIndex,
     /// Height starting from the genesis block at the genesis index.
-    pub height:        types::BlockHeight,
+    pub height: types::BlockHeight,
     /// Whether to return results only from the specified genesis index
     /// (`true`), or allow results from more recent genesis indices
     /// as well (`false`).
-    pub restrict:      bool,
+    pub restrict: bool,
 }
 
 /// An account identifier used in queries.
@@ -271,7 +273,7 @@ pub struct SpecifiedEpoch {
     /// Genesis index to query in.
     pub genesis_index: types::GenesisIndex,
     /// The epoch of the genesis to query.
-    pub epoch:         types::Epoch,
+    pub epoch: types::Epoch,
 }
 
 /// An identifier of an epoch used in queries.
@@ -348,7 +350,7 @@ impl From<EpochIdentifier> for generated::EpochRequest {
                             genesis_index: Some(generated::GenesisIndex {
                                 value: genesis_index.height,
                             }),
-                            epoch:         Some(generated::Epoch { value: epoch.epoch }),
+                            epoch: Some(generated::Epoch { value: epoch.epoch }),
                         },
                     ),
                 ),
@@ -368,7 +370,7 @@ pub struct FinalizedBlockInfo {
     /// The block hash for the finalized block.
     pub block_hash: BlockHash,
     /// The absolute block height for the finalized block.
-    pub height:     AbsoluteBlockHeight,
+    pub height: AbsoluteBlockHeight,
 }
 
 #[derive(Debug, Clone)]
@@ -680,11 +682,15 @@ impl From<&RegisteredData> for generated::RegisteredData {
     }
 }
 impl From<&[u8]> for generated::Parameter {
-    fn from(a: &[u8]) -> Self { generated::Parameter { value: a.to_vec() } }
+    fn from(a: &[u8]) -> Self {
+        generated::Parameter { value: a.to_vec() }
+    }
 }
 
 impl From<&TransactionHash> for generated::TransactionHash {
-    fn from(th: &TransactionHash) -> Self { generated::TransactionHash { value: th.to_vec() } }
+    fn from(th: &TransactionHash) -> Self {
+        generated::TransactionHash { value: th.to_vec() }
+    }
 }
 
 impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
@@ -712,11 +718,15 @@ impl From<&AccountIdentifier> for generated::AccountIdentifierInput {
 }
 
 impl From<&ModuleReference> for generated::ModuleRef {
-    fn from(mr: &ModuleReference) -> Self { Self { value: mr.to_vec() } }
+    fn from(mr: &ModuleReference) -> Self {
+        Self { value: mr.to_vec() }
+    }
 }
 
 impl From<ModuleReference> for generated::ModuleRef {
-    fn from(mr: ModuleReference) -> Self { Self { value: mr.to_vec() } }
+    fn from(mr: ModuleReference) -> Self {
+        Self { value: mr.to_vec() }
+    }
 }
 
 impl From<&WasmModule> for generated::VersionedModuleSource {
@@ -769,10 +779,10 @@ impl From<&OwnedParameter> for generated::Parameter {
 impl From<&InitContractPayload> for generated::InitContractPayload {
     fn from(v: &InitContractPayload) -> Self {
         Self {
-            amount:     Some(v.amount.into()),
+            amount: Some(v.amount.into()),
             module_ref: Some(v.mod_ref.into()),
-            init_name:  Some((&v.init_name).into()),
-            parameter:  Some((&v.param).into()),
+            init_name: Some((&v.init_name).into()),
+            parameter: Some((&v.param).into()),
         }
     }
 }
@@ -780,10 +790,10 @@ impl From<&InitContractPayload> for generated::InitContractPayload {
 impl From<&UpdateContractPayload> for generated::UpdateContractPayload {
     fn from(v: &UpdateContractPayload) -> Self {
         Self {
-            amount:       Some(v.amount.into()),
-            address:      Some(v.address.into()),
+            amount: Some(v.amount.into()),
+            address: Some(v.address.into()),
             receive_name: Some((&v.receive_name).into()),
-            parameter:    Some((&v.message).into()),
+            parameter: Some((&v.message).into()),
         }
     }
 }
@@ -791,34 +801,46 @@ impl From<&UpdateContractPayload> for generated::UpdateContractPayload {
 impl From<&ContractAddress> for generated::ContractAddress {
     fn from(ca: &ContractAddress) -> Self {
         Self {
-            index:    ca.index,
+            index: ca.index,
             subindex: ca.subindex,
         }
     }
 }
 
 impl From<Nonce> for generated::SequenceNumber {
-    fn from(v: Nonce) -> Self { generated::SequenceNumber { value: v.nonce } }
+    fn from(v: Nonce) -> Self {
+        generated::SequenceNumber { value: v.nonce }
+    }
 }
 
 impl From<UpdateSequenceNumber> for generated::UpdateSequenceNumber {
-    fn from(v: UpdateSequenceNumber) -> Self { generated::UpdateSequenceNumber { value: v.number } }
+    fn from(v: UpdateSequenceNumber) -> Self {
+        generated::UpdateSequenceNumber { value: v.number }
+    }
 }
 
 impl From<Energy> for generated::Energy {
-    fn from(v: Energy) -> Self { generated::Energy { value: v.energy } }
+    fn from(v: Energy) -> Self {
+        generated::Energy { value: v.energy }
+    }
 }
 
 impl From<TransactionTime> for generated::TransactionTime {
-    fn from(v: TransactionTime) -> Self { generated::TransactionTime { value: v.seconds } }
+    fn from(v: TransactionTime) -> Self {
+        generated::TransactionTime { value: v.seconds }
+    }
 }
 
 impl From<&Amount> for generated::Amount {
-    fn from(v: &Amount) -> Self { Self { value: v.micro_ccd } }
+    fn from(v: &Amount) -> Self {
+        Self { value: v.micro_ccd }
+    }
 }
 
 impl From<Amount> for generated::Amount {
-    fn from(v: Amount) -> Self { Self { value: v.micro_ccd } }
+    fn from(v: Amount) -> Self {
+        Self { value: v.micro_ccd }
+    }
 }
 
 impl
@@ -839,7 +861,7 @@ impl
     ) -> Self {
         Self {
             message_expiry: Some(v.message_expiry.into()),
-            payload:        Some(generated::credential_deployment::Payload::RawPayload(
+            payload: Some(generated::credential_deployment::Payload::RawPayload(
                 common::to_bytes(&v.credential),
             )),
         }
@@ -853,19 +875,22 @@ impl From<&UpdateInstruction> for generated::UpdateInstruction {
                 signatures: {
                     let mut hm = HashMap::new();
                     for (key_idx, sig) in v.signatures.signatures.iter() {
-                        hm.insert(key_idx.index.into(), generated::Signature {
-                            value: sig.sig.to_owned(),
-                        });
+                        hm.insert(
+                            key_idx.index.into(),
+                            generated::Signature {
+                                value: sig.sig.to_owned(),
+                            },
+                        );
                     }
                     hm
                 },
             }),
-            header:     Some(generated::UpdateInstructionHeader {
+            header: Some(generated::UpdateInstructionHeader {
                 sequence_number: Some(v.header.seq_number.into()),
-                effective_time:  Some(v.header.effective_time.into()),
-                timeout:         Some(v.header.timeout.into()),
+                effective_time: Some(v.header.effective_time.into()),
+                timeout: Some(v.header.timeout.into()),
             }),
-            payload:    Some(generated::UpdateInstructionPayload {
+            payload: Some(generated::UpdateInstructionPayload {
                 payload: Some(generated::update_instruction_payload::Payload::RawPayload(
                     common::to_bytes(&v.payload),
                 )),
@@ -877,7 +902,7 @@ impl From<&UpdateInstruction> for generated::UpdateInstruction {
 impl IntoRequest<generated::AccountInfoRequest> for (&AccountIdentifier, &BlockIdentifier) {
     fn into_request(self) -> tonic::Request<generated::AccountInfoRequest> {
         let ai = generated::AccountInfoRequest {
-            block_hash:         Some(self.1.into()),
+            block_hash: Some(self.1.into()),
             account_identifier: Some(self.0.into()),
         };
         tonic::Request::new(ai)
@@ -888,7 +913,7 @@ impl IntoRequest<generated::AncestorsRequest> for (&BlockIdentifier, u64) {
     fn into_request(self) -> tonic::Request<generated::AncestorsRequest> {
         let ar = generated::AncestorsRequest {
             block_hash: Some(self.0.into()),
-            amount:     self.1,
+            amount: self.1,
         };
         tonic::Request::new(ar)
     }
@@ -908,7 +933,7 @@ impl IntoRequest<generated::InstanceInfoRequest> for (ContractAddress, &BlockIde
     fn into_request(self) -> tonic::Request<generated::InstanceInfoRequest> {
         let r = generated::InstanceInfoRequest {
             block_hash: Some(self.1.into()),
-            address:    Some(self.0.into()),
+            address: Some(self.0.into()),
         };
         tonic::Request::new(r)
     }
@@ -920,8 +945,8 @@ impl<V: Into<Vec<u8>>> IntoRequest<generated::InstanceStateLookupRequest>
     fn into_request(self) -> tonic::Request<generated::InstanceStateLookupRequest> {
         let r = generated::InstanceStateLookupRequest {
             block_hash: Some(self.1.into()),
-            address:    Some(self.0.into()),
-            key:        self.2.into(),
+            address: Some(self.0.into()),
+            key: self.2.into(),
         };
         tonic::Request::new(r)
     }
@@ -946,22 +971,26 @@ impl IntoRequest<generated::AccountAddress> for &AccountAddress {
 }
 
 impl From<transactions::TransactionHeader> for generated::AccountTransactionHeader {
-    fn from(v: transactions::TransactionHeader) -> Self { (&v).into() }
+    fn from(v: transactions::TransactionHeader) -> Self {
+        (&v).into()
+    }
 }
 
 impl From<&transactions::TransactionHeader> for generated::AccountTransactionHeader {
     fn from(v: &transactions::TransactionHeader) -> Self {
         Self {
-            sender:          Some(generated::AccountAddress::from(v.sender)),
+            sender: Some(generated::AccountAddress::from(v.sender)),
             sequence_number: Some(v.nonce.into()),
-            energy_amount:   Some(v.energy_amount.into()),
-            expiry:          Some(v.expiry.into()),
+            energy_amount: Some(v.energy_amount.into()),
+            expiry: Some(v.expiry.into()),
         }
     }
 }
 
 impl From<TransactionSignature> for generated::AccountTransactionSignature {
-    fn from(v: TransactionSignature) -> Self { (&v).into() }
+    fn from(v: TransactionSignature) -> Self {
+        (&v).into()
+    }
 }
 
 impl From<&TransactionSignature> for generated::AccountTransactionSignature {
@@ -972,13 +1001,19 @@ impl From<&TransactionSignature> for generated::AccountTransactionSignature {
                 for (cred_idx, sig_map) in v.signatures.iter() {
                     let mut acc_sig_map: HashMap<u32, generated::Signature> = HashMap::new();
                     for (key_idx, sig) in sig_map.iter() {
-                        acc_sig_map.insert(key_idx.0.into(), generated::Signature {
-                            value: sig.sig.to_owned(),
-                        });
+                        acc_sig_map.insert(
+                            key_idx.0.into(),
+                            generated::Signature {
+                                value: sig.sig.to_owned(),
+                            },
+                        );
                     }
-                    cred_map.insert(cred_idx.index.into(), generated::AccountSignatureMap {
-                        signatures: acc_sig_map,
-                    });
+                    cred_map.insert(
+                        cred_idx.index.into(),
+                        generated::AccountSignatureMap {
+                            signatures: acc_sig_map,
+                        },
+                    );
                 }
                 cred_map
             },
@@ -991,7 +1026,7 @@ impl IntoRequest<generated::PreAccountTransaction>
 {
     fn into_request(self) -> tonic::Request<generated::PreAccountTransaction> {
         let request = generated::PreAccountTransaction {
-            header:  Some(self.0.into()),
+            header: Some(self.0.into()),
             payload: Some(generated::AccountTransactionPayload {
                 payload: Some(generated::account_transaction_payload::Payload::RawPayload(
                     self.1.encode().into(),
@@ -1011,8 +1046,8 @@ impl<P: PayloadLike> IntoRequest<generated::SendBlockItemRequest> for &transacti
                         generated::send_block_item_request::BlockItem::AccountTransaction(
                             generated::AccountTransaction {
                                 signature: Some((&v.signature).into()),
-                                header:    Some((&v.header).into()),
-                                payload:   {
+                                header: Some((&v.header).into()),
+                                payload: {
                                     let atp = generated::AccountTransactionPayload{
                                     payload: Some(generated::account_transaction_payload::Payload::RawPayload(v.payload.encode().into())),
                                 };
@@ -1045,12 +1080,12 @@ impl IntoRequest<generated::InvokeInstanceRequest> for (&BlockIdentifier, &Contr
         let (block, context) = self;
         tonic::Request::new(generated::InvokeInstanceRequest {
             block_hash: Some(block.into()),
-            invoker:    context.invoker.as_ref().map(|a| a.into()),
-            instance:   Some((&context.contract).into()),
-            amount:     Some(context.amount.into()),
+            invoker: context.invoker.as_ref().map(|a| a.into()),
+            instance: Some((&context.contract).into()),
+            amount: Some(context.amount.into()),
             entrypoint: Some(context.method.as_receive_name().into()),
-            parameter:  Some(context.parameter.as_ref().into()),
-            energy:     context.energy.map(From::from),
+            parameter: Some(context.parameter.as_ref().into()),
+            energy: context.energy.map(From::from),
         })
     }
 }
@@ -1059,7 +1094,7 @@ impl IntoRequest<generated::PoolInfoRequest> for (&BlockIdentifier, types::Baker
     fn into_request(self) -> tonic::Request<generated::PoolInfoRequest> {
         let req = generated::PoolInfoRequest {
             block_hash: Some(self.0.into()),
-            baker:      Some(self.1.into()),
+            baker: Some(self.1.into()),
         };
         tonic::Request::new(req)
     }
@@ -1083,7 +1118,7 @@ impl IntoRequest<generated::GetPoolDelegatorsRequest> for (&BlockIdentifier, typ
     fn into_request(self) -> tonic::Request<generated::GetPoolDelegatorsRequest> {
         let req = generated::GetPoolDelegatorsRequest {
             block_hash: Some(self.0.into()),
-            baker:      Some(self.1.into()),
+            baker: Some(self.1.into()),
         };
         tonic::Request::new(req)
     }
@@ -1121,7 +1156,9 @@ impl IntoRequest<crate::v2::generated::BannedPeer> for &types::network::BannedPe
 }
 
 impl From<generated::PeerId> for types::network::PeerId {
-    fn from(value: generated::PeerId) -> Self { types::network::PeerId(value.value) }
+    fn from(value: generated::PeerId) -> Self {
+        types::network::PeerId(value.value)
+    }
 }
 
 impl TryFrom<generated::PeersInfo> for types::network::PeersInfo {
@@ -1138,33 +1175,42 @@ impl TryFrom<generated::PeersInfo> for types::network::PeersInfo {
             .into_iter()
             .map(|peer| {
                 // Parse the catchup status of the peer.
-                let peer_consensus_info = match peer.consensus_info.require()? {
-                    generated::peers_info::peer::ConsensusInfo::Bootstrapper(_) => {
-                        types::network::PeerConsensusInfo::Bootstrapper
-                    }
-                    generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(0) => {
-                        types::network::PeerConsensusInfo::Node(
-                            types::network::PeerCatchupStatus::UpToDate,
-                        )
-                    }
-                    generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(1) => {
-                        types::network::PeerConsensusInfo::Node(
-                            types::network::PeerCatchupStatus::Pending,
-                        )
-                    }
-                    generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(2) => {
-                        types::network::PeerConsensusInfo::Node(
-                            types::network::PeerCatchupStatus::CatchingUp,
-                        )
-                    }
-                    _ => anyhow::bail!("Malformed catchup status from peer."),
-                };
+                let peer_consensus_info =
+                    Upward::from(peer.consensus_info).and_then(|info| match info {
+                        generated::peers_info::peer::ConsensusInfo::Bootstrapper(_) => {
+                            Upward::Known(types::network::PeerConsensusInfo::Bootstrapper)
+                        }
+                        generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(status) => {
+                            let Upward::Known(status) = Upward::from(
+                                generated::peers_info::peer::CatchupStatus::try_from(status).ok(),
+                            ) else {
+                                return Upward::Known(types::network::PeerConsensusInfo::Node(
+                                    Upward::Unknown,
+                                ));
+                            };
+                            let status = match status {
+                                generated::peers_info::peer::CatchupStatus::Uptodate => {
+                                    types::network::PeerCatchupStatus::UpToDate
+                                }
+                                generated::peers_info::peer::CatchupStatus::Pending => {
+                                    types::network::PeerCatchupStatus::Pending
+                                }
+                                generated::peers_info::peer::CatchupStatus::Catchingup => {
+                                    types::network::PeerCatchupStatus::CatchingUp
+                                }
+                            };
+
+                            Upward::Known(types::network::PeerConsensusInfo::Node(Upward::Known(
+                                status,
+                            )))
+                        }
+                    });
                 // Parse the network statistics for the peer.
                 let stats = peer.network_stats.require()?;
                 let network_stats = types::network::NetworkStats {
-                    packets_sent:     stats.packets_sent,
+                    packets_sent: stats.packets_sent,
                     packets_received: stats.packets_received,
-                    latency:          stats.latency,
+                    latency: stats.latency,
                 };
                 Ok(types::network::Peer {
                     peer_id: peer.peer_id.require()?.into(),
@@ -1183,11 +1229,11 @@ impl TryFrom<generated::node_info::NetworkInfo> for types::NetworkInfo {
 
     fn try_from(network_info: generated::node_info::NetworkInfo) -> Result<Self, Self::Error> {
         Ok(types::NetworkInfo {
-            node_id:             network_info.node_id.require()?.value,
-            peer_total_sent:     network_info.peer_total_sent,
+            node_id: network_info.node_id.require()?.value,
+            peer_total_sent: network_info.peer_total_sent,
             peer_total_received: network_info.peer_total_received,
-            avg_bps_in:          network_info.avg_bps_in,
-            avg_bps_out:         network_info.avg_bps_out,
+            avg_bps_in: network_info.avg_bps_in,
+            avg_bps_out: network_info.avg_bps_out,
         })
     }
 }
@@ -1204,6 +1250,45 @@ impl IntoRequest<crate::v2::generated::PeerToBan> for types::network::PeerToBan 
     }
 }
 
+impl TryFrom<generated::node_info::Details> for types::NodeDetails {
+    type Error = anyhow::Error;
+
+    fn try_from(details: generated::node_info::Details) -> Result<Self, Self::Error> {
+        match details {
+            generated::node_info::Details::Bootstrapper(_) => Ok(types::NodeDetails::Bootstrapper),
+            generated::node_info::Details::Node(status) => {
+                let Upward::Known(consensus_status) = Upward::from(status.consensus_status) else {
+                    return Ok(types::NodeDetails::Node(Upward::Unknown));
+                };
+                let consensus_status = match consensus_status {
+                    generated::node_info::node::ConsensusStatus::NotRunning(_) => {
+                        types::NodeConsensusStatus::ConsensusNotRunning
+                    }
+                    generated::node_info::node::ConsensusStatus::Passive(_) => {
+                        types::NodeConsensusStatus::ConsensusPassive
+                    }
+                    generated::node_info::node::ConsensusStatus::Active(baker) => {
+                        let baker_id = baker.baker_id.require()?.into();
+                        let Upward::Known(status) = Upward::from(baker.status) else {
+                            return Ok(types::NodeDetails::Node(Upward::Unknown));
+                        };
+
+                        match status {
+                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(0) => types::NodeConsensusStatus::NotInCommittee(baker_id),
+                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(1) => types::NodeConsensusStatus::AddedButNotActiveInCommittee(baker_id),
+                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(2) => types::NodeConsensusStatus::AddedButWrongKeys(baker_id),
+                            generated::node_info::baker_consensus_info::Status::ActiveBakerCommitteeInfo(_) => types::NodeConsensusStatus::Baker(baker_id),
+                            generated::node_info::baker_consensus_info::Status::ActiveFinalizerCommitteeInfo(_) => types::NodeConsensusStatus::Finalizer(baker_id),
+                            _ => anyhow::bail!("Malformed baker status")
+                        }
+                    }
+                };
+                Ok(types::NodeDetails::Node(Upward::Known(consensus_status)))
+            }
+        }
+    }
+}
+
 impl TryFrom<generated::NodeInfo> for types::NodeInfo {
     type Error = anyhow::Error;
 
@@ -1216,31 +1301,9 @@ impl TryFrom<generated::NodeInfo> for types::NodeInfo {
             node_info.peer_uptime.require()?.value,
         ))?;
         let network_info = node_info.network_info.require()?.try_into()?;
-        let details = match node_info.details.require()? {
-            generated::node_info::Details::Bootstrapper(_) => types::NodeDetails::Bootstrapper,
-            generated::node_info::Details::Node(status) => {
-                let consensus_status = match status.consensus_status.require()? {
-                    generated::node_info::node::ConsensusStatus::NotRunning(_) => {
-                        types::NodeConsensusStatus::ConsensusNotRunning
-                    }
-                    generated::node_info::node::ConsensusStatus::Passive(_) => {
-                        types::NodeConsensusStatus::ConsensusPassive
-                    }
-                    generated::node_info::node::ConsensusStatus::Active(baker) => {
-                        let baker_id = baker.baker_id.require()?.into();
-                        match baker.status.require()? {
-                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(0) => types::NodeConsensusStatus::NotInCommittee(baker_id),
-                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(1) => types::NodeConsensusStatus::AddedButNotActiveInCommittee(baker_id),
-                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(2) => types::NodeConsensusStatus::AddedButWrongKeys(baker_id),
-                            generated::node_info::baker_consensus_info::Status::ActiveBakerCommitteeInfo(_) => types::NodeConsensusStatus::Baker(baker_id),
-                            generated::node_info::baker_consensus_info::Status::ActiveFinalizerCommitteeInfo(_) => types::NodeConsensusStatus::Finalizer(baker_id),
-                            _ => anyhow::bail!("Malformed baker status")
-                        }
-                    }
-                };
-                types::NodeDetails::Node(consensus_status)
-            }
-        };
+        let details = Upward::from(node_info.details)
+            .map(types::NodeDetails::try_from)
+            .transpose()?;
         Ok(types::NodeInfo {
             version,
             local_time,
@@ -1262,23 +1325,33 @@ pub trait IntoBlockIdentifier {
 }
 
 impl IntoBlockIdentifier for BlockIdentifier {
-    fn into_block_identifier(self) -> BlockIdentifier { self }
+    fn into_block_identifier(self) -> BlockIdentifier {
+        self
+    }
 }
 
 impl<X: IntoBlockIdentifier + Copy> IntoBlockIdentifier for &X {
-    fn into_block_identifier(self) -> BlockIdentifier { (*self).into_block_identifier() }
+    fn into_block_identifier(self) -> BlockIdentifier {
+        (*self).into_block_identifier()
+    }
 }
 
 impl IntoBlockIdentifier for BlockHash {
-    fn into_block_identifier(self) -> BlockIdentifier { BlockIdentifier::Given(self) }
+    fn into_block_identifier(self) -> BlockIdentifier {
+        BlockIdentifier::Given(self)
+    }
 }
 
 impl IntoBlockIdentifier for AbsoluteBlockHeight {
-    fn into_block_identifier(self) -> BlockIdentifier { BlockIdentifier::AbsoluteHeight(self) }
+    fn into_block_identifier(self) -> BlockIdentifier {
+        BlockIdentifier::AbsoluteHeight(self)
+    }
 }
 
 impl IntoBlockIdentifier for RelativeBlockHeight {
-    fn into_block_identifier(self) -> BlockIdentifier { BlockIdentifier::RelativeHeight(self) }
+    fn into_block_identifier(self) -> BlockIdentifier {
+        BlockIdentifier::RelativeHeight(self)
+    }
 }
 
 impl Client {
@@ -1301,7 +1374,8 @@ impl Client {
     pub async fn new<E>(endpoint: E) -> Result<Self, tonic::transport::Error>
     where
         E: TryInto<tonic::transport::Endpoint>,
-        E::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>>, {
+        E::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>>,
+    {
         let client = generated::queries_client::QueriesClient::connect(endpoint).await?;
         Ok(Self { client })
     }
@@ -1732,7 +1806,7 @@ impl Client {
         let mut runner = dry_run::DryRun::new(&mut self.client).await?;
         let load_result = runner.load_block_state(bi).await?;
         Ok(WithRemainingQuota {
-            inner:           (runner, load_result.inner),
+            inner: (runner, load_result.inner),
             quota_remaining: load_result.quota_remaining,
         })
     }
@@ -2225,7 +2299,7 @@ impl Client {
     /// function returns a GRPC status 'Ok' in this case.
     pub async fn peer_connect(&mut self, addr: std::net::SocketAddr) -> endpoints::RPCResult<()> {
         let peer_connection = generated::IpSocketAddress {
-            ip:   Some(generated::IpAddress {
+            ip: Some(generated::IpAddress {
                 value: addr.ip().to_string(),
             }),
             port: Some(generated::Port {
@@ -2244,7 +2318,7 @@ impl Client {
         addr: std::net::SocketAddr,
     ) -> endpoints::RPCResult<()> {
         let peer_connection = generated::IpSocketAddress {
-            ip:   Some(generated::IpAddress {
+            ip: Some(generated::IpAddress {
                 value: addr.ip().to_string(),
             }),
             port: Some(generated::Port {
@@ -2990,7 +3064,7 @@ impl Client {
     ) -> endpoints::QueryResult<QueryResponse<protocol_level_tokens::TokenInfo>> {
         let request = generated::TokenInfoRequest {
             block_hash: Some((&bi.into_block_identifier()).into()),
-            token_id:   Some(token_id.into()),
+            token_id: Some(token_id.into()),
         };
         let response = self.client.get_token_info(request).await?;
         let block_hash = extract_metadata(&response)?;
@@ -3006,14 +3080,16 @@ impl Client {
 /// for new finalized blocks indefinitely. The task can be stopped by dropping
 /// the object.
 pub struct FinalizedBlocksStream {
-    handle:   tokio::task::JoinHandle<endpoints::QueryResult<()>>,
+    handle: tokio::task::JoinHandle<endpoints::QueryResult<()>>,
     receiver: tokio::sync::mpsc::Receiver<FinalizedBlockInfo>,
 }
 
 // Make sure to abort the background task so that those resources are cleaned up
 // before we drop the handle.
 impl Drop for FinalizedBlocksStream {
-    fn drop(&mut self) { self.handle.abort(); }
+    fn drop(&mut self) {
+        self.handle.abort();
+    }
 }
 
 impl FinalizedBlocksStream {
@@ -3021,7 +3097,9 @@ impl FinalizedBlocksStream {
     /// block until a finalized block becomes available. To avoid waiting
     /// indefinitely, consider using [`FinalizedBlocksStream::next_timeout`]
     /// instead. If the channel is closed, the next element is `None`.
-    pub async fn next(&mut self) -> Option<FinalizedBlockInfo> { self.receiver.recv().await }
+    pub async fn next(&mut self) -> Option<FinalizedBlockInfo> {
+        self.receiver.recv().await
+    }
 
     /// Similar to [`FinalizedBlocksStream::next`], but with a maximum wait time
     /// defined by the specified duration between each finalized block.
@@ -3180,8 +3258,8 @@ mod tests {
             b6,
             BlockIdentifier::RelativeHeight(RelativeBlockHeight {
                 genesis_index: 3.into(),
-                height:        33.into(),
-                restrict:      false,
+                height: 33.into(),
+                restrict: false,
             })
         );
 
@@ -3190,8 +3268,8 @@ mod tests {
             b7,
             BlockIdentifier::RelativeHeight(RelativeBlockHeight {
                 genesis_index: 3.into(),
-                height:        33.into(),
-                restrict:      true,
+                height: 33.into(),
+                restrict: true,
             })
         );
 

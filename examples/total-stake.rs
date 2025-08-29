@@ -16,7 +16,7 @@ struct App {
         default_value = "lastfinal",
         help = "Block to query the data in. Defaults to last finalized block."
     )]
-    block:    BlockIdentifier,
+    block: BlockIdentifier,
 }
 
 #[tokio::main(flavor = "multi_thread")]

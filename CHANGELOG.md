@@ -1,4 +1,9 @@
 ## Unreleased changes
+- Removed authorization from `TokenClient` validation.
+- Added `validate_mint`, `validate_burn`, `validate_allow_list_update`, `validate_deny_list_update` methods to `TokenClient`.
+- Added `update_token_info` method to `TokenClient`.
+- Added `Validation` as a separate enum for `TokenClient` operations.
+- Remove use of `CborTokenHolder` wrapper.
 
 - Introduce `ProtocolVersionInt` newtype, wrapping the `u64` representation of the `ProtocolVersion`. This type is forward-compatible, meaning future protocol versions can be represented using this type.
 - BREAKING: Change type `ProtocolVersion` to  `ProtocolVersionInt` for field `protocol_version` in the types listed below. Now introducing new protocol versions in `ProtocolVersion` does not result in RPC parsing errors, and consumers of this library can write more applications that are more forward-compatible.
@@ -44,11 +49,85 @@
   - Method `AccountTransactionEffects::is_rejected` return value.
   - Type `AccountTransactionEffects` field `reject_reason`.
   - Type `InvokeContractResult` field `reason`.
+  - Type `UpdateInstruction` field `payload` now needs to be decoded on-demand, ensuring errors due to new variants for `UpdatePayload` can be handled separately and the rest of `UpdateInstruction` can still be read.
+  - Type `UpdateDetails` field `payload` is wrapped.
+  - Method `UpdateDetails::update_type` return type is wrapped.
+  - Type `AccountTransactionEffects::BakerConfigured` field `data` from `Vec<BakerEvent>` to `Vec<Upward<BakerEvent>>`.
+  - Type `AccountTransactionEffects::DelegationConfigured` field `data` from `Vec<DelegationEvent>` to `Vec<Upward<DelegationEvent>>`.
+  - Type `InvokeContractResult` field `events` of `Success` variant is now `Vec<Upward<ContractTraceElement>>`.
+  - Type `InvokeInstanceSuccess` field `events` is now `Vec<Upward<ContractTraceElement>>`.
+  - Method `ContractUpdateBuilder::events` return type from `&[ContractTraceElement]` to `&[Upward<ContractTraceElement>]`.
+  - Associated type `Indexer::Data` for `AffectedContractIndexer` now wraps the affected contract addresses in `Upward`.
+  - Type `AccountTransactionEffects` field `effects` of `ContractUpdateIssued` variant is now `Vec<Upward<ContractTraceElement>>`.
+  - Method `BlockItemSummary::contract_update_logs` now wraps the iterator items in `Upward`.
+  - Method `BlockItemSummaryDetails::contract_update_logs` now wraps the iterator items in `Upward`.
+  - Method `AccountTransactionEffects::affected_addresses` now wraps the return type in `Upward`.
+  - Method `ExecutionTree::affected_addresses` now wraps the return type in `Upward`.
+  - Method `ExecutionTree::events` now wraps the `Iterator::Item` in `Upward`.
+  - Function `execution_tree` parameter changed from `Vec<Upward<ContractTraceElement>>` to `Vec<ContractTraceElement>`.
+  - Type `ExecutionTreeV0` field `rest` change from `Vec<TraceV0>` to `Vec<Upward<TraceV0>>`.
+  - Type `ExecutionTreeV1` field `events` change from `Vec<TraceV1>` to `Vec<Upward<TraceV1>>`.
+  - Type `NodeDetails` variant `Node` is now wrapped in `Upward`.
+  - Type `NodeInfo` field `details` is now wrapped in `Upward`.
+  - Type `Peer` field `consensus_info` is now wrapped in `Upward`.
+  - Type `PeerConsensusInfo::Node` unnamed field is now wrapped in `Upward`.
+  - Type `AccountInfo` field `account_stake` changes from `Option<AccountStakingInfo>` to `Option<Upward<AccountStakingInfo>>`.
+  - Type `Cooldown` field `status` is now wrapped in `Upward`.
 
-- Add `NextUpdateSequenceNumbers::protocol_level_tokens` and protobuf deserialization of it
-- Changed `TokenClient`'s `burn` and `mint` methods to accept a singular `TokenAmount`, instead of `Vec<TokenAmount>`.
-- Added `PartialEq`, `Eq`, `Hash` to `TokenInfo`
-- Fix JSON serialization of `RejectReason` such that it matches the Haskell counterpart.
+## 7.0.0
+
+Adds support for integrating with Concordium nodes running protocol version 9.
+
+Explicit changes with respect to 6.0.0 release:
+  - Introduce protocol version 9 variant `ProtocolVersion::P9`.
+  - Introduce basic types related to protocol level tokens (PLT)
+    - `RawCbor`: Represents CBOR encoded details for PLT module state, events, and operations
+    - `CborMemo`: Represents CBOR encoded memos for PLT transactions
+    - `TokenId`: A unique text identifier of a PLT
+    - `TokenAmount`: A representation of a PLT amount
+    - `TokenModuleRef`: The module reference of a PLT instance
+    - `MetadataUrl`: An object containing the url for token metadata
+    - `TokenModuleAccountState`: The state stored in the module of an account with respect to a PLT token (e.g. if account is on the allow/deny list)
+    - `TokenModuleInitializationParameters`: The parameters that are parsed to the token module when creating a PLT token.
+    - `TokenModuleState`: The state stored by the token module.
+    - `TokenAccountState`: The state of a protocol level token associated with some account (e.g. its token balance and if account is on the allow/deny list meaning its module states).  
+    - `TokenHolder`: A representation of the different token holder entities. Currently, only accounts are supported.
+  - Extend `RejectReason` with `TokenUpdateTransactionFailed` and `NonExistentTokenId` variants.
+  - Add `tokens` field to `AccountInfo` with PLTs held by the account.
+  - Extend `AccountTransactionEffects` with `TokenUpdate` variant.
+  - Add new variant `TokenUpdate` to the `Payload` enum and corresponding `TransactionType` representing the payload of an account transaction updating a token.
+  - Add `TokenOperations` type to represent the different actions when updating a token (e.g. `mint/burn/transfer/pause/unpause/addAndRemoveFromToAllowDenyLists`). Operations can be created using functions in `concordium_base::protocol_level_tokens::operations`.
+  - Add new struct `CreatePlt` and corresponding `UpdatePayload` type representing the payload of a create PLT chain-update transaction creating a new token.
+  - Extend `BlockItemSummaryDetails` with `TokenCreationDetails` variant including contained PLT events. `TokenCreationDetails` is the summary corresponding to `CreatePlt` updates.
+  - Add `NextUpdateSequenceNumbers::protocol_level_tokens` and protobuf deserialization of it.
+  - Add `TokenEvent` type.
+  - Add `TokenEventDetails` enum with variants `Module(TokenModuleEvent)`, `Transfer(TokenTransferEvent)`, `Mint(TokenSupplyUpdateEvent)`, and `Burn(TokenSupplyUpdateEvent)`.
+  - Add `TokenModuleRejectReason` struct representing PLT transaction rejections.
+  - Event and reject reasons CBOR can be decoded with `TokenModuleEvent::decode_token_module_event` or
+  `TokenModuleRejectReason::decode_reject_reason`.
+  - Add generic support for `cbor` encoding/decoding in the `cbor` module. The `cbor::cbor_decode/encode` function can encode/decode PLT types that are represented as `cbor`.
+  - Add `Level2KeysUpdateV2(AuthorizationsV1)` variant to the `RootUpdate` enum which must have a field `Some(create_plt)` for exposing and updating the access structure for PLT creation.
+  - Add `TokenClient`, which is a client for interacting with PLTs.
+  - Add the examples `plt-transfer.rs`, `plt-mint-and-burn.rs`, `plt-allow-and-deny-list`, `plt-pause.rs`, and `plt-token-client.rs` in the `examples` folder.
+  - Extend the `affected_addresses` function within the `BlockItemSummary` implementation to return a vector of addresses whose CCD or PLT token balances were impacted by the transaction.
+  - Add `get_canonical_address` method on `AccountAddress`.
+  - Add getter function `reward_period_epochs` to access the field in the struct `RewardPeriodLength`.
+  - Introduce `RewardsOverview::common_reward_data` for getting the common reward data across `RewardsOverview` version 0 and version 1.
+  - Add constructor `TokenAddress::new` for CIS2 type `TokenAddress`.
+  - Change behavior of `TraverseConfig::traverse` to continuously start up new `Indexer::on_finalized` tasks up to `max_parallel` as the output channel takes the results of prior tasks.
+  The prior behavior was to start preparing `max_parallel` tasks, then wait for everything to be consumed before starting another round of `max_parallel` tasks.
+  - Fix issue in `ProcessorConfig::process_event_stream` and `ProcessorConfig::process_events` where it did not check the stop signal while retrying, preventing a graceful shutdown.
+  - Introduce `ProcessorConfig::process_event_stream` which is equivalent to `ProcessorConfig::process_events` but the `events` argument is generalized to be some implementation of `Stream`.
+  - `ProcessorConfig` now requires the future for signaling graceful shutdown is marked `Send` effectively marking `ProcessorConfig` as `Send`. This is a minor breaking change, but expected to be the case for most if not all use cases.
+  - Add `parse` method to `ReturnValue` to simplify deserialization of values returned by contract invocations.
+  - Add genesis block hash for testnet/mainnet to constants.
+  - **Breaking change**: Updated dependencies: tonic = 0.10 -> 0.12, prost = 0.12 -> 0.13, http = 0.2 -> 1.2
+  - MSRV updated: 1.73 -> 1.85
+  - The feature `generate-protos` has been removed (it was for internal usage and should not be used by any consumers)
+- Additional changes with respect to the last `alpha` release: 
+  - Change `TokenClient`'s `burn` and `mint` methods to accept a singular `TokenAmount`, instead of `Vec<TokenAmount>`.
+  - Add `PartialEq`, `Eq`, `Hash` to `TokenInfo`
+  - Fix JSON serialization of `RejectReason` such that it matches the Haskell counterpart.
 
 ## 7.0.0-alpha.3
 

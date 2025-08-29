@@ -15,9 +15,9 @@ struct App {
         help = "GRPC interface of the node.",
         default_value = "http://localhost:20000"
     )]
-    endpoint:     v2::Endpoint,
+    endpoint: v2::Endpoint,
     #[structopt(long = "contract", help = "The address of the contract to invoke")]
-    contract:     ContractAddress,
+    contract: ContractAddress,
     #[structopt(long = "entrypoint", help = "The entrypoint of the contract to invoke")]
     receive_name: OwnedReceiveName,
 }
@@ -35,12 +35,12 @@ async fn main() -> anyhow::Result<()> {
         .context("Cannot connect.")?;
 
     let context = ContractContext {
-        invoker:   None,
-        contract:  app.contract,
-        amount:    Amount::zero(),
-        method:    app.receive_name,
+        invoker: None,
+        contract: app.contract,
+        amount: Amount::zero(),
+        method: app.receive_name,
         parameter: Default::default(),
-        energy:    None,
+        energy: None,
     };
 
     let info = client
