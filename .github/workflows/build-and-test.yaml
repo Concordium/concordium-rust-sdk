@@ -14,9 +14,6 @@ on:
 
   workflow_dispatch: # allows manual trigger
 
-env:
-  RUST_FMT: 1.82
-
 jobs:
   "lint_fmt":
     name: lint:fmt
@@ -26,8 +23,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Format
         run: |
-          rustup +$RUST_FMT component add rustfmt
-          cargo +$RUST_FMT fmt -- --color=always --check
+          rustup component add rustfmt
+          cargo fmt -- --color=always --check
 
   "lint_doc":
     name: lint:doc
