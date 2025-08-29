@@ -17,7 +17,7 @@ struct App {
         long = "account",
         help = "Account address to get non-finalized transactions for."
     )]
-    account:  AccountAddress,
+    account: AccountAddress,
 }
 
 #[tokio::main(flavor = "multi_thread")]

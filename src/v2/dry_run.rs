@@ -33,11 +33,13 @@ mod shared_receiver {
     /// can queue to receive items from the stream.
     pub struct SharedReceiver<I> {
         senders: mpsc::UnboundedSender<oneshot::Sender<I>>,
-        task:    JoinHandle<()>,
+        task: JoinHandle<()>,
     }
 
     impl<I> Drop for SharedReceiver<I> {
-        fn drop(&mut self) { self.task.abort(); }
+        fn drop(&mut self) {
+            self.task.abort();
+        }
     }
 
     impl<I> SharedReceiver<I>
@@ -101,7 +103,7 @@ pub enum ErrorResult {
     #[error("account balance insufficient")]
     BalanceInsufficient {
         /// The balance required to pay for the operation.
-        required_amount:  Amount,
+        required_amount: Amount,
         /// The actual amount available on the account to pay for the operation.
         available_amount: Amount,
     },
@@ -125,9 +127,9 @@ pub enum ErrorResult {
         /// present.
         return_value: Option<ReturnValue>,
         /// Energy used by the execution.
-        used_energy:  Energy,
+        used_energy: Energy,
         /// Contract execution failed for the given reason.
-        reason:       RejectReason,
+        reason: RejectReason,
     },
 }
 
@@ -145,7 +147,7 @@ impl TryFrom<dry_run_error_response::Error> for ErrorResult {
                 amount_limit: e.amount_limit.require()?.into(),
             },
             Error::BalanceInsufficient(e) => Self::BalanceInsufficient {
-                required_amount:  e.required_amount.require()?.into(),
+                required_amount: e.required_amount.require()?.into(),
                 available_amount: e.available_amount.require()?.into(),
             },
             Error::EnergyInsufficient(e) => Self::EnergyInsufficient {
@@ -153,8 +155,8 @@ impl TryFrom<dry_run_error_response::Error> for ErrorResult {
             },
             Error::InvokeFailed(e) => Self::InvokeFailure {
                 return_value: e.return_value.map(ReturnValue::from),
-                used_energy:  e.used_energy.require()?.into(),
-                reason:       e.reason.require()?.try_into()?,
+                used_energy: e.used_energy.require()?.into(),
+                reason: e.reason.require()?.try_into()?,
             },
         };
         Ok(res)
@@ -175,7 +177,7 @@ pub enum DryRunError {
     OperationFailed {
         /// The error result.
         #[source]
-        result:          ErrorResult,
+        result: ErrorResult,
         /// The energy quota remaining for subsequent dry-run requests in the
         /// session.
         quota_remaining: Energy,
@@ -187,7 +189,7 @@ pub enum DryRunError {
 #[derive(Debug, Clone)]
 pub struct WithRemainingQuota<T> {
     /// The result value.
-    pub inner:           T,
+    pub inner: T,
     /// The remaining energy quota.
     pub quota_remaining: Energy,
 }
@@ -199,10 +201,10 @@ pub struct BlockStateLoaded {
     /// executing transactions.
     pub current_timestamp: Timestamp,
     /// The hash of the block that was loaded.
-    pub block_hash:        BlockHash,
+    pub block_hash: BlockHash,
     /// The protocol version at the specified block. The behavior of operations
     /// can vary across protocol version.
-    pub protocol_version:  ProtocolVersion,
+    pub protocol_version: ProtocolVersion,
 }
 
 impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
@@ -332,12 +334,12 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
 impl From<&ContractContext> for DryRunInvokeInstance {
     fn from(context: &ContractContext) -> Self {
         DryRunInvokeInstance {
-            invoker:    context.invoker.as_ref().map(|a| a.into()),
-            instance:   Some((&context.contract).into()),
-            amount:     Some(context.amount.into()),
+            invoker: context.invoker.as_ref().map(|a| a.into()),
+            instance: Some((&context.contract).into()),
+            amount: Some(context.amount.into()),
             entrypoint: Some(context.method.as_receive_name().into()),
-            parameter:  Some(context.parameter.as_ref().into()),
-            energy:     context.energy.map(From::from),
+            parameter: Some(context.parameter.as_ref().into()),
+            energy: context.energy.map(From::from),
         }
     }
 }
@@ -348,9 +350,9 @@ pub struct InvokeInstanceSuccess {
     /// The return value for a V1 contract call. Absent for a V0 contract call.
     pub return_value: Option<ReturnValue>,
     /// The effects produced by contract execution.
-    pub events:       Vec<ContractTraceElement>,
+    pub events: Vec<ContractTraceElement>,
     /// The energy used by the execution.
-    pub used_energy:  Energy,
+    pub used_energy: Energy,
 }
 
 impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
@@ -373,8 +375,8 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
                     ErrorResult::NoState
                         | ErrorResult::InvokeFailure {
                             return_value: _,
-                            used_energy:  _,
-                            reason:       _,
+                            used_energy: _,
+                            reason: _,
                         }
                 ) {
                     Err(tonic::Status::unknown("unexpected error response type"))?
@@ -391,12 +393,12 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
                     Response::InvokeSucceeded(result) => {
                         let inner = InvokeInstanceSuccess {
                             return_value: result.return_value.map(|a| ReturnValue { value: a }),
-                            events:       result
+                            events: result
                                 .effects
                                 .into_iter()
                                 .map(TryFrom::try_from)
                                 .collect::<Result<_, tonic::Status>>()?,
-                            used_energy:  result.used_energy.require()?.into(),
+                            used_energy: result.used_energy.require()?.into(),
                         };
                         Ok(WithRemainingQuota {
                             inner,
@@ -513,15 +515,15 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
 #[derive(Clone, Debug)]
 pub struct DryRunTransaction {
     /// The account originating the transaction.
-    pub sender:        AccountAddress,
+    pub sender: AccountAddress,
     /// The limit on the energy that may be used by the transaction.
     pub energy_amount: Energy,
     /// The transaction payload to execute.
-    pub payload:       EncodedPayload,
+    pub payload: EncodedPayload,
     /// The credential-keys that are treated as signing the transaction.
     /// If this is the empty vector, it is treated as the single key (0,0)
     /// signing.
-    pub signatures:    Vec<(CredentialIndex, KeyIndex)>,
+    pub signatures: Vec<(CredentialIndex, KeyIndex)>,
 }
 
 impl DryRunTransaction {
@@ -544,10 +546,10 @@ impl<P: PayloadLike> From<concordium_base::transactions::AccountTransaction<P>>
 {
     fn from(value: concordium_base::transactions::AccountTransaction<P>) -> Self {
         DryRunTransaction {
-            sender:        value.header.sender,
+            sender: value.header.sender,
             energy_amount: value.header.energy_amount,
-            payload:       value.payload.encode(),
-            signatures:    value
+            payload: value.payload.encode(),
+            signatures: value
                 .signature
                 .signatures
                 .into_iter()
@@ -561,17 +563,17 @@ impl From<DryRunTransaction> for generated::DryRunTransaction {
     fn from(transaction: DryRunTransaction) -> Self {
         let payload = account_transaction_payload::Payload::RawPayload(transaction.payload.into());
         generated::DryRunTransaction {
-            sender:        Some(transaction.sender.into()),
+            sender: Some(transaction.sender.into()),
             energy_amount: Some(transaction.energy_amount.into()),
-            payload:       Some(generated::AccountTransactionPayload {
+            payload: Some(generated::AccountTransactionPayload {
                 payload: Some(payload),
             }),
-            signatures:    transaction
+            signatures: transaction
                 .signatures
                 .into_iter()
                 .map(|(cred, key)| DryRunSignature {
                     credential: cred.index.into(),
-                    key:        key.0.into(),
+                    key: key.0.into(),
                 })
                 .collect(),
         }
@@ -584,9 +586,9 @@ impl From<DryRunTransaction> for generated::DryRunTransaction {
 #[derive(Clone, Debug)]
 pub struct TransactionExecuted {
     /// The actual energy cost of executing the transaction.
-    pub energy_cost:  Energy,
+    pub energy_cost: Energy,
     /// Detailed result of the transaction execution.
-    pub details:      AccountTransactionDetails,
+    pub details: AccountTransactionDetails,
     /// For V1 contract update and init transactions, the return value.
     pub return_value: Option<Vec<u8>>,
 }
@@ -625,8 +627,8 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
                 match response {
                     generated::dry_run_success_response::Response::TransactionExecuted(res) => {
                         let inner = TransactionExecuted {
-                            energy_cost:  res.energy_cost.require()?.into(),
-                            details:      res.details.require()?.try_into()?,
+                            energy_cost: res.energy_cost.require()?.into(),
+                            details: res.details.require()?.try_into()?,
                             return_value: res.return_value,
                         };
                         Ok(WithRemainingQuota {
@@ -662,13 +664,13 @@ pub type DryRunResult<T> = Result<WithRemainingQuota<T>, DryRunError>;
 pub struct DryRun {
     /// The channel used for sending requests to the server.
     /// This is `None` if the session has been closed.
-    request_send:  Option<channel::mpsc::Sender<generated::DryRunRequest>>,
+    request_send: Option<channel::mpsc::Sender<generated::DryRunRequest>>,
     /// The channel used for receiving responses from the server.
     response_recv: shared_receiver::SharedReceiver<tonic::Result<generated::DryRunResponse>>,
     /// The timeout in milliseconds for the dry-run session to complete.
-    timeout:       u64,
+    timeout: u64,
     /// The energy quota for the dry-run session as a whole.
-    energy_quota:  u64,
+    energy_quota: u64,
 }
 
 impl DryRun {
@@ -704,10 +706,14 @@ impl DryRun {
     /// Get the timeout for the dry-run session set by the server.
     /// Returns `None` if the initial metadata did not include the timeout, or
     /// it could not be parsed.
-    pub fn timeout(&self) -> std::time::Duration { std::time::Duration::from_millis(self.timeout) }
+    pub fn timeout(&self) -> std::time::Duration {
+        std::time::Duration::from_millis(self.timeout)
+    }
 
     /// Get the total energy quota set for the dry-run session.
-    pub fn energy_quota(&self) -> Energy { self.energy_quota.into() }
+    pub fn energy_quota(&self) -> Energy {
+        self.energy_quota.into()
+    }
 
     /// Load the state from a specified block.
     /// This can result in an error if the dry-run session has already been
@@ -1074,7 +1080,7 @@ impl DryRun {
                         generated::dry_run_state_operation::Operation::MintToAccount(
                             DryRunMintToAccount {
                                 account: Some(account_address.into()),
-                                amount:  Some(mint_amount.into()),
+                                amount: Some(mint_amount.into()),
                             },
                         ),
                     ),
@@ -1210,7 +1216,9 @@ impl DryRun {
     /// that services in-flight requests, so it should not be dropped before
     /// `await`ing any such requests. Closing the request stream does not stop
     /// the background task.
-    pub fn close(&mut self) { self.request_send = None; }
+    pub fn close(&mut self) {
+        self.request_send = None;
+    }
 
     /// Helper function that issues a dry-run request and returns a future for
     /// the corresponding response.

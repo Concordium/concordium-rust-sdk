@@ -41,7 +41,9 @@ pub enum Cis4QueryError {
 }
 
 impl From<RejectReason> for Cis4QueryError {
-    fn from(value: RejectReason) -> Self { Self::NodeRejected(value) }
+    fn from(value: RejectReason) -> Self {
+        Self::NodeRejected(value)
+    }
 }
 
 impl Cis4QueryError {

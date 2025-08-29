@@ -15,7 +15,7 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "block", help = "Block to query delegators in.")]
-    block:    Option<BlockHash>,
+    block: Option<BlockHash>,
 }
 
 #[tokio::main(flavor = "multi_thread")]

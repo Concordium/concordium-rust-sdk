@@ -39,7 +39,8 @@ pub(crate) mod byte_array_hex {
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
             where
-                E: serde::de::Error, {
+                E: serde::de::Error,
+            {
                 let r = hex::decode(v).map_err(serde::de::Error::custom)?;
                 Ok(r)
             }
@@ -63,7 +64,7 @@ pub(crate) mod account_amounts {
     #[serde(rename_all = "camelCase")]
     struct AccountAmount {
         address: AccountAddress,
-        amount:  Amount,
+        amount: Amount,
     }
     pub fn serialize<S: serde::Serializer>(
         dt: &BTreeMap<AccountAddress, Amount>,
@@ -91,7 +92,8 @@ pub(crate) mod account_amounts {
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
             where
-                A: serde::de::SeqAccess<'de>, {
+                A: serde::de::SeqAccess<'de>,
+            {
                 let mut out = BTreeMap::new();
                 while let Some(e) = seq.next_element::<AccountAmount>()? {
                     if out.insert(e.address, e.amount).is_some() {

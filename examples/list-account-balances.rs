@@ -26,26 +26,26 @@ struct App {
         long = "lastfinal",
         help = "Block to query the data in. Defaults to last finalized block."
     )]
-    block:    BlockIdentifier,
+    block: BlockIdentifier,
     #[structopt(
         long = "out",
         help = "File to output the list of accounts with their balances to."
     )]
-    out:      PathBuf,
+    out: PathBuf,
     #[structopt(
         long = "num",
         help = "How many queries to make in parallel.",
         default_value = "8"
     )]
-    num:      usize,
+    num: usize,
 }
 
 #[derive(SerdeSerialize)]
 struct Row {
     #[serde(rename = "Account address")]
-    address:  AccountAddress,
+    address: AccountAddress,
     #[serde(rename = "Account balance in CCD", serialize_with = "to_string")]
-    balance:  Amount,
+    balance: Amount,
     #[serde(rename = "isBaker")]
     is_baker: bool,
     #[serde(rename = "Account type")]

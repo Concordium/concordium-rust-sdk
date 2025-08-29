@@ -20,11 +20,11 @@ struct App {
         help = "Number of parallel queries to make.",
         default_value = "4"
     )]
-    num:      usize,
+    num: usize,
     #[structopt(long = "from", help = "Starting time. Defaults to genesis time.")]
-    from:     Option<chrono::DateTime<chrono::Utc>>,
+    from: Option<chrono::DateTime<chrono::Utc>>,
     #[structopt(long = "to", help = "End time. Defaults to infinity.")]
-    to:       Option<chrono::DateTime<chrono::Utc>>,
+    to: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 #[tokio::main(flavor = "multi_thread")]

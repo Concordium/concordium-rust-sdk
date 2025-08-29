@@ -14,9 +14,9 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "module", help = "Module reference to query.")]
-    module:   ModuleReference,
+    module: ModuleReference,
     #[structopt(long = "out", help = "File path to write the module into.")]
-    out:      Option<PathBuf>,
+    out: Option<PathBuf>,
 }
 
 #[tokio::main(flavor = "multi_thread")]
