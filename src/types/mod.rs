@@ -398,7 +398,11 @@ pub struct AccountInfo {
     /// minus the locked amount. The locked amount is the maximum of the
     /// amount in the release schedule and the total amount that is actively
     /// staked or in cooldown (inactive stake).
-    pub available_balance: Amount,
+    ///
+    /// Note future versions of the Concordium Node API might introduce new
+    /// variants of [`AccountStakingInfo`], therefore each event is wrapped in
+    /// [`Upward`] potentially representing some future unknown data.
+    pub available_balance: Upward<Amount>,
     /// The protocol level tokens (PLT) held by the account.
     pub tokens: Vec<protocol_level_tokens::AccountToken>,
 }

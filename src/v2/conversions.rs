@@ -1016,26 +1016,35 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
         // If we up the minimum supported node version to version 7, we can remove this
         // fallback calculation and instead require the available balance field to
         // always be present.
-        let available_balance = available_balance.map(|ab| ab.into()).unwrap_or({
-            let active_stake = if let Some(Upward::Known(staking_info)) = &account_stake {
-                staking_info.staked_amount()
-            } else {
-                Default::default()
-            };
+        let available_balance = available_balance
+            .map(|ab| Upward::Known(ab.into()))
+            .unwrap_or({
+                let active_stake = if let Some(Upward::Known(staking_info)) = &account_stake {
+                    Some(staking_info.staked_amount())
+                } else if let Some(Upward::Unknown) = &account_stake {
+                    None
+                } else {
+                    Some(Default::default())
+                };
 
-            let inactive_stake = cooldowns.iter().map(|cd| cd.amount).sum();
+                match active_stake {
+                    None => Upward::Unknown,
+                    Some(active_stake) => {
+                        let inactive_stake = cooldowns.iter().map(|cd| cd.amount).sum();
+                        let staked_amount = active_stake + inactive_stake;
 
-            let staked_amount = active_stake + inactive_stake;
+                        // The locked amount is the maximum of the amount in the release schedule and
+                        // the total amount that is actively staked or in cooldown (inactive stake).
+                        let locked_amount = Ord::max(account_release_schedule.total, staked_amount);
 
-            // The locked amount is the maximum of the amount in the release schedule and
-            // the total amount that is actively staked or in cooldown (inactive stake).
-            let locked_amount = Ord::max(account_release_schedule.total, staked_amount);
+                        // According to the protobuf documentation:
+                        // The available (unencrypted) balance of the account is the balance minus the locked amount.
+                        let available_amount = account_amount - locked_amount;
+                        Upward::Known(available_amount)
+                    }
+                }
+            });
 
-            // According to the protobuf documentation:
-            // The available (unencrypted) balance of the account is the balance minus the
-            // locked amount.
-            account_amount - locked_amount
-        });
         let tokens = tokens
             .into_iter()
             .map(|token| token.try_into())
