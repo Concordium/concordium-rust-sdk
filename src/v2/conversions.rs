@@ -17,6 +17,7 @@ use concordium_base::{
             InitialCredentialDeploymentValues,
         },
     },
+    smart_contracts::WasmVersionInt,
     updates,
 };
 use cooldown::CooldownStatus;
@@ -1015,7 +1016,7 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
         // If we up the minimum supported node version to version 7, we can remove this
         // fallback calculation and instead require the available balance field to
         // always be present.
-        let available_balance = available_balance.map(|ab| ab.into()).unwrap_or_else(|| {
+        let available_balance = available_balance.map(|ab| ab.into()).unwrap_or({
             let active_stake = if let Some(Upward::Known(staking_info)) = &account_stake {
                 staking_info.staked_amount()
             } else {
@@ -1755,7 +1756,13 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
             account_transaction_effects::Effect::ContractInitialized(cie) => {
                 Ok(Self::ContractInitialized {
                     data: super::types::ContractInitializedEvent {
-                        contract_version: cie.contract_version().into(),
+                        contract_version: u8::try_from(cie.contract_version)
+                            .map(WasmVersionInt)
+                            .map_err(|err| {
+                                tonic::Status::internal(format!(
+                                    "Could not map contract version from i32 to u8: {err}"
+                                ))
+                            })?,
                         origin_ref: cie.origin_ref.require()?.try_into()?,
                         address: cie.address.require()?.into(),
                         amount: cie.amount.require()?.into(),
@@ -2178,7 +2185,13 @@ impl TryFrom<InstanceUpdatedEvent> for super::types::InstanceUpdatedEvent {
 
     fn try_from(value: InstanceUpdatedEvent) -> Result<Self, Self::Error> {
         Ok(Self {
-            contract_version: value.contract_version().into(),
+            contract_version: u8::try_from(value.contract_version)
+                .map(WasmVersionInt)
+                .map_err(|err| {
+                    tonic::Status::internal(format!(
+                        "Could not map contract version from i32 to u8: {err}"
+                    ))
+                })?,
             address: value.address.require()?.into(),
             instigator: value.instigator.require()?.try_into()?,
             amount: value.amount.require()?.into(),
@@ -2186,15 +2199,6 @@ impl TryFrom<InstanceUpdatedEvent> for super::types::InstanceUpdatedEvent {
             receive_name: value.receive_name.require()?.try_into()?,
             events: value.events.into_iter().map(Into::into).collect(),
         })
-    }
-}
-
-impl From<ContractVersion> for super::types::smart_contracts::WasmVersion {
-    fn from(value: ContractVersion) -> Self {
-        match value {
-            ContractVersion::V0 => Self::V0,
-            ContractVersion::V1 => Self::V1,
-        }
     }
 }
 

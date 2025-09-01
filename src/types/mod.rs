@@ -38,9 +38,7 @@ use concordium_base::{
         },
     },
     protocol_level_tokens::{TokenAmount, TokenEvent, TokenEventDetails, TokenHolder, TokenId},
-    smart_contracts::{
-        ContractEvent, ModuleReference, OwnedParameter, OwnedReceiveName, WasmVersion,
-    },
+    smart_contracts::{ContractEvent, ModuleReference, OwnedParameter, OwnedReceiveName},
     transactions::{AccountAccessStructure, ExactSizeTransactionSigner, TransactionSigner},
 };
 use std::{
@@ -1501,8 +1499,8 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                     },
             } => {
                 if let Some(end) = stack.pop() {
-                    let tree = match contract_version {
-                        WasmVersion::V0 => ExecutionTree::V0(ExecutionTreeV0 {
+                    let tree = match contract_version.0 {
+                        0 => ExecutionTree::V0(ExecutionTreeV0 {
                             top_level: UpdateV0 {
                                 address,
                                 instigator,
@@ -1513,7 +1511,7 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                             },
                             rest: Vec::new(),
                         }),
-                        WasmVersion::V1 => ExecutionTree::V1(ExecutionTreeV1 {
+                        1 => ExecutionTree::V1(ExecutionTreeV1 {
                             address,
                             instigator,
                             amount,
@@ -1521,6 +1519,17 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                             receive_name,
                             events: vec![Upward::Known(TraceV1::Events { events })],
                         }),
+                        _ => {
+                            // TODO -> use unkown
+                            ExecutionTree::V1(ExecutionTreeV1 {
+                                address,
+                                instigator,
+                                amount,
+                                message,
+                                receive_name,
+                                events: vec![Upward::Known(TraceV1::Events { events })],
+                            })
+                        }
                     };
                     match end {
                         Worker::V0(mut v0) => {
@@ -1566,8 +1575,8 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                     }
                 } else {
                     // no stack yet
-                    match contract_version {
-                        WasmVersion::V0 => stack.push(Worker::V0(ExecutionTreeV0 {
+                    match contract_version.0 {
+                        0 => stack.push(Worker::V0(ExecutionTreeV0 {
                             top_level: UpdateV0 {
                                 address,
                                 instigator,
@@ -1578,7 +1587,7 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                             },
                             rest: Vec::new(),
                         })),
-                        WasmVersion::V1 => {
+                        1 => {
                             let tree = ExecutionTreeV1 {
                                 address,
                                 instigator,
@@ -1593,6 +1602,9 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                             } else {
                                 return None;
                             }
+                        }
+                        _ => {
+                            // TODO
                         }
                     }
                 }
@@ -2557,8 +2569,8 @@ pub struct EncryptedSelfAmountAddedEvent {
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ContractInitializedEvent {
-    #[serde(default)]
-    pub contract_version: smart_contracts::WasmVersion,
+    #[serde(default = "smart_contracts::WasmVersionInt::zero_version")]
+    pub contract_version: smart_contracts::WasmVersionInt,
     #[serde(rename = "ref")]
     /// Module with the source code of the contract.
     pub origin_ref: smart_contracts::ModuleReference,
