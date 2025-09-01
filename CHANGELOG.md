@@ -11,7 +11,7 @@
   - `ConsensusInfo`
   - `CommonRewardData`
 - Introduce `Upward<A>` for representing types, which might get extended in a future version of the Concordium Node API and allows the consumer of this library to decide how to handle some unknown future data, like new transaction types and chain events.
-- Using a newly defined type `WasmVersionInt` defined in `concordium-base` in order to make the Wasm Version (Smart contract version) forwards compatible by storing it there as a u8.
+- Use the `WasmVersionInt` defined in `concordium-base` for the wasm version (smart contract version) to make it forward-compatible.
 - BREAKING: Change types related to gRPC API responses to wrap `Upward` for values which might be extended in a future version of the API of the Concordium Node.
 
   The changes are for:
@@ -39,6 +39,7 @@
   - Type `ModuleDeployError::Failed`.
   - Type `DryRunModuleDeployError::Failed`.
   - Type `RejectedTransaction` field `reason`.
+  - Type `ExecutionTree`.
   - Method `ContractClient::view<P, A, E>` require `E` to implement `From<v2::Upward<RejectReason>>`.
   - Method `ContractClient::view_raw<A, E>` require `E` to implement `From<v2::Upward<RejectReason>>`.
   - Method `ContractClient::invoke_raw<E>` require `E` to implement `From<v2::Upward<RejectReason>>`.

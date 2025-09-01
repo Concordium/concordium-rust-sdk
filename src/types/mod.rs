@@ -1277,34 +1277,43 @@ pub enum ExecutionTree {
     V0(ExecutionTreeV0),
     /// The top-level call was a V1 contract instance update.
     V1(ExecutionTreeV1),
+    /// Future versions of the Concordium Node API might introduce new
+    /// variants of [`ExecutionTree`]. This variant represents some future unknown data.
+    Unkown,
 }
 
 impl ExecutionTree {
     /// Return the name of the top-level entrypoint that was invoked.
-    pub fn entrypoint(&self) -> EntrypointName {
+    pub fn entrypoint(&self) -> Upward<EntrypointName> {
         match self {
-            ExecutionTree::V0(v0) => v0
-                .top_level
-                .receive_name
-                .as_receive_name()
-                .entrypoint_name(),
-            ExecutionTree::V1(v1) => v1.receive_name.as_receive_name().entrypoint_name(),
+            ExecutionTree::V0(v0) => Upward::Known(
+                v0.top_level
+                    .receive_name
+                    .as_receive_name()
+                    .entrypoint_name(),
+            ),
+            ExecutionTree::V1(v1) => {
+                Upward::Known(v1.receive_name.as_receive_name().entrypoint_name())
+            }
+            ExecutionTree::Unkown => Upward::Unknown,
         }
     }
 
     /// Return the name of the top-level contract that was invoked.
-    pub fn address(&self) -> ContractAddress {
+    pub fn address(&self) -> Upward<ContractAddress> {
         match self {
-            ExecutionTree::V0(v0) => v0.top_level.address,
-            ExecutionTree::V1(v1) => v1.address,
+            ExecutionTree::V0(v0) => Upward::Known(v0.top_level.address),
+            ExecutionTree::V1(v1) => Upward::Known(v1.address),
+            ExecutionTree::Unkown => Upward::Unknown,
         }
     }
 
     /// Return parameter to the top-level contract call.
-    pub fn parameter(&self) -> Parameter {
+    pub fn parameter(&self) -> Upward<Parameter> {
         match self {
-            ExecutionTree::V0(v0) => v0.top_level.message.as_parameter(),
-            ExecutionTree::V1(v1) => v1.message.as_parameter(),
+            ExecutionTree::V0(v0) => Upward::Known(v0.top_level.message.as_parameter()),
+            ExecutionTree::V1(v1) => Upward::Known(v1.message.as_parameter()),
+            ExecutionTree::Unkown => Upward::Unknown,
         }
     }
 
@@ -1349,6 +1358,7 @@ impl ExecutionTree {
                         }
                     }
                 }
+                ExecutionTree::Unkown => return Upward::Unknown,
             }
         }
         Upward::Known(addresses)
@@ -1438,6 +1448,7 @@ impl ExecutionTree {
                                     }
                                 }
                             }
+                            ExecutionTree::Unkown => return Some(Upward::Unknown),
                         },
                     }
                 }
@@ -1523,17 +1534,7 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                             receive_name,
                             events: vec![Upward::Known(TraceV1::Events { events })],
                         }),
-                        _ => {
-                            // TODO -> use unkown
-                            ExecutionTree::V1(ExecutionTreeV1 {
-                                address,
-                                instigator,
-                                amount,
-                                message,
-                                receive_name,
-                                events: vec![Upward::Known(TraceV1::Events { events })],
-                            })
-                        }
+                        _ => ExecutionTree::Unkown,
                     };
                     match end {
                         Worker::V0(mut v0) => {
@@ -1607,9 +1608,7 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                                 return None;
                             }
                         }
-                        _ => {
-                            // TODO
-                        }
+                        _ => return Some(ExecutionTree::Unkown),
                     }
                 }
             }

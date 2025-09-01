@@ -493,8 +493,10 @@ impl Indexer for ContractUpdateIndexer {
                     let Some(info) = update_info(summary) else {
                         return Ok(None);
                     };
-                    if info.execution_tree.address() == self.target_address
-                        && info.execution_tree.entrypoint() == self.entrypoint.as_entrypoint_name()
+                    if info.execution_tree.address()
+                        == v2::upward::Upward::Known(self.target_address)
+                        && info.execution_tree.entrypoint()
+                            == v2::upward::Upward::Known(self.entrypoint.as_entrypoint_name())
                     {
                         Ok(Some(info))
                     } else {
