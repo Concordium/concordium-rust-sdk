@@ -5045,7 +5045,7 @@ pub mod dry_run_error_response {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DryRunSuccessResponse {
     #[prost(oneof = "dry_run_success_response::Response", tags = "1, 2, 3, 4, 5, 6, 7")]
-    pub response: ::core::option::Option<dry_run_success_response::Response>,
+    pub response: ::core::option::Option<Upward<dry_run_success_response::Response>>,
 }
 /// Nested message and enum types in `DryRunSuccessResponse`.
 pub mod dry_run_success_response {

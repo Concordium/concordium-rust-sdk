@@ -72,6 +72,8 @@
   - Type `PeerConsensusInfo::Node` unnamed field is now wrapped in `Upward`.
   - Type `AccountInfo` field `account_stake` changes from `Option<AccountStakingInfo>` to `Option<Upward<AccountStakingInfo>>`.
   - Type `Cooldown` field `status` is now wrapped in `Upward`.
+  - Type `DryRunSuccessResponse` field `response` is wrapped.
+  - Method `try_from` match response.response is amended to cater for Upward Known.
 
 ## 7.0.0
 

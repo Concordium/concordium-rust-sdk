@@ -233,22 +233,28 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
             Response::Success(s) => {
                 let response = s.response.require()?;
                 match response {
-                    generated::dry_run_success_response::Response::BlockStateLoaded(loaded) => {
-                        let protocol_version =
-                            generated::ProtocolVersion::try_from(loaded.protocol_version)
-                                .map_err(|_| tonic::Status::unknown("Unknown protocol version"))?
-                                .into();
-                        let loaded = BlockStateLoaded {
-                            current_timestamp: loaded.current_timestamp.require()?.into(),
-                            block_hash: loaded.block_hash.require()?.try_into()?,
-                            protocol_version,
-                        };
-                        Ok(WithRemainingQuota {
-                            inner: loaded,
-                            quota_remaining,
-                        })
-                    }
-                    _ => Err(tonic::Status::unknown("unexpected success response type"))?,
+                    Upward::Known(inner) => match inner {
+                        generated::dry_run_success_response::Response::BlockStateLoaded(loaded) => {
+                            let protocol_version =
+                                generated::ProtocolVersion::try_from(loaded.protocol_version)
+                                    .map_err(|_| {
+                                        tonic::Status::unknown("Unknown protocol version")
+                                    })?
+                                    .into();
+                            let loaded = BlockStateLoaded {
+                                current_timestamp: loaded.current_timestamp.require()?.into(),
+                                block_hash: loaded.block_hash.require()?.try_into()?,
+                                protocol_version,
+                            };
+                            Ok(WithRemainingQuota {
+                                inner: loaded,
+                                quota_remaining,
+                            })
+                        }
+                        _ => Err(tonic::Status::unknown("unexpected success response type"))?,
+                    },
+                    // Upward::Known
+                    Upward::Unknown => Err(tonic::Status::unknown("Unknown response type"))?,
                 }
             }
         }
@@ -282,11 +288,14 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
                 let response = s.response.require()?;
                 use generated::dry_run_success_response::*;
                 match response {
-                    Response::AccountInfo(info) => Ok(WithRemainingQuota {
-                        inner: info.try_into()?,
-                        quota_remaining,
-                    }),
-                    _ => Err(tonic::Status::unknown("unexpected success response type"))?,
+                    Upward::Known(inner) => match inner {
+                        Response::AccountInfo(info) => Ok(WithRemainingQuota {
+                            inner: info.try_into()?,
+                            quota_remaining,
+                        }),
+                        _ => Err(tonic::Status::unknown("unexpected success response type"))?,
+                    }, // Upward::Known
+                    Upward::Unknown => Err(tonic::Status::unknown("Unknown response type"))?,
                 }
             }
         }
@@ -320,11 +329,15 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
                 let response = s.response.require()?;
                 use generated::dry_run_success_response::*;
                 match response {
-                    Response::InstanceInfo(info) => Ok(WithRemainingQuota {
-                        inner: info.try_into()?,
-                        quota_remaining,
-                    }),
-                    _ => Err(tonic::Status::unknown("unexpected success response type"))?,
+                    Upward::Known(inner) => match inner {
+                        Response::InstanceInfo(info) => Ok(WithRemainingQuota {
+                            inner: info.try_into()?,
+                            quota_remaining,
+                        }),
+                        _ => Err(tonic::Status::unknown("unexpected success response type"))?,
+                    }, // Upward::Known
+
+                    Upward::Unknown => Err(tonic::Status::unknown("Unknown response type"))?,
                 }
             }
         }
