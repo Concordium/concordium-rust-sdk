@@ -39,7 +39,6 @@
   - Type `ModuleDeployError::Failed`.
   - Type `DryRunModuleDeployError::Failed`.
   - Type `RejectedTransaction` field `reason`.
-  - Type `ExecutionTree`.
   - Method `ContractClient::view<P, A, E>` require `E` to implement `From<v2::Upward<RejectReason>>`.
   - Method `ContractClient::view_raw<A, E>` require `E` to implement `From<v2::Upward<RejectReason>>`.
   - Method `ContractClient::invoke_raw<E>` require `E` to implement `From<v2::Upward<RejectReason>>`.
@@ -65,6 +64,9 @@
   - Method `AccountTransactionEffects::affected_addresses` now wraps the return type in `Upward`.
   - Method `ExecutionTree::affected_addresses` now wraps the return type in `Upward`.
   - Method `ExecutionTree::events` now wraps the `Iterator::Item` in `Upward`.
+  - Method `ExecutionTree::entrypoint` now wraps return type in `Upward`.
+  - Method `ExecutionTree::address` now wraps return type in `Upward`.
+  - Method `ExecutionTree::parameter` now wraps return type in `Upward`.
   - Function `execution_tree` parameter changed from `Vec<Upward<ContractTraceElement>>` to `Vec<ContractTraceElement>`.
   - Type `ExecutionTreeV0` field `rest` change from `Vec<TraceV0>` to `Vec<Upward<TraceV0>>`.
   - Type `ExecutionTreeV1` field `events` change from `Vec<TraceV1>` to `Vec<Upward<TraceV1>>`.
@@ -73,6 +75,7 @@
   - Type `Peer` field `consensus_info` is now wrapped in `Upward`.
   - Type `PeerConsensusInfo::Node` unnamed field is now wrapped in `Upward`.
   - Type `AccountInfo` field `account_stake` changes from `Option<AccountStakingInfo>` to `Option<Upward<AccountStakingInfo>>`.
+  - Type `AccountInfo` field `available_balance` changes from `Amount` to `Upward<Amount>`.
   - Type `Cooldown` field `status` is now wrapped in `Upward`.
 
 ## 7.0.0
