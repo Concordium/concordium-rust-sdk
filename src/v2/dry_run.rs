@@ -72,6 +72,38 @@ mod shared_receiver {
     }
 }
 
+#[derive(Debug)]
+pub struct DryRunSuccessResponseWrapper {
+    pub response: Option<Upward<generated::dry_run_success_response::Response>>,
+}
+
+impl DryRunSuccessResponseWrapper {
+    pub fn from_proto(proto: generated::DryRunSuccessResponse) -> Self {
+        // If the inner Option is Some, we consider it Known
+        // Otherwise (None), treat it as Unknown
+        let response = match proto.response {
+            Some(r) => Upward::Known(r),
+            None => Upward::Unknown,
+        };
+
+        Self {
+            response: Some(response),
+        }
+    }
+}
+
+impl DryRunSuccessResponseWrapper {
+    pub fn unwrap_response(
+        &self,
+    ) -> Result<&generated::dry_run_success_response::Response, tonic::Status> {
+        match &self.response {
+            Some(Upward::Known(r)) => Ok(r),
+            Some(Upward::Unknown) => Err(tonic::Status::unknown("Unknown response type")),
+            None => Err(tonic::Status::unknown("None response type")),
+        }
+    }
+}
+
 /// An error response to a dry-run request.
 #[derive(thiserror::Error, Debug)]
 pub enum ErrorResult {
@@ -231,7 +263,10 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
                 })
             }
             Response::Success(s) => {
-                let response = s.response.require()?;
+                let wrapper = DryRunSuccessResponseWrapper::from_proto(s);
+
+                let response = wrapper.unwrap_response()?;
+
                 match response {
                     generated::dry_run_success_response::Response::BlockStateLoaded(loaded) => {
                         let protocol_version =
@@ -239,8 +274,9 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
                                 .map_err(|_| tonic::Status::unknown("Unknown protocol version"))?
                                 .into();
                         let loaded = BlockStateLoaded {
-                            current_timestamp: loaded.current_timestamp.require()?.into(),
-                            block_hash: loaded.block_hash.require()?.try_into()?,
+                            current_timestamp: (*loaded.current_timestamp.as_ref().require()?)
+                                .into(),
+                            block_hash: loaded.block_hash.as_ref().require()?.clone().try_into()?,
                             protocol_version,
                         };
                         Ok(WithRemainingQuota {
