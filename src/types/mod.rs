@@ -38,7 +38,9 @@ use concordium_base::{
         },
     },
     protocol_level_tokens::{TokenAmount, TokenEvent, TokenEventDetails, TokenHolder, TokenId},
-    smart_contracts::{ContractEvent, ModuleReference, OwnedParameter, OwnedReceiveName},
+    smart_contracts::{
+        ContractEvent, ModuleReference, OwnedParameter, OwnedReceiveName, WasmVersion,
+    },
     transactions::{AccountAccessStructure, ExactSizeTransactionSigner, TransactionSigner},
 };
 use std::{
@@ -398,11 +400,7 @@ pub struct AccountInfo {
     /// minus the locked amount. The locked amount is the maximum of the
     /// amount in the release schedule and the total amount that is actively
     /// staked or in cooldown (inactive stake).
-    ///
-    /// Note future versions of the Concordium Node API might introduce new
-    /// variants of [`AccountStakingInfo`], therefore each event is wrapped in
-    /// [`Upward`] potentially representing some future unknown data.
-    pub available_balance: Upward<Amount>,
+    pub available_balance: Amount,
     /// The protocol level tokens (PLT) held by the account.
     pub tokens: Vec<protocol_level_tokens::AccountToken>,
 }
@@ -1279,7 +1277,7 @@ pub enum ExecutionTree {
     V1(ExecutionTreeV1),
     /// Future versions of the Concordium Node API might introduce new
     /// variants of [`ExecutionTree`]. This variant represents some future unknown data.
-    Unkown,
+    Unknown,
 }
 
 impl ExecutionTree {
@@ -1295,7 +1293,7 @@ impl ExecutionTree {
             ExecutionTree::V1(v1) => {
                 Upward::Known(v1.receive_name.as_receive_name().entrypoint_name())
             }
-            ExecutionTree::Unkown => Upward::Unknown,
+            ExecutionTree::Unknown => Upward::Unknown,
         }
     }
 
@@ -1304,7 +1302,7 @@ impl ExecutionTree {
         match self {
             ExecutionTree::V0(v0) => Upward::Known(v0.top_level.address),
             ExecutionTree::V1(v1) => Upward::Known(v1.address),
-            ExecutionTree::Unkown => Upward::Unknown,
+            ExecutionTree::Unknown => Upward::Unknown,
         }
     }
 
@@ -1313,7 +1311,7 @@ impl ExecutionTree {
         match self {
             ExecutionTree::V0(v0) => Upward::Known(v0.top_level.message.as_parameter()),
             ExecutionTree::V1(v1) => Upward::Known(v1.message.as_parameter()),
-            ExecutionTree::Unkown => Upward::Unknown,
+            ExecutionTree::Unknown => Upward::Unknown,
         }
     }
 
@@ -1358,7 +1356,7 @@ impl ExecutionTree {
                         }
                     }
                 }
-                ExecutionTree::Unkown => return Upward::Unknown,
+                ExecutionTree::Unknown => return Upward::Unknown,
             }
         }
         Upward::Known(addresses)
@@ -1448,7 +1446,7 @@ impl ExecutionTree {
                                     }
                                 }
                             }
-                            ExecutionTree::Unkown => return Some(Upward::Unknown),
+                            ExecutionTree::Unknown => return Some(Upward::Unknown),
                         },
                     }
                 }
@@ -1514,8 +1512,8 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                     },
             } => {
                 if let Some(end) = stack.pop() {
-                    let tree = match contract_version.0 {
-                        0 => ExecutionTree::V0(ExecutionTreeV0 {
+                    let tree = match WasmVersion::try_from(contract_version) {
+                        Ok(WasmVersion::V0) => ExecutionTree::V0(ExecutionTreeV0 {
                             top_level: UpdateV0 {
                                 address,
                                 instigator,
@@ -1526,7 +1524,7 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                             },
                             rest: Vec::new(),
                         }),
-                        1 => ExecutionTree::V1(ExecutionTreeV1 {
+                        Ok(WasmVersion::V1) => ExecutionTree::V1(ExecutionTreeV1 {
                             address,
                             instigator,
                             amount,
@@ -1534,8 +1532,9 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                             receive_name,
                             events: vec![Upward::Known(TraceV1::Events { events })],
                         }),
-                        _ => ExecutionTree::Unkown,
+                        Err(_) => ExecutionTree::Unknown,
                     };
+
                     match end {
                         Worker::V0(mut v0) => {
                             v0.rest.push(Upward::Known(TraceV0::Call(tree)));
@@ -1580,8 +1579,8 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                     }
                 } else {
                     // no stack yet
-                    match contract_version.0 {
-                        0 => stack.push(Worker::V0(ExecutionTreeV0 {
+                    match WasmVersion::try_from(contract_version) {
+                        Ok(WasmVersion::V0) => stack.push(Worker::V0(ExecutionTreeV0 {
                             top_level: UpdateV0 {
                                 address,
                                 instigator,
@@ -1592,7 +1591,7 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                             },
                             rest: Vec::new(),
                         })),
-                        1 => {
+                        Ok(WasmVersion::V1) => {
                             let tree = ExecutionTreeV1 {
                                 address,
                                 instigator,
@@ -1608,7 +1607,7 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                                 return None;
                             }
                         }
-                        _ => return Some(ExecutionTree::Unkown),
+                        Err(_) => return Some(ExecutionTree::Unknown),
                     }
                 }
             }

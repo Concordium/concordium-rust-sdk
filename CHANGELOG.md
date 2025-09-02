@@ -75,7 +75,6 @@
   - Type `Peer` field `consensus_info` is now wrapped in `Upward`.
   - Type `PeerConsensusInfo::Node` unnamed field is now wrapped in `Upward`.
   - Type `AccountInfo` field `account_stake` changes from `Option<AccountStakingInfo>` to `Option<Upward<AccountStakingInfo>>`.
-  - Type `AccountInfo` field `available_balance` changes from `Amount` to `Upward<Amount>`.
   - Type `Cooldown` field `status` is now wrapped in `Upward`.
 
 ## 7.0.0
