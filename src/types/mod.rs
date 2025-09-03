@@ -1360,11 +1360,9 @@ impl ExecutionTree {
     ///
     /// Each item of the iterator is wrapped into an `Upward` type.
     /// If the SDK is not fully compatible with the Concordium node,
-    /// it can occur that a smart contract version is unkonwn to this SDK
-    /// and its execution traces cannot be parsed into an execution tree or
-    /// some new events from a smart contract might be unknown to the SDK.
-    /// In any of such cases this function cannot evaluate that part of the execution tree for events.
-    /// Items of `Unkown` are inserted in the iterator if evaluation couldn't be performed for that reason.
+    /// it can occur that new events in the execution tree occur that are unknown
+    /// to the SDK or some of the execution traces are unknown.
+    /// Items of `Unkown` are inserted in the iterator in that case.
     pub fn events(
         &self,
     ) -> impl Iterator<
@@ -1464,12 +1462,11 @@ impl ExecutionTree {
 ///
 /// The return type is wrapped into an `Upward` type.
 /// If the SDK is not fully compatible with the Concordium node,
-/// it can occur that the `elements` trace through a smart contract with a version that is unkonwn to this SDK
-/// and some part of the `elements` can not be parsed into a known execution tree.
-/// In such a case this function cannot construct a valid execution tree and
-/// `Unkown` is returned.
-/// If some of the `elements` are `Unknown` to this SDK, but otherwise a known execution tree
-/// can be constructed then that is ha
+/// it can occur that the `contractTraceElements` pass through a smart contract with a version that is unkonwn to this SDK.
+/// As the assumption is that new smart contract versions require a different execution tree to be accurated represented/executed,
+/// this function will return `Unkown` in that case.
+/// If some of the `contractTraceElements` are `Unknown` to this SDK, but otherwise pass through smart contracts with known versions,
+/// an execution tree can be constructed that contains all trace elements (potentially `Unkown` trace elements).
 pub fn execution_tree(
     elements: Vec<Upward<ContractTraceElement>>,
 ) -> Option<Upward<ExecutionTree>> {

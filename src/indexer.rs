@@ -639,9 +639,7 @@ impl Indexer for AffectedContractIndexer {
 
                     let affected_addresses = execution_tree.affected_addresses();
                     let v2::Upward::Known(affected_addresses) = affected_addresses else {
-                        return Err(OnFinalizationError::Unknown(
-                            "affected_addresses".to_string(),
-                        ));
+                        return Ok(Some(v2::Upward::Unknown));
                     };
 
                     if (self.all
