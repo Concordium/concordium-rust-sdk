@@ -1223,7 +1223,7 @@ impl BlockItemSummary {
 
     /// If the block item is a smart contract update transaction then return the
     /// execution tree.
-    pub fn contract_update(self) -> Option<ExecutionTree> {
+    pub fn contract_update(self) -> Option<Upward<ExecutionTree>> {
         self.details.known()?.contract_update()
     }
 
@@ -1275,43 +1275,34 @@ pub enum ExecutionTree {
     V0(ExecutionTreeV0),
     /// The top-level call was a V1 contract instance update.
     V1(ExecutionTreeV1),
-    /// Future versions of the Concordium Node API might introduce new
-    /// variants of [`ExecutionTree`]. This variant represents some future unknown data.
-    Unknown,
 }
 
 impl ExecutionTree {
     /// Return the name of the top-level entrypoint that was invoked.
-    pub fn entrypoint(&self) -> Upward<EntrypointName> {
+    pub fn entrypoint(&self) -> EntrypointName {
         match self {
-            ExecutionTree::V0(v0) => Upward::Known(
-                v0.top_level
-                    .receive_name
-                    .as_receive_name()
-                    .entrypoint_name(),
-            ),
-            ExecutionTree::V1(v1) => {
-                Upward::Known(v1.receive_name.as_receive_name().entrypoint_name())
-            }
-            ExecutionTree::Unknown => Upward::Unknown,
+            ExecutionTree::V0(v0) => v0
+                .top_level
+                .receive_name
+                .as_receive_name()
+                .entrypoint_name(),
+            ExecutionTree::V1(v1) => v1.receive_name.as_receive_name().entrypoint_name(),
         }
     }
 
     /// Return the name of the top-level contract that was invoked.
-    pub fn address(&self) -> Upward<ContractAddress> {
+    pub fn address(&self) -> ContractAddress {
         match self {
-            ExecutionTree::V0(v0) => Upward::Known(v0.top_level.address),
-            ExecutionTree::V1(v1) => Upward::Known(v1.address),
-            ExecutionTree::Unknown => Upward::Unknown,
+            ExecutionTree::V0(v0) => v0.top_level.address,
+            ExecutionTree::V1(v1) => v1.address,
         }
     }
 
     /// Return parameter to the top-level contract call.
-    pub fn parameter(&self) -> Upward<Parameter> {
+    pub fn parameter(&self) -> Parameter {
         match self {
-            ExecutionTree::V0(v0) => Upward::Known(v0.top_level.message.as_parameter()),
-            ExecutionTree::V1(v1) => Upward::Known(v1.message.as_parameter()),
-            ExecutionTree::Unknown => Upward::Unknown,
+            ExecutionTree::V0(v0) => v0.top_level.message.as_parameter(),
+            ExecutionTree::V1(v1) => v1.message.as_parameter(),
         }
     }
 
@@ -1325,38 +1316,58 @@ impl ExecutionTree {
         &self,
     ) -> Upward<BTreeMap<ContractAddress, BTreeSet<OwnedReceiveName>>> {
         let mut addresses = BTreeMap::<ContractAddress, BTreeSet<_>>::new();
-        let mut todo = vec![self];
+        let mut todo = vec![Some(self)];
         while let Some(head) = todo.pop() {
             match head {
-                ExecutionTree::V0(v0) => {
+                Some(ExecutionTree::V0(v0)) => {
                     addresses
                         .entry(v0.top_level.address)
                         .or_default()
                         .insert(v0.top_level.receive_name.clone());
                     for rest in &v0.rest {
-                        let Upward::Known(rest) = rest else {
-                            return Upward::Unknown;
-                        };
-                        if let TraceV0::Call(call) = rest {
-                            todo.push(call);
+                        match rest {
+                            Upward::Known(rest) => {
+                                if let TraceV0::Call(call) = rest {
+                                    let entry = match call {
+                                        Upward::Unknown => None,
+                                        Upward::Known(tree) => Some(tree),
+                                    };
+                                    todo.push(entry);
+                                }
+                            }
+                            Upward::Unknown => {
+                                todo.push(None);
+                            }
                         }
                     }
                 }
-                ExecutionTree::V1(v1) => {
+                Some(ExecutionTree::V1(v1)) => {
                     addresses
                         .entry(v1.address)
                         .or_default()
                         .insert(v1.receive_name.clone());
                     for event in &v1.events {
-                        let Upward::Known(event) = event else {
-                            return Upward::Unknown;
-                        };
-                        if let TraceV1::Call { call } = event {
-                            todo.push(call);
+                        match event {
+                            Upward::Known(event) => {
+                                if let TraceV1::Call { call } = event {
+                                    let entry = match call {
+                                        Upward::Unknown => None,
+                                        Upward::Known(tree) => Some(tree),
+                                    };
+                                    todo.push(entry);
+                                }
+                            }
+                            Upward::Unknown => {
+                                todo.push(None);
+                            }
                         }
                     }
                 }
-                ExecutionTree::Unknown => return Upward::Unknown,
+                None => {
+                    // To signal that some addresses are missing as not all of the execution trees were known,
+                    // we insert an entry representing an empty map for the `Unknown` execution trees.
+                    return Upward::Unknown;
+                }
             }
         }
         Upward::Known(addresses)
@@ -1379,7 +1390,7 @@ impl ExecutionTree {
         // An auxiliary type used to store the list of next items produced by
         // the [`EventsIterator`]
         enum LogsIteratorNext<'a> {
-            Tree(&'a ExecutionTree),
+            Tree(&'a Upward<ExecutionTree>),
             Events(
                 (
                     ContractAddress,
@@ -1406,7 +1417,7 @@ impl ExecutionTree {
                     match next {
                         LogsIteratorNext::Events(r) => return Some(Upward::Known(r)),
                         LogsIteratorNext::Tree(next) => match next {
-                            ExecutionTree::V0(v0) => {
+                            Upward::Known(ExecutionTree::V0(v0)) => {
                                 let rv = (
                                     v0.top_level.address,
                                     v0.top_level
@@ -1425,7 +1436,7 @@ impl ExecutionTree {
                                 }
                                 return Some(Upward::Known(rv));
                             }
-                            ExecutionTree::V1(v1) => {
+                            Upward::Known(ExecutionTree::V1(v1)) => {
                                 for event in v1.events.iter().rev() {
                                     let Upward::Known(event) = event else {
                                         return Some(Upward::Unknown);
@@ -1439,14 +1450,15 @@ impl ExecutionTree {
                                             )))
                                         }
                                         TraceV1::Call { call } => {
-                                            self.next.push(LogsIteratorNext::Tree(call));
+                                            // FIXME
+                                            // self.next.push(LogsIteratorNext::Tree(call));
                                         }
                                         TraceV1::Transfer { .. } => (),
                                         TraceV1::Upgrade { .. } => (),
                                     }
                                 }
                             }
-                            ExecutionTree::Unknown => return Some(Upward::Unknown),
+                            Upward::Unknown => return Some(Upward::Unknown),
                         },
                     }
                 }
@@ -1455,7 +1467,8 @@ impl ExecutionTree {
         }
 
         LogsIterator {
-            next: vec![LogsIteratorNext::Tree(self)],
+            // FIXME: vec![LogsIteratorNext::Tree(self)],
+            next: vec![],
         }
     }
 }
@@ -1464,7 +1477,9 @@ impl ExecutionTree {
 /// This will fail if the list was not generated correctly, but if the list of
 /// trace elements is coming from the node it will always be in the correct
 /// format.
-pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<ExecutionTree> {
+pub fn execution_tree(
+    elements: Vec<Upward<ContractTraceElement>>,
+) -> Option<Upward<ExecutionTree>> {
     #[derive(Debug)]
     struct PartialTree {
         address: ContractAddress,
@@ -1513,7 +1528,7 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
             } => {
                 if let Some(end) = stack.pop() {
                     let tree = match WasmVersion::try_from(contract_version) {
-                        Ok(WasmVersion::V0) => ExecutionTree::V0(ExecutionTreeV0 {
+                        Ok(WasmVersion::V0) => Upward::Known(ExecutionTree::V0(ExecutionTreeV0 {
                             top_level: UpdateV0 {
                                 address,
                                 instigator,
@@ -1523,16 +1538,16 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                                 events,
                             },
                             rest: Vec::new(),
-                        }),
-                        Ok(WasmVersion::V1) => ExecutionTree::V1(ExecutionTreeV1 {
+                        })),
+                        Ok(WasmVersion::V1) => Upward::Known(ExecutionTree::V1(ExecutionTreeV1 {
                             address,
                             instigator,
                             amount,
                             message,
                             receive_name,
                             events: vec![Upward::Known(TraceV1::Events { events })],
-                        }),
-                        Err(_) => ExecutionTree::Unknown,
+                        })),
+                        Err(_) => Upward::Unknown,
                     };
 
                     match end {
@@ -1542,6 +1557,11 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                         }
                         Worker::Partial(mut partial) => {
                             if partial.resumed {
+                                // return `Upward::Unkown` immediatly
+                                let Upward::Known(tree) = tree else {
+                                    return Some(tree);
+                                };
+
                                 // terminate it.
                                 let ExecutionTree::V1(mut tree) = tree else {
                                     return None;
@@ -1552,19 +1572,19 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                                     match last {
                                         Worker::V0(v0) => {
                                             v0.rest.push(Upward::Known(TraceV0::Call(
-                                                ExecutionTree::V1(tree),
+                                                Upward::Known(ExecutionTree::V1(tree)),
                                             )));
                                         }
                                         Worker::Partial(v0) => {
                                             v0.events.push(Upward::Known(TraceV1::Call {
-                                                call: ExecutionTree::V1(tree),
+                                                call: Upward::Known(ExecutionTree::V1(tree)),
                                             }));
                                         }
                                     }
                                 } else {
                                     // and return it.
                                     if elements.next().is_none() {
-                                        return Some(ExecutionTree::V1(tree));
+                                        return Some(Upward::Known(ExecutionTree::V1(tree)));
                                     } else {
                                         return None;
                                     }
@@ -1602,12 +1622,12 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                             };
                             // and return it.
                             if elements.next().is_none() {
-                                return Some(ExecutionTree::V1(tree));
+                                return Some(Upward::Known(ExecutionTree::V1(tree)));
                             } else {
                                 return None;
                             }
                         }
-                        Err(_) => return Some(ExecutionTree::Unknown),
+                        Err(_) => return Some(Upward::Unknown),
                     }
                 }
             }
@@ -1650,7 +1670,7 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                             return None;
                         };
                         partial.events.push(Upward::Known(TraceV1::Call {
-                            call: ExecutionTree::V0(v0),
+                            call: Upward::Known(ExecutionTree::V0(v0)),
                         }));
                         partial.resumed = true;
                     }
@@ -1681,7 +1701,7 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
         return None;
     };
     if stack.is_empty() {
-        Some(ExecutionTree::V0(v0))
+        Some(Upward::Known(ExecutionTree::V0(v0)))
     } else {
         None
     }
@@ -1717,7 +1737,7 @@ pub struct ExecutionTreeV0 {
 /// An action generated by a V0 contract.
 pub enum TraceV0 {
     /// A contract call, either V0 or V1 contract with all its nested calls.
-    Call(ExecutionTree),
+    Call(Upward<ExecutionTree>),
     /// A transfer of CCD from the V0 contract to an account.
     Transfer {
         /// Sender contract.
@@ -1754,7 +1774,7 @@ pub enum TraceV1 {
     /// New events emitted.
     Events { events: Vec<ContractEvent> },
     /// A successful call to another contract, either V0 or V1.
-    Call { call: ExecutionTree },
+    Call { call: Upward<ExecutionTree> },
     /// A transfer of CCD from the contract to the account.
     Transfer {
         /// Sender contract.
@@ -1859,7 +1879,7 @@ impl BlockItemSummaryDetails {
 
     /// If the block item is a smart contract update transaction then return the
     /// execution tree.
-    pub fn contract_update(self) -> Option<ExecutionTree> {
+    pub fn contract_update(self) -> Option<Upward<ExecutionTree>> {
         match self.account_transaction()?.effects.known()? {
             AccountTransactionEffects::ContractInitialized { .. } => None,
             AccountTransactionEffects::ContractUpdateIssued { effects } => execution_tree(effects),
