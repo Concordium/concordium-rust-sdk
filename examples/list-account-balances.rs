@@ -7,7 +7,7 @@ use concordium_rust_sdk::{
     id,
     id::types::AccountAddress,
     types::{AccountStakingInfo, CredentialType},
-    v2::{self, BlockIdentifier},
+    v2::{self, BlockIdentifier, Upward},
 };
 use futures::TryStreamExt;
 use serde::Serializer;
@@ -112,17 +112,17 @@ async fn main() -> anyhow::Result<()> {
             let (acc, info) = res??;
             let is_baker = if let Some(account_stake) = info.account_stake {
                 match account_stake {
-                    v2::Upward::Known(AccountStakingInfo::Baker { staked_amount, .. }) => {
+                    Upward::Known(AccountStakingInfo::Baker { staked_amount, .. }) => {
                         num_bakers += 1;
                         total_staked_amount += staked_amount;
                         true
                     }
-                    v2::Upward::Known(AccountStakingInfo::Delegated { staked_amount, .. }) => {
+                    Upward::Known(AccountStakingInfo::Delegated { staked_amount, .. }) => {
                         total_delegated_amount += staked_amount;
 
                         false
                     }
-                    v2::Upward::Unknown => false,
+                    Upward::Unknown => false,
                 }
             } else {
                 false
@@ -130,26 +130,29 @@ async fn main() -> anyhow::Result<()> {
 
             total_amount += info.account_amount;
 
-            let acc_type =
-                info.account_credentials
-                    .get(&0.into())
-                    .map_or(CredentialType::Normal, |cdi| match cdi.value {
-                        id::types::AccountCredentialWithoutProofs::Initial { .. } => {
-                            num_initial += 1;
-                            CredentialType::Initial
-                        }
-                        id::types::AccountCredentialWithoutProofs::Normal { .. } => {
-                            CredentialType::Normal
-                        }
-                    });
-
-            let row = Row {
-                address: acc,
-                balance: info.account_amount,
-                is_baker,
-                acc_type,
+            if let Some(acc_type) = info.account_credentials.get(&0.into()).map_or(
+                Some(CredentialType::Normal),
+                |cdi| match cdi.value {
+                    Upward::Known(id::types::AccountCredentialWithoutProofs::Initial {
+                        ..
+                    }) => {
+                        num_initial += 1;
+                        Some(CredentialType::Initial)
+                    }
+                    Upward::Known(id::types::AccountCredentialWithoutProofs::Normal { .. }) => {
+                        Some(CredentialType::Normal)
+                    }
+                    Upward::Unknown => None,
+                },
+            ) {
+                let row = Row {
+                    address: acc,
+                    balance: info.account_amount,
+                    is_baker,
+                    acc_type,
+                };
+                acc_balances.push(row);
             };
-            acc_balances.push(row);
         }
     }
 

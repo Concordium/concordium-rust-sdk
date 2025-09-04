@@ -126,12 +126,17 @@ async fn main() -> anyhow::Result<()> {
                 .account_credentials
                 .get(&0.into())
                 .is_some_and(|cdi| match &cdi.value {
-                    concordium_rust_sdk::id::types::AccountCredentialWithoutProofs::Initial {
-                        ..
-                    } => true,
-                    concordium_rust_sdk::id::types::AccountCredentialWithoutProofs::Normal {
-                        ..
-                    } => false,
+                    v2::Upward::Known(
+                        concordium_rust_sdk::id::types::AccountCredentialWithoutProofs::Initial {
+                            ..
+                        },
+                    ) => true,
+                    v2::Upward::Known(
+                        concordium_rust_sdk::id::types::AccountCredentialWithoutProofs::Normal {
+                            ..
+                        },
+                    ) => false,
+                    v2::Upward::Unknown => false,
                 });
             if is_initial && !start_block_accounts.contains(&ainfo.account_address) {
                 writeln!(&mut out, "{}", ainfo.account_address)?;
