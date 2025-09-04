@@ -36,6 +36,8 @@ pub enum CredentialLookupError {
     InitialCredential { cred_id: CredentialRegistrationID },
     #[error("Unexpected response from the node: {0}")]
     InvalidResponse(String),
+    #[error("Unknown stored credential for {cred_id}.")]
+    UnknownCredential { cred_id: CredentialRegistrationID },
 }
 
 /// The public cryptographic data of a credential together with its current
@@ -80,55 +82,58 @@ pub async fn verify_credential_metadata(
             let ai = client
                 .get_account_info(&cred_id.into(), BlockIdentifier::LastFinal)
                 .await?;
-            let Some(cred) = ai
-                .response
-                .account_credentials
-                .values()
-                .find(|cred| cred.value.cred_id() == cred_id.as_ref())
-            else {
+            let Some(cred) = ai.response.account_credentials.values().find(|cred| {
+                cred.value
+                    .clone()
+                    .is_known_and(|c| c.cred_id() == cred_id.as_ref())
+            }) else {
                 return Err(CredentialLookupError::CredentialNotPresent {
                     cred_id,
                     account: ai.response.account_address,
                 });
             };
-            if cred.value.issuer() != issuer {
-                return Err(CredentialLookupError::InconsistentIssuer {
-                    stated: issuer,
-                    actual: cred.value.issuer(),
-                });
-            }
-            match &cred.value {
-                concordium_base::id::types::AccountCredentialWithoutProofs::Initial { .. } => {
-                    Err(CredentialLookupError::InitialCredential { cred_id })
+            if let Some(c) = cred.value.clone().known() {
+                if c.issuer() != issuer {
+                    return Err(CredentialLookupError::InconsistentIssuer {
+                        stated: issuer,
+                        actual: c.issuer(),
+                    });
                 }
-                concordium_base::id::types::AccountCredentialWithoutProofs::Normal {
-                    cdv,
-                    commitments,
-                } => {
-                    let now = client.get_block_info(bi).await?.response.block_slot_time;
-                    let valid_from = cdv.policy.created_at.lower().ok_or_else(|| {
-                        CredentialLookupError::InvalidResponse(
-                            "Credential creation date is not valid.".into(),
-                        )
-                    })?;
-                    let valid_until = cdv.policy.valid_to.upper().ok_or_else(|| {
-                        CredentialLookupError::InvalidResponse(
-                            "Credential creation date is not valid.".into(),
-                        )
-                    })?;
-                    let status = if valid_from > now {
-                        CredentialStatus::NotActivated
-                    } else if valid_until < now {
-                        CredentialStatus::Expired
-                    } else {
-                        CredentialStatus::Active
-                    };
-                    let inputs = CredentialsInputs::Account {
-                        commitments: commitments.cmm_attributes.clone(),
-                    };
+                match &c {
+                    concordium_base::id::types::AccountCredentialWithoutProofs::Initial {
+                        ..
+                    } => Err(CredentialLookupError::InitialCredential { cred_id }),
+                    concordium_base::id::types::AccountCredentialWithoutProofs::Normal {
+                        cdv,
+                        commitments,
+                    } => {
+                        let now = client.get_block_info(bi).await?.response.block_slot_time;
+                        let valid_from = cdv.policy.created_at.lower().ok_or_else(|| {
+                            CredentialLookupError::InvalidResponse(
+                                "Credential creation date is not valid.".into(),
+                            )
+                        })?;
+                        let valid_until = cdv.policy.valid_to.upper().ok_or_else(|| {
+                            CredentialLookupError::InvalidResponse(
+                                "Credential creation date is not valid.".into(),
+                            )
+                        })?;
+                        let status = if valid_from > now {
+                            CredentialStatus::NotActivated
+                        } else if valid_until < now {
+                            CredentialStatus::Expired
+                        } else {
+                            CredentialStatus::Active
+                        };
+                        let inputs = CredentialsInputs::Account {
+                            commitments: commitments.cmm_attributes.clone(),
+                        };
 
-                    Ok(CredentialWithMetadata { status, inputs })
+                        Ok(CredentialWithMetadata { status, inputs })
+                    }
                 }
+            } else {
+                return Err(CredentialLookupError::UnknownCredential { cred_id });
             }
         }
         CredentialMetadata::Web3Id { contract, holder } => {

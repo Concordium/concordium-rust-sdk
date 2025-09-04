@@ -852,7 +852,7 @@ impl TryFrom<CredentialCommitments> for crate::id::types::CredentialDeploymentCo
     }
 }
 
-impl TryFrom<AccountCredential> for AccountCredentialWithoutProofs<ArCurve, AttributeKind> {
+impl TryFrom<AccountCredential> for Upward<AccountCredentialWithoutProofs<ArCurve, AttributeKind>> {
     type Error = tonic::Status;
 
     fn try_from(value: AccountCredential) -> Result<Self, Self::Error> {
@@ -864,7 +864,9 @@ impl TryFrom<AccountCredential> for AccountCredentialWithoutProofs<ArCurve, Attr
                     ip_identity: ic.ip_id.require()?.into(),
                     policy: ic.policy.require()?.try_into()?,
                 };
-                Ok(Self::Initial { icdv })
+                Ok(Upward::Known(AccountCredentialWithoutProofs::Initial {
+                    icdv,
+                }))
             }
             account_credential::CredentialValues::Normal(nc) => {
                 let cdv = CredentialDeploymentValues {
@@ -886,8 +888,12 @@ impl TryFrom<AccountCredential> for AccountCredentialWithoutProofs<ArCurve, Attr
                     policy: nc.policy.require()?.try_into()?,
                 };
                 let commitments = nc.commitments.require()?.try_into()?;
-                Ok(Self::Normal { cdv, commitments })
+                Ok(Upward::Known(AccountCredentialWithoutProofs::Normal {
+                    cdv,
+                    commitments,
+                }))
             }
+            _unknown => Ok(Upward::Unknown),
         }
     }
 }

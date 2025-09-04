@@ -1,5 +1,5 @@
 //! Functionality for generating, and verifying account signatures.
-use crate::v2::{self, AccountIdentifier, BlockIdentifier, QueryError};
+use crate::v2::{self, AccountIdentifier, BlockIdentifier, QueryError, Upward};
 use concordium_base::{
     common::{
         types::{CredentialIndex, KeyIndex, KeyPair, Signature},
@@ -219,7 +219,7 @@ fn check_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C
     signatures: &AccountSignatures,
     on_chain_credentials: &BTreeMap<
         CredentialIndex,
-        Versioned<AccountCredentialWithoutProofs<C, AttributeType>>,
+        Versioned<Upward<AccountCredentialWithoutProofs<C, AttributeType>>>,
     >,
 ) -> Result<(), SignatureError> {
     // Ensure all outer-level keys in the signatures map exist in the
@@ -237,17 +237,22 @@ fn check_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C
         // Ensure that the inner-level keys in the signatures map exist in the
         // on_chain_credentials map.
         for inner_key in inner_map.sigs.keys() {
-            let map = match &on_chain_cred.value {
-                AccountCredentialWithoutProofs::Initial { icdv } => &icdv.cred_account.keys,
-                AccountCredentialWithoutProofs::Normal { cdv, .. } => &cdv.cred_key_info.keys,
+            if let Some(map) = match &on_chain_cred.value {
+                Upward::Known(AccountCredentialWithoutProofs::Initial { icdv }) => {
+                    Some(&icdv.cred_account.keys)
+                }
+                Upward::Known(AccountCredentialWithoutProofs::Normal { cdv, .. }) => {
+                    Some(&cdv.cred_key_info.keys)
+                }
+                Upward::Unknown => None,
+            } {
+                if !map.contains_key(&KeyIndex(*inner_key)) {
+                    return Err(SignatureError::MissingIndicesOnChain {
+                        credential_index: *outer_key,
+                        key_index: *inner_key,
+                    });
+                }
             };
-
-            if !map.contains_key(&KeyIndex(*inner_key)) {
-                return Err(SignatureError::MissingIndicesOnChain {
-                    credential_index: *outer_key,
-                    key_index: *inner_key,
-                });
-            }
         }
     }
     Ok(())
@@ -286,42 +291,45 @@ pub async fn verify_account_signature(
     let mut valid_credential_signatures_count = 0u8;
     for (credential_index, credential) in signer_account_credentials {
         // Retrieve the public key and threshold from the on-chain information.
-        let (keys, signatures_threshold) = match credential.value {
-            AccountCredentialWithoutProofs::Initial { icdv } => {
-                (icdv.cred_account.keys, icdv.cred_account.threshold)
+        if let Some((keys, signatures_threshold)) = match credential.value {
+            Upward::Unknown => None,
+            Upward::Known(x) => match x {
+                AccountCredentialWithoutProofs::Initial { icdv } => {
+                    Some((icdv.cred_account.keys, icdv.cred_account.threshold))
+                }
+                AccountCredentialWithoutProofs::Normal { cdv, .. } => {
+                    Some((cdv.cred_key_info.keys, cdv.cred_key_info.threshold))
+                }
+            },
+        } {
+            let mut valid_signatures_count = 0u8;
+
+            for (key_index, public_key) in keys {
+                // If a signature exists for the given credential and key index, verify it and
+                // increase the `valid_signatures_count`.
+                let Some(cred_sigs) = signatures.sigs.get(&credential_index.index) else {
+                    continue;
+                };
+
+                let Some(signature) = cred_sigs.sigs.get(&key_index.0) else {
+                    continue;
+                };
+
+                if public_key.verify(message_hash, signature) {
+                    // If the signature is valid, increase the `valid_signatures_count`.
+                    valid_signatures_count += 1;
+                } else {
+                    // If any signature is invalid, return `false`.
+                    return Ok(false);
+                }
             }
-            AccountCredentialWithoutProofs::Normal { cdv, .. } => {
-                (cdv.cred_key_info.keys, cdv.cred_key_info.threshold)
+
+            // Check if the number of valid signatures meets the required threshold
+            // so that this credential counts as having a valid credential signature.
+            if valid_signatures_count >= signatures_threshold.into() {
+                valid_credential_signatures_count += 1;
             }
         };
-
-        let mut valid_signatures_count = 0u8;
-
-        for (key_index, public_key) in keys {
-            // If a signature exists for the given credential and key index, verify it and
-            // increase the `valid_signatures_count`.
-            let Some(cred_sigs) = signatures.sigs.get(&credential_index.index) else {
-                continue;
-            };
-
-            let Some(signature) = cred_sigs.sigs.get(&key_index.0) else {
-                continue;
-            };
-
-            if public_key.verify(message_hash, signature) {
-                // If the signature is valid, increase the `valid_signatures_count`.
-                valid_signatures_count += 1;
-            } else {
-                // If any signature is invalid, return `false`.
-                return Ok(false);
-            }
-        }
-
-        // Check if the number of valid signatures meets the required threshold
-        // so that this credential counts as having a valid credential signature.
-        if valid_signatures_count >= signatures_threshold.into() {
-            valid_credential_signatures_count += 1;
-        }
     }
 
     // Check if the total number of valid credential signatures meets the required
@@ -426,61 +434,64 @@ pub async fn sign_as_account(
     // Iterate through the `account_keys` map.
     for (credential_index, credential) in account_keys.keys {
         for (key_index, signing_key) in credential.keys {
-            let on_chain_credential = &signer_account_credentials
+            if let Some(on_chain_credential) = &signer_account_credentials
                 .get(&credential_index)
                 .ok_or(SignatureError::MissingIndicesOnChain {
                     credential_index: credential_index.index,
                     key_index: key_index.0,
                 })?
-                .value;
+                .value
+                .clone()
+                .known()
+            {
+                let on_chain_keys = match on_chain_credential {
+                    AccountCredentialWithoutProofs::Initial { icdv } => &icdv.cred_account.keys,
+                    AccountCredentialWithoutProofs::Normal { cdv, .. } => &cdv.cred_key_info.keys,
+                };
 
-            let on_chain_keys = match on_chain_credential {
-                AccountCredentialWithoutProofs::Initial { icdv } => &icdv.cred_account.keys,
-                AccountCredentialWithoutProofs::Normal { cdv, .. } => &cdv.cred_key_info.keys,
-            };
+                let on_chain_public_key =
+                    on_chain_keys
+                        .get(&key_index)
+                        .ok_or(SignatureError::MissingIndicesOnChain {
+                            credential_index: credential_index.index,
+                            key_index: key_index.0,
+                        })?;
 
-            let on_chain_public_key =
-                on_chain_keys
-                    .get(&key_index)
-                    .ok_or(SignatureError::MissingIndicesOnChain {
+                let VerifyKey::Ed25519VerifyKey(public_key) = *on_chain_public_key;
+
+                // Check that the public key in the `account_keys` map matches the public key on
+                // chain.
+                if signing_key.public() != public_key {
+                    return Err(SignatureError::MismatchPublicKeyOnChain {
                         credential_index: credential_index.index,
                         key_index: key_index.0,
-                    })?;
+                        expected_public_key: Box::new(public_key),
+                        actual_public_key: Box::new(signing_key.public()),
+                    });
+                };
 
-            let VerifyKey::Ed25519VerifyKey(public_key) = *on_chain_public_key;
+                // Generate the signature.
+                let signature = signing_key.sign(&message_hash);
 
-            // Check that the public key in the `account_keys` map matches the public key on
-            // chain.
-            if signing_key.public() != public_key {
-                return Err(SignatureError::MismatchPublicKeyOnChain {
-                    credential_index: credential_index.index,
-                    key_index: key_index.0,
-                    expected_public_key: Box::new(public_key),
-                    actual_public_key: Box::new(signing_key.public()),
-                });
-            };
+                // Check that the signature is valid to ensure
+                // that the public and private keys in the `account_keys` map match.
+                if !VerifyKey::from(public_key).verify(message_hash, &Signature::from(signature)) {
+                    return Err(SignatureError::MismatchPublicPrivateKeys {
+                        credential_index: credential_index.index,
+                        key_index: key_index.0,
+                    });
+                }
 
-            // Generate the signature.
-            let signature = signing_key.sign(&message_hash);
-
-            // Check that the signature is valid to ensure
-            // that the public and private keys in the `account_keys` map match.
-            if !VerifyKey::from(public_key).verify(message_hash, &Signature::from(signature)) {
-                return Err(SignatureError::MismatchPublicPrivateKeys {
-                    credential_index: credential_index.index,
-                    key_index: key_index.0,
-                });
+                // Insert the generated signature into the return map.
+                account_signatures
+                    .sigs
+                    .entry(credential_index.index)
+                    .or_insert_with(|| CredentialSignatures {
+                        sigs: BTreeMap::new(),
+                    })
+                    .sigs
+                    .insert(key_index.0, signature.into());
             }
-
-            // Insert the generated signature into the return map.
-            account_signatures
-                .sigs
-                .entry(credential_index.index)
-                .or_insert_with(|| CredentialSignatures {
-                    sigs: BTreeMap::new(),
-                })
-                .sigs
-                .insert(key_index.0, signature.into());
         }
     }
 

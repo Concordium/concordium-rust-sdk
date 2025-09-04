@@ -360,7 +360,7 @@ pub struct AccountInfo {
     /// with index 0.
     pub account_credentials: std::collections::BTreeMap<
         CredentialIndex,
-        Versioned<AccountCredentialWithoutProofs<ArCurve, AttributeKind>>,
+        Versioned<Upward<AccountCredentialWithoutProofs<ArCurve, AttributeKind>>>,
     >,
     /// Lower bound on how many credentials must sign any given transaction from
     /// this account.
@@ -423,17 +423,21 @@ impl From<&AccountInfo> for AccountAccessStructure {
                 .account_credentials
                 .iter()
                 .map(|(idx, v)| {
-                    let key = match v.value {
-                        crate::id::types::AccountCredentialWithoutProofs::Initial { ref icdv } => {
-                            icdv.cred_account.clone()
-                        }
-                        crate::id::types::AccountCredentialWithoutProofs::Normal {
-                            ref cdv,
-                            ..
-                        } => cdv.cred_key_info.clone(),
+                    let key = match v.value.clone() {
+                        Upward::Unknown => None,
+                        Upward::Known(x) => match x {
+                            crate::id::types::AccountCredentialWithoutProofs::Initial {
+                                ref icdv,
+                            } => Some(icdv.cred_account.clone()),
+                            crate::id::types::AccountCredentialWithoutProofs::Normal {
+                                ref cdv,
+                                ..
+                            } => Some(cdv.cred_key_info.clone()),
+                        },
                     };
                     (*idx, key)
                 })
+                .filter_map(|(idx, opt_key)| opt_key.map(|key| (idx, key)))
                 .collect(),
             threshold: value.account_threshold,
         }
