@@ -1223,7 +1223,7 @@ impl BlockItemSummary {
 
     /// If the block item is a smart contract update transaction then return the
     /// execution tree.
-    pub fn contract_update(self) -> Option<ExecutionTree> {
+    pub fn contract_update(self) -> Option<Upward<ExecutionTree>> {
         self.details.known()?.contract_update()
     }
 
@@ -1357,6 +1357,12 @@ impl ExecutionTree {
     /// `(address, entrypoint, logs)` where the meaning is that the contract
     /// at the given address, while executing the entrypoint `entrypoint`
     /// produced the `logs`. Note that the `logs` might be an empty slice.
+    ///
+    /// Each item of the iterator is wrapped into an `Upward` type.
+    /// If the SDK is not fully compatible with the Concordium node,
+    /// it can occur that new events in the execution tree occur that are unknown
+    /// to the SDK or some of the execution traces are unknown.
+    /// Items of `Unkown` are inserted in the iterator in that case.
     pub fn events(
         &self,
     ) -> impl Iterator<
@@ -1453,7 +1459,17 @@ impl ExecutionTree {
 /// This will fail if the list was not generated correctly, but if the list of
 /// trace elements is coming from the node it will always be in the correct
 /// format.
-pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<ExecutionTree> {
+///
+/// The return type is wrapped into an `Upward` type.
+/// If the SDK is not fully compatible with the Concordium node,
+/// it can occur that the `contractTraceElements` pass through a smart contract with a version that is unkonwn to this SDK.
+/// As the assumption is that new smart contract versions require a different execution tree to be accurated represented/executed,
+/// this function will return `Unkown` in that case.
+/// If some of the `contractTraceElements` are `Unknown` to this SDK, but otherwise pass through smart contracts with known versions,
+/// an execution tree can be constructed that contains all trace elements (potentially `Unkown` trace elements).
+pub fn execution_tree(
+    elements: Vec<Upward<ContractTraceElement>>,
+) -> Option<Upward<ExecutionTree>> {
     #[derive(Debug)]
     struct PartialTree {
         address: ContractAddress,
@@ -1501,8 +1517,8 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                     },
             } => {
                 if let Some(end) = stack.pop() {
-                    let tree = match contract_version {
-                        WasmVersion::V0 => ExecutionTree::V0(ExecutionTreeV0 {
+                    let tree = match WasmVersion::try_from(contract_version) {
+                        Ok(WasmVersion::V0) => ExecutionTree::V0(ExecutionTreeV0 {
                             top_level: UpdateV0 {
                                 address,
                                 instigator,
@@ -1513,7 +1529,7 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                             },
                             rest: Vec::new(),
                         }),
-                        WasmVersion::V1 => ExecutionTree::V1(ExecutionTreeV1 {
+                        Ok(WasmVersion::V1) => ExecutionTree::V1(ExecutionTreeV1 {
                             address,
                             instigator,
                             amount,
@@ -1521,7 +1537,9 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                             receive_name,
                             events: vec![Upward::Known(TraceV1::Events { events })],
                         }),
+                        Err(_) => return Some(Upward::Unknown), // return immediately if unknown
                     };
+
                     match end {
                         Worker::V0(mut v0) => {
                             v0.rest.push(Upward::Known(TraceV0::Call(tree)));
@@ -1551,7 +1569,7 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                                 } else {
                                     // and return it.
                                     if elements.next().is_none() {
-                                        return Some(ExecutionTree::V1(tree));
+                                        return Some(Upward::Known(ExecutionTree::V1(tree)));
                                     } else {
                                         return None;
                                     }
@@ -1566,8 +1584,8 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                     }
                 } else {
                     // no stack yet
-                    match contract_version {
-                        WasmVersion::V0 => stack.push(Worker::V0(ExecutionTreeV0 {
+                    match WasmVersion::try_from(contract_version) {
+                        Ok(WasmVersion::V0) => stack.push(Worker::V0(ExecutionTreeV0 {
                             top_level: UpdateV0 {
                                 address,
                                 instigator,
@@ -1578,7 +1596,7 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                             },
                             rest: Vec::new(),
                         })),
-                        WasmVersion::V1 => {
+                        Ok(WasmVersion::V1) => {
                             let tree = ExecutionTreeV1 {
                                 address,
                                 instigator,
@@ -1589,11 +1607,12 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
                             };
                             // and return it.
                             if elements.next().is_none() {
-                                return Some(ExecutionTree::V1(tree));
+                                return Some(Upward::Known(ExecutionTree::V1(tree)));
                             } else {
                                 return None;
                             }
                         }
+                        Err(_) => return Some(Upward::Unknown), // return immediately if unknown
                     }
                 }
             }
@@ -1667,7 +1686,7 @@ pub fn execution_tree(elements: Vec<Upward<ContractTraceElement>>) -> Option<Exe
         return None;
     };
     if stack.is_empty() {
-        Some(ExecutionTree::V0(v0))
+        Some(Upward::Known(ExecutionTree::V0(v0)))
     } else {
         None
     }
@@ -1845,7 +1864,7 @@ impl BlockItemSummaryDetails {
 
     /// If the block item is a smart contract update transaction then return the
     /// execution tree.
-    pub fn contract_update(self) -> Option<ExecutionTree> {
+    pub fn contract_update(self) -> Option<Upward<ExecutionTree>> {
         match self.account_transaction()?.effects.known()? {
             AccountTransactionEffects::ContractInitialized { .. } => None,
             AccountTransactionEffects::ContractUpdateIssued { effects } => execution_tree(effects),
@@ -2557,8 +2576,8 @@ pub struct EncryptedSelfAmountAddedEvent {
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ContractInitializedEvent {
-    #[serde(default)]
-    pub contract_version: smart_contracts::WasmVersion,
+    #[serde(default = "smart_contracts::WasmVersionInt::zero_version")]
+    pub contract_version: smart_contracts::WasmVersionInt,
     #[serde(rename = "ref")]
     /// Module with the source code of the contract.
     pub origin_ref: smart_contracts::ModuleReference,

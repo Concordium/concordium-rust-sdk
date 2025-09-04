@@ -1,3 +1,5 @@
+use std::any::type_name;
+
 /// Type for forward-compatibility with the Concordium Node API.
 ///
 /// Wraps enum types which are expected to be extended some future version of
@@ -32,7 +34,10 @@ impl<A> Upward<A> {
     pub fn unwrap(self) -> A {
         match self {
             Self::Known(value) => value,
-            Self::Unknown => panic!("called `Upward::unwrap()` on an `Unknown` value"),
+            Self::Unknown => panic!(
+                "called `Upward::<{}>::unwrap()` on an `Unknown` value",
+                type_name::<A>()
+            ),
         }
     }
 
@@ -213,9 +218,10 @@ where
         if let Upward::Known(a) = self {
             a.serialize(serializer)
         } else {
-            Err(serde::ser::Error::custom(
-                "Serializing `Upward::Unknown` is not supported",
-            ))
+            Err(serde::ser::Error::custom(format!(
+                "Serializing `Upward::<{}>::Unknown` is not supported",
+                type_name::<A>()
+            )))
         }
     }
 }

@@ -11,6 +11,8 @@
   - `ConsensusInfo`
   - `CommonRewardData`
 - Introduce `Upward<A>` for representing types, which might get extended in a future version of the Concordium Node API and allows the consumer of this library to decide how to handle some unknown future data, like new transaction types and chain events.
+- Use the `WasmVersionInt` defined in `concordium-base` for the wasm version (smart contract version) to make it forward-compatible.
+- Changed the `Indexer` module to use a new `OnFinalizationError` and the new result types `OnFinalizationResult`/`TraverseResult` when traversing and processing blocks. The indexer's errors/results can now represent the `Unkown` types as part of adding forward-compatibility.
 - BREAKING: Change types related to gRPC API responses to wrap `Upward` for values which might be extended in a future version of the API of the Concordium Node.
 
   The changes are for:
@@ -63,6 +65,8 @@
   - Method `AccountTransactionEffects::affected_addresses` now wraps the return type in `Upward`.
   - Method `ExecutionTree::affected_addresses` now wraps the return type in `Upward`.
   - Method `ExecutionTree::events` now wraps the `Iterator::Item` in `Upward`.
+  - Method `ExecutionTree::execution_tree` return type was changed from `Option<ExecutionTree>` to `Option<Upward<ExecutionTree>>`
+  - Method `ExecutionTree::contract_update` now wraps return type in `Upward`.
   - Function `execution_tree` parameter changed from `Vec<Upward<ContractTraceElement>>` to `Vec<ContractTraceElement>`.
   - Type `ExecutionTreeV0` field `rest` change from `Vec<TraceV0>` to `Vec<Upward<TraceV0>>`.
   - Type `ExecutionTreeV1` field `events` change from `Vec<TraceV1>` to `Vec<Upward<TraceV1>>`.
