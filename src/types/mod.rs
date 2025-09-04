@@ -2397,7 +2397,7 @@ pub enum BakerEvent {
         /// Baker's id
         baker_id: BakerId,
         /// The open status.
-        open_status: OpenStatus,
+        open_status: Upward<OpenStatus>,
     },
     /// Updated metadata url for baker pool
     BakerSetMetadataURL {

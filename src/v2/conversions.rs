@@ -2047,7 +2047,8 @@ impl TryFrom<baker_event::Event> for super::types::BakerEvent {
                 data: Box::new(v.try_into()?),
             },
             baker_event::Event::BakerSetOpenStatus(v) => {
-                let open_status = v.open_status().into();
+                let open_status = Upward::from(OpenStatus::try_from(v.open_status).ok())
+                    .map(super::types::OpenStatus::from);
                 Self::BakerSetOpenStatus {
                     baker_id: v.baker_id.require()?.into(),
                     open_status,

@@ -261,7 +261,7 @@ pub(crate) enum Event {
         /// Baker account
         account: AccountAddress,
         /// The open status.
-        open_status: OpenStatus,
+        open_status: Upward<OpenStatus>,
     },
     /// Updated metadata url for baker pool
     #[serde(rename_all = "camelCase")]
