@@ -524,8 +524,7 @@ impl Indexer for ContractUpdateIndexer {
         if bi.transaction_count != 0 {
             let summary = client
                 .get_block_transaction_events(fbi.height)
-                .await
-                .map_err(OnFinalizationError::from)?
+                .await?
                 .response
                 .map_err(OnFinalizationError::from)
                 .try_filter_map(|summary| async move {
@@ -622,8 +621,7 @@ impl Indexer for AffectedContractIndexer {
         if bi.transaction_count != 0 {
             let summary = client
                 .get_block_transaction_events(fbi.height)
-                .await
-                .map_err(OnFinalizationError::from)?
+                .await?
                 .response
                 .map_err(OnFinalizationError::from)
                 .try_filter_map(|summary| async move {

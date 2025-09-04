@@ -35,7 +35,7 @@ impl<A> Upward<A> {
         match self {
             Self::Known(value) => value,
             Self::Unknown => panic!(
-                "called `Upward<{}>::unwrap()` on an `Unknown` value",
+                "called `Upward::<{}>::unwrap()` on an `Unknown` value",
                 type_name::<A>()
             ),
         }
@@ -218,9 +218,10 @@ where
         if let Upward::Known(a) = self {
             a.serialize(serializer)
         } else {
-            Err(serde::ser::Error::custom(
-                "Serializing `Upward::Unknown` is not supported",
-            ))
+            Err(serde::ser::Error::custom(format!(
+                "Serializing `Upward::<{}>::Unknown` is not supported",
+                type_name::<A>()
+            )))
         }
     }
 }
