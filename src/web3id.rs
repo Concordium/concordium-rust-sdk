@@ -27,8 +27,8 @@ pub enum CredentialLookupError {
     QueryError(#[from] v2::QueryError),
     #[error("Unable to query CIS4 contract: {0}")]
     Cis4QueryError(#[from] Cis4QueryError),
-    #[error("Credential {cred_id} no longer present on account: {account}")]
-    CredentialNotPresent {
+    #[error("Credential {cred_id} no longer present or of unkown type on account: {account}")]
+    CredentialNotPresentOrUnknown {
         cred_id: CredentialRegistrationID,
         account: AccountAddress,
     },
@@ -87,7 +87,7 @@ pub async fn verify_credential_metadata(
                     .clone()
                     .is_known_and(|c| c.cred_id() == cred_id.as_ref())
             }) else {
-                return Err(CredentialLookupError::CredentialNotPresent {
+                return Err(CredentialLookupError::CredentialNotPresentOrUnknown {
                     cred_id,
                     account: ai.response.account_address,
                 });

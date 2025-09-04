@@ -115,24 +115,26 @@ async fn main() -> anyhow::Result<()> {
                     Upward::Known(AccountStakingInfo::Baker { staked_amount, .. }) => {
                         num_bakers += 1;
                         total_staked_amount += staked_amount;
-                        true
+                        Some(true)
                     }
                     Upward::Known(AccountStakingInfo::Delegated { staked_amount, .. }) => {
                         total_delegated_amount += staked_amount;
 
-                        false
+                        Some(false)
                     }
-                    Upward::Unknown => false,
+                    Upward::Unknown => None,
                 }
             } else {
-                false
-            };
+                Some(false)
+            }
+            .context(format!("Unknown AccountStakingInfo variant."))?;
 
             total_amount += info.account_amount;
 
-            if let Some(acc_type) = info.account_credentials.get(&0.into()).map_or(
-                Some(CredentialType::Normal),
-                |cdi| {
+            let acc_type = info
+                .account_credentials
+                .get(&0.into())
+                .map_or(None, |cdi| {
                     cdi.value.clone().map_or(None, |known| match known {
                         id::types::AccountCredentialWithoutProofs::Initial { .. } => {
                             num_initial += 1;
@@ -142,16 +144,16 @@ async fn main() -> anyhow::Result<()> {
                             Some(CredentialType::Normal)
                         }
                     })
-                },
-            ) {
-                let row = Row {
-                    address: acc,
-                    balance: info.account_amount,
-                    is_baker,
-                    acc_type,
-                };
-                acc_balances.push(row);
+                })
+                .context(format!("Unknown CredentialType variant."))?;
+
+            let row = Row {
+                address: acc,
+                balance: info.account_amount,
+                is_baker,
+                acc_type,
             };
+            acc_balances.push(row);
         }
     }
 

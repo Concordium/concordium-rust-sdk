@@ -122,22 +122,26 @@ async fn main() -> anyhow::Result<()> {
         }
         for ainfo in futures::future::join_all(handles).await {
             let ainfo: AccountInfo = ainfo?.response;
-            let is_initial = ainfo
-                .account_credentials
-                .get(&0.into())
-                .is_some_and(|cdi| match &cdi.value {
+            let mut is_initial = false;
+            if let Some(acred) = ainfo.account_credentials.get(&0.into()) {
+                let err_or_is_initial = match acred.value {
                     v2::Upward::Known(
                         concordium_rust_sdk::id::types::AccountCredentialWithoutProofs::Initial {
                             ..
                         },
-                    ) => true,
+                    ) => Ok(true),
                     v2::Upward::Known(
                         concordium_rust_sdk::id::types::AccountCredentialWithoutProofs::Normal {
                             ..
                         },
-                    ) => false,
-                    v2::Upward::Unknown => false,
-                });
+                    ) => Ok(false),
+                    v2::Upward::Unknown => Err(anyhow::anyhow!(
+                        "Unknown AccountCredentialWithoutProofs variant"
+                    )),
+                };
+
+                is_initial = err_or_is_initial?;
+            }
             if is_initial && !start_block_accounts.contains(&ainfo.account_address) {
                 writeln!(&mut out, "{}", ainfo.account_address)?;
             }
