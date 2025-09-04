@@ -893,7 +893,6 @@ impl TryFrom<AccountCredential> for Upward<AccountCredentialWithoutProofs<ArCurv
                     commitments,
                 }))
             }
-            _unknown => Ok(Upward::Unknown),
         }
     }
 }

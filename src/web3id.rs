@@ -133,7 +133,7 @@ pub async fn verify_credential_metadata(
                     }
                 }
             } else {
-                return Err(CredentialLookupError::UnknownCredential { cred_id });
+                Err(CredentialLookupError::UnknownCredential { cred_id })
             }
         }
         CredentialMetadata::Web3Id { contract, holder } => {
