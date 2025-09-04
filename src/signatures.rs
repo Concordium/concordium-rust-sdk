@@ -237,22 +237,25 @@ fn check_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C
         // Ensure that the inner-level keys in the signatures map exist in the
         // on_chain_credentials map.
         for inner_key in inner_map.sigs.keys() {
-            if let Some(map) = match &on_chain_cred.value {
-                Upward::Known(AccountCredentialWithoutProofs::Initial { icdv }) => {
-                    Some(&icdv.cred_account.keys)
-                }
-                Upward::Known(AccountCredentialWithoutProofs::Normal { cdv, .. }) => {
-                    Some(&cdv.cred_key_info.keys)
-                }
-                Upward::Unknown => None,
-            } {
+            if let Some(map) = &on_chain_cred
+                .value
+                .clone()
+                .map_or(None, |known| match known {
+                    AccountCredentialWithoutProofs::Initial { icdv } => {
+                        Some(icdv.cred_account.keys)
+                    }
+                    AccountCredentialWithoutProofs::Normal { cdv, .. } => {
+                        Some(cdv.cred_key_info.keys)
+                    }
+                })
+            {
                 if !map.contains_key(&KeyIndex(*inner_key)) {
                     return Err(SignatureError::MissingIndicesOnChain {
                         credential_index: *outer_key,
                         key_index: *inner_key,
                     });
                 }
-            };
+            }
         }
     }
     Ok(())

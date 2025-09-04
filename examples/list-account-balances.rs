@@ -132,17 +132,16 @@ async fn main() -> anyhow::Result<()> {
 
             if let Some(acc_type) = info.account_credentials.get(&0.into()).map_or(
                 Some(CredentialType::Normal),
-                |cdi| match cdi.value {
-                    Upward::Known(id::types::AccountCredentialWithoutProofs::Initial {
-                        ..
-                    }) => {
-                        num_initial += 1;
-                        Some(CredentialType::Initial)
-                    }
-                    Upward::Known(id::types::AccountCredentialWithoutProofs::Normal { .. }) => {
-                        Some(CredentialType::Normal)
-                    }
-                    Upward::Unknown => None,
+                |cdi| {
+                    cdi.value.clone().map_or(None, |known| match known {
+                        id::types::AccountCredentialWithoutProofs::Initial { .. } => {
+                            num_initial += 1;
+                            Some(CredentialType::Initial)
+                        }
+                        id::types::AccountCredentialWithoutProofs::Normal { .. } => {
+                            Some(CredentialType::Normal)
+                        }
+                    })
                 },
             ) {
                 let row = Row {
