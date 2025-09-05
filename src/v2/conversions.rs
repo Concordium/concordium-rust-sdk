@@ -855,8 +855,22 @@ impl TryFrom<CredentialCommitments> for crate::id::types::CredentialDeploymentCo
 impl TryFrom<AccountCredential> for Upward<AccountCredentialWithoutProofs<ArCurve, AttributeKind>> {
     type Error = tonic::Status;
 
-    fn try_from(value: AccountCredential) -> Result<Self, Self::Error> {
-        match value.credential_values.require()? {
+    fn try_from(message: AccountCredential) -> Result<Self, Self::Error> {
+        let key = message
+            .credential_values
+            .map(super::id::types::AccountCredentialWithoutProofs::try_from)
+            .transpose()?;
+        Ok(Upward::from(key))
+    }
+}
+
+impl TryFrom<account_credential::CredentialValues>
+    for AccountCredentialWithoutProofs<ArCurve, AttributeKind>
+{
+    type Error = tonic::Status;
+
+    fn try_from(cred: account_credential::CredentialValues) -> Result<Self, Self::Error> {
+        match cred {
             account_credential::CredentialValues::Initial(ic) => {
                 let icdv = InitialCredentialDeploymentValues {
                     cred_account: ic.keys.require()?.try_into()?,
@@ -864,9 +878,7 @@ impl TryFrom<AccountCredential> for Upward<AccountCredentialWithoutProofs<ArCurv
                     ip_identity: ic.ip_id.require()?.into(),
                     policy: ic.policy.require()?.try_into()?,
                 };
-                Ok(Upward::Known(AccountCredentialWithoutProofs::Initial {
-                    icdv,
-                }))
+                Ok(AccountCredentialWithoutProofs::Initial { icdv })
             }
             account_credential::CredentialValues::Normal(nc) => {
                 let cdv = CredentialDeploymentValues {
@@ -888,10 +900,7 @@ impl TryFrom<AccountCredential> for Upward<AccountCredentialWithoutProofs<ArCurv
                     policy: nc.policy.require()?.try_into()?,
                 };
                 let commitments = nc.commitments.require()?.try_into()?;
-                Ok(Upward::Known(AccountCredentialWithoutProofs::Normal {
-                    cdv,
-                    commitments,
-                }))
+                Ok(AccountCredentialWithoutProofs::Normal { cdv, commitments })
             }
         }
     }

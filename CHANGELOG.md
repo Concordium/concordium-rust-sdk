@@ -78,6 +78,7 @@
   - Type `Cooldown` field `status` is now wrapped in `Upward`.
   - Type `BakerEvent::BakerSetOpenStatus` field `open_status` is now wrapped in `Upward`.
   - Type `Event` field `open_status` is now wrapped in `Upward`.
+  - Type `AccountInfo` field `account_credentials` change from `BTreeMap<CredentialIndex,Versioned<AccountCredentialWithoutProofs<ArCurve, AttributeKind>>>` to `BTreeMap<CredentialIndex,Versioned<Upward<AccountCredentialWithoutProofs<ArCurve, AttributeKind>>>>`.
 
 ## 7.0.0
 
