@@ -111,7 +111,7 @@ pub type TraverseResult<A> = OnFinalizationResult<A>;
 ///         client: v2::Client,
 ///         ctx: &'a Self::Context,
 ///         fbi: FinalizedBlockInfo,
-///     ) -> QueryResult<Self::Data> {
+///     ) -> OnFinalizationResult<Self::Data> {
 ///         unimplemented!("Implement me.")
 ///     }
 ///
