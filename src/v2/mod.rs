@@ -1185,7 +1185,7 @@ impl TryFrom<generated::PeersInfo> for types::network::PeersInfo {
                                 generated::peers_info::peer::CatchupStatus::try_from(status).ok(),
                             ) else {
                                 return Upward::Known(types::network::PeerConsensusInfo::Node(
-                                    Upward::Unknown,
+                                    Upward::Unknown(()),
                                 ));
                             };
                             let status = match status {
@@ -1258,7 +1258,7 @@ impl TryFrom<generated::node_info::Details> for types::NodeDetails {
             generated::node_info::Details::Bootstrapper(_) => Ok(types::NodeDetails::Bootstrapper),
             generated::node_info::Details::Node(status) => {
                 let Upward::Known(consensus_status) = Upward::from(status.consensus_status) else {
-                    return Ok(types::NodeDetails::Node(Upward::Unknown));
+                    return Ok(types::NodeDetails::Node(Upward::Unknown(())));
                 };
                 let consensus_status = match consensus_status {
                     generated::node_info::node::ConsensusStatus::NotRunning(_) => {
@@ -1270,7 +1270,7 @@ impl TryFrom<generated::node_info::Details> for types::NodeDetails {
                     generated::node_info::node::ConsensusStatus::Active(baker) => {
                         let baker_id = baker.baker_id.require()?.into();
                         let Upward::Known(status) = Upward::from(baker.status) else {
-                            return Ok(types::NodeDetails::Node(Upward::Unknown));
+                            return Ok(types::NodeDetails::Node(Upward::Unknown(())));
                         };
 
                         match status {
