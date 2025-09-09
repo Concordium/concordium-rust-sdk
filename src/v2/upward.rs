@@ -16,15 +16,20 @@ use std::any::type_name;
 /// The serde implementation should be considered deprecated and might be
 /// removed in a future version.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Upward<A> {
+pub enum Upward<A, R = ()> {
     /// New unknown variant, the structure is not known to the current version
     /// of this library. Consider updating the library if support is needed.
-    Unknown,
+    ///
+    /// For protocols that support decoding unkown data, a representation
+    /// of the data is the residual value (represented by a dynamic data type).
+    /// This is the caes for CBOR e.g., but not possible for protobuf that is
+    /// not self-descriptive.
+    Unknown(R),
     /// Known variant.
     Known(A),
 }
 
-impl<A> Upward<A> {
+impl<A, R> Upward<A, R> {
     /// Returns the contained [`Upward::Known`] value, consuming the `self`
     /// value.
     ///
@@ -34,7 +39,7 @@ impl<A> Upward<A> {
     pub fn unwrap(self) -> A {
         match self {
             Self::Known(value) => value,
-            Self::Unknown => panic!(
+            Self::Unknown(_) => panic!(
                 "called `Upward::<{}>::unwrap()` on an `Unknown` value",
                 type_name::<A>()
             ),
@@ -52,7 +57,7 @@ impl<A> Upward<A> {
     /// represents [`Upward::Known`] and [`Option::None`] represents
     /// [`Upward::Unknown`].
     pub fn as_known(&self) -> Option<&A> {
-        Option::from(self.as_ref())
+        Option::from(self.as_ref_with_residual())
     }
 
     /// Require the data to be known, converting it from `Upward<A>` to
@@ -100,13 +105,13 @@ impl<A> Upward<A> {
 
     /// Maps an `Upward<A>` to `Upward<U>` by applying a function to a contained
     /// value (if `Known`) or returns `Unknown` (if `Unknown`).
-    pub fn map<U, F>(self, f: F) -> Upward<U>
+    pub fn map<U, F>(self, f: F) -> Upward<U, R>
     where
         F: FnOnce(A) -> U,
     {
         match self {
             Self::Known(x) => Upward::Known(f(x)),
-            Self::Unknown => Upward::Unknown,
+            Self::Unknown(r) => Upward::Unknown(r),
         }
     }
 
@@ -125,7 +130,7 @@ impl<A> Upward<A> {
     {
         match self {
             Upward::Known(a) => f(a),
-            Upward::Unknown => default,
+            Upward::Unknown(_) => default,
         }
     }
 
@@ -139,38 +144,48 @@ impl<A> Upward<A> {
     {
         match self {
             Upward::Known(t) => f(t),
-            Upward::Unknown => default(),
+            Upward::Unknown(_) => default(),
         }
     }
 
-    /// Converts from `&Option<A>` to `Option<&A>`.
-    pub const fn as_ref(&self) -> Upward<&A> {
+    /// Converts from `&Upward<A, R>` to `Upward<&A, &R>`.
+    pub const fn as_ref_with_residual(&self) -> Upward<&A, &R> {
         match *self {
             Self::Known(ref x) => Upward::Known(x),
-            Self::Unknown => Upward::Unknown,
+            Self::Unknown(ref r) => Upward::Unknown(r),
         }
     }
 
     /// Returns [`Upward::Unknown`] if the option is [`Upward::Unknown`],
     /// otherwise calls `f` with the wrapped value and returns the result.
-    pub fn and_then<U, F>(self, f: F) -> Upward<U>
+    pub fn and_then<U, F>(self, f: F) -> Upward<U, R>
     where
-        F: FnOnce(A) -> Upward<U>,
+        F: FnOnce(A) -> Upward<U, R>,
     {
         match self {
-            Upward::Unknown => Upward::Unknown,
+            Upward::Unknown(r) => Upward::Unknown(r),
             Upward::Known(x) => f(x),
         }
     }
 }
 
-impl<A, E> Upward<Result<A, E>> {
+impl<A> Upward<A> {
+    /// Converts from `&Upward<A>` to `Upward<&A>`.
+    pub const fn as_ref(&self) -> Upward<&A> {
+        match *self {
+            Self::Known(ref x) => Upward::Known(x),
+            Self::Unknown(_) => Upward::Unknown(()),
+        }
+    }
+}
+
+impl<A, R, E> Upward<Result<A, E>, R> {
     /// Transposes an `Upward` of a [`Result`] into a [`Result`] of an `Upward`.
-    pub fn transpose(self) -> Result<Upward<A>, E> {
+    pub fn transpose(self) -> Result<Upward<A, R>, E> {
         match self {
             Upward::Known(Ok(x)) => Ok(Upward::Known(x)),
             Upward::Known(Err(e)) => Err(e),
-            Upward::Unknown => Ok(Upward::Unknown),
+            Upward::Unknown(r) => Ok(Upward::Unknown(r)),
         }
     }
 }
@@ -180,13 +195,13 @@ impl<A> From<Option<A>> for Upward<A> {
         if let Some(n) = value {
             Self::Known(n)
         } else {
-            Self::Unknown
+            Self::Unknown(())
         }
     }
 }
 
-impl<A> From<Upward<A>> for Option<A> {
-    fn from(value: Upward<A>) -> Self {
+impl<A, R> From<Upward<A, R>> for Option<A> {
+    fn from(value: Upward<A, R>) -> Self {
         if let Upward::Known(n) = value {
             Some(n)
         } else {
@@ -195,7 +210,7 @@ impl<A> From<Upward<A>> for Option<A> {
     }
 }
 
-impl<'de, A> serde::Deserialize<'de> for Upward<A>
+impl<'de, A, R> serde::Deserialize<'de> for Upward<A, R>
 where
     A: serde::Deserialize<'de>,
 {
@@ -207,7 +222,7 @@ where
     }
 }
 
-impl<A> serde::Serialize for Upward<A>
+impl<A, R> serde::Serialize for Upward<A, R>
 where
     A: serde::Serialize,
 {
@@ -237,7 +252,7 @@ impl<A> std::iter::FromIterator<Upward<A>> for Upward<Vec<A>> {
             if let Upward::Known(a) = a {
                 vec.push(a);
             } else {
-                return Upward::Unknown;
+                return Upward::Unknown(());
             }
         }
         Upward::Known(vec)
@@ -258,8 +273,8 @@ mod tests {
     #[test]
     fn test_upward_from_iterator_some_unknown() {
         let mut list = vec![Upward::Known(42); 50];
-        list[25] = Upward::Unknown;
+        list[25] = Upward::Unknown(());
         let res = list.into_iter().collect::<Upward<_>>();
-        assert_eq!(Upward::Unknown, res)
+        assert_eq!(Upward::Unknown(()), res)
     }
 }

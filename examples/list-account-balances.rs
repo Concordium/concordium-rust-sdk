@@ -122,7 +122,7 @@ async fn main() -> anyhow::Result<()> {
 
                         false
                     }
-                    v2::Upward::Unknown => false,
+                    v2::Upward::Unknown(_) => false,
                 }
             } else {
                 false

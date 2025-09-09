@@ -1326,7 +1326,7 @@ impl ExecutionTree {
                         .insert(v0.top_level.receive_name.clone());
                     for rest in &v0.rest {
                         let Upward::Known(rest) = rest else {
-                            return Upward::Unknown;
+                            return Upward::Unknown(());
                         };
                         if let TraceV0::Call(call) = rest {
                             todo.push(call);
@@ -1340,7 +1340,7 @@ impl ExecutionTree {
                         .insert(v1.receive_name.clone());
                     for event in &v1.events {
                         let Upward::Known(event) = event else {
-                            return Upward::Unknown;
+                            return Upward::Unknown(());
                         };
                         if let TraceV1::Call { call } = event {
                             todo.push(call);
@@ -1413,7 +1413,7 @@ impl ExecutionTree {
                                 );
                                 for rest in v0.rest.iter().rev() {
                                     let Upward::Known(rest) = rest else {
-                                        return Some(Upward::Unknown);
+                                        return Some(Upward::Unknown(()));
                                     };
                                     if let TraceV0::Call(call) = rest {
                                         self.next.push(LogsIteratorNext::Tree(call));
@@ -1424,7 +1424,7 @@ impl ExecutionTree {
                             ExecutionTree::V1(v1) => {
                                 for event in v1.events.iter().rev() {
                                     let Upward::Known(event) = event else {
-                                        return Some(Upward::Unknown);
+                                        return Some(Upward::Unknown(()));
                                     };
                                     match event {
                                         TraceV1::Events { events } => {
@@ -1496,9 +1496,9 @@ pub fn execution_tree(
             // model control flow events interrupting with `Resumed` and `Interrupted`.
             let last = stack.last_mut()?;
             match last {
-                Worker::V0(v0) => v0.rest.push(Upward::Unknown),
+                Worker::V0(v0) => v0.rest.push(Upward::Unknown(())),
                 Worker::Partial(partial) => {
-                    partial.events.push(Upward::Unknown);
+                    partial.events.push(Upward::Unknown(()));
                 }
             }
             continue;
@@ -1537,7 +1537,7 @@ pub fn execution_tree(
                             receive_name,
                             events: vec![Upward::Known(TraceV1::Events { events })],
                         }),
-                        Err(_) => return Some(Upward::Unknown), // return immediately if unknown
+                        Err(_) => return Some(Upward::Unknown(())), // return immediately if unknown
                     };
 
                     match end {
@@ -1612,7 +1612,7 @@ pub fn execution_tree(
                                 return None;
                             }
                         }
-                        Err(_) => return Some(Upward::Unknown), // return immediately if unknown
+                        Err(_) => return Some(Upward::Unknown(())), // return immediately if unknown
                     }
                 }
             }
@@ -1895,7 +1895,7 @@ impl BlockItemSummaryDetails {
             AccountTransactionEffects::ContractUpdateIssued { effects } => {
                 let iter = effects.iter().flat_map(|effect| {
                     let Upward::Known(effect) = effect else {
-                        return Some(Upward::Unknown);
+                        return Some(Upward::Unknown(()));
                     };
 
                     match effect {
@@ -1923,7 +1923,7 @@ impl BlockItemSummaryDetails {
         let out = match self {
             BlockItemSummaryDetails::AccountTransaction(at) => {
                 let Upward::Known(effects) = &at.effects else {
-                    return Upward::Unknown;
+                    return Upward::Unknown(());
                 };
                 match effects {
                     AccountTransactionEffects::None { .. } => vec![at.sender],
@@ -1935,7 +1935,7 @@ impl BlockItemSummaryDetails {
                         let mut addresses = vec![at.sender];
                         for effect in effects {
                             let Upward::Known(effect) = effect else {
-                                return Upward::Unknown;
+                                return Upward::Unknown(());
                             };
                             match effect {
                                 ContractTraceElement::Updated { .. } => (),
@@ -2042,7 +2042,7 @@ impl AccountTransactionDetails {
     /// in a newer node API version.
     pub fn transaction_type(&self) -> Option<Upward<TransactionType>> {
         let Upward::Known(effects) = self.effects.as_ref() else {
-            return Some(Upward::Unknown);
+            return Some(Upward::Unknown(()));
         };
         effects.transaction_type().map(Upward::Known)
     }
@@ -2126,7 +2126,7 @@ impl AccountTransactionEffects {
 
                 for effect in effects {
                     let Upward::Known(effect) = effect else {
-                        addresses.push(Upward::Unknown);
+                        addresses.push(Upward::Unknown(()));
                         continue;
                     };
                     match effect {

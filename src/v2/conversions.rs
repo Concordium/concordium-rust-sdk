@@ -1315,7 +1315,7 @@ impl TryFrom<BlockItem>
         if let Some(item) = value.block_item {
             Ok(Upward::Known(item.try_into()?))
         } else {
-            Ok(Upward::Unknown)
+            Ok(Upward::Unknown(()))
         }
     }
 }
