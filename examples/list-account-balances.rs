@@ -7,7 +7,7 @@ use concordium_rust_sdk::{
     id,
     id::types::AccountAddress,
     types::{AccountStakingInfo, CredentialType},
-    v2::{self, BlockIdentifier, Upward},
+    v2::{self, upward::UnknownDataError, BlockIdentifier},
 };
 use futures::TryStreamExt;
 use serde::Serializer;
@@ -111,41 +111,35 @@ async fn main() -> anyhow::Result<()> {
         for res in futures::future::join_all(handles).await {
             let (acc, info) = res??;
             let is_baker = if let Some(account_stake) = info.account_stake {
-                match account_stake {
-                    Upward::Known(AccountStakingInfo::Baker { staked_amount, .. }) => {
+                match account_stake.known_or_err()? {
+                    AccountStakingInfo::Baker { staked_amount, .. } => {
                         num_bakers += 1;
                         total_staked_amount += staked_amount;
-                        Some(true)
+                        true
                     }
-                    Upward::Known(AccountStakingInfo::Delegated { staked_amount, .. }) => {
+                    AccountStakingInfo::Delegated { staked_amount, .. } => {
                         total_delegated_amount += staked_amount;
-
-                        Some(false)
+                        false
                     }
-                    Upward::Unknown => None,
                 }
             } else {
-                Some(false)
-            }
-            .context(format!("Unknown AccountStakingInfo variant."))?;
+                false
+            };
 
             total_amount += info.account_amount;
 
-            let acc_type = info
-                .account_credentials
-                .get(&0.into())
-                .map_or(None, |cdi| {
-                    cdi.value.clone().map_or(None, |known| match known {
-                        id::types::AccountCredentialWithoutProofs::Initial { .. } => {
-                            num_initial += 1;
-                            Some(CredentialType::Initial)
-                        }
-                        id::types::AccountCredentialWithoutProofs::Normal { .. } => {
-                            Some(CredentialType::Normal)
-                        }
-                    })
-                })
-                .context(format!("Unknown CredentialType variant."))?;
+            let acc_type = info.account_credentials.get(&0.into()).map_or(
+                Ok::<_, UnknownDataError>(CredentialType::Normal),
+                |cdi| match cdi.value.clone().known_or_err()? {
+                    id::types::AccountCredentialWithoutProofs::Initial { .. } => {
+                        num_initial += 1;
+                        Ok(CredentialType::Initial)
+                    }
+                    id::types::AccountCredentialWithoutProofs::Normal { .. } => {
+                        Ok(CredentialType::Normal)
+                    }
+                },
+            )?;
 
             let row = Row {
                 address: acc,

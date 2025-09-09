@@ -242,17 +242,16 @@ fn check_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C
         // Ensure that the inner-level keys in the signatures map exist in the
         // on_chain_credentials map.
         for inner_key in inner_map.sigs.keys() {
-            let map = match &on_chain_cred.value {
-                Upward::Known(AccountCredentialWithoutProofs::Initial { icdv }) => {
-                    Ok(icdv.clone().cred_account.keys)
-                }
-                Upward::Known(AccountCredentialWithoutProofs::Normal { cdv, .. }) => {
-                    Ok(cdv.clone().cred_key_info.keys)
-                }
-                Upward::Unknown(_) => Err(SignatureError::UnknownAccountCredential {
+            let map = match &on_chain_cred.value.as_ref().known_or(
+                SignatureError::UnknownAccountCredential {
                     credential_index: *outer_key,
-                }),
-            }?;
+                },
+            )? {
+                AccountCredentialWithoutProofs::Initial { icdv } => icdv.clone().cred_account.keys,
+                AccountCredentialWithoutProofs::Normal { cdv, .. } => {
+                    cdv.clone().cred_key_info.keys
+                }
+            };
 
             if !map.contains_key(&KeyIndex(*inner_key)) {
                 return Err(SignatureError::MissingIndicesOnChain {
@@ -298,19 +297,19 @@ pub async fn verify_account_signature(
     let mut valid_credential_signatures_count = 0u8;
     for (credential_index, credential) in signer_account_credentials {
         // Retrieve the public key and threshold from the on-chain information.
-        let (keys, signatures_threshold) = match credential.value {
-            Upward::Unknown(_) => Err(SignatureError::UnknownAccountCredential {
-                credential_index: credential_index.index,
-            }),
-            Upward::Known(x) => match x {
+        let (keys, signatures_threshold) =
+            match credential
+                .value
+                .known_or(SignatureError::UnknownAccountCredential {
+                    credential_index: credential_index.index,
+                })? {
                 AccountCredentialWithoutProofs::Initial { icdv } => {
-                    Ok((icdv.cred_account.keys, icdv.cred_account.threshold))
+                    (icdv.cred_account.keys, icdv.cred_account.threshold)
                 }
                 AccountCredentialWithoutProofs::Normal { cdv, .. } => {
-                    Ok((cdv.cred_key_info.keys, cdv.cred_key_info.threshold))
+                    (cdv.cred_key_info.keys, cdv.cred_key_info.threshold)
                 }
-            },
-        }?;
+            };
         let mut valid_signatures_count = 0u8;
 
         for (key_index, public_key) in keys {
@@ -449,7 +448,7 @@ pub async fn sign_as_account(
                     key_index: key_index.0,
                 })?
                 .value
-                .clone()
+                .as_ref()
                 .known_or(SignatureError::UnknownAccountCredential {
                     credential_index: credential_index.index,
                 })?;

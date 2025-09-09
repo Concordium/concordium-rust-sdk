@@ -416,31 +416,28 @@ impl AccountInfo {
     }
 }
 
-impl From<&AccountInfo> for AccountAccessStructure {
+impl From<&AccountInfo> for Upward<AccountAccessStructure> {
     fn from(value: &AccountInfo) -> Self {
-        Self {
-            keys: value
-                .account_credentials
-                .iter()
-                .map(|(idx, v)| {
-                    let key = match v.value.clone() {
-                        Upward::Unknown(_) => None,
-                        Upward::Known(x) => match x {
-                            crate::id::types::AccountCredentialWithoutProofs::Initial {
-                                ref icdv,
-                            } => Some(icdv.cred_account.clone()),
-                            crate::id::types::AccountCredentialWithoutProofs::Normal {
-                                ref cdv,
-                                ..
-                            } => Some(cdv.cred_key_info.clone()),
-                        },
-                    };
-                    (*idx, key)
+        let keys = value
+            .account_credentials
+            .iter()
+            .map(|(idx, v)| {
+                v.value.as_ref().map(|x| match x {
+                    crate::id::types::AccountCredentialWithoutProofs::Initial { ref icdv } => {
+                        (*idx, icdv.cred_account.clone())
+                    }
+                    crate::id::types::AccountCredentialWithoutProofs::Normal {
+                        ref cdv, ..
+                    } => (*idx, cdv.cred_key_info.clone()),
                 })
-                .filter_map(|(idx, opt_key)| opt_key.map(|key| (idx, key)))
-                .collect(),
-            threshold: value.account_threshold,
-        }
+            })
+            .collect::<Upward<Vec<(CredentialIndex, CredentialPublicKeys)>>>();
+        let threshold = value.account_threshold;
+
+        keys.map(|ks| AccountAccessStructure {
+            keys: ks.into_iter().collect(),
+            threshold,
+        })
     }
 }
 
