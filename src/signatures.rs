@@ -249,7 +249,7 @@ fn check_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C
                 Upward::Known(AccountCredentialWithoutProofs::Normal { cdv, .. }) => {
                     Ok(cdv.clone().cred_key_info.keys)
                 }
-                Upward::Unknown => Err(SignatureError::UnknownAccountCredential {
+                Upward::Unknown(_) => Err(SignatureError::UnknownAccountCredential {
                     credential_index: *outer_key,
                 }),
             }?;
@@ -299,7 +299,7 @@ pub async fn verify_account_signature(
     for (credential_index, credential) in signer_account_credentials {
         // Retrieve the public key and threshold from the on-chain information.
         let (keys, signatures_threshold) = match credential.value {
-            Upward::Unknown => Err(SignatureError::UnknownAccountCredential {
+            Upward::Unknown(_) => Err(SignatureError::UnknownAccountCredential {
                 credential_index: credential_index.index,
             }),
             Upward::Known(x) => match x {

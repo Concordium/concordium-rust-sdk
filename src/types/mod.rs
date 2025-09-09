@@ -424,7 +424,7 @@ impl From<&AccountInfo> for AccountAccessStructure {
                 .iter()
                 .map(|(idx, v)| {
                     let key = match v.value.clone() {
-                        Upward::Unknown => None,
+                        Upward::Unknown(_) => None,
                         Upward::Known(x) => match x {
                             crate::id::types::AccountCredentialWithoutProofs::Initial {
                                 ref icdv,

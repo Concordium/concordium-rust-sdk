@@ -135,7 +135,7 @@ async fn main() -> anyhow::Result<()> {
                             ..
                         },
                     ) => Ok(false),
-                    v2::Upward::Unknown => Err(anyhow::anyhow!(
+                    v2::Upward::Unknown(_) => Err(anyhow::anyhow!(
                         "Unknown AccountCredentialWithoutProofs variant"
                     )),
                 };

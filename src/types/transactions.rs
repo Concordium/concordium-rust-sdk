@@ -21,7 +21,7 @@ impl HasAccountAccessStructure for AccountInfo {
                 ref cdv,
                 ..
             }) => Some(&cdv.cred_key_info),
-            Upward::Unknown => None,
+            Upward::Unknown(_) => None,
         }
     }
 }
