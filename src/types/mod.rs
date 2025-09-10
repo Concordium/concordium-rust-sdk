@@ -8,22 +8,39 @@ mod summary_helper;
 pub mod transactions;
 
 use anyhow::Context;
-pub use concordium_base::hashes;
 // re-export to maintain backwards compatibility.
-use crate::{constants::*, protocol_level_tokens, v2::upward::Upward};
+use crate::{
+    constants::*,
+    id::types::VerifyKey,
+    protocol_level_tokens,
+    v2::upward::{UnknownDataError, Upward},
+};
 pub use concordium_base::{
     base::*,
-    id::types::CredentialType,
+    common::{base16_decode, base16_encode, types::KeyPair},
+    curve_arithmetic::Curve,
+    hashes,
+    id::{
+        secret_sharing::Threshold,
+        types::{
+            ArIdentity, Attribute, AttributeTag, ChainArData, CredId,
+            CredentialDeploymentCommitments, CredentialType, IpIdentity, Policy,
+        },
+    },
+    pedersen_commitment::{
+        Commitment as PedersenCommitment, CommitmentKey as PedersenKey,
+        Randomness as PedersenRandomness, Value as PedersenValue,
+    },
     smart_contracts::{ContractTraceElement, InstanceUpdatedEvent},
 };
 use concordium_base::{
     common::{
         self,
-        types::{Amount, CredentialIndex, Timestamp, TransactionTime},
+        types::{Amount, CredentialIndex, KeyIndex, Timestamp, TransactionTime},
         Buffer, Deserial, Get, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
         Versioned,
     },
-    contracts_common::{Duration, EntrypointName, Parameter},
+    contracts_common::{Duration, EntrypointName, Parameter, SignatureThreshold},
     encrypted_transfers::{
         self,
         types::{
@@ -33,15 +50,13 @@ use concordium_base::{
     id::{
         constants::{ArCurve, AttributeKind},
         elgamal,
-        types::{
-            AccountAddress, AccountCredentialWithoutProofs, AccountKeys, CredentialPublicKeys,
-        },
+        types::{AccountAddress, AccountKeys},
     },
     protocol_level_tokens::{TokenAmount, TokenEvent, TokenEventDetails, TokenHolder, TokenId},
     smart_contracts::{
         ContractEvent, ModuleReference, OwnedParameter, OwnedReceiveName, WasmVersion,
     },
-    transactions::{AccountAccessStructure, ExactSizeTransactionSigner, TransactionSigner},
+    transactions::{ExactSizeTransactionSigner, TransactionSigner},
 };
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
@@ -218,6 +233,179 @@ impl AccountEncryptedAmount {
         }
     }
 }
+
+/// Public credential keys currently on the account, together with the threshold
+/// needed for a valid signature on a transaction.
+/// Note: In contrast to the corresponding `base` type, this type
+/// has the `VerifyKey` wrapped in `Upward`.
+#[derive(Debug, PartialEq, Eq, SerdeSerialize, SerdeDeserialize, Clone)]
+pub struct CredentialPublicKeys {
+    #[serde(rename = "keys")]
+    pub keys: BTreeMap<KeyIndex, Upward<VerifyKey>>,
+    #[serde(rename = "threshold")]
+    pub threshold: SignatureThreshold,
+}
+
+impl From<concordium_base::id::types::CredentialPublicKeys> for CredentialPublicKeys {
+    fn from(value: concordium_base::id::types::CredentialPublicKeys) -> Self {
+        let test: BTreeMap<_, _> = value
+            .keys
+            .iter()
+            .map(|(k, v)| (*k, Upward::Known(v.clone())))
+            .collect();
+
+        CredentialPublicKeys {
+            keys: test,
+            threshold: value.threshold,
+        }
+    }
+}
+
+impl TryFrom<CredentialPublicKeys> for concordium_base::id::types::CredentialPublicKeys {
+    type Error = UnknownDataError;
+
+    fn try_from(value: CredentialPublicKeys) -> Result<Self, Self::Error> {
+        let keys: BTreeMap<_, _> = value
+            .keys
+            .into_iter()
+            .map(|(k, v)| {
+                let known_verify_key = v.known_or_err()?;
+                Ok((k, known_verify_key))
+            })
+            .collect::<Result<_, _>>()?;
+
+        Ok(concordium_base::id::types::CredentialPublicKeys {
+            keys,
+            threshold: value.threshold,
+        })
+    }
+}
+
+/// The most straighforward account access structure is a map of public keys
+/// with the account threshold.
+/// Note: In contrast to the corresponding `base` type, this type
+/// has the `VerifyKey` in the `CredentialPublicKeys` type wrapped in `Upward`.
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct AccountAccessStructure {
+    /// Keys indexed by credential.
+    pub keys: BTreeMap<CredentialIndex, CredentialPublicKeys>,
+    /// The number of credentials that needed to sign a transaction.
+    pub threshold: AccountThreshold,
+}
+
+/// Values (as opposed to proofs) in credential deployment.
+/// Note: In contrast to the corresponding `base` type, this type
+/// has the `VerifyKey` in the `CredentialPublicKeys` type wrapped in `Upward`.
+#[derive(Debug, PartialEq, Eq, SerdeSerialize, SerdeDeserialize, Clone)]
+#[serde(bound(
+    serialize = "C: Curve, AttributeType: Attribute<C::Scalar> + SerdeSerialize",
+    deserialize = "C: Curve, AttributeType: Attribute<C::Scalar> + SerdeDeserialize<'de>"
+))]
+pub struct CredentialDeploymentValues<C: Curve, AttributeType: Attribute<C::Scalar>> {
+    /// Credential keys (i.e. account holder keys).
+    #[serde(rename = "credentialPublicKeys")]
+    pub cred_key_info: CredentialPublicKeys,
+    /// Credential registration id of the credential.
+    #[serde(
+        rename = "credId",
+        serialize_with = "base16_encode",
+        deserialize_with = "base16_decode"
+    )]
+    pub cred_id: CredId<C>,
+    /// Identity of the identity provider who signed the identity object from
+    /// which this credential is derived.
+    #[serde(rename = "ipIdentity")]
+    pub ip_identity: IpIdentity,
+    /// Anonymity revocation threshold. Must be <= length of ar_data.
+    #[serde(rename = "revocationThreshold")]
+    pub threshold: Threshold,
+    /// Anonymity revocation data. List of anonymity revokers which can revoke
+    /// identity. NB: The order is important since it is the same order as that
+    /// signed by the identity provider, and permuting the list will invalidate
+    /// the signature from the identity provider.
+    // #[map_size_length = 2]
+    #[serde(rename = "arData")] //deserialize_with = "deserialize_ar_data")]
+    pub ar_data: BTreeMap<ArIdentity, ChainArData<C>>,
+    /// Policy of this credential object.
+    #[serde(rename = "policy")]
+    pub policy: Policy<C, AttributeType>,
+}
+
+/// Values in initial credential deployment.
+/// Note: In contrast to the corresponding `base` type, this type
+/// has the `VerifyKey` in the `CredentialPublicKeys` type wrapped in `Upward`.
+#[derive(Debug, PartialEq, Eq, SerdeSerialize, SerdeDeserialize, Clone)]
+#[serde(bound(
+    serialize = "C: Curve, AttributeType: Attribute<C::Scalar> + SerdeSerialize",
+    deserialize = "C: Curve, AttributeType: Attribute<C::Scalar> + SerdeDeserialize<'de>"
+))]
+pub struct InitialCredentialDeploymentValues<C: Curve, AttributeType: Attribute<C::Scalar>> {
+    /// Account this credential belongs to.
+    #[serde(rename = "credentialPublicKeys")]
+    pub cred_account: CredentialPublicKeys,
+    /// Credential registration id of the credential.
+    #[serde(
+        rename = "regId",
+        serialize_with = "base16_encode",
+        deserialize_with = "base16_decode"
+    )]
+    pub reg_id: CredId<C>,
+    /// Identity of the identity provider who signed the identity object from
+    /// which this credential is derived.
+    #[serde(rename = "ipIdentity")]
+    pub ip_identity: IpIdentity,
+    /// Policy of this credential object.
+    #[serde(rename = "policy")]
+    pub policy: Policy<C, AttributeType>,
+}
+
+/// Note: In contrast to the corresponding `base` type, this type
+/// has the `VerifyKey` in the `CredentialPublicKeys` type
+/// in the `InitialCredentialDeploymentValues/CredentialDeploymentValues` types
+/// wrapped in `Upward`.
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq, Eq, Clone)]
+#[serde(tag = "type", content = "contents")]
+#[serde(bound(
+    serialize = "C: Curve, AttributeType: Attribute<C::Scalar> + SerdeSerialize",
+    deserialize = "C: Curve, AttributeType: Attribute<C::Scalar> + SerdeDeserialize<'de>"
+))]
+pub enum AccountCredentialWithoutProofs<C: Curve, AttributeType: Attribute<C::Scalar>> {
+    #[serde(rename = "initial")]
+    Initial {
+        #[serde(flatten)]
+        icdv: InitialCredentialDeploymentValues<C, AttributeType>,
+    },
+    #[serde(rename = "normal")]
+    Normal {
+        #[serde(flatten)]
+        cdv: CredentialDeploymentValues<C, AttributeType>,
+        #[serde(rename = "commitments")]
+        commitments: CredentialDeploymentCommitments<C>,
+    },
+}
+
+impl<C: Curve, AttributeType: Attribute<C::Scalar>>
+    AccountCredentialWithoutProofs<C, AttributeType>
+{
+    /// Retrieve the issuer of the credential. The [`IpIdentity`] is a reference
+    /// to the identity provider on the chain of which the credential is a part
+    /// of.
+    pub fn issuer(&self) -> IpIdentity {
+        match self {
+            AccountCredentialWithoutProofs::Initial { icdv } => icdv.ip_identity,
+            AccountCredentialWithoutProofs::Normal { cdv, .. } => cdv.ip_identity,
+        }
+    }
+
+    /// Return the credential registration ID of the account credential.
+    pub fn cred_id(&self) -> &CredId<C> {
+        match self {
+            AccountCredentialWithoutProofs::Initial { icdv } => &icdv.reg_id,
+            AccountCredentialWithoutProofs::Normal { cdv, .. } => &cdv.cred_id,
+        }
+    }
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Eq, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 /// State of the account's release schedule. This is the balance of the account
@@ -427,31 +615,6 @@ impl AccountInfo {
             .iter()
             .find(|at| at.token_id == *token_id)
             .map(|at| at.state.balance.to_owned())
-    }
-}
-
-impl From<&AccountInfo> for Upward<AccountAccessStructure> {
-    fn from(value: &AccountInfo) -> Self {
-        let keys = value
-            .account_credentials
-            .iter()
-            .map(|(idx, v)| {
-                v.value.as_ref().map(|x| match x {
-                    crate::id::types::AccountCredentialWithoutProofs::Initial { ref icdv } => {
-                        (*idx, icdv.cred_account.clone())
-                    }
-                    crate::id::types::AccountCredentialWithoutProofs::Normal {
-                        ref cdv, ..
-                    } => (*idx, cdv.cred_key_info.clone()),
-                })
-            })
-            .collect::<Upward<Vec<(CredentialIndex, CredentialPublicKeys)>>>();
-        let threshold = value.account_threshold;
-
-        keys.map(|ks| AccountAccessStructure {
-            keys: ks.into_iter().collect(),
-            threshold,
-        })
     }
 }
 
@@ -1375,8 +1538,8 @@ impl ExecutionTree {
     ///
     /// Each item of the iterator is wrapped into an `Upward` type.
     /// If the SDK is not fully compatible with the Concordium node,
-    /// it can occur that new events in the execution tree occur that are unknown
-    /// to the SDK or some of the execution traces are unknown.
+    /// it can occur that new events in the execution tree occur that are
+    /// unknown to the SDK or some of the execution traces are unknown.
     /// Items of `Unkown` are inserted in the iterator in that case.
     pub fn events(
         &self,
@@ -1477,11 +1640,14 @@ impl ExecutionTree {
 ///
 /// The return type is wrapped into an `Upward` type.
 /// If the SDK is not fully compatible with the Concordium node,
-/// it can occur that the `contractTraceElements` pass through a smart contract with a version that is unkonwn to this SDK.
-/// As the assumption is that new smart contract versions require a different execution tree to be accurated represented/executed,
-/// this function will return `Unkown` in that case.
-/// If some of the `contractTraceElements` are `Unknown` to this SDK, but otherwise pass through smart contracts with known versions,
-/// an execution tree can be constructed that contains all trace elements (potentially `Unkown` trace elements).
+/// it can occur that the `contractTraceElements` pass through a smart contract
+/// with a version that is unkonwn to this SDK. As the assumption is that new
+/// smart contract versions require a different execution tree to be accurated
+/// represented/executed, this function will return `Unkown` in that case.
+/// If some of the `contractTraceElements` are `Unknown` to this SDK, but
+/// otherwise pass through smart contracts with known versions, an execution
+/// tree can be constructed that contains all trace elements (potentially
+/// `Unkown` trace elements).
 pub fn execution_tree(
     elements: Vec<Upward<ContractTraceElement>>,
 ) -> Option<Upward<ExecutionTree>> {
@@ -3281,7 +3447,11 @@ impl WalletAccount {
         let mut keys = BTreeMap::new();
         for (&ci, k) in self.keys.keys.iter() {
             let public = CredentialPublicKeys {
-                keys: k.keys.iter().map(|(ki, kp)| (*ki, kp.into())).collect(),
+                keys: k
+                    .keys
+                    .iter()
+                    .map(|(ki, kp)| (*ki, Upward::Known(VerifyKey::Ed25519VerifyKey(kp.public()))))
+                    .collect(),
                 threshold: k.threshold,
             };
             keys.insert(ci, public);

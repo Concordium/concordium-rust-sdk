@@ -102,35 +102,33 @@ pub async fn verify_credential_metadata(
                     actual: c.issuer(),
                 });
             }
-            match &c {
-                concordium_base::id::types::AccountCredentialWithoutProofs::Initial { .. } => {
-                    Err(CredentialLookupError::InitialCredential { cred_id })
-                }
-                concordium_base::id::types::AccountCredentialWithoutProofs::Normal {
-                    cdv,
-                    commitments,
-                } => {
-                    let now = client.get_block_info(bi).await?.response.block_slot_time;
-                    let valid_from = cdv.policy.created_at.lower().ok_or_else(|| {
-                        CredentialLookupError::InvalidResponse(
-                            "Credential creation date is not valid.".into(),
-                        )
-                    })?;
-                    let valid_until = cdv.policy.valid_to.upper().ok_or_else(|| {
-                        CredentialLookupError::InvalidResponse(
-                            "Credential creation date is not valid.".into(),
-                        )
-                    })?;
-                    let status = if valid_from > now {
-                        CredentialStatus::NotActivated
-                    } else if valid_until < now {
-                        CredentialStatus::Expired
-                    } else {
-                        CredentialStatus::Active
-                    };
-                    let inputs = CredentialsInputs::Account {
-                        commitments: commitments.cmm_attributes.clone(),
-                    };
+            
+                match &c {
+                    crate::types::AccountCredentialWithoutProofs::Initial { .. } => {
+                        Err(CredentialLookupError::InitialCredential { cred_id })
+                    }
+                    crate::types::AccountCredentialWithoutProofs::Normal { cdv, commitments } => {
+                        let now = client.get_block_info(bi).await?.response.block_slot_time;
+                        let valid_from = cdv.policy.created_at.lower().ok_or_else(|| {
+                            CredentialLookupError::InvalidResponse(
+                                "Credential creation date is not valid.".into(),
+                            )
+                        })?;
+                        let valid_until = cdv.policy.valid_to.upper().ok_or_else(|| {
+                            CredentialLookupError::InvalidResponse(
+                                "Credential creation date is not valid.".into(),
+                            )
+                        })?;
+                        let status = if valid_from > now {
+                            CredentialStatus::NotActivated
+                        } else if valid_until < now {
+                            CredentialStatus::Expired
+                        } else {
+                            CredentialStatus::Active
+                        };
+                        let inputs = CredentialsInputs::Account {
+                            commitments: commitments.cmm_attributes.clone(),
+                        };
 
                     Ok(CredentialWithMetadata { status, inputs })
                 }

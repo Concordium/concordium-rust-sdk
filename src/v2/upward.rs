@@ -39,10 +39,12 @@ impl<A, R> Upward<A, R> {
     pub fn unwrap(self) -> A {
         match self {
             Self::Known(value) => value,
-            Self::Unknown(_) => panic!(
-                "called `Upward::<{}>::unwrap()` on an `Unknown` value",
-                type_name::<A>()
-            ),
+            Self::Unknown => {
+                panic!(
+                    "called `Upward::<{}>::unwrap()` on an `Unknown` value",
+                    type_name::<A>()
+                )
+            }
         }
     }
 

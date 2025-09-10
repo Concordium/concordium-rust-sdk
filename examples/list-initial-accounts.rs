@@ -125,6 +125,7 @@ async fn main() -> anyhow::Result<()> {
         }
         for ainfo in futures::future::join_all(handles).await {
             let ainfo: AccountInfo = ainfo?.response;
+
             let is_initial = if let Some(acred) = ainfo.account_credentials.get(&0.into()) {
                 match acred.value.as_ref().known_or_err()? {
                     concordium_rust_sdk::id::types::AccountCredentialWithoutProofs::Initial {

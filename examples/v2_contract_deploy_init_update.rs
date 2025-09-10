@@ -63,8 +63,8 @@ enum Action {
         address: ContractAddress,
     },
     #[structopt(
-        about = "Update the contract and set the provided weather using JSON parameters and a \
-                 schema."
+        about = "Update the contract and set the provided weather using JSON parameters \
+                         and a schema."
     )]
     UpdateWithSchema {
         #[structopt(long, help = "Path of the JSON parameter.")]

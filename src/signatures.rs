@@ -7,10 +7,7 @@ use concordium_base::{
     },
     contracts_common::{AccountAddress, SignatureThreshold},
     curve_arithmetic::Curve,
-    id::types::{
-        AccountCredentialWithoutProofs, AccountKeys, Attribute, InitialAccountData,
-        PublicCredentialData, VerifyKey,
-    },
+    id::types::{AccountKeys, Attribute, InitialAccountData, PublicCredentialData, VerifyKey},
 };
 use ed25519_dalek::{SigningKey, VerifyingKey};
 use sha2::Digest;
@@ -51,6 +48,11 @@ pub enum SignatureError {
          the node will resolve this issue."
     )]
     UnknownAccountCredential { credential_index: u8 },
+    #[error(
+        "The type `${0}` is unkown to this SDK. This can happen if the SDK is not fully \
+         compatible with the Concordium node. You might want to update the SDK to a newer version."
+    )]
+    Unknown(String),
 }
 
 /// Account signatures are constructed similarly to transaction signatures. The
@@ -225,7 +227,7 @@ fn check_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C
     signatures: &AccountSignatures,
     on_chain_credentials: &BTreeMap<
         CredentialIndex,
-        Versioned<Upward<AccountCredentialWithoutProofs<C, AttributeType>>>,
+        Versioned<Upward<crate::types::AccountCredentialWithoutProofs<C, AttributeType>>>,
     >,
 ) -> Result<(), SignatureError> {
     // Ensure all outer-level keys in the signatures map exist in the
@@ -324,13 +326,18 @@ pub async fn verify_account_signature(
                 continue;
             };
 
-            if public_key.verify(message_hash, signature) {
-                // If the signature is valid, increase the `valid_signatures_count`.
-                valid_signatures_count += 1;
-            } else {
-                // If any signature is invalid, return `false`.
-                return Ok(false);
-            }
+
+                let Upward::Known(public_key) = public_key else {
+                    return Err(SignatureError::Unknown("PublicKey/VerifyKey".to_string()));
+                };
+
+                if public_key.verify(message_hash, signature) {
+                    // If the signature is valid, increase the `valid_signatures_count`.
+                    valid_signatures_count += 1;
+                } else {
+                    // If any signature is invalid, return `false`.
+                    return Ok(false);
+                }
         }
 
         // Check if the number of valid signatures meets the required threshold
@@ -459,15 +466,10 @@ pub async fn sign_as_account(
                 AccountCredentialWithoutProofs::Normal { cdv, .. } => &cdv.cred_key_info.keys,
             };
 
-            let on_chain_public_key =
-                on_chain_keys
-                    .get(&key_index)
-                    .ok_or(SignatureError::MissingIndicesOnChain {
-                        credential_index: credential_index.index,
-                        key_index: key_index.0,
-                    })?;
-
-            let VerifyKey::Ed25519VerifyKey(public_key) = *on_chain_public_key;
+                let Upward::Known(VerifyKey::Ed25519VerifyKey(public_key)) = *on_chain_public_key
+                else {
+                    return Err(SignatureError::Unknown("PublicKey/VerifyKey".to_string()));
+                };
 
             // Check that the public key in the `account_keys` map matches the public key on
             // chain.

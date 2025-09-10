@@ -4,7 +4,6 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::{types::Amount, SerdeSerialize},
-    id,
     id::types::AccountAddress,
     types::{AccountStakingInfo, CredentialType},
     v2::{self, upward::UnknownDataError, BlockIdentifier},

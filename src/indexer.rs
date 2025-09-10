@@ -43,7 +43,10 @@ pub enum TraverseError {
     Query(#[from] QueryError),
     #[error("Timed out waiting for finalized blocks.")]
     Elapsed(#[from] Elapsed),
-    #[error("The type `${0}` is unkown to this SDK. This can happen if the SDK is not fully compatible with the Concordium node. You might want to update the SDK to a newer version.")]
+    #[error(
+        "The type `${0}` is unkown to this SDK. This can happen if the SDK is not fully \
+         compatible with the Concordium node. You might want to update the SDK to a newer version."
+    )]
     Unknown(String),
 }
 
@@ -62,7 +65,10 @@ impl From<OnFinalizationError> for TraverseError {
 pub enum OnFinalizationError {
     #[error("Failed to query: {0}")]
     Query(#[from] QueryError),
-    #[error("The type `${0}` is unkown to this SDK. This can happen if the SDK is not fully compatible with the Concordium node. You might want to update the SDK to a newer version.")]
+    #[error(
+        "The type `${0}` is unkown to this SDK. This can happen if the SDK is not fully \
+         compatible with the Concordium node. You might want to update the SDK to a newer version."
+    )]
     Unknown(String),
 }
 
