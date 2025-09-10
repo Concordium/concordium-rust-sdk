@@ -7,10 +7,7 @@ use concordium_base::{
     },
     contracts_common::{AccountAddress, SignatureThreshold},
     curve_arithmetic::Curve,
-    id::types::{
-        AccountCredentialWithoutProofs, AccountKeys, Attribute, InitialAccountData,
-        PublicCredentialData, VerifyKey,
-    },
+    id::types::{AccountKeys, Attribute, InitialAccountData, PublicCredentialData, VerifyKey},
 };
 use ed25519_dalek::{SigningKey, VerifyingKey};
 use sha2::Digest;
@@ -45,6 +42,11 @@ pub enum SignatureError {
         expected_public_key: Box<VerifyingKey>,
         actual_public_key: Box<VerifyingKey>,
     },
+    #[error(
+        "The type `${0}` is unkown to this SDK. This can happen if the SDK is not fully \
+         compatible with the Concordium node. You might want to update the SDK to a newer version."
+    )]
+    Unknown(String),
 }
 
 /// Account signatures are constructed similarly to transaction signatures. The
@@ -219,7 +221,7 @@ fn check_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C
     signatures: &AccountSignatures,
     on_chain_credentials: &BTreeMap<
         CredentialIndex,
-        Versioned<Upward<AccountCredentialWithoutProofs<C, AttributeType>>>,
+        Versioned<Upward<crate::types::AccountCredentialWithoutProofs<C, AttributeType>>>,
     >,
 ) -> Result<(), SignatureError> {
     // Ensure all outer-level keys in the signatures map exist in the
@@ -238,12 +240,12 @@ fn check_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C
         // on_chain_credentials map.
         for inner_key in inner_map.sigs.keys() {
             if let Some(map) = match &on_chain_cred.value {
-                Upward::Known(AccountCredentialWithoutProofs::Initial { icdv }) => {
+                Upward::Known(crate::types::AccountCredentialWithoutProofs::Initial { icdv }) => {
                     Some(&icdv.cred_account.keys)
                 }
-                Upward::Known(AccountCredentialWithoutProofs::Normal { cdv, .. }) => {
-                    Some(&cdv.cred_key_info.keys)
-                }
+                Upward::Known(crate::types::AccountCredentialWithoutProofs::Normal {
+                    cdv, ..
+                }) => Some(&cdv.cred_key_info.keys),
                 Upward::Unknown => None,
             } {
                 if !map.contains_key(&KeyIndex(*inner_key)) {
@@ -294,10 +296,10 @@ pub async fn verify_account_signature(
         if let Some((keys, signatures_threshold)) = match credential.value {
             Upward::Unknown => None,
             Upward::Known(x) => match x {
-                AccountCredentialWithoutProofs::Initial { icdv } => {
+                crate::types::AccountCredentialWithoutProofs::Initial { icdv } => {
                     Some((icdv.cred_account.keys, icdv.cred_account.threshold))
                 }
-                AccountCredentialWithoutProofs::Normal { cdv, .. } => {
+                crate::types::AccountCredentialWithoutProofs::Normal { cdv, .. } => {
                     Some((cdv.cred_key_info.keys, cdv.cred_key_info.threshold))
                 }
             },
@@ -313,6 +315,10 @@ pub async fn verify_account_signature(
 
                 let Some(signature) = cred_sigs.sigs.get(&key_index.0) else {
                     continue;
+                };
+
+                let Upward::Known(public_key) = public_key else {
+                    return Err(SignatureError::Unknown("PublicKey/VerifyKey".to_string()));
                 };
 
                 if public_key.verify(message_hash, signature) {
@@ -445,8 +451,12 @@ pub async fn sign_as_account(
                 .known()
             {
                 let on_chain_keys = match on_chain_credential {
-                    AccountCredentialWithoutProofs::Initial { icdv } => &icdv.cred_account.keys,
-                    AccountCredentialWithoutProofs::Normal { cdv, .. } => &cdv.cred_key_info.keys,
+                    crate::types::AccountCredentialWithoutProofs::Initial { icdv } => {
+                        &icdv.cred_account.keys
+                    }
+                    crate::types::AccountCredentialWithoutProofs::Normal { cdv, .. } => {
+                        &cdv.cred_key_info.keys
+                    }
                 };
 
                 let on_chain_public_key =
@@ -457,7 +467,10 @@ pub async fn sign_as_account(
                             key_index: key_index.0,
                         })?;
 
-                let VerifyKey::Ed25519VerifyKey(public_key) = *on_chain_public_key;
+                let Upward::Known(VerifyKey::Ed25519VerifyKey(public_key)) = *on_chain_public_key
+                else {
+                    return Err(SignatureError::Unknown("PublicKey/VerifyKey".to_string()));
+                };
 
                 // Check that the public key in the `account_keys` map matches the public key on
                 // chain.

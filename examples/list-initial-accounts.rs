@@ -127,12 +127,12 @@ async fn main() -> anyhow::Result<()> {
                 .get(&0.into())
                 .is_some_and(|cdi| match &cdi.value {
                     v2::Upward::Known(
-                        concordium_rust_sdk::id::types::AccountCredentialWithoutProofs::Initial {
+                        concordium_rust_sdk::types::AccountCredentialWithoutProofs::Initial {
                             ..
                         },
                     ) => true,
                     v2::Upward::Known(
-                        concordium_rust_sdk::id::types::AccountCredentialWithoutProofs::Normal {
+                        concordium_rust_sdk::types::AccountCredentialWithoutProofs::Normal {
                             ..
                         },
                     ) => false,

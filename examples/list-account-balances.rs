@@ -4,7 +4,6 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::{types::Amount, SerdeSerialize},
-    id,
     id::types::AccountAddress,
     types::{AccountStakingInfo, CredentialType},
     v2::{self, BlockIdentifier, Upward},
@@ -133,15 +132,19 @@ async fn main() -> anyhow::Result<()> {
             if let Some(acc_type) = info.account_credentials.get(&0.into()).map_or(
                 Some(CredentialType::Normal),
                 |cdi| match cdi.value {
-                    Upward::Known(id::types::AccountCredentialWithoutProofs::Initial {
-                        ..
-                    }) => {
+                    Upward::Known(
+                        concordium_rust_sdk::types::AccountCredentialWithoutProofs::Initial {
+                            ..
+                        },
+                    ) => {
                         num_initial += 1;
                         Some(CredentialType::Initial)
                     }
-                    Upward::Known(id::types::AccountCredentialWithoutProofs::Normal { .. }) => {
-                        Some(CredentialType::Normal)
-                    }
+                    Upward::Known(
+                        concordium_rust_sdk::types::AccountCredentialWithoutProofs::Normal {
+                            ..
+                        },
+                    ) => Some(CredentialType::Normal),
                     Upward::Unknown => None,
                 },
             ) {

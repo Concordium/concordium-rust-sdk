@@ -100,13 +100,10 @@ pub async fn verify_credential_metadata(
                     });
                 }
                 match &c {
-                    concordium_base::id::types::AccountCredentialWithoutProofs::Initial {
-                        ..
-                    } => Err(CredentialLookupError::InitialCredential { cred_id }),
-                    concordium_base::id::types::AccountCredentialWithoutProofs::Normal {
-                        cdv,
-                        commitments,
-                    } => {
+                    crate::types::AccountCredentialWithoutProofs::Initial { .. } => {
+                        Err(CredentialLookupError::InitialCredential { cred_id })
+                    }
+                    crate::types::AccountCredentialWithoutProofs::Normal { cdv, commitments } => {
                         let now = client.get_block_info(bi).await?.response.block_slot_time;
                         let valid_from = cdv.policy.created_at.lower().ok_or_else(|| {
                             CredentialLookupError::InvalidResponse(
