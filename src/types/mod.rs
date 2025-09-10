@@ -37,8 +37,7 @@ use concordium_base::{
     common::{
         self,
         types::{Amount, CredentialIndex, KeyIndex, Timestamp, TransactionTime},
-        Buffer, Deserial, Get, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
-        Versioned,
+        Buffer, Deserial, Get, ParseResult, ReadBytesExt, Serial, Versioned,
     },
     contracts_common::{Duration, EntrypointName, Parameter, SignatureThreshold},
     encrypted_transfers::{
@@ -58,9 +57,12 @@ use concordium_base::{
     },
     transactions::{ExactSizeTransactionSigner, TransactionSigner},
 };
+use serde::{de, de::Visitor, Deserialize as SerdeDeserialize, Serialize as SerdeSerialize};
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     convert::TryFrom,
+    fmt,
+    str::FromStr,
 };
 
 /// Cryptographic context for the chain. These parameters are used to support
@@ -238,6 +240,9 @@ impl AccountEncryptedAmount {
 /// needed for a valid signature on a transaction.
 /// Note: In contrast to the corresponding `base` type, this type
 /// has the `VerifyKey` wrapped in `Upward`.
+/// The `VerifyKey` can possibly be unknown if the SDK is not fully compatible
+/// with future Concordium node versions that extend the enum type with new
+/// variants.
 #[derive(Debug, PartialEq, Eq, SerdeSerialize, SerdeDeserialize, Clone)]
 pub struct CredentialPublicKeys {
     #[serde(rename = "keys")]
@@ -285,6 +290,9 @@ impl TryFrom<CredentialPublicKeys> for concordium_base::id::types::CredentialPub
 /// with the account threshold.
 /// Note: In contrast to the corresponding `base` type, this type
 /// has the `VerifyKey` in the `CredentialPublicKeys` type wrapped in `Upward`.
+/// The `VerifyKey` can possibly be unknown if the SDK is not fully compatible
+/// with future Concordium node versions that extend the enum type with new
+/// variants.
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct AccountAccessStructure {
     /// Keys indexed by credential.
@@ -296,6 +304,9 @@ pub struct AccountAccessStructure {
 /// Values (as opposed to proofs) in credential deployment.
 /// Note: In contrast to the corresponding `base` type, this type
 /// has the `VerifyKey` in the `CredentialPublicKeys` type wrapped in `Upward`.
+/// The `VerifyKey` can possibly be unknown if the SDK is not fully compatible
+/// with future Concordium node versions that extend the enum type with new
+/// variants.
 #[derive(Debug, PartialEq, Eq, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(bound(
     serialize = "C: Curve, AttributeType: Attribute<C::Scalar> + SerdeSerialize",
@@ -323,17 +334,53 @@ pub struct CredentialDeploymentValues<C: Curve, AttributeType: Attribute<C::Scal
     /// identity. NB: The order is important since it is the same order as that
     /// signed by the identity provider, and permuting the list will invalidate
     /// the signature from the identity provider.
-    // #[map_size_length = 2]
-    #[serde(rename = "arData")] //deserialize_with = "deserialize_ar_data")]
+    #[serde(rename = "arData", deserialize_with = "deserialize_ar_data")]
     pub ar_data: BTreeMap<ArIdentity, ChainArData<C>>,
     /// Policy of this credential object.
     #[serde(rename = "policy")]
     pub policy: Policy<C, AttributeType>,
 }
 
+fn deserialize_ar_data<'de, D: de::Deserializer<'de>, C: Curve>(
+    des: D,
+) -> Result<BTreeMap<ArIdentity, ChainArData<C>>, D::Error> {
+    #[derive(Default)]
+    struct ArIdentityVisitor<C>(std::marker::PhantomData<C>);
+
+    impl<'de, C: Curve> Visitor<'de> for ArIdentityVisitor<C> {
+        type Value = BTreeMap<ArIdentity, ChainArData<C>>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            write!(
+                formatter,
+                "An object with integer keys and ChainArData values."
+            )
+        }
+
+        fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+        where
+            A: de::MapAccess<'de>,
+        {
+            let mut map = map;
+            let mut res = BTreeMap::new();
+            while let Some((k, v)) = map.next_entry::<String, _>()? {
+                let k = ArIdentity::from_str(&k)
+                    .map_err(|_| de::Error::custom("Cannot read ArIdentity key."))?;
+                res.insert(k, v);
+            }
+            Ok(res)
+        }
+    }
+
+    des.deserialize_map(ArIdentityVisitor(std::default::Default::default()))
+}
+
 /// Values in initial credential deployment.
 /// Note: In contrast to the corresponding `base` type, this type
 /// has the `VerifyKey` in the `CredentialPublicKeys` type wrapped in `Upward`.
+/// The `VerifyKey` can possibly be unknown if the SDK is not fully compatible
+/// with future Concordium node versions that extend the enum type with new
+/// variants.
 #[derive(Debug, PartialEq, Eq, SerdeSerialize, SerdeDeserialize, Clone)]
 #[serde(bound(
     serialize = "C: Curve, AttributeType: Attribute<C::Scalar> + SerdeSerialize",
@@ -359,10 +406,14 @@ pub struct InitialCredentialDeploymentValues<C: Curve, AttributeType: Attribute<
     pub policy: Policy<C, AttributeType>,
 }
 
+/// Account credential with values and commitments, but without proofs.
 /// Note: In contrast to the corresponding `base` type, this type
 /// has the `VerifyKey` in the `CredentialPublicKeys` type
 /// in the `InitialCredentialDeploymentValues/CredentialDeploymentValues` types
 /// wrapped in `Upward`.
+/// The `VerifyKey` can possibly be unknown if the SDK is not fully compatible
+/// with future Concordium node versions that extend the enum type with new
+/// variants.
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(tag = "type", content = "contents")]
 #[serde(bound(
