@@ -2,8 +2,8 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
-    types::AccountInfo,
-    v2::{self, upward},
+    types::{AccountCredentialWithoutProofs, AccountInfo},
+    v2,
 };
 use futures::TryStreamExt;
 use std::{collections::BTreeSet, io::Write, path::PathBuf};

@@ -55,7 +55,7 @@ use concordium_base::{
     smart_contracts::{
         ContractEvent, ModuleReference, OwnedParameter, OwnedReceiveName, WasmVersion,
     },
-    transactions::{ExactSizeTransactionSigner, TransactionSigner},
+    transactions::{AccountAccessStructure, ExactSizeTransactionSigner, TransactionSigner},
 };
 use serde::{de, de::Visitor, Deserialize as SerdeDeserialize, Serialize as SerdeSerialize};
 use std::{
@@ -284,21 +284,6 @@ impl TryFrom<CredentialPublicKeys> for concordium_base::id::types::CredentialPub
             threshold: value.threshold,
         })
     }
-}
-
-/// The most straighforward account access structure is a map of public keys
-/// with the account threshold.
-/// Note: In contrast to the corresponding `base` type, this type
-/// has the `VerifyKey` in the `CredentialPublicKeys` type wrapped in `Upward`.
-/// The `VerifyKey` can possibly be unknown if the SDK is not fully compatible
-/// with future Concordium node versions that extend the enum type with new
-/// variants.
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub struct AccountAccessStructure {
-    /// Keys indexed by credential.
-    pub keys: BTreeMap<CredentialIndex, CredentialPublicKeys>,
-    /// The number of credentials that needed to sign a transaction.
-    pub threshold: AccountThreshold,
 }
 
 /// Values (as opposed to proofs) in credential deployment.
@@ -3497,11 +3482,11 @@ impl WalletAccount {
     pub fn access_structure(&self) -> AccountAccessStructure {
         let mut keys = BTreeMap::new();
         for (&ci, k) in self.keys.keys.iter() {
-            let public = CredentialPublicKeys {
+            let public = concordium_base::id::types::CredentialPublicKeys {
                 keys: k
                     .keys
                     .iter()
-                    .map(|(ki, kp)| (*ki, Upward::Known(VerifyKey::Ed25519VerifyKey(kp.public()))))
+                    .map(|(ki, kp)| (*ki, VerifyKey::Ed25519VerifyKey(kp.public())))
                     .collect(),
                 threshold: k.threshold,
             };
