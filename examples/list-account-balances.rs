@@ -130,7 +130,7 @@ async fn main() -> anyhow::Result<()> {
 
             let acc_type = info.account_credentials.get(&0.into()).map_or(
                 Ok::<_, UnknownDataError>(CredentialType::Normal),
-                |cdi| match cdi.value.clone().known_or_err()? {
+                |cdi| match cdi.value.as_ref().known_or_err()? {
                     id::types::AccountCredentialWithoutProofs::Initial { .. } => {
                         num_initial += 1;
                         Ok(CredentialType::Initial)
