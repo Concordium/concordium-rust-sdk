@@ -77,9 +77,9 @@
   - Type `AccountInfo` field `account_stake` changes from `Option<AccountStakingInfo>` to `Option<Upward<AccountStakingInfo>>`.
   - Type `Cooldown` field `status` is now wrapped in `Upward`.
   - Type `BakerEvent::BakerSetOpenStatus` field `open_status` is now wrapped in `Upward`.
-  - Type `Event` field `open_status` is now wrapped in `Upward`.
   - Type `AccountInfo` field `account_credentials` change from `BTreeMap<CredentialIndex,Versioned<AccountCredentialWithoutProofs<ArCurve, AttributeKind>>>` to `BTreeMap<CredentialIndex,Versioned<Upward<AccountCredentialWithoutProofs<ArCurve, AttributeKind>>>>`.
   - Type `BakerPoolInfo` moved from `concordium-base` to the `rust-sdk`.
+  - Type `Event`/`BakerPoolInfo` field `open_status` is now wrapped in `Upward`.
 
 ## 7.0.0
 

@@ -563,7 +563,8 @@ impl TryFrom<BakerPoolInfo> for super::types::BakerPoolInfo {
     type Error = tonic::Status;
 
     fn try_from(value: BakerPoolInfo) -> Result<Self, Self::Error> {
-        let open_status = value.open_status().into();
+        let open_status = Upward::from(OpenStatus::try_from(value.open_status).ok())
+            .map(super::types::OpenStatus::from);
         let metadata_url = value
             .url
             .try_into()
