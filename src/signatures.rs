@@ -1,5 +1,8 @@
 //! Functionality for generating, and verifying account signatures.
-use crate::v2::{self, AccountIdentifier, BlockIdentifier, QueryError, Upward};
+use crate::{
+    types::AccountCredentialWithoutProofs,
+    v2::{self, AccountIdentifier, BlockIdentifier, QueryError, Upward},
+};
 use concordium_base::{
     common::{
         types::{CredentialIndex, KeyIndex, KeyPair, Signature},
@@ -227,7 +230,7 @@ fn check_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C
     signatures: &AccountSignatures,
     on_chain_credentials: &BTreeMap<
         CredentialIndex,
-        Versioned<Upward<crate::types::AccountCredentialWithoutProofs<C, AttributeType>>>,
+        Versioned<Upward<AccountCredentialWithoutProofs<C, AttributeType>>>,
     >,
 ) -> Result<(), SignatureError> {
     // Ensure all outer-level keys in the signatures map exist in the
@@ -250,10 +253,8 @@ fn check_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C
                     credential_index: *outer_key,
                 },
             )? {
-                crate::types::AccountCredentialWithoutProofs::Initial { icdv } => {
-                    icdv.clone().cred_account.keys
-                }
-                crate::types::AccountCredentialWithoutProofs::Normal { cdv, .. } => {
+                AccountCredentialWithoutProofs::Initial { icdv } => icdv.clone().cred_account.keys,
+                AccountCredentialWithoutProofs::Normal { cdv, .. } => {
                     cdv.clone().cred_key_info.keys
                 }
             };
@@ -308,10 +309,10 @@ pub async fn verify_account_signature(
                 .known_or(SignatureError::UnknownAccountCredential {
                     credential_index: credential_index.index,
                 })? {
-                crate::types::AccountCredentialWithoutProofs::Initial { icdv } => {
+                AccountCredentialWithoutProofs::Initial { icdv } => {
                     (icdv.cred_account.keys, icdv.cred_account.threshold)
                 }
-                crate::types::AccountCredentialWithoutProofs::Normal { cdv, .. } => {
+                AccountCredentialWithoutProofs::Normal { cdv, .. } => {
                     (cdv.cred_key_info.keys, cdv.cred_key_info.threshold)
                 }
             };
@@ -463,12 +464,8 @@ pub async fn sign_as_account(
                 })?;
 
             let on_chain_keys = match on_chain_credential {
-                crate::types::AccountCredentialWithoutProofs::Initial { icdv } => {
-                    &icdv.cred_account.keys
-                }
-                crate::types::AccountCredentialWithoutProofs::Normal { cdv, .. } => {
-                    &cdv.cred_key_info.keys
-                }
+                AccountCredentialWithoutProofs::Initial { icdv } => &icdv.cred_account.keys,
+                AccountCredentialWithoutProofs::Normal { cdv, .. } => &cdv.cred_key_info.keys,
             };
 
             let on_chain_public_key =

@@ -2,6 +2,7 @@
 
 use crate::{
     cis4::{Cis4Contract, Cis4QueryError},
+    types::AccountCredentialWithoutProofs,
     v2::{self, BlockIdentifier, IntoBlockIdentifier},
 };
 pub use concordium_base::web3id::*;
@@ -104,10 +105,10 @@ pub async fn verify_credential_metadata(
             }
 
             match &c {
-                crate::types::AccountCredentialWithoutProofs::Initial { .. } => {
+                AccountCredentialWithoutProofs::Initial { .. } => {
                     Err(CredentialLookupError::InitialCredential { cred_id })
                 }
-                crate::types::AccountCredentialWithoutProofs::Normal { cdv, commitments } => {
+                AccountCredentialWithoutProofs::Normal { cdv, commitments } => {
                     let now = client.get_block_info(bi).await?.response.block_slot_time;
                     let valid_from = cdv.policy.created_at.lower().ok_or_else(|| {
                         CredentialLookupError::InvalidResponse(

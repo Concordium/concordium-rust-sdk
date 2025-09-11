@@ -4,7 +4,8 @@
 use super::{generated::*, upward::Upward, Require};
 use crate::types::{
     queries::{ConcordiumBFTDetails, ProtocolVersionInt},
-    AccountReleaseSchedule, ActiveBakerPoolStatus, UpdateKeysCollectionSkeleton,
+    AccountCredentialWithoutProofs, AccountReleaseSchedule, ActiveBakerPoolStatus,
+    UpdateKeysCollectionSkeleton,
 };
 use chrono::TimeZone;
 use concordium_base::{
@@ -858,22 +859,20 @@ impl TryFrom<CredentialCommitments> for crate::id::types::CredentialDeploymentCo
     }
 }
 
-impl TryFrom<AccountCredential>
-    for Upward<crate::types::AccountCredentialWithoutProofs<ArCurve, AttributeKind>>
-{
+impl TryFrom<AccountCredential> for Upward<AccountCredentialWithoutProofs<ArCurve, AttributeKind>> {
     type Error = tonic::Status;
 
     fn try_from(message: AccountCredential) -> Result<Self, Self::Error> {
         let key = message
             .credential_values
-            .map(crate::types::AccountCredentialWithoutProofs::try_from)
+            .map(AccountCredentialWithoutProofs::try_from)
             .transpose()?;
         Ok(Upward::from(key))
     }
 }
 
 impl TryFrom<account_credential::CredentialValues>
-    for crate::types::AccountCredentialWithoutProofs<ArCurve, AttributeKind>
+    for AccountCredentialWithoutProofs<ArCurve, AttributeKind>
 {
     type Error = tonic::Status;
 
@@ -886,7 +885,7 @@ impl TryFrom<account_credential::CredentialValues>
                     ip_identity: ic.ip_id.require()?.into(),
                     policy: ic.policy.require()?.try_into()?,
                 };
-                Ok(crate::types::AccountCredentialWithoutProofs::Initial { icdv })
+                Ok(AccountCredentialWithoutProofs::Initial { icdv })
             }
 
             account_credential::CredentialValues::Normal(nc) => {
@@ -909,7 +908,7 @@ impl TryFrom<account_credential::CredentialValues>
                     policy: nc.policy.require()?.try_into()?,
                 };
                 let commitments = nc.commitments.require()?.try_into()?;
-                Ok(crate::types::AccountCredentialWithoutProofs::Normal { cdv, commitments })
+                Ok(AccountCredentialWithoutProofs::Normal { cdv, commitments })
             }
         }
     }
