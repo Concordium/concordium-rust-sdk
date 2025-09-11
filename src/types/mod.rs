@@ -260,6 +260,20 @@ pub struct BakerInfo {
     pub baker_aggregation_verify_key: BakerAggregationVerifyKey,
 }
 
+/// Additional information about a baking pool.
+/// This information is added with the introduction of delegation in protocol
+/// version 4.
+#[derive(SerdeSerialize, SerdeDeserialize, PartialEq, Eq, Serial, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BakerPoolInfo {
+    /// Whether the pool allows delegators.
+    pub open_status: OpenStatus,
+    /// The URL that links to the metadata about the pool.
+    pub metadata_url: UrlText,
+    /// The commission rates charged by the pool owner.
+    pub commission_rates: CommissionRates,
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum AccountStakingInfo {
