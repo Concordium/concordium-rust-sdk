@@ -36,7 +36,7 @@ pub enum CredentialLookupError {
     InitialCredential { cred_id: CredentialRegistrationID },
     #[error("Unexpected response from the node: {0}")]
     InvalidResponse(String),
-    #[error("Unknown stored credential for {cred_id}.")]
+    #[error("Unknown stored credential for {cred_id}. Updating the rust-sdk to a version compatible with the node will resolve this issue.")]
     UnknownCredential { cred_id: CredentialRegistrationID },
 }
 

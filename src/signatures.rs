@@ -47,7 +47,8 @@ pub enum SignatureError {
     },
     #[error(
         "There exists a account credential with the given index, but it has an \
-         unknown variant type."
+         unknown variant type. Updating the rust-sdk to a version compatible with \
+         the node will resolve this issue."
     )]
     UnknownAccountCredential { credential_index: u8 },
 }
