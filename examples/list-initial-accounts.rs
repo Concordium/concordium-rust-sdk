@@ -136,8 +136,8 @@ async fn main() -> anyhow::Result<()> {
                 }
             } else {
                 Ok(false)
-            };
-            if is_initial? && !start_block_accounts.contains(&ainfo.account_address) {
+            }?;
+            if is_initial && !start_block_accounts.contains(&ainfo.account_address) {
                 writeln!(&mut out, "{}", ainfo.account_address)?;
             }
         }
