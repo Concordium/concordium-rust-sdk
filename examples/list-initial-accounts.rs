@@ -1,7 +1,10 @@
 //! List initial accounts created between two given timestamps.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_rust_sdk::{types::AccountInfo, v2};
+use concordium_rust_sdk::{
+    types::AccountInfo,
+    v2::{self, upward},
+};
 use futures::TryStreamExt;
 use std::{collections::BTreeSet, io::Write, path::PathBuf};
 use structopt::StructOpt;
@@ -122,17 +125,18 @@ async fn main() -> anyhow::Result<()> {
         }
         for ainfo in futures::future::join_all(handles).await {
             let ainfo: AccountInfo = ainfo?.response;
-            let is_initial = ainfo
-                .account_credentials
-                .get(&0.into())
-                .is_some_and(|cdi| match &cdi.value {
+            let is_initial = if let Some(acred) = ainfo.account_credentials.get(&0.into()) {
+                match acred.value.as_ref().known_or_err()? {
                     concordium_rust_sdk::id::types::AccountCredentialWithoutProofs::Initial {
                         ..
-                    } => true,
+                    } => Ok::<_, upward::UnknownDataError>(true),
                     concordium_rust_sdk::id::types::AccountCredentialWithoutProofs::Normal {
                         ..
-                    } => false,
-                });
+                    } => Ok(false),
+                }
+            } else {
+                Ok(false)
+            }?;
             if is_initial && !start_block_accounts.contains(&ainfo.account_address) {
                 writeln!(&mut out, "{}", ainfo.account_address)?;
             }

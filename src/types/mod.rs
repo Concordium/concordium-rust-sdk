@@ -360,7 +360,7 @@ pub struct AccountInfo {
     /// with index 0.
     pub account_credentials: std::collections::BTreeMap<
         CredentialIndex,
-        Versioned<AccountCredentialWithoutProofs<ArCurve, AttributeKind>>,
+        Versioned<Upward<AccountCredentialWithoutProofs<ArCurve, AttributeKind>>>,
     >,
     /// Lower bound on how many credentials must sign any given transaction from
     /// this account.
@@ -416,27 +416,28 @@ impl AccountInfo {
     }
 }
 
-impl From<&AccountInfo> for AccountAccessStructure {
+impl From<&AccountInfo> for Upward<AccountAccessStructure> {
     fn from(value: &AccountInfo) -> Self {
-        Self {
-            keys: value
-                .account_credentials
-                .iter()
-                .map(|(idx, v)| {
-                    let key = match v.value {
-                        crate::id::types::AccountCredentialWithoutProofs::Initial { ref icdv } => {
-                            icdv.cred_account.clone()
-                        }
-                        crate::id::types::AccountCredentialWithoutProofs::Normal {
-                            ref cdv,
-                            ..
-                        } => cdv.cred_key_info.clone(),
-                    };
-                    (*idx, key)
+        let keys = value
+            .account_credentials
+            .iter()
+            .map(|(idx, v)| {
+                v.value.as_ref().map(|x| match x {
+                    crate::id::types::AccountCredentialWithoutProofs::Initial { ref icdv } => {
+                        (*idx, icdv.cred_account.clone())
+                    }
+                    crate::id::types::AccountCredentialWithoutProofs::Normal {
+                        ref cdv, ..
+                    } => (*idx, cdv.cred_key_info.clone()),
                 })
-                .collect(),
-            threshold: value.account_threshold,
-        }
+            })
+            .collect::<Upward<Vec<(CredentialIndex, CredentialPublicKeys)>>>();
+        let threshold = value.account_threshold;
+
+        keys.map(|ks| AccountAccessStructure {
+            keys: ks.into_iter().collect(),
+            threshold,
+        })
     }
 }
 

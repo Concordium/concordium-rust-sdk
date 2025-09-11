@@ -1,5 +1,5 @@
 //! Functionality for generating, and verifying account signatures.
-use crate::v2::{self, AccountIdentifier, BlockIdentifier, QueryError};
+use crate::v2::{self, AccountIdentifier, BlockIdentifier, QueryError, Upward};
 use concordium_base::{
     common::{
         types::{CredentialIndex, KeyIndex, KeyPair, Signature},
@@ -45,6 +45,12 @@ pub enum SignatureError {
         expected_public_key: Box<VerifyingKey>,
         actual_public_key: Box<VerifyingKey>,
     },
+    #[error(
+        "There exists a account credential with the given index, but it has an \
+         unknown variant type. Updating the rust-sdk to a version compatible with \
+         the node will resolve this issue."
+    )]
+    UnknownAccountCredential { credential_index: u8 },
 }
 
 /// Account signatures are constructed similarly to transaction signatures. The
@@ -219,7 +225,7 @@ fn check_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C
     signatures: &AccountSignatures,
     on_chain_credentials: &BTreeMap<
         CredentialIndex,
-        Versioned<AccountCredentialWithoutProofs<C, AttributeType>>,
+        Versioned<Upward<AccountCredentialWithoutProofs<C, AttributeType>>>,
     >,
 ) -> Result<(), SignatureError> {
     // Ensure all outer-level keys in the signatures map exist in the
@@ -237,9 +243,15 @@ fn check_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C
         // Ensure that the inner-level keys in the signatures map exist in the
         // on_chain_credentials map.
         for inner_key in inner_map.sigs.keys() {
-            let map = match &on_chain_cred.value {
-                AccountCredentialWithoutProofs::Initial { icdv } => &icdv.cred_account.keys,
-                AccountCredentialWithoutProofs::Normal { cdv, .. } => &cdv.cred_key_info.keys,
+            let map = match &on_chain_cred.value.as_ref().known_or(
+                SignatureError::UnknownAccountCredential {
+                    credential_index: *outer_key,
+                },
+            )? {
+                AccountCredentialWithoutProofs::Initial { icdv } => icdv.clone().cred_account.keys,
+                AccountCredentialWithoutProofs::Normal { cdv, .. } => {
+                    cdv.clone().cred_key_info.keys
+                }
             };
 
             if !map.contains_key(&KeyIndex(*inner_key)) {
@@ -286,15 +298,19 @@ pub async fn verify_account_signature(
     let mut valid_credential_signatures_count = 0u8;
     for (credential_index, credential) in signer_account_credentials {
         // Retrieve the public key and threshold from the on-chain information.
-        let (keys, signatures_threshold) = match credential.value {
-            AccountCredentialWithoutProofs::Initial { icdv } => {
-                (icdv.cred_account.keys, icdv.cred_account.threshold)
-            }
-            AccountCredentialWithoutProofs::Normal { cdv, .. } => {
-                (cdv.cred_key_info.keys, cdv.cred_key_info.threshold)
-            }
-        };
-
+        let (keys, signatures_threshold) =
+            match credential
+                .value
+                .known_or(SignatureError::UnknownAccountCredential {
+                    credential_index: credential_index.index,
+                })? {
+                AccountCredentialWithoutProofs::Initial { icdv } => {
+                    (icdv.cred_account.keys, icdv.cred_account.threshold)
+                }
+                AccountCredentialWithoutProofs::Normal { cdv, .. } => {
+                    (cdv.cred_key_info.keys, cdv.cred_key_info.threshold)
+                }
+            };
         let mut valid_signatures_count = 0u8;
 
         for (key_index, public_key) in keys {
@@ -432,7 +448,11 @@ pub async fn sign_as_account(
                     credential_index: credential_index.index,
                     key_index: key_index.0,
                 })?
-                .value;
+                .value
+                .as_ref()
+                .known_or(SignatureError::UnknownAccountCredential {
+                    credential_index: credential_index.index,
+                })?;
 
             let on_chain_keys = match on_chain_credential {
                 AccountCredentialWithoutProofs::Initial { icdv } => &icdv.cred_account.keys,
