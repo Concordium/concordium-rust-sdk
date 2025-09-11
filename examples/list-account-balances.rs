@@ -5,7 +5,7 @@ use clap::AppSettings;
 use concordium_rust_sdk::{
     common::{types::Amount, SerdeSerialize},
     id::types::AccountAddress,
-    types::{AccountStakingInfo, CredentialType},
+    types::{AccountCredentialWithoutProofs, AccountStakingInfo, CredentialType},
     v2::{self, upward::UnknownDataError, BlockIdentifier},
 };
 use futures::TryStreamExt;
@@ -130,13 +130,11 @@ async fn main() -> anyhow::Result<()> {
             let acc_type = info.account_credentials.get(&0.into()).map_or(
                 Ok::<_, UnknownDataError>(CredentialType::Normal),
                 |cdi| match cdi.value.as_ref().known_or_err()? {
-                    id::types::AccountCredentialWithoutProofs::Initial { .. } => {
+                    AccountCredentialWithoutProofs::Initial { .. } => {
                         num_initial += 1;
                         Ok(CredentialType::Initial)
                     }
-                    id::types::AccountCredentialWithoutProofs::Normal { .. } => {
-                        Ok(CredentialType::Normal)
-                    }
+                    AccountCredentialWithoutProofs::Normal { .. } => Ok(CredentialType::Normal),
                 },
             )?;
 

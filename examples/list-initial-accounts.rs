@@ -3,7 +3,7 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_rust_sdk::{
     types::{AccountCredentialWithoutProofs, AccountInfo},
-    v2,
+    v2::{self, upward},
 };
 use futures::TryStreamExt;
 use std::{collections::BTreeSet, io::Write, path::PathBuf};
@@ -128,12 +128,10 @@ async fn main() -> anyhow::Result<()> {
 
             let is_initial = if let Some(acred) = ainfo.account_credentials.get(&0.into()) {
                 match acred.value.as_ref().known_or_err()? {
-                    concordium_rust_sdk::id::types::AccountCredentialWithoutProofs::Initial {
-                        ..
-                    } => Ok::<_, upward::UnknownDataError>(true),
-                    concordium_rust_sdk::id::types::AccountCredentialWithoutProofs::Normal {
-                        ..
-                    } => Ok(false),
+                    AccountCredentialWithoutProofs::Initial { .. } => {
+                        Ok::<_, upward::UnknownDataError>(true)
+                    }
+                    AccountCredentialWithoutProofs::Normal { .. } => Ok(false),
                 }
             } else {
                 Ok(false)

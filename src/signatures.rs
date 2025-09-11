@@ -250,8 +250,10 @@ fn check_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C
                     credential_index: *outer_key,
                 },
             )? {
-                AccountCredentialWithoutProofs::Initial { icdv } => icdv.clone().cred_account.keys,
-                AccountCredentialWithoutProofs::Normal { cdv, .. } => {
+                crate::types::AccountCredentialWithoutProofs::Initial { icdv } => {
+                    icdv.clone().cred_account.keys
+                }
+                crate::types::AccountCredentialWithoutProofs::Normal { cdv, .. } => {
                     cdv.clone().cred_key_info.keys
                 }
             };
@@ -306,10 +308,10 @@ pub async fn verify_account_signature(
                 .known_or(SignatureError::UnknownAccountCredential {
                     credential_index: credential_index.index,
                 })? {
-                AccountCredentialWithoutProofs::Initial { icdv } => {
+                crate::types::AccountCredentialWithoutProofs::Initial { icdv } => {
                     (icdv.cred_account.keys, icdv.cred_account.threshold)
                 }
-                AccountCredentialWithoutProofs::Normal { cdv, .. } => {
+                crate::types::AccountCredentialWithoutProofs::Normal { cdv, .. } => {
                     (cdv.cred_key_info.keys, cdv.cred_key_info.threshold)
                 }
             };
@@ -326,18 +328,17 @@ pub async fn verify_account_signature(
                 continue;
             };
 
+            let Upward::Known(public_key) = public_key else {
+                return Err(SignatureError::Unknown("PublicKey/VerifyKey".to_string()));
+            };
 
-                let Upward::Known(public_key) = public_key else {
-                    return Err(SignatureError::Unknown("PublicKey/VerifyKey".to_string()));
-                };
-
-                if public_key.verify(message_hash, signature) {
-                    // If the signature is valid, increase the `valid_signatures_count`.
-                    valid_signatures_count += 1;
-                } else {
-                    // If any signature is invalid, return `false`.
-                    return Ok(false);
-                }
+            if public_key.verify(message_hash, signature) {
+                // If the signature is valid, increase the `valid_signatures_count`.
+                valid_signatures_count += 1;
+            } else {
+                // If any signature is invalid, return `false`.
+                return Ok(false);
+            }
         }
 
         // Check if the number of valid signatures meets the required threshold
@@ -462,14 +463,26 @@ pub async fn sign_as_account(
                 })?;
 
             let on_chain_keys = match on_chain_credential {
-                AccountCredentialWithoutProofs::Initial { icdv } => &icdv.cred_account.keys,
-                AccountCredentialWithoutProofs::Normal { cdv, .. } => &cdv.cred_key_info.keys,
+                crate::types::AccountCredentialWithoutProofs::Initial { icdv } => {
+                    &icdv.cred_account.keys
+                }
+                crate::types::AccountCredentialWithoutProofs::Normal { cdv, .. } => {
+                    &cdv.cred_key_info.keys
+                }
             };
 
-                let Upward::Known(VerifyKey::Ed25519VerifyKey(public_key)) = *on_chain_public_key
-                else {
-                    return Err(SignatureError::Unknown("PublicKey/VerifyKey".to_string()));
-                };
+            let on_chain_public_key =
+                on_chain_keys
+                    .get(&key_index)
+                    .ok_or(SignatureError::MissingIndicesOnChain {
+                        credential_index: credential_index.index,
+                        key_index: key_index.0,
+                    })?;
+
+            let Upward::Known(VerifyKey::Ed25519VerifyKey(public_key)) = *on_chain_public_key
+            else {
+                return Err(SignatureError::Unknown("PublicKey/VerifyKey".to_string()));
+            };
 
             // Check that the public key in the `account_keys` map matches the public key on
             // chain.

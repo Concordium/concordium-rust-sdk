@@ -5,7 +5,7 @@
 - Added `Validation` as a separate enum for `TokenClient` operations.
 - Remove use of `CborTokenHolder` wrapper.
 - Introduce `ProtocolVersionInt` newtype, wrapping the `u64` representation of the `ProtocolVersion`. This type is forward-compatible, meaning future protocol versions can be represented using this type.
-- Added `CredentialPublicKeys`, `AccountAccessStructure`, `CredentialDeploymentValues`, `InitialCredentialDeploymentValues`, and
+- Added `CredentialPublicKeys`, `CredentialDeploymentValues`, `InitialCredentialDeploymentValues`, and
 `AccountCredentialWithoutProofs` types which in contrast to the corresponding `base` types have the `VerifyKey` types wrapped into `Upward`.
 - BREAKING: Change type `ProtocolVersion` to  `ProtocolVersionInt` for field `protocol_version` in the types listed below. Now introducing new protocol versions in `ProtocolVersion` does not result in RPC parsing errors, and consumers of this library can write more applications that are more forward-compatible.
   - `BlockInfo`
@@ -14,6 +14,9 @@
 - Introduce `Upward<A, R = ()>` for representing types, which might get extended in a future version of the Concordium Node API and allows the consumer of this library to decide how to handle some unknown future data, like new transaction types and chain events.
 - Use the `WasmVersionInt` defined in `concordium-base` for the wasm version (smart contract version) to make it forward-compatible.
 - Changed the `Indexer` module to use a new `OnFinalizationError` and the new result types `OnFinalizationResult`/`TraverseResult` when traversing and processing blocks. The indexer's errors/results can now represent the `Unkown` types as part of adding forward-compatibility.
+- Removed the `From<AccountInfo>` implementation for `AccountAccessStructure`.
+- Removed the implementation of the trait `HasAccountAccessStructure` for `AccountInfo`.
+
 - BREAKING: Change types related to gRPC API responses to wrap `Upward` for values which might be extended in a future version of the API of the Concordium Node.
 
   The changes are for:

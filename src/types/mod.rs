@@ -3483,11 +3483,7 @@ impl WalletAccount {
         let mut keys = BTreeMap::new();
         for (&ci, k) in self.keys.keys.iter() {
             let public = concordium_base::id::types::CredentialPublicKeys {
-                keys: k
-                    .keys
-                    .iter()
-                    .map(|(ki, kp)| (*ki, VerifyKey::Ed25519VerifyKey(kp.public())))
-                    .collect(),
+                keys: k.keys.iter().map(|(ki, kp)| (*ki, kp.into())).collect(),
                 threshold: k.threshold,
             };
             keys.insert(ci, public);
