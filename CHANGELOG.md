@@ -13,7 +13,7 @@
   - `CommonRewardData`
 - Introduce `Upward<A, R = ()>` for representing types, which might get extended in a future version of the Concordium Node API and allows the consumer of this library to decide how to handle some unknown future data, like new transaction types and chain events.
 - Use the `WasmVersionInt` defined in `concordium-base` for the wasm version (smart contract version) to make it forward-compatible.
-- Changed the `Indexer` module to use a new `OnFinalizationError` and the new result types `OnFinalizationResult`/`TraverseResult` when traversing and processing blocks. The indexer's errors/results can now represent the `Unkown` types as part of adding forward-compatibility.
+- Changed the `Indexer` module to use a new `OnFinalizationError` and the new result types `OnFinalizationResult`/`TraverseResult` when traversing and processing blocks. The indexer's errors/results can now represent the `Unknown` types as part of adding forward-compatibility.
 - Removed the `From<AccountInfo>` implementation for `AccountAccessStructure`.
 - Removed the implementation of the trait `HasAccountAccessStructure` for `AccountInfo`.
 

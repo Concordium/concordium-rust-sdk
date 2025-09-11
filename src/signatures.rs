@@ -49,7 +49,7 @@ pub enum SignatureError {
     )]
     UnknownAccountCredential { credential_index: u8 },
     #[error(
-        "The type `${0}` is unkown to this SDK. This can happen if the SDK is not fully \
+        "The type `${0}` is unknown to this SDK. This can happen if the SDK is not fully \
          compatible with the Concordium node. You might want to update the SDK to a newer version."
     )]
     Unknown(String),

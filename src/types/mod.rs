@@ -253,14 +253,14 @@ pub struct CredentialPublicKeys {
 
 impl From<concordium_base::id::types::CredentialPublicKeys> for CredentialPublicKeys {
     fn from(value: concordium_base::id::types::CredentialPublicKeys) -> Self {
-        let test: BTreeMap<_, _> = value
+        let keys: BTreeMap<_, _> = value
             .keys
             .iter()
             .map(|(k, v)| (*k, Upward::Known(v.clone())))
             .collect();
 
         CredentialPublicKeys {
-            keys: test,
+            keys,
             threshold: value.threshold,
         }
     }
@@ -1576,7 +1576,7 @@ impl ExecutionTree {
     /// If the SDK is not fully compatible with the Concordium node,
     /// it can occur that new events in the execution tree occur that are
     /// unknown to the SDK or some of the execution traces are unknown.
-    /// Items of `Unkown` are inserted in the iterator in that case.
+    /// Items of `Unknown` are inserted in the iterator in that case.
     pub fn events(
         &self,
     ) -> impl Iterator<
@@ -1679,11 +1679,11 @@ impl ExecutionTree {
 /// it can occur that the `contractTraceElements` pass through a smart contract
 /// with a version that is unkonwn to this SDK. As the assumption is that new
 /// smart contract versions require a different execution tree to be accurated
-/// represented/executed, this function will return `Unkown` in that case.
+/// represented/executed, this function will return `Unknown` in that case.
 /// If some of the `contractTraceElements` are `Unknown` to this SDK, but
 /// otherwise pass through smart contracts with known versions, an execution
 /// tree can be constructed that contains all trace elements (potentially
-/// `Unkown` trace elements).
+/// `Unknown` trace elements).
 pub fn execution_tree(
     elements: Vec<Upward<ContractTraceElement>>,
 ) -> Option<Upward<ExecutionTree>> {

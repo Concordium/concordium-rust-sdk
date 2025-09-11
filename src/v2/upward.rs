@@ -20,7 +20,7 @@ pub enum Upward<A, R = ()> {
     /// New unknown variant, the structure is not known to the current version
     /// of this library. Consider updating the library if support is needed.
     ///
-    /// For protocols that support decoding unkown data, a representation
+    /// For protocols that support decoding unknown data, a representation
     /// of the data is the residual value (represented by a dynamic data type).
     /// This is the caes for CBOR e.g., but not possible for protobuf that is
     /// not self-descriptive.
