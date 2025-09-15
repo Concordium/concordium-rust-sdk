@@ -329,11 +329,10 @@ pub async fn verify_account_signature(
                 continue;
             };
 
-            let Upward::Known(public_key) = public_key else {
-                return Err(SignatureError::Unknown("PublicKey/VerifyKey".to_string()));
-            };
-
-            if public_key.verify(message_hash, signature) {
+            if public_key
+                .known_or(SignatureError::Unknown("PublicKey/VerifyKey".to_string()))?
+                .verify(message_hash, signature)
+            {
                 // If the signature is valid, increase the `valid_signatures_count`.
                 valid_signatures_count += 1;
             } else {

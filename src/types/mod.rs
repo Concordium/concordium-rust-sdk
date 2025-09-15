@@ -654,6 +654,46 @@ impl AccountInfo {
     }
 }
 
+impl TryFrom<&AccountInfo> for AccountAccessStructure {
+    type Error = UnknownDataError;
+    fn try_from(value: &AccountInfo) -> Result<Self, Self::Error> {
+        fn check_unknown_keys(
+            keys: BTreeMap<KeyIndex, Upward<VerifyKey>>,
+        ) -> Result<BTreeMap<KeyIndex, VerifyKey>, UnknownDataError> {
+            keys.into_iter()
+                .map(|(k, vk)| Ok((k, vk.known_or_err()?)))
+                .collect()
+        }
+        let keys = value
+            .account_credentials
+            .iter()
+            .map(|(idx, v)| match v.value.as_ref().known_or_err()? {
+                AccountCredentialWithoutProofs::Initial { ref icdv } => {
+                    let keys = check_unknown_keys(icdv.cred_account.keys.clone())?;
+                    let threshold = icdv.cred_account.threshold;
+                    Ok((
+                        *idx,
+                        concordium_base::id::types::CredentialPublicKeys { keys, threshold },
+                    ))
+                }
+                AccountCredentialWithoutProofs::Normal { ref cdv, .. } => {
+                    let keys = check_unknown_keys(cdv.cred_key_info.keys.clone())?;
+                    let threshold = cdv.cred_key_info.threshold;
+                    Ok((
+                        *idx,
+                        concordium_base::id::types::CredentialPublicKeys { keys, threshold },
+                    ))
+                }
+            })
+            .collect::<Result<
+                BTreeMap<CredentialIndex, concordium_base::id::types::CredentialPublicKeys>,
+                UnknownDataError,
+            >>()?;
+        let threshold = value.account_threshold;
+        Ok(AccountAccessStructure { keys, threshold })
+    }
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// The state of consensus parameters, and allowed participants (i.e., bakers).
