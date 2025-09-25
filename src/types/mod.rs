@@ -1166,8 +1166,7 @@ pub struct FinalizationSummaryParty {
     pub signed: bool,
 }
 
-#[derive(SerdeDeserialize, Debug, Clone)]
-#[serde(try_from = "summary_helper::BlockItemSummary")]
+#[derive(Debug, Clone)]
 /// Summary of the outcome of a block item in structured form.
 /// The summary determines which transaction type it was.
 ///
@@ -1175,7 +1174,7 @@ pub struct FinalizationSummaryParty {
 /// of the content contains [`Upward::Unknown`].
 /// The serde::Serialize implementation for this type is now deprecated and will
 /// be removed.
-pub struct BlockItemSummary {
+pub struct BlockItemSummaryT<C: DataContainer> {
     /// Index of the transaction in the block where it is included.
     pub index: TransactionIndex,
     /// The amount of NRG the transaction cost.
@@ -1185,8 +1184,22 @@ pub struct BlockItemSummary {
     /// Details that are specific to different transaction types.
     /// For successful transactions there is a one to one mapping of transaction
     /// types and variants (together with subvariants) of this type.
-    pub details: Upward<BlockItemSummaryDetails>,
+    pub details: C::Container<BlockItemSummaryDetails>,
 }
+
+impl<'de> SerdeDeserialize<'de> for BlockItemSummary {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        summary_helper::BlockItemSummary::deserialize(deserializer)?
+            .try_into()
+            .map_err(|err| serde::de::Error::custom(err))
+    }
+}
+
+pub type BlockItemSummaryW = BlockItemSummaryT<IdentityContainer>;
+pub type BlockItemSummary = BlockItemSummaryT<UpwardContainer>;
 
 impl BlockItemSummary {
     /// Return whether the transaction was successful, i.e., the intended effect
@@ -1793,20 +1806,24 @@ pub enum TraceV1 {
     },
 }
 
-#[derive(Debug, Clone)]
 /// Details of a block item summary, split by the kind of block item it is for.
-pub enum BlockItemSummaryDetails {
+#[derive(Debug, Clone, PartialEq)]
+pub enum BlockItemSummaryDetailsT<C: DataContainer> {
     /// The summary is of an account transaction with the given details.
-    AccountTransaction(AccountTransactionDetails),
+    AccountTransaction(AccountTransactionDetailsT<C>),
     /// The summary is of an account creation, and the outcome is as specified
     /// by the payload.
     AccountCreation(AccountCreationDetails),
     /// The summary is of a chain update, and the outcome is as specified by the
     /// payload.
-    Update(UpdateDetails),
+    Update(UpdateDetailsT<C>),
     /// The summary is of a token creation update.
     TokenCreationDetails(TokenCreationDetails),
 }
+
+pub type BlockItemSummaryDetailsW = BlockItemSummaryDetailsT<IdentityContainer>;
+pub type BlockItemSummaryDetails = BlockItemSummaryDetailsT<UpwardContainer>;
+
 impl BlockItemSummaryDetails {
     /// Extract the [`BlockItemSummaryDetails::AccountTransaction`] if relevant
     /// otherwise [`None`].
@@ -2035,15 +2052,18 @@ impl BlockItemSummaryDetails {
 #[derive(Debug, Clone)]
 /// Details of an account transaction. This always has a sender and is paid for,
 /// and it might have some other effects on the state of the chain.
-pub struct AccountTransactionDetails {
+pub struct AccountTransactionDetailsT<C: DataContainer> {
     /// The amount of CCD the sender paid for including this transaction in
     /// the block.
     pub cost: Amount,
     /// Sender of the transaction.
     pub sender: AccountAddress,
     /// Effects of the account transaction, if any.
-    pub effects: Upward<AccountTransactionEffects>,
+    pub effects: C::Container<AccountTransactionEffects>,
 }
+
+pub type AccountTransactionDetailsW = AccountTransactionDetailsT<IdentityContainer>;
+pub type AccountTransactionDetails = AccountTransactionDetailsT<UpwardContainer>;
 
 impl AccountTransactionDetails {
     /// Get the transaction type corresponding to the details.
@@ -2498,10 +2518,13 @@ pub struct AccountCreationDetails {
 /// Details of an update instruction. These are free, and we only ever get a
 /// response for them if the update is successfully enqueued, hence no failure
 /// cases.
-pub struct UpdateDetails {
+pub struct UpdateDetailsT<C: DataContainer> {
     pub effective_time: TransactionTime,
-    pub payload: Upward<UpdatePayload>,
+    pub payload: C::Container<UpdatePayload>,
 }
+
+pub type UpdateDetailsW = UpdateDetailsT<IdentityContainer>;
+pub type UpdateDetails = UpdateDetailsT<UpwardContainer>;
 
 impl UpdateDetails {
     pub fn update_type(&self) -> Upward<UpdateType> {
@@ -2611,6 +2634,7 @@ pub struct ContractInitializedEvent {
 }
 
 // re-export for backwards compatibility
+use crate::types::queries::{DataContainer, IdentityContainer, UpwardContainer};
 pub use concordium_base::{
     transactions::{Memo, RegisteredData, TransactionType},
     updates::*,

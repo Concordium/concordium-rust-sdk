@@ -1,5 +1,6 @@
 //! Types that appear in various queries of the node.
 
+use std::fmt::Debug;
 use super::{hashes::*, network::RemotePeerId, *};
 use crate::id;
 use block_certificates::raw;
@@ -295,15 +296,52 @@ pub enum BanMethod {
     Id(RemotePeerId),
 }
 
+pub trait DataContainer {
+    type Container<T:Debug + Clone>: Debug+Clone;
+}
+
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
+pub struct UpwardContainer;
+
+impl DataContainer for UpwardContainer {
+    type Container<T: Debug + Clone> = Upward<T>;
+}
+
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
+pub struct IdentityContainer;
+
+impl DataContainer for IdentityContainer {
+    type Container<T: Debug + Clone> = T;
+}
+
 #[derive(Debug, Clone, SerdeSerialize, SerdeDeserialize)]
 #[serde(rename_all = "camelCase")]
-/// A scheduled pending update.
-pub struct PendingUpdate {
+pub struct PendingUpdateT<C: DataContainer> {
     /// Time when it will become effective.
     pub effective_time: TransactionTime,
     /// The effect the update will have.
-    pub effect: Upward<PendingUpdateEffect>,
+    pub effect: C::Container<PendingUpdateEffect>,
 }
+
+pub type PendingUpdateW = PendingUpdateT<IdentityContainer>;
+pub type PendingUpdate = PendingUpdateT<UpwardContainer>;
+
+fn create_pending_update() -> PendingUpdateW {
+    let w = PendingUpdateW {
+        effective_time: TransactionTime::from_seconds(0),
+        effect: PendingUpdateEffect::BlockEnergyLimit(Energy::from(0)),
+    };
+
+    let _ = Clone::clone(&w);
+    let _ = serde_json::to_string(&w);
+
+    w
+}
+
+fn read_pending_update(pending_update: &PendingUpdate) {
+    let _effect: &PendingUpdateEffect = pending_update.effect.as_ref().unwrap();
+}
+
 
 #[derive(Debug, Clone, SerdeSerialize, SerdeDeserialize)]
 #[serde(tag = "updateType", content = "update")]
