@@ -2401,10 +2401,8 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
     type Error = tonic::Status;
 
     fn try_from(value: ConsensusInfo) -> Result<Self, Self::Error> {
-        let protocol_version =
-            ProtocolVersionInt(u64::try_from(value.protocol_version).map_err(|err| {
-                tonic::Status::internal(format!("Invalid protocol version: {err}"))
-            })?);
+        let protocol_version = ProtocolVersionInt::from_grpc(value.protocol_version)
+            .map_err(|err| tonic::Status::internal(format!("Invalid protocol version: {err}")))?;
         Ok(Self {
             last_finalized_block_height: value.last_finalized_block_height.require()?.into(),
             block_arrive_latency_e_m_s_d: value.block_arrive_latency_emsd,
@@ -2716,10 +2714,8 @@ impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
     type Error = tonic::Status;
 
     fn try_from(value: BlockInfo) -> Result<Self, Self::Error> {
-        let protocol_version =
-            ProtocolVersionInt(u64::try_from(value.protocol_version).map_err(|err| {
-                tonic::Status::internal(format!("Invalid protocol version: {err}"))
-            })?);
+        let protocol_version = ProtocolVersionInt::from_grpc(value.protocol_version)
+            .map_err(|err| tonic::Status::internal(format!("Invalid protocol version: {err}")))?;
 
         Ok(Self {
             transactions_size: value.transactions_size.into(),
