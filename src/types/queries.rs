@@ -7,9 +7,9 @@ use concordium_base::{
     base::*,
     common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize},
 };
-use thiserror::Error;
 use derive_more::Display;
 use std::net::IpAddr;
+use thiserror::Error;
 
 /// Integer representation of the protocol version.
 #[derive(
