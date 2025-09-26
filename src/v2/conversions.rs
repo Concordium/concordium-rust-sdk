@@ -34,6 +34,18 @@ fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
     }
 }
 
+/// Convert from the 0-based protobuf representation to the 1-based internal
+/// representation of a [ProtocolVersionInt].
+fn protocol_version_int_from_enum(tag_number: i32) -> Result<ProtocolVersionInt, tonic::Status> {
+    if tag_number < 0 {
+        Err(tonic::Status::internal(format!(
+            "Invalid protocol version: {tag_number}"
+        )))
+    } else {
+        Ok(ProtocolVersionInt(tag_number as u64 + 1))
+    }
+}
+
 impl TryFrom<AccountAddress> for super::AccountAddress {
     type Error = tonic::Status;
 
@@ -2401,8 +2413,7 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
     type Error = tonic::Status;
 
     fn try_from(value: ConsensusInfo) -> Result<Self, Self::Error> {
-        let protocol_version = ProtocolVersionInt::from_grpc(value.protocol_version)
-            .map_err(|err| tonic::Status::internal(format!("Invalid protocol version: {err}")))?;
+        let protocol_version = protocol_version_int_from_enum(value.protocol_version)?;
         Ok(Self {
             last_finalized_block_height: value.last_finalized_block_height.require()?.into(),
             block_arrive_latency_e_m_s_d: value.block_arrive_latency_emsd,
@@ -2714,8 +2725,7 @@ impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
     type Error = tonic::Status;
 
     fn try_from(value: BlockInfo) -> Result<Self, Self::Error> {
-        let protocol_version = ProtocolVersionInt::from_grpc(value.protocol_version)
-            .map_err(|err| tonic::Status::internal(format!("Invalid protocol version: {err}")))?;
+        let protocol_version = protocol_version_int_from_enum(value.protocol_version)?;
 
         Ok(Self {
             transactions_size: value.transactions_size.into(),
@@ -2877,10 +2887,7 @@ impl TryFrom<TokenomicsInfo> for super::types::RewardsOverview {
         match value.tokenomics.require()? {
             tokenomics_info::Tokenomics::V0(value) => Ok(Self::V0 {
                 data: super::types::CommonRewardData {
-                    protocol_version: ProtocolVersionInt::from_grpc(value.protocol_version)
-                        .map_err(|err| {
-                            tonic::Status::internal(format!("Invalid protocol version: {err}"))
-                        })?,
+                    protocol_version: protocol_version_int_from_enum(value.protocol_version)?,
                     total_amount: value.total_amount.require()?.into(),
                     total_encrypted_amount: value.total_encrypted_amount.require()?.into(),
                     baking_reward_account: value.baking_reward_account.require()?.into(),
@@ -2893,10 +2900,7 @@ impl TryFrom<TokenomicsInfo> for super::types::RewardsOverview {
             }),
             tokenomics_info::Tokenomics::V1(value) => Ok(Self::V1 {
                 common: super::types::CommonRewardData {
-                    protocol_version: ProtocolVersionInt::from_grpc(value.protocol_version)
-                        .map_err(|err| {
-                            tonic::Status::internal(format!("Invalid protocol version: {err}"))
-                        })?,
+                    protocol_version: protocol_version_int_from_enum(value.protocol_version)?,
                     total_amount: value.total_amount.require()?.into(),
                     total_encrypted_amount: value.total_encrypted_amount.require()?.into(),
                     baking_reward_account: value.baking_reward_account.require()?.into(),

@@ -7,9 +7,7 @@ use concordium_base::{
     base::*,
     common::{types::TransactionTime, SerdeDeserialize, SerdeSerialize},
 };
-use derive_more::Display;
 use std::net::IpAddr;
-use thiserror::Error;
 
 /// Integer representation of the protocol version.
 #[derive(
@@ -41,27 +39,6 @@ impl TryFrom<ProtocolVersionInt> for ProtocolVersion {
 impl From<ProtocolVersion> for ProtocolVersionInt {
     fn from(value: ProtocolVersion) -> Self {
         Self(value.into())
-    }
-}
-
-#[derive(Debug, Error, Display)]
-/// A structure to represent conversion errors when converting unsigned
-/// integers to [ProtocolVersionInt]. Used if the protocol version is
-/// negative.
-pub struct InvalidProtocolVersion {
-    /// The version that was attempted to be converted, but is not supported.
-    version: i32,
-}
-
-impl ProtocolVersionInt {
-    /// Convert from the 0-based GRPC representation to the 1-based internal
-    /// representation.
-    pub fn from_grpc(value: i32) -> Result<Self, InvalidProtocolVersion> {
-        if value < 0 {
-            Err(InvalidProtocolVersion { version: value })
-        } else {
-            Ok(Self((value as u64) + 1))
-        }
     }
 }
 
