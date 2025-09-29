@@ -66,7 +66,9 @@ impl<A, R> Upward<A, R> {
     /// This is effectively opt out of forward-compatibility, forcing the
     /// library to be up to date with the node version.
     pub fn known_or_err(self) -> Result<A, UnknownDataError> {
-        self.known_or(UnknownDataError(type_name::<A>().to_string()))
+        self.known_or(UnknownDataError {
+            type_name: type_name::<A>(),
+        })
     }
 
     /// Transforms the `Upward<T>` into a [`Result<T, E>`], mapping
@@ -242,8 +244,10 @@ where
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("Encountered unknown data from the Node API on type `Upward::<{0}>::Unknown`, which is required to be known. Upgrade `concordium_rust_sdk` version.")]
-pub struct UnknownDataError(pub String);
+#[error("Encountered unknown data from the Node API on type `Upward::<{type_name}>::Unknown`, which is required to be known. Upgrade `concordium_rust_sdk` version.")]
+pub struct UnknownDataError {
+    pub type_name: &'static str,
+}
 
 impl<A> std::iter::FromIterator<Upward<A>> for Upward<Vec<A>> {
     fn from_iter<T: IntoIterator<Item = Upward<A>>>(iter: T) -> Self {
