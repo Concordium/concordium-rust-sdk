@@ -8,7 +8,7 @@ use crate::{
         execution_tree, queries::BlockInfo, AccountTransactionEffects, BlockItemSummary,
         ExecutionTree, SpecialTransactionOutcome,
     },
-    v2::{self, FinalizedBlockInfo, QueryError, QueryResult, Upward},
+    v2::{self, upward::UnknownDataError, FinalizedBlockInfo, QueryError, QueryResult, Upward},
 };
 use concordium_base::{
     base::{AbsoluteBlockHeight, Energy},
@@ -43,15 +43,15 @@ pub enum TraverseError {
     Query(#[from] QueryError),
     #[error("Timed out waiting for finalized blocks.")]
     Elapsed(#[from] Elapsed),
-    #[error("The type `${0}` is unkown to this SDK. This can happen if the SDK is not fully compatible with the Concordium node. You might want to update the SDK to a newer version.")]
-    Unknown(String),
+    #[error("UnknownDataError occured: {0}")]
+    UnkownDataError(#[from] UnknownDataError),
 }
 
 impl From<OnFinalizationError> for TraverseError {
     fn from(e: OnFinalizationError) -> Self {
         match e {
             OnFinalizationError::Query(query_error) => query_error.into(),
-            OnFinalizationError::Unknown(unkown_type) => TraverseError::Unknown(unkown_type),
+            OnFinalizationError::UnkownDataError(err) => TraverseError::UnkownDataError(err),
         }
     }
 }
@@ -62,8 +62,8 @@ impl From<OnFinalizationError> for TraverseError {
 pub enum OnFinalizationError {
     #[error("Failed to query: {0}")]
     Query(#[from] QueryError),
-    #[error("The type `${0}` is unkown to this SDK. This can happen if the SDK is not fully compatible with the Concordium node. You might want to update the SDK to a newer version.")]
-    Unknown(String),
+    #[error("UnknownDataError occured: ${0}")]
+    UnkownDataError(#[from] UnknownDataError),
 }
 
 impl From<tonic::Status> for OnFinalizationError {
@@ -532,11 +532,7 @@ impl Indexer for ContractUpdateIndexer {
                         return Ok(None);
                     };
 
-                    let v2::Upward::Known(ref execution_tree) = info.execution_tree else {
-                        return Err(OnFinalizationError::Unknown(
-                            "contractUpdateInfo.execution_tree".to_string(),
-                        ));
-                    };
+                    let execution_tree = info.execution_tree.as_ref().known_or_err()?;
 
                     if execution_tree.address() == self.target_address
                         && execution_tree.entrypoint() == self.entrypoint.as_entrypoint_name()
@@ -629,11 +625,7 @@ impl Indexer for AffectedContractIndexer {
                         return Ok(None);
                     };
 
-                    let v2::Upward::Known(ref execution_tree) = info.execution_tree else {
-                        return Err(OnFinalizationError::Unknown(
-                            "contractUpdateInfo.execution_tree".to_string(),
-                        ));
-                    };
+                    let execution_tree = info.execution_tree.as_ref().known_or_err()?;
 
                     let affected_addresses = execution_tree.affected_addresses();
                     let v2::Upward::Known(affected_addresses) = affected_addresses else {
