@@ -667,12 +667,17 @@ impl TryFrom<ReleaseSchedule> for super::types::AccountReleaseSchedule {
     }
 }
 
-impl TryFrom<AccountVerifyKey> for crate::id::types::VerifyKey {
+impl TryFrom<AccountVerifyKey> for Upward<crate::id::types::VerifyKey> {
     type Error = tonic::Status;
 
     fn try_from(value: AccountVerifyKey) -> Result<Self, Self::Error> {
-        match value.key.require()? {
-            account_verify_key::Key::Ed25519Key(v) => Ok(Self::Ed25519VerifyKey(consume(&v)?)),
+        let Some(key) = value.key else {
+            return Ok(Upward::Unknown(()));
+        };
+        match key {
+            account_verify_key::Key::Ed25519Key(v) => Ok(Upward::Known(
+                crate::id::types::VerifyKey::Ed25519VerifyKey(consume(&v)?),
+            )),
         }
     }
 }
@@ -732,26 +737,25 @@ impl TryFrom<ArThreshold> for crate::id::secret_sharing::Threshold {
     }
 }
 
-impl TryFrom<CredentialPublicKeys> for crate::id::types::CredentialPublicKeys {
+impl TryFrom<CredentialPublicKeys> for Upward<crate::id::types::CredentialPublicKeys> {
     type Error = tonic::Status;
 
     fn try_from(value: CredentialPublicKeys) -> Result<Self, Self::Error> {
-        Ok(Self {
-            keys: value
-                .keys
-                .into_iter()
-                .map(|(k, v)| {
-                    if let Ok(k) = u8::try_from(k) {
-                        let k = k.into();
-                        let v = v.try_into()?;
-                        Ok((k, v))
-                    } else {
-                        Err(tonic::Status::internal("Unexpected key index."))
-                    }
-                })
-                .collect::<Result<_, tonic::Status>>()?,
+        let mut keys = BTreeMap::new();
+        for (index, key) in value.keys {
+            let k = u8::try_from(index)
+                .map_err(|_| tonic::Status::internal("Unexpected key index."))?
+                .into();
+
+            let Upward::Known(v) = key.try_into()? else {
+                return Ok(Upward::Unknown(()));
+            };
+            keys.insert(k, v);
+        }
+        Ok(Upward::Known(crate::id::types::CredentialPublicKeys {
+            keys,
             threshold: value.threshold.require()?.try_into()?,
-        })
+        }))
     }
 }
 
@@ -869,33 +873,41 @@ impl TryFrom<AccountCredential> for Upward<AccountCredentialWithoutProofs<ArCurv
     type Error = tonic::Status;
 
     fn try_from(message: AccountCredential) -> Result<Self, Self::Error> {
-        let key = message
-            .credential_values
-            .map(super::id::types::AccountCredentialWithoutProofs::try_from)
-            .transpose()?;
-        Ok(Upward::from(key))
+        let Some(values) = message.credential_values else {
+            return Ok(Upward::Unknown(()));
+        };
+        values.try_into()
     }
 }
 
 impl TryFrom<account_credential::CredentialValues>
-    for AccountCredentialWithoutProofs<ArCurve, AttributeKind>
+    for Upward<AccountCredentialWithoutProofs<ArCurve, AttributeKind>>
 {
     type Error = tonic::Status;
 
     fn try_from(cred: account_credential::CredentialValues) -> Result<Self, Self::Error> {
         match cred {
             account_credential::CredentialValues::Initial(ic) => {
+                let Upward::Known(cred_account) = ic.keys.require()?.try_into()? else {
+                    return Ok(Upward::Unknown(()));
+                };
                 let icdv = InitialCredentialDeploymentValues {
-                    cred_account: ic.keys.require()?.try_into()?,
+                    cred_account,
                     reg_id: ic.cred_id.require()?.try_into()?,
                     ip_identity: ic.ip_id.require()?.into(),
                     policy: ic.policy.require()?.try_into()?,
                 };
-                Ok(AccountCredentialWithoutProofs::Initial { icdv })
+                Ok(Upward::Known(AccountCredentialWithoutProofs::Initial {
+                    icdv,
+                }))
             }
             account_credential::CredentialValues::Normal(nc) => {
+                let Upward::Known(cred_key_info) = nc.keys.require()?.try_into()? else {
+                    return Ok(Upward::Unknown(()));
+                };
+
                 let cdv = CredentialDeploymentValues {
-                    cred_key_info: nc.keys.require()?.try_into()?,
+                    cred_key_info,
                     cred_id: nc.cred_id.require()?.try_into()?,
                     ip_identity: nc.ip_id.require()?.into(),
                     threshold: nc.ar_threshold.require()?.try_into()?,
@@ -913,7 +925,10 @@ impl TryFrom<account_credential::CredentialValues>
                     policy: nc.policy.require()?.try_into()?,
                 };
                 let commitments = nc.commitments.require()?.try_into()?;
-                Ok(AccountCredentialWithoutProofs::Normal { cdv, commitments })
+                Ok(Upward::Known(AccountCredentialWithoutProofs::Normal {
+                    cdv,
+                    commitments,
+                }))
             }
         }
     }

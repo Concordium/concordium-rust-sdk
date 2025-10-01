@@ -80,6 +80,7 @@
   - Type `AccountInfo` field `account_credentials` change from `BTreeMap<CredentialIndex,Versioned<AccountCredentialWithoutProofs<ArCurve, AttributeKind>>>` to `BTreeMap<CredentialIndex,Versioned<Upward<AccountCredentialWithoutProofs<ArCurve, AttributeKind>>>>`.
   - Type `BakerPoolInfo` moved from `concordium-base` to the `rust-sdk`.
   - Type `Event`/`BakerPoolInfo` field `open_status` is now wrapped in `Upward`.
+  - Bubble `Upward` from new variants of `VerifyKey` to `Upward<AccountCredentialWithoutProofs<...>>` in `AccountInfo::account_credentials`.
 
 ## 7.0.0
 
