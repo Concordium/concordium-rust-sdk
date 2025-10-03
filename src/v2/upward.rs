@@ -246,7 +246,13 @@ where
 #[derive(Debug, thiserror::Error)]
 #[error("Encountered unknown data from the Node API on type `Upward::<{type_name}>::Unknown`, which is required to be known. Upgrade `concordium_rust_sdk` version.")]
 pub struct UnknownDataError {
-    pub type_name: &'static str,
+    type_name: &'static str,
+}
+
+impl UnknownDataError {
+    pub fn new(type_name: &'static str) -> Self {
+        Self { type_name }
+    }
 }
 
 impl<A> std::iter::FromIterator<Upward<A>> for Upward<Vec<A>> {
