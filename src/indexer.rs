@@ -43,9 +43,9 @@ pub enum TraverseError {
     Query(#[from] QueryError),
     #[error("Timed out waiting for finalized blocks.")]
     Elapsed(#[from] Elapsed),
-    #[error("UnknownDataError occured: {0}")]
+    #[error("UnknownDataError occurred: {0}")]
     UnknownDataError(#[from] UnknownDataError),
-    #[error("Other error occured: ${0}")]
+    #[error("Other error occurred: ${0}")]
     OtherError(#[from] anyhow::Error),
 }
 
@@ -65,9 +65,9 @@ impl From<OnFinalizationError> for TraverseError {
 pub enum OnFinalizationError {
     #[error("Failed to query: {0}")]
     Query(#[from] QueryError),
-    #[error("UnknownDataError occured: ${0}")]
+    #[error("UnknownDataError occurred: ${0}")]
     UnknownDataError(#[from] UnknownDataError),
-    #[error("Other error occured: ${0}")]
+    #[error("Other error occurred: ${0}")]
     OtherError(#[from] anyhow::Error),
 }
 
