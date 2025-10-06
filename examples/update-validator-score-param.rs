@@ -1,34 +1,36 @@
 //! An example showing how to do a simple update of the validator score
 //! parameters.
-use anyhow::Context;
-use clap::AppSettings;
-use concordium_base::updates::ValidatorScoreParameters;
-use concordium_rust_sdk::{
-    common::types::TransactionTime,
-    types::{
-        transactions::{update, BlockItem, Payload},
-        TransactionStatus, UpdateKeyPair, UpdatePayload,
-    },
-    v2::{self, BlockIdentifier, ChainParameters},
-};
-use std::path::PathBuf;
-use structopt::StructOpt;
-use tokio_stream::StreamExt;
 
-#[derive(StructOpt)]
-struct App {
-    #[structopt(
-        long = "node",
-        help = "GRPC interface of the node.",
-        default_value = "http://localhost:20000"
-    )]
-    endpoint: v2::Endpoint,
-    #[structopt(long = "key", help = "Path to update keys to use.")]
-    keys: Vec<PathBuf>,
-}
-
+#[cfg(feature = "serde_deprecated")]
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
+    use anyhow::Context;
+    use clap::AppSettings;
+    use concordium_base::updates::ValidatorScoreParameters;
+    use concordium_rust_sdk::{
+        common::types::TransactionTime,
+        types::{
+            transactions::{update, BlockItem, Payload},
+            TransactionStatus, UpdateKeyPair, UpdatePayload,
+        },
+        v2::{self, BlockIdentifier, ChainParameters},
+    };
+    use std::path::PathBuf;
+    use structopt::StructOpt;
+    use tokio_stream::StreamExt;
+
+    #[derive(StructOpt)]
+    struct App {
+        #[structopt(
+            long = "node",
+            help = "GRPC interface of the node.",
+            default_value = "http://localhost:20000"
+        )]
+        endpoint: v2::Endpoint,
+        #[structopt(long = "key", help = "Path to update keys to use.")]
+        keys: Vec<PathBuf>,
+    }
+
     let app = {
         let app = App::clap().global_setting(AppSettings::ColoredHelp);
         let matches = app.get_matches();
@@ -120,4 +122,9 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(not(feature = "serde_deprecated"))]
+fn main() {
+    println!("This example requires the 'serde_deprecated' feature to be enabled.");
 }

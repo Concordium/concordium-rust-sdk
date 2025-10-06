@@ -1,54 +1,56 @@
 //! Example that shows how to administrate allow and deny lists for (PLT)
 //! tokens.
-use anyhow::Context;
-use clap::AppSettings;
-use concordium_base::{
-    contracts_common::AccountAddress,
-    protocol_level_tokens::{operations, TokenId},
-};
-use concordium_rust_sdk::{
-    common::types::TransactionTime,
-    types::{
-        transactions::{send, BlockItem},
-        WalletAccount,
-    },
-    v2::{self},
-};
-use std::{path::PathBuf, str::FromStr};
-use structopt::*;
 
-#[derive(StructOpt)]
-struct App {
-    #[structopt(
-        long = "node",
-        help = "V2 GRPC interface of the node.",
-        default_value = "http://localhost:20000"
-    )]
-    endpoint: v2::Endpoint,
-    #[structopt(
-        long = "account",
-        help = "Path to the account key file of the governance account."
-    )]
-    account: PathBuf,
-    #[structopt(long = "token", help = "Token to add/remove to/from allow/deny list.")]
-    token_id: String,
-    #[structopt(subcommand)]
-    cmd: AddRemoveAllowDeny,
-    #[structopt(long = "target", help = "Target address.")]
-    target: String,
-}
-
-/// Token allow/deny list operation
-#[derive(StructOpt)]
-enum AddRemoveAllowDeny {
-    AddAllow,
-    RemoveAllow,
-    AddDeny,
-    RemoveDeny,
-}
-
+#[cfg(feature = "serde_deprecated")]
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
+    use anyhow::Context;
+    use clap::AppSettings;
+    use concordium_base::{
+        contracts_common::AccountAddress,
+        protocol_level_tokens::{operations, TokenId},
+    };
+    use concordium_rust_sdk::{
+        common::types::TransactionTime,
+        types::{
+            transactions::{send, BlockItem},
+            WalletAccount,
+        },
+        v2::{self},
+    };
+    use std::{path::PathBuf, str::FromStr};
+    use structopt::*;
+
+    #[derive(StructOpt)]
+    struct App {
+        #[structopt(
+            long = "node",
+            help = "V2 GRPC interface of the node.",
+            default_value = "http://localhost:20000"
+        )]
+        endpoint: v2::Endpoint,
+        #[structopt(
+            long = "account",
+            help = "Path to the account key file of the governance account."
+        )]
+        account: PathBuf,
+        #[structopt(long = "token", help = "Token to add/remove to/from allow/deny list.")]
+        token_id: String,
+        #[structopt(subcommand)]
+        cmd: AddRemoveAllowDeny,
+        #[structopt(long = "target", help = "Target address.")]
+        target: String,
+    }
+
+    /// Token allow/deny list operation
+    #[derive(StructOpt)]
+    enum AddRemoveAllowDeny {
+        AddAllow,
+        RemoveAllow,
+        AddDeny,
+        RemoveDeny,
+    }
+
     let app = {
         let app = App::clap().global_setting(AppSettings::ColoredHelp);
         let matches = app.get_matches();
@@ -107,4 +109,9 @@ async fn main() -> anyhow::Result<()> {
     println!("The outcome is {:#?}", bs);
 
     Ok(())
+}
+
+#[cfg(not(feature = "serde_deprecated"))]
+fn main() {
+    println!("This example requires the 'serde_deprecated' feature to be enabled.");
 }

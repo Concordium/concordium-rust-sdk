@@ -1,41 +1,44 @@
 //! Module with the token information part of [`v2::Client::get_account_info`]
 //! response.
-
 use crate::v2::{generated, Require};
 use concordium_base::{
     common::{cbor, cbor::CborSerializationResult},
     protocol_level_tokens::{RawCbor, TokenAmount, TokenId, TokenModuleAccountState},
 };
-
 /// State of a protocol level token associated with some account.
 ///
 /// Part of the response for
 /// [`v2::Client::get_account_info`](crate::v2::Client::get_account_info).
-#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, PartialEq, Clone)]
+#[cfg_attr(
+    feature = "serde_deprecated",
+    derive(serde::Serialize, serde::Deserialize)
+)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 pub struct AccountToken {
     /// The unique identifier/symbol for the protocol level token.
     pub token_id: TokenId,
     /// The state of the token associated with the account.
     pub state: TokenAccountState,
 }
-
 /// State of a protocol level token associated with some account.
 ///
 /// Part of the response for
 /// [`Client::get_account_info`](crate::v2::Client::get_account_info).
-#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, PartialEq, Clone)]
+#[cfg_attr(
+    feature = "serde_deprecated",
+    derive(serde::Serialize, serde::Deserialize)
+)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 pub struct TokenAccountState {
     /// The token balance of the account.
     pub balance: TokenAmount,
     /// The token-module defined state of the account.
     pub module_state: Option<RawCbor>,
 }
-
 impl TryFrom<generated::account_info::Token> for AccountToken {
     type Error = tonic::Status;
-
     fn try_from(value: generated::account_info::Token) -> Result<Self, Self::Error> {
         Ok(Self {
             token_id: value.token_id.require()?.try_into()?,
@@ -43,10 +46,8 @@ impl TryFrom<generated::account_info::Token> for AccountToken {
         })
     }
 }
-
 impl TryFrom<generated::plt::TokenAccountState> for TokenAccountState {
     type Error = tonic::Status;
-
     fn try_from(value: generated::plt::TokenAccountState) -> Result<Self, Self::Error> {
         Ok(Self {
             balance: value.balance.require()?.try_into()?,
@@ -54,7 +55,6 @@ impl TryFrom<generated::plt::TokenAccountState> for TokenAccountState {
         })
     }
 }
-
 impl TokenAccountState {
     /// Decode the token module state from CBOR. If the module state is `None`,
     /// it returns a default `TokenModuleAccountState`.

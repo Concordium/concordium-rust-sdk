@@ -1,44 +1,46 @@
 //! Example that shows how to transfer (PLT) tokens.
-use anyhow::Context;
-use clap::AppSettings;
-use concordium_base::{
-    contracts_common::AccountAddress,
-    protocol_level_tokens::{operations, ConversionRule, TokenAmount, TokenId},
-};
-use concordium_rust_sdk::{
-    common::types::TransactionTime,
-    types::{
-        transactions::{send, BlockItem},
-        WalletAccount,
-    },
-    v2::{
-        BlockIdentifier, {self},
-    },
-};
-use rust_decimal::Decimal;
-use std::{path::PathBuf, str::FromStr};
-use structopt::*;
 
-#[derive(StructOpt)]
-struct App {
-    #[structopt(
-        long = "node",
-        help = "V2 GRPC interface of the node.",
-        default_value = "http://localhost:20000"
-    )]
-    endpoint: v2::Endpoint,
-    #[structopt(long = "sender", help = "Path to the sender account key file.")]
-    account: PathBuf,
-    #[structopt(long = "receiver", help = "Receiver address.")]
-    receiver: String,
-    #[structopt(long = "token", help = "Token id of token.")]
-    token_id: String,
-    #[structopt(long = "amount", help = "Amount to send.", default_value = "100.0")]
-    amount: Decimal,
-}
-
+#[cfg(feature = "serde_deprecated")]
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
+    use anyhow::Context;
+    use clap::AppSettings;
+    use concordium_base::{
+        contracts_common::AccountAddress,
+        protocol_level_tokens::{operations, ConversionRule, TokenAmount, TokenId},
+    };
+    use concordium_rust_sdk::{
+        common::types::TransactionTime,
+        types::{
+            transactions::{send, BlockItem},
+            WalletAccount,
+        },
+        v2::{
+            BlockIdentifier, {self},
+        },
+    };
+    use rust_decimal::Decimal;
+    use std::{path::PathBuf, str::FromStr};
+    use structopt::*;
+
+    #[derive(StructOpt)]
+    struct App {
+        #[structopt(
+            long = "node",
+            help = "V2 GRPC interface of the node.",
+            default_value = "http://localhost:20000"
+        )]
+        endpoint: v2::Endpoint,
+        #[structopt(long = "sender", help = "Path to the sender account key file.")]
+        account: PathBuf,
+        #[structopt(long = "receiver", help = "Receiver address.")]
+        receiver: String,
+        #[structopt(long = "token", help = "Token id of token.")]
+        token_id: String,
+        #[structopt(long = "amount", help = "Amount to send.", default_value = "100.0")]
+        amount: Decimal,
+    }
+
     let app = {
         let app = App::clap().global_setting(AppSettings::ColoredHelp);
         let matches = app.get_matches();
@@ -107,4 +109,9 @@ async fn main() -> anyhow::Result<()> {
     println!("The outcome is {:#?}", bs);
 
     Ok(())
+}
+
+#[cfg(not(feature = "serde_deprecated"))]
+fn main() {
+    println!("This example requires the 'serde_deprecated' feature to be enabled.");
 }

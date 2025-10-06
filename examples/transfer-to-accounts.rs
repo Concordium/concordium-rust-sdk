@@ -1,41 +1,43 @@
 //! Send a given amount of CCD to the account listed in a provided file.
 //! The file format should be one account address per line.
-use anyhow::Context;
-use clap::AppSettings;
-use concordium_rust_sdk::{
-    common::types::{Amount, TransactionTime},
-    id::types::AccountAddress,
-    types::{
-        self,
-        transactions::{send, BlockItem},
-        WalletAccount,
-    },
-    v2::{self, BlockIdentifier},
-};
-use std::{io::BufRead, path::PathBuf};
-use structopt::StructOpt;
 
-#[derive(StructOpt)]
-struct App {
-    #[structopt(
-        long = "node",
-        help = "V2 GRPC interface of the node.",
-        default_value = "http://localhost:20000"
-    )]
-    endpoint: v2::Endpoint,
-    #[structopt(long = "sender", help = "Account keys of the sender.")]
-    account: PathBuf,
-    #[structopt(
-        long = "receivers",
-        help = "File with a list of receivers. One account address per line."
-    )]
-    receivers: PathBuf,
-    #[structopt(long = "amount", help = "Amount to send.", default_value = "100.0")]
-    amount: Amount,
-}
-
+#[cfg(feature = "serde_deprecated")]
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
+    use anyhow::Context;
+    use clap::AppSettings;
+    use concordium_rust_sdk::{
+        common::types::{Amount, TransactionTime},
+        id::types::AccountAddress,
+        types::{
+            self,
+            transactions::{send, BlockItem},
+            WalletAccount,
+        },
+        v2::{self, BlockIdentifier},
+    };
+    use std::{io::BufRead, path::PathBuf};
+    use structopt::StructOpt;
+
+    #[derive(StructOpt)]
+    struct App {
+        #[structopt(
+            long = "node",
+            help = "V2 GRPC interface of the node.",
+            default_value = "http://localhost:20000"
+        )]
+        endpoint: v2::Endpoint,
+        #[structopt(long = "sender", help = "Account keys of the sender.")]
+        account: PathBuf,
+        #[structopt(
+            long = "receivers",
+            help = "File with a list of receivers. One account address per line."
+        )]
+        receivers: PathBuf,
+        #[structopt(long = "amount", help = "Amount to send.", default_value = "100.0")]
+        amount: Amount,
+    }
+
     let app = {
         let app = App::clap().global_setting(AppSettings::ColoredHelp);
         let matches = app.get_matches();
@@ -105,4 +107,9 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(not(feature = "serde_deprecated"))]
+fn main() {
+    println!("This example requires the 'serde_deprecated' feature to be enabled.");
 }

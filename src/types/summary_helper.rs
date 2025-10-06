@@ -14,13 +14,11 @@ use super::{
     Energy, InstanceUpdatedEvent, Memo, NewEncryptedAmountEvent, OpenStatus, RegisteredData,
     RejectReason, TransactionIndex, TransactionType, UpdatePayload, UrlText,
 };
-
 use crate::types::Address;
+#[cfg(feature = "serde_deprecated")]
+use concordium_base::common::{SerdeDeserialize, SerdeSerialize};
 use concordium_base::{
-    common::{
-        types::{Amount, Timestamp, TransactionTime},
-        SerdeDeserialize, SerdeSerialize,
-    },
+    common::types::{Amount, Timestamp, TransactionTime},
     id::types::AccountAddress,
     protocol_level_tokens::{
         TokenEvent, TokenEventDetails, TokenId, TokenModuleEvent, TokenSupplyUpdateEvent,
@@ -30,12 +28,12 @@ use concordium_base::{
 };
 use std::convert::{TryFrom, TryInto};
 use thiserror::Error;
-
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// Summary of the outcome of a block item.
 pub(crate) struct BlockItemSummary {
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_deprecated", serde(default))]
     /// Sender, if available. The sender is always available for account
     /// transactions.
     sender: Option<AccountAddress>,
@@ -45,7 +43,7 @@ pub(crate) struct BlockItemSummary {
     cost: Amount,
     /// The amount of NRG the transaction cost.
     energy_cost: Energy,
-    #[serde(rename = "type")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "type"))]
     /// Which type of block item this is.
     summary_type: BlockItemType,
     /// What is the outcome of this particular block item.
@@ -53,61 +51,70 @@ pub(crate) struct BlockItemSummary {
     /// Index of the transaction in the block where it is included.
     index: TransactionIndex,
 }
-
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(tag = "type", content = "contents", rename_all = "camelCase")]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[cfg_attr(
+    feature = "serde_deprecated",
+    serde(tag = "type", content = "contents", rename_all = "camelCase")
+)]
 /// The type of the block item.
 enum BlockItemType {
-    #[serde(rename = "accountTransaction")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "accountTransaction"))]
     /// Account transactions are transactions that are signed by an account.
     /// Most transactions are account transactions.
-    Account(#[serde(default)] Option<TransactionType>),
-    #[serde(rename = "credentialDeploymentTransaction")]
+    Account(#[cfg_attr(feature = "serde_deprecated", serde(default))] Option<TransactionType>),
+    #[cfg_attr(
+        feature = "serde_deprecated",
+        serde(rename = "credentialDeploymentTransaction")
+    )]
     /// Credential deployments that create accounts are special kinds of
     /// transactions. They are not signed by the account in the usual way,
     /// and they are not paid for directly by the sender.
     CredentialDeployment(CredentialType),
-    #[serde(rename = "updateTransaction")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "updateTransaction"))]
     /// Chain updates are signed by the governance keys. They affect the core
     /// parameters of the chain.
     Update(super::UpdateType),
 }
-
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(tag = "outcome", rename_all = "camelCase")]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[cfg_attr(
+    feature = "serde_deprecated",
+    serde(tag = "outcome", rename_all = "camelCase")
+)]
 /// Outcome of a block item execution.
 enum BlockItemResult {
     /// The intended action was completed. The sender was charged, if
     /// applicable. Some events were generated describing the changes that
     /// happened on the chain.
     Success { events: Vec<Event> },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// The intended action was not completed due to an error. The sender was
     /// charged, but no other effect is seen on the chain.
     Reject { reject_reason: Box<RejectReason> },
 }
-
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(tag = "tag")]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[cfg_attr(feature = "serde_deprecated", serde(tag = "tag"))]
 /// An event describing the changes that occurred to the state of the chain.
 pub(crate) enum Event {
     /// A smart contract module was successfully deployed.
     ModuleDeployed {
-        #[serde(rename = "contents")]
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
         module_ref: smart_contracts::ModuleReference,
     },
     /// A new smart contract instance was created.
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     ContractInitialized {
-        #[serde(flatten)]
+        #[cfg_attr(feature = "serde_deprecated", serde(flatten))]
         data: ContractInitializedEvent,
     },
     /// A smart contract instance was updated.
     Updated {
-        #[serde(flatten)]
+        #[cfg_attr(feature = "serde_deprecated", serde(flatten))]
         data: InstanceUpdatedEvent,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// An amount of CCD was transferred.
     Transferred {
         /// Sender, either smart contract instance or account.
@@ -120,7 +127,7 @@ pub(crate) enum Event {
     },
     /// An account with the given address was created.
     AccountCreated { contents: AccountAddress },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// A new credential with the given ID was deployed onto an account.
     /// This is used only when a new account is created. See
     /// [Event::CredentialsUpdated] for when an existing account's
@@ -131,23 +138,23 @@ pub(crate) enum Event {
     },
     /// A new baker was registered, with the given ID and keys.
     BakerAdded {
-        #[serde(flatten)]
+        #[cfg_attr(feature = "serde_deprecated", serde(flatten))]
         data: Box<BakerAddedEvent>,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// A baker was scheduled to be removed.
     BakerRemoved {
         baker_id: BakerId,
         account: AccountAddress,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// A baker's stake was increased. This has effect immediately.
     BakerStakeIncreased {
         baker_id: BakerId,
         account: AccountAddress,
         new_stake: Amount,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// A baker's stake was scheduled to be decreased. This will have an effect
     /// on the stake after a number of epochs, controlled by the baker
     /// cooldown period.
@@ -156,7 +163,7 @@ pub(crate) enum Event {
         account: AccountAddress,
         new_stake: Amount,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// The setting for whether rewards are added to stake immediately or not
     /// was changed to the given value.
     BakerSetRestakeEarnings {
@@ -167,26 +174,26 @@ pub(crate) enum Event {
     },
     /// The baker keys were updated. The new keys are listed.
     BakerKeysUpdated {
-        #[serde(flatten)]
+        #[cfg_attr(feature = "serde_deprecated", serde(flatten))]
         data: Box<BakerKeysEvent>,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// Keys of the given credential were updated.
     CredentialKeysUpdated { cred_id: CredentialRegistrationID },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// A new encrypted amount was added to the account.
     NewEncryptedAmount {
-        #[serde(flatten)]
+        #[cfg_attr(feature = "serde_deprecated", serde(flatten))]
         data: Box<NewEncryptedAmountEvent>,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// One or more encrypted amounts were removed from an account as part of a
     /// transfer or decryption.
     EncryptedAmountsRemoved {
-        #[serde(flatten)]
+        #[cfg_attr(feature = "serde_deprecated", serde(flatten))]
         data: Box<EncryptedAmountRemovedEvent>,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// The public balance of the account was increased via a transfer from
     /// encrypted to public balance.
     AmountAddedByDecryption {
@@ -196,16 +203,16 @@ pub(crate) enum Event {
     /// The encrypted balance of the account was updated due to transfer from
     /// public to encrypted balance of the account.
     EncryptedSelfAmountAdded {
-        #[serde(flatten)]
+        #[cfg_attr(feature = "serde_deprecated", serde(flatten))]
         data: Box<EncryptedSelfAmountAddedEvent>,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// An update was enqueued for the given time.
     UpdateEnqueued {
         effective_time: TransactionTime,
         payload: UpdatePayload,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// A transfer with schedule was enqueued.
     TransferredWithSchedule {
         /// Sender account.
@@ -215,7 +222,7 @@ pub(crate) enum Event {
         /// The list of releases. Ordered by increasing timestamp.
         amount: Vec<(Timestamp, Amount)>,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// The credentials of the account were updated. Either added, removed, or
     /// both.
     CredentialsUpdated {
@@ -228,14 +235,14 @@ pub(crate) enum Event {
         /// The (possibly) updated account threshold.
         new_threshold: AccountThreshold,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// Data was registered.
     DataRegistered { data: RegisteredData },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// Memo
     TransferMemo { memo: Memo },
     /// A V1 contract was interrupted.
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     Interrupted {
         /// Address of the contract that was interrupted.
         address: super::ContractAddress,
@@ -243,7 +250,7 @@ pub(crate) enum Event {
         events: Vec<smart_contracts::ContractEvent>,
     },
     /// A V1 contract resumed execution.
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     Resumed {
         /// Address of the contract that is resuming.
         address: super::ContractAddress,
@@ -251,7 +258,7 @@ pub(crate) enum Event {
         success: bool,
     },
     /// Updated open status for a baker pool
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     BakerSetOpenStatus {
         /// Baker's id
         baker_id: BakerId,
@@ -261,18 +268,18 @@ pub(crate) enum Event {
         open_status: OpenStatus,
     },
     /// Updated metadata url for baker pool
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     BakerSetMetadataURL {
         /// Baker's id
         baker_id: BakerId,
         /// Baker account
         account: AccountAddress,
         /// The URL.
-        #[serde(rename = "metadataURL")]
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "metadataURL"))]
         metadata_url: UrlText,
     },
     /// Updated transaction fee commission for baker pool
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     BakerSetTransactionFeeCommission {
         /// Baker's id
         baker_id: BakerId,
@@ -282,7 +289,7 @@ pub(crate) enum Event {
         transaction_fee_commission: AmountFraction,
     },
     /// Updated baking reward commission for baker pool
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     BakerSetBakingRewardCommission {
         /// Baker's id
         baker_id: BakerId,
@@ -292,7 +299,7 @@ pub(crate) enum Event {
         baking_reward_commission: AmountFraction,
     },
     /// Updated finalization reward commission for baker pool
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     BakerSetFinalizationRewardCommission {
         /// Baker's id
         baker_id: BakerId,
@@ -301,7 +308,7 @@ pub(crate) enum Event {
         /// The finalization reward commission
         finalization_reward_commission: AmountFraction,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     DelegationStakeIncreased {
         /// Delegator's id
         delegator_id: DelegatorId,
@@ -310,7 +317,7 @@ pub(crate) enum Event {
         /// New stake
         new_stake: Amount,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     DelegationStakeDecreased {
         /// Delegator's id
         delegator_id: DelegatorId,
@@ -319,7 +326,7 @@ pub(crate) enum Event {
         /// New stake
         new_stake: Amount,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     DelegationSetRestakeEarnings {
         /// Delegator's id
         delegator_id: DelegatorId,
@@ -328,7 +335,7 @@ pub(crate) enum Event {
         /// Whether earnings will be restaked
         restake_earnings: bool,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     DelegationSetDelegationTarget {
         /// Delegator's id
         delegator_id: DelegatorId,
@@ -337,21 +344,21 @@ pub(crate) enum Event {
         /// New delegation target
         delegation_target: DelegationTarget,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     DelegationAdded {
         /// Delegator's id
         delegator_id: DelegatorId,
         /// Delegator account
         account: AccountAddress,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     DelegationRemoved {
         /// Delegator's id
         delegator_id: DelegatorId,
         /// Delegator account
         account: AccountAddress,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     Upgraded {
         /// Address of the instance that was upgraded.
         address: super::ContractAddress,
@@ -360,14 +367,14 @@ pub(crate) enum Event {
         /// The new module reference that is in effect after the upgrade.
         to: smart_contracts::ModuleReference,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     BakerSuspended {
         /// Baker's id
         baker_id: BakerId,
         /// Baker account
         account: AccountAddress,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     BakerResumed {
         /// Baker's id
         baker_id: BakerId,
@@ -375,54 +382,51 @@ pub(crate) enum Event {
         account: AccountAddress,
     },
     /// An event emitted by a plt (protocol level token) module.
-    #[serde(rename_all = "camelCase")]
-    #[allow(clippy::enum_variant_names)] // Note: The clippy warning is disabled to keep
-    // the name `TokenModuleEvent` which has to align with the corresponding type in the haskell
-    // code base in `concordium-base`. This is needed as the JSON representation of the event
-    // is tagged with this name in the haskell code base.
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
+    #[allow(clippy::enum_variant_names)]
     TokenModuleEvent {
         /// The token id of the token.
         token_id: TokenId,
         /// The event includes the `type` and cbor encoded `details` of the
         /// event.
-        #[serde(flatten)]
+        #[cfg_attr(feature = "serde_deprecated", serde(flatten))]
         event: TokenModuleEvent,
     },
     /// An event emitted when a transfer of plt (protocol level token) is
     /// performed.
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     TokenTransfer {
         /// The token id of the token.
         token_id: TokenId,
         /// The event includes the `from` and `to` addresses and the `amount` of
         /// tokens being transferred. An optional `memo` can be present.
-        #[serde(flatten)]
+        #[cfg_attr(feature = "serde_deprecated", serde(flatten))]
         event: TokenTransferEvent,
     },
     /// An event emitted when the plt (protocol level token) supply is updated
     /// by minting tokens to a token holder.
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     TokenMint {
         /// The token id of the token.
         token_id: TokenId,
         /// The event includes the `target` address and the `amount` of tokens
         /// minted.
-        #[serde(flatten)]
+        #[cfg_attr(feature = "serde_deprecated", serde(flatten))]
         event: TokenSupplyUpdateEvent,
     },
     /// An event emitted when the plt (protocol level token) supply is updated
     /// by burning tokens from the balance of a token holder.
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     TokenBurn {
         /// The token id of the token.
         token_id: TokenId,
         /// The event includes the `target` address and the `amount` of tokens
         /// burned.
-        #[serde(flatten)]
+        #[cfg_attr(feature = "serde_deprecated", serde(flatten))]
         event: TokenSupplyUpdateEvent,
     },
     /// An event emitted when the plt (protocol level token) is created.
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     TokenCreated {
         /// The transaction payload when the token was created.
         /// It includes the `token_id`, `token_module_reference`,
@@ -430,7 +434,6 @@ pub(crate) enum Event {
         payload: CreatePlt,
     },
 }
-
 impl From<TokenEvent> for Event {
     fn from(e: TokenEvent) -> Self {
         match e.event {
@@ -453,7 +456,6 @@ impl From<TokenEvent> for Event {
         }
     }
 }
-
 impl From<super::ContractTraceElement> for Event {
     fn from(e: super::ContractTraceElement) -> Self {
         match e {
@@ -475,10 +477,8 @@ impl From<super::ContractTraceElement> for Event {
         }
     }
 }
-
 impl TryFrom<Event> for super::ContractTraceElement {
     type Error = ConversionError;
-
     fn try_from(value: Event) -> Result<Self, Self::Error> {
         match value {
             Event::Updated { data } => Ok(super::ContractTraceElement::Updated { data }),
@@ -497,7 +497,6 @@ impl TryFrom<Event> for super::ContractTraceElement {
         }
     }
 }
-
 impl From<super::BlockItemSummary> for BlockItemSummary {
     fn from(bi: super::BlockItemSummary) -> Self {
         match bi.details {
@@ -949,7 +948,6 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                     .map(|x| x.into())
                     .collect();
                 events.extend(additional_events);
-
                 BlockItemSummary {
                     sender: None,
                     hash: bi.hash,
@@ -963,7 +961,6 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
         }
     }
 }
-
 #[derive(Debug, Error)]
 pub enum ConversionError {
     #[error("Account creation failed.")]
@@ -977,7 +974,6 @@ pub enum ConversionError {
     #[error("Unexpected response for an account transaction. Details: {0}")]
     InvalidTransactionResult(String),
 }
-
 #[inline(always)]
 fn with_singleton(
     events: Vec<Event>,
@@ -991,7 +987,6 @@ fn with_singleton(
         "Couldn't convert `Event` to `Option<AccountTransactionEffects>`".to_string(),
     ))
 }
-
 fn convert_account_transaction(
     ty: Option<TransactionType>,
     cost: Amount,
@@ -1008,7 +1003,6 @@ fn convert_account_transaction(
             },
         })
     };
-
     let mk_success = |effects| {
         Ok(super::AccountTransactionDetails {
             cost,
@@ -1016,7 +1010,6 @@ fn convert_account_transaction(
             effects,
         })
     };
-
     let ty = match ty {
         Some(ty) => ty,
         None => return mk_none(RejectReason::SerializationFailure),
@@ -1481,10 +1474,8 @@ fn convert_account_transaction(
         }
     }
 }
-
 impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
     type Error = ConversionError;
-
     fn try_from(value: BlockItemSummary) -> Result<Self, Self::Error> {
         match value.summary_type {
             BlockItemType::Account(ty) => {
@@ -1521,7 +1512,7 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
                         }
                     }
                     BlockItemResult::Reject { .. } => {
-                        return Err(ConversionError::FailedAccountCreation)
+                        return Err(ConversionError::FailedAccountCreation);
                     }
                 };
                 let acd = super::AccountCreationDetails {
@@ -1543,7 +1534,6 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
                         let Some(first_event) = events.first() else {
                             return Err(ConversionError::InvalidUpdateResult);
                         };
-
                         match first_event {
                             Event::UpdateEnqueued {
                                 effective_time,
@@ -1552,24 +1542,21 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
                                 if events.len() != 1 {
                                     return Err(ConversionError::InvalidUpdateResult);
                                 }
-
                                 Ok(super::UpdateDetails {
                                     effective_time: *effective_time,
                                     payload: payload.clone(),
                                 })
                             }
                             Event::TokenCreated { payload } => Ok(super::UpdateDetails {
-                                // `Effective_time` is always 0 for plt token creation
-                                // transactions. Plt token creation
-                                // transactions are not queued and instead take
-                                // effect immediately.
                                 effective_time: TransactionTime { seconds: 0 },
                                 payload: UpdatePayload::CreatePlt(payload.clone()),
                             }),
                             _ => Err(ConversionError::InvalidUpdateResult),
                         }
                     }
-                    BlockItemResult::Reject { .. } => return Err(ConversionError::FailedUpdate),
+                    BlockItemResult::Reject { .. } => {
+                        return Err(ConversionError::FailedUpdate);
+                    }
                 }?;
                 let details = super::BlockItemSummaryDetails::Update(ud);
                 Ok(super::BlockItemSummary {

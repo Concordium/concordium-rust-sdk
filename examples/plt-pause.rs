@@ -1,45 +1,47 @@
 //! Example that shows how to pause and unpause (PLT) tokens.
-use anyhow::Context;
-use clap::AppSettings;
-use concordium_base::protocol_level_tokens::{operations, TokenId};
-use concordium_rust_sdk::{
-    common::types::TransactionTime,
-    types::{
-        transactions::{send, BlockItem},
-        WalletAccount,
-    },
-    v2,
-};
-use std::path::PathBuf;
-use structopt::*;
 
-#[derive(StructOpt)]
-struct App {
-    #[structopt(
-        long = "node",
-        help = "V2 GRPC interface of the node.",
-        default_value = "http://localhost:20000"
-    )]
-    endpoint: v2::Endpoint,
-    #[structopt(
-        long = "account",
-        help = "Path to the account keys file of the governance account."
-    )]
-    account: PathBuf,
-    #[structopt(long = "token", help = "Token to pause or unpause.")]
-    token_id: String,
-    #[structopt(subcommand)]
-    cmd: Status,
-}
-
-#[derive(StructOpt)]
-enum Status {
-    Pause,
-    Unpause,
-}
-
+#[cfg(feature = "serde_deprecated")]
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
+    use anyhow::Context;
+    use clap::AppSettings;
+    use concordium_base::protocol_level_tokens::{operations, TokenId};
+    use concordium_rust_sdk::{
+        common::types::TransactionTime,
+        types::{
+            transactions::{send, BlockItem},
+            WalletAccount,
+        },
+        v2,
+    };
+    use std::path::PathBuf;
+    use structopt::*;
+
+    #[derive(StructOpt)]
+    struct App {
+        #[structopt(
+            long = "node",
+            help = "V2 GRPC interface of the node.",
+            default_value = "http://localhost:20000"
+        )]
+        endpoint: v2::Endpoint,
+        #[structopt(
+            long = "account",
+            help = "Path to the account keys file of the governance account."
+        )]
+        account: PathBuf,
+        #[structopt(long = "token", help = "Token to pause or unpause.")]
+        token_id: String,
+        #[structopt(subcommand)]
+        cmd: Status,
+    }
+
+    #[derive(StructOpt)]
+    enum Status {
+        Pause,
+        Unpause,
+    }
+
     let app = {
         let app = App::clap().global_setting(AppSettings::ColoredHelp);
         let matches = app.get_matches();
@@ -93,4 +95,9 @@ async fn main() -> anyhow::Result<()> {
     println!("The outcome is {:#?}", bs);
 
     Ok(())
+}
+
+#[cfg(not(feature = "serde_deprecated"))]
+fn main() {
+    println!("This example requires the 'serde_deprecated' feature to be enabled.");
 }

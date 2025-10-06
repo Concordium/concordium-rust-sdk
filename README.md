@@ -103,3 +103,10 @@ cargo run
 
 Updating these files should only be done when the node's API, determined by the
 schemas, changes and we need to support the new API in the SDK.
+
+The use of serde is guarded by the flag `serde_deprecated`. Enable the flag to use the sdk with serde.
+
+```
+[dependencies]
+concordium-rust-sdk = { version = "...", features = ["serde_deprecated"] }
+```
