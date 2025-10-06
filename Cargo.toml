@@ -54,4 +54,5 @@ tracing-subscriber = "0.3"
 sqlite = "0.33"
 
 [features]
+default = ["serde_deprecated"]
 serde_deprecated = []
