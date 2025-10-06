@@ -1,51 +1,53 @@
 //! Example that shows how to mint and burn (PLT) tokens.
-use anyhow::Context;
-use clap::AppSettings;
-use concordium_base::protocol_level_tokens::{operations, TokenAmount, TokenId};
-use concordium_rust_sdk::{
-    common::types::TransactionTime,
-    types::{
-        transactions::{send, BlockItem},
-        WalletAccount,
-    },
-    v2::{
-        BlockIdentifier, {self},
-    },
-};
-use rust_decimal::Decimal;
-use std::path::PathBuf;
-use structopt::*;
 
-#[derive(StructOpt)]
-struct App {
-    #[structopt(
-        long = "node",
-        help = "V2 GRPC interface of the node.",
-        default_value = "http://localhost:20000"
-    )]
-    endpoint: v2::Endpoint,
-    #[structopt(long = "account", help = "Account keys of the governance account.")]
-    account: PathBuf,
-    #[structopt(long = "token", help = "Token to mint or burn.")]
-    token_id: String,
-    #[structopt(subcommand)]
-    cmd: MintOrBurn,
-    #[structopt(
-        long = "amount",
-        help = "Amount to mint/burn.",
-        default_value = "100.0"
-    )]
-    amount: Decimal,
-}
-
-#[derive(StructOpt)]
-enum MintOrBurn {
-    Mint,
-    Burn,
-}
-
+#[cfg(feature = "serde_deprecated")]
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
+    use anyhow::Context;
+    use clap::AppSettings;
+    use concordium_base::protocol_level_tokens::{operations, TokenAmount, TokenId};
+    use concordium_rust_sdk::{
+        common::types::TransactionTime,
+        types::{
+            transactions::{send, BlockItem},
+            WalletAccount,
+        },
+        v2::{
+            BlockIdentifier, {self},
+        },
+    };
+    use rust_decimal::Decimal;
+    use std::path::PathBuf;
+    use structopt::*;
+
+    #[derive(StructOpt)]
+    struct App {
+        #[structopt(
+            long = "node",
+            help = "V2 GRPC interface of the node.",
+            default_value = "http://localhost:20000"
+        )]
+        endpoint: v2::Endpoint,
+        #[structopt(long = "account", help = "Account keys of the governance account.")]
+        account: PathBuf,
+        #[structopt(long = "token", help = "Token to mint or burn.")]
+        token_id: String,
+        #[structopt(subcommand)]
+        cmd: MintOrBurn,
+        #[structopt(
+            long = "amount",
+            help = "Amount to mint/burn.",
+            default_value = "100.0"
+        )]
+        amount: Decimal,
+    }
+
+    #[derive(StructOpt)]
+    enum MintOrBurn {
+        Mint,
+        Burn,
+    }
+
     let app = {
         let app = App::clap().global_setting(AppSettings::ColoredHelp);
         let matches = app.get_matches();
@@ -113,4 +115,9 @@ async fn main() -> anyhow::Result<()> {
     println!("The outcome is {:#?}", bs);
 
     Ok(())
+}
+
+#[cfg(not(feature = "serde_deprecated"))]
+fn main() {
+    println!("This example requires the 'serde_deprecated' feature to be enabled.");
 }

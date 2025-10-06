@@ -1,61 +1,51 @@
 //! Network related types.
-
+#[cfg(feature = "serde_deprecated")]
 use concordium_base::common::{SerdeDeserialize, SerdeSerialize};
 use derive_more::{Display, From, FromStr, Into};
 use std::{fmt, net::IpAddr, num::ParseIntError};
-
 #[repr(transparent)]
 #[derive(Debug)]
 pub struct RemotePeerId {
     id: u64,
 }
-
 /// Parse from a (possibly 0 padded) hex value.
 impl std::str::FromStr for RemotePeerId {
     type Err = ParseIntError;
-
     fn from_str(s: &str) -> Result<Self, ParseIntError> {
         let id = u64::from_str_radix(s, 16)?;
         Ok(RemotePeerId { id })
     }
 }
-
 /// Display as a 0-padded hex value.
 impl std::fmt::Display for RemotePeerId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:016x}", self.id)
     }
 }
-
 #[repr(transparent)]
-#[derive(SerdeSerialize, SerdeDeserialize)]
-#[serde(transparent)]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[cfg_attr(feature = "serde_deprecated", serde(transparent))]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, FromStr, Display, From, Into)]
 pub struct NetworkId {
     pub(crate) network_id: u16,
 }
-
 /// A banned peer identified by its IP address.
 #[derive(Debug)]
 pub struct BannedPeer(pub std::net::IpAddr);
-
 /// A peer to ban identified by its IP address.
 #[derive(Debug)]
 pub enum PeerToBan {
     IpAddr(IpAddr),
 }
-
 /// A vector of the peers that
 /// the node is connected to.
 #[derive(Debug)]
 pub struct PeersInfo {
     pub peers: Vec<Peer>,
 }
-
 /// A peer id
 #[derive(Debug)]
 pub struct PeerId(pub String);
-
 /// A peer that the node is connected to
 #[derive(Debug)]
 pub struct Peer {
@@ -68,7 +58,6 @@ pub struct Peer {
     /// The address of the peer
     pub addr: std::net::SocketAddr,
 }
-
 /// Consensus info related to a peer.
 #[derive(Debug)]
 pub enum PeerConsensusInfo {
@@ -78,7 +67,6 @@ pub enum PeerConsensusInfo {
     /// Regular nodes do have a catchup status.
     Node(PeerCatchupStatus),
 }
-
 /// The catch up status of the peer.
 #[derive(Debug)]
 pub enum PeerCatchupStatus {
@@ -91,7 +79,6 @@ pub enum PeerCatchupStatus {
     /// The peer is catching up on the chain.
     CatchingUp,
 }
-
 /// Network statistics for the peer.
 #[derive(Debug)]
 pub struct NetworkStats {

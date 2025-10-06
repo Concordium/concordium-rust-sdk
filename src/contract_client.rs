@@ -40,7 +40,6 @@ use concordium_smart_contract_engine::utils;
 use serde_json::Value;
 use std::{fmt, marker::PhantomData, sync::Arc};
 use v2::{QueryError, RPCError};
-
 /// A contract client that handles some of the boilerplate such as serialization
 /// and parsing of responses when sending transactions, or invoking smart
 /// contracts.
@@ -59,7 +58,6 @@ pub struct ContractClient<Type> {
     pub schema: Arc<Option<VersionedModuleSchema>>,
     phantom: PhantomData<Type>,
 }
-
 impl<Type> Clone for ContractClient<Type> {
     fn clone(&self) -> Self {
         Self {
@@ -71,7 +69,6 @@ impl<Type> Clone for ContractClient<Type> {
         }
     }
 }
-
 /// Transaction metadata for CIS-4 update transactions.
 #[derive(Debug, Clone, Copy)]
 pub struct ContractTransactionMetadata {
@@ -86,7 +83,6 @@ pub struct ContractTransactionMetadata {
     /// The amount of CCD to include in the transaction.
     pub amount: types::Amount,
 }
-
 #[derive(Debug, thiserror::Error)]
 /// An error that can be used as the error for the
 /// [`view`](ContractClient::view) family of functions.
@@ -102,13 +98,11 @@ pub enum ViewError {
     #[error("Parameter is too large: {0}")]
     ParameterError(#[from] ExceedsParameterSize),
 }
-
 impl From<RejectReason> for ViewError {
     fn from(value: RejectReason) -> Self {
         Self::QueryFailed(value)
     }
 }
-
 /// A builder of transactions out of minimal data typically obtained by
 /// dry-running.
 ///
@@ -128,7 +122,6 @@ pub struct TransactionBuilder<const ADD_ENERGY: bool, Inner> {
     payload: transactions::Payload,
     inner: Inner,
 }
-
 impl<const ADD: bool, Inner> TransactionBuilder<ADD, Inner> {
     fn new(
         client: v2::Client,
@@ -148,14 +141,12 @@ impl<const ADD: bool, Inner> TransactionBuilder<ADD, Inner> {
             inner,
         }
     }
-
     /// Set the expiry time for the transaction. If not set the default is one
     /// hour from the time the transaction is signed.
     pub fn expiry(mut self, expiry: TransactionTime) -> Self {
         self.expiry = Some(expiry);
         self
     }
-
     /// Set the nonce for the transaction. If not set the default behaviour is
     /// to get the nonce from the connected [`Client`] at the
     /// time the transaction is sent.
@@ -163,12 +154,10 @@ impl<const ADD: bool, Inner> TransactionBuilder<ADD, Inner> {
         self.nonce = Some(nonce);
         self
     }
-
     /// Return the amount of [`Energy`] that will be allowed for the transaction
     /// if the transaction was sent with the current parameters.
     pub fn current_energy(&self) -> Energy {
         if ADD {
-            // Add 10% to the call, or at least 50.
             self.energy
                 + self
                     .add_energy
@@ -177,7 +166,6 @@ impl<const ADD: bool, Inner> TransactionBuilder<ADD, Inner> {
             self.energy
         }
     }
-
     /// Send the transaction and return a handle that can be queried
     /// for the status.
     pub async fn send_inner<A>(
@@ -209,7 +197,6 @@ impl<const ADD: bool, Inner> TransactionBuilder<ADD, Inner> {
         Ok(k(tx_hash, self.client))
     }
 }
-
 impl<Inner> TransactionBuilder<true, Inner> {
     /// Add extra energy to the call.
     /// The default amount is 10%, or at least 50.
@@ -221,7 +208,6 @@ impl<Inner> TransactionBuilder<true, Inner> {
         self
     }
 }
-
 /// A helper type to construct [`ContractInitBuilder`].
 /// Users do not directly interact with values of this type.
 pub struct ContractInitInner<Type> {
@@ -229,7 +215,6 @@ pub struct ContractInitInner<Type> {
     event: ContractInitializedEvent,
     phantom: PhantomData<Type>,
 }
-
 impl<Type> ContractInitInner<Type> {
     fn new(event: ContractInitializedEvent) -> Self {
         Self {
@@ -238,7 +223,6 @@ impl<Type> ContractInitInner<Type> {
         }
     }
 }
-
 /// Builder for initializing a new smart contract instance.
 ///
 /// The builder is intended to be constructed using
@@ -247,7 +231,6 @@ impl<Type> ContractInitInner<Type> {
 /// and the transaction is intended to be sent using the
 /// [`send`](ContractInitBuilder::send) method.
 pub type ContractInitBuilder<Type> = TransactionBuilder<true, ContractInitInner<Type>>;
-
 /// A handle returned when sending a smart contract init transaction.
 /// This can be used to get the response of the initialization.
 ///
@@ -258,7 +241,6 @@ pub struct ContractInitHandle<Type> {
     client: v2::Client,
     phantom: PhantomData<Type>,
 }
-
 /// The [`Display`](std::fmt::Display) implementation displays the hash of the
 /// transaction.
 impl<Type> std::fmt::Display for ContractInitHandle<Type> {
@@ -266,7 +248,6 @@ impl<Type> std::fmt::Display for ContractInitHandle<Type> {
         self.tx_hash.fmt(f)
     }
 }
-
 #[derive(Debug, thiserror::Error)]
 /// An error that may occur when querying the result of a smart contract update
 /// transaction.
@@ -276,13 +257,11 @@ pub enum ContractInitError {
     #[error("Contract update failed with reason: {0:?}")]
     Failed(RejectReason),
 }
-
 impl<Type> ContractInitHandle<Type> {
     /// Extract the hash of the transaction underlying this handle.
     pub fn hash(&self) -> TransactionHash {
         self.tx_hash
     }
-
     /// Wait until the transaction is finalized and return the client for the
     /// contract together with a list of events generated by the contract
     /// during initialization.
@@ -292,13 +271,11 @@ impl<Type> ContractInitHandle<Type> {
         mut self,
     ) -> Result<(ContractClient<Type>, Vec<ContractEvent>), ContractInitError> {
         let (_, result) = self.client.wait_until_finalized(&self.tx_hash).await?;
-
         let mk_error = |msg| {
             Err(ContractInitError::from(QueryError::RPCError(
                 RPCError::CallError(tonic::Status::invalid_argument(msg)),
             )))
         };
-
         match result.details {
             crate::types::BlockItemSummaryDetails::AccountTransaction(at) => match at.effects {
                 AccountTransactionEffects::ContractInitialized { data } => {
@@ -326,7 +303,6 @@ impl<Type> ContractInitHandle<Type> {
             ),
         }
     }
-
     /// Wait until the transaction is finalized or until the timeout has elapsed
     /// and return the result.
     pub async fn wait_for_finalization_timeout(
@@ -344,7 +320,6 @@ impl<Type> ContractInitHandle<Type> {
         }
     }
 }
-
 #[derive(thiserror::Error, Debug)]
 /// An error that may occur when attempting to dry run a new instance creation.
 pub enum DryRunNewInstanceError {
@@ -364,13 +339,11 @@ pub enum DryRunNewInstanceError {
         min: Energy,
     },
 }
-
 impl From<RejectReason> for DryRunNewInstanceError {
     fn from(value: RejectReason) -> Self {
         Self::Failed(value)
     }
 }
-
 impl<Type> ContractInitBuilder<Type> {
     /// Attempt to dry run a smart contract initialization transaction.
     ///
@@ -388,7 +361,6 @@ impl<Type> ContractInitBuilder<Type> {
         let parameter = OwnedParameter::from_serial(parameter)?;
         Self::dry_run_new_instance_raw(client, sender, mod_ref, name, amount, parameter).await
     }
-
     /// Attempt to dry run a smart contract initialization transaction.
     /// In case of success the resulting value can be used to extract
     /// the generated events from the dry-run, and sign and send the
@@ -436,12 +408,13 @@ impl<Type> ContractInitBuilder<Type> {
             .map_err(dry_run::DryRunError::from)?
             .await?
             .inner;
-
         let data = match result.details.effects {
             AccountTransactionEffects::None {
                 transaction_type: _,
                 reject_reason,
-            } => return Err(reject_reason.into()),
+            } => {
+                return Err(reject_reason.into());
+            }
             AccountTransactionEffects::ContractInitialized { data } => data,
             _ => {
                 return Err(
@@ -449,7 +422,7 @@ impl<Type> ContractInitBuilder<Type> {
                         "Unexpected response from dry-running a contract initialization.",
                     ))
                     .into(),
-                )
+                );
             }
         };
         let base_cost = transactions::cost::base_cost(
@@ -460,7 +433,6 @@ impl<Type> ContractInitBuilder<Type> {
             .energy_cost
             .checked_sub(base_cost)
             .ok_or(DryRunNewInstanceError::InvalidEnergy { min: base_cost })?;
-
         Ok(ContractInitBuilder::new(
             client,
             sender,
@@ -469,7 +441,6 @@ impl<Type> ContractInitBuilder<Type> {
             ContractInitInner::new(data),
         ))
     }
-
     /// Access to the generated events.
     ///
     /// Note that these are events generated as part of a dry run.
@@ -478,7 +449,6 @@ impl<Type> ContractInitBuilder<Type> {
     pub fn event(&self) -> &ContractInitializedEvent {
         &self.inner.event
     }
-
     /// Send the transaction and return a handle that can be queried
     /// for the status.
     pub async fn send(
@@ -494,9 +464,7 @@ impl<Type> ContractInitBuilder<Type> {
         .await
     }
 }
-
 pub type ModuleDeployBuilder = TransactionBuilder<false, ModuleReference>;
-
 #[derive(thiserror::Error, Debug)]
 /// An error that may occur when attempting to dry run a smart contract module
 /// deployment.
@@ -513,7 +481,6 @@ pub enum DryRunModuleDeployError {
         min: Energy,
     },
 }
-
 impl DryRunModuleDeployError {
     /// Check whether dry-run failed because the module already exists.
     pub fn already_exists(&self) -> bool {
@@ -523,13 +490,11 @@ impl DryRunModuleDeployError {
         matches!(reason, RejectReason::ModuleHashAlreadyExists { .. })
     }
 }
-
 impl From<RejectReason> for DryRunModuleDeployError {
     fn from(value: RejectReason) -> Self {
         Self::Failed(value)
     }
 }
-
 impl ModuleDeployBuilder {
     /// Attempt to dry run a module deployment transaction.
     ///
@@ -558,12 +523,13 @@ impl ModuleDeployBuilder {
             .map_err(dry_run::DryRunError::from)?
             .await?
             .inner;
-
         let module_ref = match result.details.effects {
             AccountTransactionEffects::None {
                 transaction_type: _,
                 reject_reason,
-            } => return Err(reject_reason.into()),
+            } => {
+                return Err(reject_reason.into());
+            }
             AccountTransactionEffects::ModuleDeployed { module_ref } => module_ref,
             _ => {
                 return Err(
@@ -571,7 +537,7 @@ impl ModuleDeployBuilder {
                         "Unexpected response from dry-running a contract initialization.",
                     ))
                     .into(),
-                )
+                );
             }
         };
         let base_cost = transactions::cost::base_cost(
@@ -585,7 +551,6 @@ impl ModuleDeployBuilder {
         Ok(Self::new(client, sender, energy, payload, module_ref))
     }
 }
-
 impl ModuleDeployBuilder {
     /// Send the transaction and return a handle that can be queried
     /// for the status.
@@ -600,12 +565,10 @@ impl ModuleDeployBuilder {
         .await
     }
 }
-
 pub struct ModuleDeployHandle {
     tx_hash: TransactionHash,
     client: v2::Client,
 }
-
 /// The [`Display`](std::fmt::Display) implementation displays the hash of the
 /// transaction.
 impl std::fmt::Display for ModuleDeployHandle {
@@ -613,7 +576,6 @@ impl std::fmt::Display for ModuleDeployHandle {
         self.tx_hash.fmt(f)
     }
 }
-
 #[derive(Debug, thiserror::Error)]
 /// An error that may occur when querying the result of a module deploy
 /// transaction.
@@ -623,7 +585,6 @@ pub enum ModuleDeployError {
     #[error("Module deployment failed with reason: {0:?}")]
     Failed(RejectReason),
 }
-
 #[derive(Debug, Clone, Copy)]
 /// Result of successful module deployment.
 pub struct ModuleDeployData {
@@ -634,24 +595,20 @@ pub struct ModuleDeployData {
     /// The module reference.
     pub module_reference: ModuleReference,
 }
-
 impl ModuleDeployHandle {
     /// Extract the hash of the transaction underlying this handle.
     pub fn hash(&self) -> TransactionHash {
         self.tx_hash
     }
-
     /// Wait until the transaction is finalized and return the result.
     /// Note that this can potentially wait indefinitely.
     pub async fn wait_for_finalization(mut self) -> Result<ModuleDeployData, ModuleDeployError> {
         let (_, result) = self.client.wait_until_finalized(&self.tx_hash).await?;
-
         let mk_error = |msg| {
             Err(ModuleDeployError::from(QueryError::RPCError(
                 RPCError::CallError(tonic::Status::invalid_argument(msg)),
             )))
         };
-
         match result.details {
             crate::types::BlockItemSummaryDetails::AccountTransaction(at) => match at.effects {
                 AccountTransactionEffects::ModuleDeployed { module_ref } => Ok(ModuleDeployData {
@@ -677,7 +634,6 @@ impl ModuleDeployHandle {
             ),
         }
     }
-
     /// Wait until the transaction is finalized or until the timeout has elapsed
     /// and return the result.
     pub async fn wait_for_finalization_timeout(
@@ -695,11 +651,9 @@ impl ModuleDeployHandle {
         }
     }
 }
-
 /// Define a newtype wrapper around the error schema type.
 #[derive(Debug, Clone)]
 pub struct ErrorSchema(pub Value);
-
 /// Write a custom display implementation for the error schema type.
 /// This implementation displays nested errors meaningfully.
 /// For example the nested error: `Object {\"Custom\": Array
@@ -728,7 +682,6 @@ impl std::fmt::Display for ErrorSchema {
         Ok(())
     }
 }
-
 /// A human-readable decoded error for the reject reason of a reverted
 /// transaction.
 #[derive(Debug, Clone)]
@@ -752,22 +705,16 @@ pub enum DecodedReason {
         parsed: ErrorSchema,
     },
 }
-
 /// Write a custom display implementation for the decoded human-readable error
 /// of the `DecodedReason` type.
 impl std::fmt::Display for DecodedReason {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DecodedReason::Std { parsed, .. } => {
-                write!(f, "{}", parsed)
-            }
-            DecodedReason::Custom { parsed, .. } => {
-                write!(f, "{}", parsed)
-            }
+            DecodedReason::Std { parsed, .. } => write!(f, "{}", parsed),
+            DecodedReason::Custom { parsed, .. } => write!(f, "{}", parsed),
         }
     }
 }
-
 /// The outcome of invoking (dry-running) a transaction to update a smart
 /// contract instance. The variants describe the two cases of successfully
 /// simulating the transaction and rejecting the transaction due to some
@@ -778,14 +725,12 @@ pub enum InvokeContractOutcome {
     /// The transaction was rejected due to some reverts.
     Failure(RejectedTransaction),
 }
-
 /// The `SimulatedTransaction` type is an alias for the `ContractUpdateBuilder`
 /// type. This type is used when an invoke (dry-run) of a transaction succeeds.
 /// This type includes a convenient send method to send and execute the
 /// transaction on-chain in a subsequent action. As such, it is a builder to
 /// simplify sending smart contract updates.
 pub type SimulatedTransaction = ContractUpdateBuilder;
-
 /// This type is used when an invoke (dry-run) of a transaction gets rejected.
 #[derive(Debug, Clone)]
 pub struct RejectedTransaction {
@@ -803,7 +748,6 @@ pub struct RejectedTransaction {
     /// The payload of the transaction.
     pub payload: transactions::Payload,
 }
-
 impl InvokeContractOutcome {
     /// This converts `InvokeContractOutcome` into a result type.
     pub fn success(self) -> Result<SimulatedTransaction, RejectedTransaction> {
@@ -813,16 +757,19 @@ impl InvokeContractOutcome {
         }
     }
 }
-
-#[derive(thiserror::Error, Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(thiserror::Error, Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_deprecated",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[repr(i32)]
 pub enum ConcordiumStdRejectReason {
     #[error("[Unspecified (Default reject)]")]
-    Unspecified = -2147483648, // i32::MIN
+    Unspecified = -2147483648,
     #[error("[Error ()]")]
-    Unit = -2147483647, // i32::MIN + 1
+    Unit = -2147483647,
     #[error("[ParseError]")]
-    Parse = -2147483646, // ...
+    Parse = -2147483646,
     #[error("[LogError::Full]")]
     LogFull = -2147483645,
     #[error("[LogError::Malformed]")]
@@ -872,7 +819,6 @@ pub enum ConcordiumStdRejectReason {
     #[error("[QueryContractBalanceError]")]
     QueryContractBalanceError = -2147483622,
 }
-
 /// Decode the `reject_reason` into a human-readable error based on the error
 /// code definition in the `concordium-std` crate.
 pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRejectReason> {
@@ -883,7 +829,6 @@ pub fn decode_concordium_std_error(reject_reason: i32) -> Option<ConcordiumStdRe
         None
     }
 }
-
 /// Decode the smart contract logical revert reason and return a human-readable
 /// error.
 ///
@@ -1112,23 +1057,13 @@ pub fn decode_smart_contract_revert(
             parameter: _,
         } => {
             let receive_name = receive_name.as_receive_name();
-
-            // Step 1: Try to decode the `reject_reason` using the `concordium-std`
-            // error codes.
             if let Some(decoded_error) = decode_concordium_std_error(*error_code) {
                 return Some(DecodedReason::Std {
                     reject_reason: *error_code,
                     parsed: decoded_error,
                 });
             }
-
-            // Step 2: Try to decode the `reject_reason` using the `error_schema` and the
-            // `return_value`.
-
-            // If no `schema` is provided, the
-            // `reject_reason` can not be decoded further.
             let schema = schema?;
-
             let (Some(error_schema), Some(return_value)) = (
                 schema
                     .get_receive_error_schema(
@@ -1138,13 +1073,9 @@ pub fn decode_smart_contract_revert(
                     .ok(),
                 return_value,
             ) else {
-                // If no `error_schema` and/or `return_value` is provided, the
-                // `reject_reason` can not be decoded further.
                 return None;
             };
-
             let mut cursor = Cursor::new(&return_value.value);
-
             error_schema
                 .to_json(&mut cursor)
                 .ok()
@@ -1154,14 +1085,9 @@ pub fn decode_smart_contract_revert(
                     parsed: ErrorSchema(decoded_reason),
                 })
         }
-        // If the error is NOT caused by a smart contract logical revert, the
-        // `reject_reason` is already a human-readable error. No
-        // further decoding of the error is needed. An example of
-        // such a transaction is the error variant "OutOfEnergy".
         _ => None,
     }
 }
-
 impl<Type> ContractClient<Type> {
     /// Construct a [`ContractClient`] by looking up metadata from the chain
     /// (such as the contract_name and the embedded schema).
@@ -1171,27 +1097,20 @@ impl<Type> ContractClient<Type> {
     /// * `client` - The RPC client for the concordium node.
     /// * `address` - The contract address of the smart contract instance.
     pub async fn create(mut client: Client, address: ContractAddress) -> v2::QueryResult<Self> {
-        // Get the smart contract instance info.
         let contract_instance_info = client
             .get_instance_info(address, BlockIdentifier::LastFinal)
             .await?
             .response;
-
         let contract_name = contract_instance_info.name().clone();
         let module_reference = contract_instance_info.source_module();
-
-        // Get the wasm module associated to the contract instance.
         let wasm_module = client
             .get_module_source(&module_reference, BlockIdentifier::LastFinal)
             .await?
             .response;
-
-        // Get the schema associated to the contract instance.
         let schema = match wasm_module.version {
             WasmVersion::V0 => utils::get_embedded_schema_v0(wasm_module.source.as_ref()).ok(),
             WasmVersion::V1 => utils::get_embedded_schema_v1(wasm_module.source.as_ref()).ok(),
         };
-
         Ok(Self {
             client,
             address,
@@ -1200,7 +1119,6 @@ impl<Type> ContractClient<Type> {
             schema: Arc::new(schema),
         })
     }
-
     /// Construct a [`ContractClient`] locally. In comparison to
     /// [`create`](Self::create) this always succeeds and does not check
     /// existence of the contract.
@@ -1221,7 +1139,6 @@ impl<Type> ContractClient<Type> {
             schema: Arc::new(None),
         }
     }
-
     /// Construct a [`ContractClient`] locally. In comparison to
     /// [`create`](Self::create) this always succeeds and does not check
     /// existence of the contract and does not look up metadata from the chain
@@ -1252,7 +1169,6 @@ impl<Type> ContractClient<Type> {
             schema: Arc::new(Some(schema)),
         }
     }
-
     /// Invoke a contract and return the response.
     ///
     /// This will always fail for a V0 contract, and for V1 contracts it will
@@ -1280,7 +1196,6 @@ impl<Type> ContractClient<Type> {
         let parameter = OwnedParameter::from_serial(parameter)?;
         self.view_raw::<A, E>(entrypoint, parameter, bi).await
     }
-
     /// Like [`view`](Self::view) but expects an already serialized parameter.
     pub async fn view_raw<A: contracts_common::Deserial, E>(
         &mut self,
@@ -1308,7 +1223,6 @@ impl<Type> ContractClient<Type> {
             smart_contracts::InvokeContractResult::Failure { reason, .. } => Err(reason.into()),
         }
     }
-
     /// Invoke a contract instance and return the response without any
     /// processing.
     pub async fn invoke_raw<E>(
@@ -1324,7 +1238,6 @@ impl<Type> ContractClient<Type> {
     {
         let contract_name = self.contract_name.as_contract_name().contract_name();
         let method = OwnedReceiveName::try_from(format!("{contract_name}.{entrypoint}"))?;
-
         let context = ContractContext {
             invoker,
             contract: self.address,
@@ -1333,11 +1246,9 @@ impl<Type> ContractClient<Type> {
             parameter,
             energy: None,
         };
-
         let invoke_result = self.client.invoke_instance(bi, &context).await?.response;
         Ok(invoke_result)
     }
-
     /// Dry run an update. If the dry run succeeds the return value is an object
     /// that has a send method to send the transaction that was simulated during
     /// the dry run.
@@ -1365,7 +1276,6 @@ impl<Type> ContractClient<Type> {
         self.dry_run_update_raw(entrypoint, amount, sender, message)
             .await
     }
-
     /// Dry run an update. In comparison to
     /// [`dry_run_update`](Self::dry_run_update) this function does not throw an
     /// error when the transaction reverts and instead tries to decode the
@@ -1393,7 +1303,6 @@ impl<Type> ContractClient<Type> {
         self.dry_run_update_raw_with_reject_reason_info(entrypoint, amount, sender, message)
             .await
     }
-
     /// Like [`dry_run_update`](Self::dry_run_update) but expects an already
     /// formed parameter.
     pub async fn dry_run_update_raw<E>(
@@ -1408,16 +1317,13 @@ impl<Type> ContractClient<Type> {
     {
         let contract_name = self.contract_name.as_contract_name().contract_name();
         let receive_name = OwnedReceiveName::try_from(format!("{contract_name}.{entrypoint}"))?;
-
         let payload = UpdateContractPayload {
             amount,
             address: self.address,
             receive_name,
             message,
         };
-
         let context = ContractContext::new_from_payload(sender, None, payload);
-
         let invoke_result = self
             .client
             .invoke_instance(BlockIdentifier::LastFinal, &context)
@@ -1429,7 +1335,6 @@ impl<Type> ContractClient<Type> {
             receive_name: context.method,
             message: context.parameter,
         };
-
         match invoke_result {
             InvokeContractResult::Success {
                 used_energy,
@@ -1448,7 +1353,6 @@ impl<Type> ContractClient<Type> {
             InvokeContractResult::Failure { reason, .. } => Err(reason.into()),
         }
     }
-
     /// Like [`dry_run_update_with_reject_reason_info`](Self::dry_run_update_with_reject_reason_info) but expects an already
     /// formed parameter.
     pub async fn dry_run_update_raw_with_reject_reason_info<E>(
@@ -1463,22 +1367,18 @@ impl<Type> ContractClient<Type> {
     {
         let contract_name = self.contract_name.as_contract_name().contract_name();
         let receive_name = OwnedReceiveName::try_from(format!("{contract_name}.{entrypoint}"))?;
-
         let payload = UpdateContractPayload {
             amount,
             address: self.address,
             receive_name: receive_name.clone(),
             message,
         };
-
         let context = ContractContext::new_from_payload(sender, None, payload.clone());
-
         let invoke_result = self
             .client
             .invoke_instance(BlockIdentifier::LastFinal, &context)
             .await?
             .response;
-
         match invoke_result {
             InvokeContractResult::Success {
                 used_energy,
@@ -1504,7 +1404,6 @@ impl<Type> ContractClient<Type> {
                     &reason,
                     (*self.schema).as_ref(),
                 );
-
                 Ok(InvokeContractOutcome::Failure(RejectedTransaction {
                     payload: transactions::Payload::Update { payload },
                     return_value,
@@ -1515,7 +1414,6 @@ impl<Type> ContractClient<Type> {
             }
         }
     }
-
     /// Make the payload of a contract update with the specified parameter.
     pub fn make_update<P: contracts_common::Serial, E>(
         &self,
@@ -1530,7 +1428,6 @@ impl<Type> ContractClient<Type> {
         let message = OwnedParameter::from_serial(message)?;
         self.make_update_raw::<E>(signer, metadata, entrypoint, message)
     }
-
     /// Make **and send** a transaction with the specified parameter.
     pub async fn update<P: contracts_common::Serial, E>(
         &mut self,
@@ -1546,7 +1443,6 @@ impl<Type> ContractClient<Type> {
         self.update_raw::<E>(signer, metadata, entrypoint, message)
             .await
     }
-
     /// Like [`update`](Self::update) but expects a serialized parameter.
     pub async fn update_raw<E>(
         &mut self,
@@ -1562,7 +1458,6 @@ impl<Type> ContractClient<Type> {
         let hash = self.client.send_account_transaction(tx).await?;
         Ok(hash)
     }
-
     /// Like [`make_update`](Self::make_update) but expects a serialized
     /// parameter.
     pub fn make_update_raw<E>(
@@ -1577,14 +1472,12 @@ impl<Type> ContractClient<Type> {
     {
         let contract_name = self.contract_name.as_contract_name().contract_name();
         let receive_name = OwnedReceiveName::try_from(format!("{contract_name}.{entrypoint}"))?;
-
         let payload = UpdateContractPayload {
             amount: metadata.amount,
             address: self.address,
             receive_name,
             message,
         };
-
         let tx = transactions::send::make_and_sign_transaction(
             signer,
             metadata.sender_address,
@@ -1596,17 +1489,14 @@ impl<Type> ContractClient<Type> {
         Ok(tx)
     }
 }
-
 /// A helper type to construct [`ContractUpdateBuilder`].
 /// Users do not directly interact with values of this type.
 pub struct ContractUpdateInner {
     return_value: Option<ReturnValue>,
     events: Vec<ContractTraceElement>,
 }
-
 /// A builder to simplify sending smart contract updates.
 pub type ContractUpdateBuilder = TransactionBuilder<true, ContractUpdateInner>;
-
 impl ContractUpdateBuilder {
     /// Send the transaction and return a handle that can be queried
     /// for the status.
@@ -1620,18 +1510,15 @@ impl ContractUpdateBuilder {
         })
         .await
     }
-
     /// Get the return value from dry-running.
     pub fn return_value(&self) -> Option<&ReturnValue> {
         self.inner.return_value.as_ref()
     }
-
     /// Get the events generated from the dry-run.
     pub fn events(&self) -> &[ContractTraceElement] {
         &self.inner.events
     }
 }
-
 /// A handle returned when sending a smart contract update transaction.
 /// This can be used to get the response of the update.
 ///
@@ -1641,7 +1528,6 @@ pub struct ContractUpdateHandle {
     tx_hash: TransactionHash,
     client: v2::Client,
 }
-
 /// The [`Display`](std::fmt::Display) implementation displays the hash of the
 /// transaction.
 impl std::fmt::Display for ContractUpdateHandle {
@@ -1649,7 +1535,6 @@ impl std::fmt::Display for ContractUpdateHandle {
         self.tx_hash.fmt(f)
     }
 }
-
 #[derive(Debug, thiserror::Error)]
 /// An error that may occur when querying the result of a smart contract update
 /// transaction.
@@ -1659,26 +1544,22 @@ pub enum ContractUpdateError {
     #[error("Contract update failed with reason: {0:?}")]
     Failed(RejectReason),
 }
-
 impl ContractUpdateHandle {
     /// Extract the hash of the transaction underlying this handle.
     pub fn hash(&self) -> TransactionHash {
         self.tx_hash
     }
-
     /// Wait until the transaction is finalized and return the result.
     /// Note that this can potentially wait indefinitely.
     pub async fn wait_for_finalization(
         mut self,
     ) -> Result<ContractUpdateInfo, ContractUpdateError> {
         let (_, result) = self.client.wait_until_finalized(&self.tx_hash).await?;
-
         let mk_error = |msg| {
             Err(ContractUpdateError::from(QueryError::RPCError(
                 RPCError::CallError(tonic::Status::invalid_argument(msg)),
             )))
         };
-
         match result.details {
             crate::types::BlockItemSummaryDetails::AccountTransaction(at) => match at.effects {
                 AccountTransactionEffects::ContractUpdateIssued { effects } => {
@@ -1713,7 +1594,6 @@ impl ContractUpdateHandle {
             ),
         }
     }
-
     /// Wait until the transaction is finalized or until the timeout has elapsed
     /// and return the result.
     pub async fn wait_for_finalization_timeout(

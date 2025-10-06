@@ -2,98 +2,89 @@
 //!
 //! In particular, it uses the "weather" contract which is part of the
 //! [icecream example contract](https://github.com/Concordium/concordium-rust-smart-contracts/blob/main/examples/icecream/src/lib.rs).
-use anyhow::Context;
-use clap::AppSettings;
-use concordium_rust_sdk::{
-    common::{SerdeDeserialize, SerdeSerialize},
-    contract_client::{ContractClient, ContractInitBuilder, ViewError},
-    endpoints,
-    smart_contracts::{
-        common as concordium_std,
-        common::{Amount, ContractAddress, Serial},
-    },
-    types::{smart_contracts::ModuleReference, WalletAccount},
-    v2,
-};
-use std::path::PathBuf;
-use structopt::*;
-use thiserror::Error;
 
-#[derive(StructOpt)]
-struct App {
-    #[structopt(
-        long = "node",
-        help = "GRPC interface of the node.",
-        default_value = "http://localhost:20000"
-    )]
-    endpoint: endpoints::Endpoint,
-    #[structopt(long = "account", help = "Path to the account key file.")]
-    keys_path: PathBuf,
-    #[structopt(subcommand, help = "The action you want to perform.")]
-    action: Action,
-}
-
-#[derive(StructOpt)]
-enum Action {
-    #[structopt(about = "Initialize the contract with the provided weather")]
-    Init {
-        #[structopt(long, help = "The initial weather.")]
-        weather: Weather,
-        #[structopt(
-            long,
-            help = "The module reference used for initializing the contract instance."
-        )]
-        module_ref: ModuleReference,
-    },
-    #[structopt(about = "Update the contract and set the provided weather")]
-    Update {
-        #[structopt(long, help = "The new weather.")]
-        weather: Weather,
-        #[structopt(long, help = "The contract to update the weather on.")]
-        address: ContractAddress,
-    },
-}
-
-// The order must match the enum defined in the contract code. Otherwise, the
-// serialization will be incorrect.
-#[derive(SerdeSerialize, SerdeDeserialize, Serial, StructOpt)]
-enum Weather {
-    Rainy,
-    Sunny,
-}
-
-#[derive(Debug, Error)]
-#[error("invalid weather variant; expected \"rainy\" or \"sunny\", but got \"{0}\"")]
-struct WeatherError(String);
-
-impl std::str::FromStr for Weather {
-    type Err = WeatherError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "rainy" => Ok(Weather::Rainy),
-            "sunny" => Ok(Weather::Sunny),
-            _ => Err(WeatherError(s.to_owned())),
-        }
-    }
-}
-
-enum WeatherContractMarker {}
-
+#[cfg(feature = "serde_deprecated")]
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
+    use anyhow::Context;
+    use clap::AppSettings;
+    #[cfg(feature = "serde_deprecated")]
+    use concordium_rust_sdk::common::{SerdeDeserialize, SerdeSerialize};
+    use concordium_rust_sdk::{
+        contract_client::{ContractClient, ContractInitBuilder, ViewError},
+        endpoints,
+        smart_contracts::{
+            common as concordium_std,
+            common::{Amount, ContractAddress, Serial},
+        },
+        types::{smart_contracts::ModuleReference, WalletAccount},
+        v2,
+    };
+    use std::path::PathBuf;
+    use structopt::*;
+    use thiserror::Error;
+    #[derive(StructOpt)]
+    struct App {
+        #[structopt(
+            long = "node",
+            help = "GRPC interface of the node.",
+            default_value = "http://localhost:20000"
+        )]
+        endpoint: endpoints::Endpoint,
+        #[structopt(long = "account", help = "Path to the account key file.")]
+        keys_path: PathBuf,
+        #[structopt(subcommand, help = "The action you want to perform.")]
+        action: Action,
+    }
+    #[derive(StructOpt)]
+    enum Action {
+        #[structopt(about = "Initialize the contract with the provided weather")]
+        Init {
+            #[structopt(long, help = "The initial weather.")]
+            weather: Weather,
+            #[structopt(
+                long,
+                help = "The module reference used for initializing the contract instance."
+            )]
+            module_ref: ModuleReference,
+        },
+        #[structopt(about = "Update the contract and set the provided weather")]
+        Update {
+            #[structopt(long, help = "The new weather.")]
+            weather: Weather,
+            #[structopt(long, help = "The contract to update the weather on.")]
+            address: ContractAddress,
+        },
+    }
+    #[derive(Serial, StructOpt)]
+    #[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+    enum Weather {
+        Rainy,
+        Sunny,
+    }
+    #[derive(Debug, Error)]
+    #[error("invalid weather variant; expected \"rainy\" or \"sunny\", but got \"{0}\"")]
+    struct WeatherError(String);
+    impl std::str::FromStr for Weather {
+        type Err = WeatherError;
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "rainy" => Ok(Weather::Rainy),
+                "sunny" => Ok(Weather::Sunny),
+                _ => Err(WeatherError(s.to_owned())),
+            }
+        }
+    }
+    enum WeatherContractMarker {}
+
     let app = {
         let app = App::clap().global_setting(AppSettings::ColoredHelp);
         let matches = app.get_matches();
         App::from_clap(&matches)
     };
-
     let client = v2::Client::new(app.endpoint).await?;
-
-    // load account keys and sender address from a file
     let account: WalletAccount =
         WalletAccount::from_json_file(app.keys_path).context("Could not parse the keys file.")?;
-
     match app.action {
         Action::Init {
             weather,
@@ -144,4 +135,9 @@ async fn main() -> anyhow::Result<()> {
         }
     };
     Ok(())
+}
+
+#[cfg(not(feature = "serde_deprecated"))]
+fn main() {
+    println!("This example requires the 'serde_deprecated' feature to be enabled.");
 }

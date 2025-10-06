@@ -1,75 +1,79 @@
 //! Example that shows how to use the TokenClient
-use anyhow::Context;
-use clap::AppSettings;
-use concordium_base::{
-    contracts_common::AccountAddress,
-    protocol_level_tokens::{ConversionRule, TokenAmount, TokenId},
-};
-use concordium_rust_sdk::{
-    common::types::TransactionTime,
-    protocol_level_tokens::token_client::{self, TransactionMetadata, TransferTokens, Validation},
-    types::WalletAccount,
-    v2::{self, BlockIdentifier},
-};
-use rust_decimal::Decimal;
-use std::{path::PathBuf, str::FromStr};
-use structopt::*;
 
-#[derive(StructOpt)]
-struct App {
-    #[structopt(
-        long = "node",
-        help = "V2 GRPC interface of the node.",
-        default_value = "http://localhost:20000"
-    )]
-    endpoint: v2::Endpoint,
-    #[structopt(long = "sender", help = "Path to the sender account key file.")]
-    account: PathBuf,
-    #[structopt(long = "token", help = "Token id of the token.")]
-    token_id: String,
-    #[structopt(subcommand)]
-    cmd: Action,
-}
-
-/// TokenClient operations
-#[derive(StructOpt)]
-enum Action {
-    Mint {
-        #[structopt(long = "amount", help = "Amount of token to mint.")]
-        amount: Decimal,
-    },
-    Burn {
-        #[structopt(long = "amount", help = "Amount of token to burn.")]
-        amount: Decimal,
-    },
-    Transfer {
-        #[structopt(long = "receiver", help = "Target account address.")]
-        receiver: String,
-        #[structopt(long = "amount", help = "Amount of token to transfer.")]
-        amount: Decimal,
-    },
-    AddAllow {
-        #[structopt(long = "target", help = "Account address to add to allow list.")]
-        target: String,
-    },
-    RemoveAllow {
-        #[structopt(long = "target", help = "Account address to remove from allow list.")]
-        target: String,
-    },
-    AddDeny {
-        #[structopt(long = "target", help = "Account address to add to deny list.")]
-        target: String,
-    },
-    RemoveDeny {
-        #[structopt(long = "target", help = "Account address to remove from deny list.")]
-        target: String,
-    },
-    Pause,
-    Unpause,
-}
-
+#[cfg(feature = "serde_deprecated")]
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
+    use anyhow::Context;
+    use clap::AppSettings;
+    use concordium_base::{
+        contracts_common::AccountAddress,
+        protocol_level_tokens::{ConversionRule, TokenAmount, TokenId},
+    };
+    use concordium_rust_sdk::{
+        common::types::TransactionTime,
+        protocol_level_tokens::token_client::{
+            self, TransactionMetadata, TransferTokens, Validation,
+        },
+        types::WalletAccount,
+        v2::{self, BlockIdentifier},
+    };
+    use rust_decimal::Decimal;
+    use std::{path::PathBuf, str::FromStr};
+    use structopt::*;
+
+    #[derive(StructOpt)]
+    struct App {
+        #[structopt(
+            long = "node",
+            help = "V2 GRPC interface of the node.",
+            default_value = "http://localhost:20000"
+        )]
+        endpoint: v2::Endpoint,
+        #[structopt(long = "sender", help = "Path to the sender account key file.")]
+        account: PathBuf,
+        #[structopt(long = "token", help = "Token id of the token.")]
+        token_id: String,
+        #[structopt(subcommand)]
+        cmd: Action,
+    }
+
+    /// TokenClient operations
+    #[derive(StructOpt)]
+    enum Action {
+        Mint {
+            #[structopt(long = "amount", help = "Amount of token to mint.")]
+            amount: Decimal,
+        },
+        Burn {
+            #[structopt(long = "amount", help = "Amount of token to burn.")]
+            amount: Decimal,
+        },
+        Transfer {
+            #[structopt(long = "receiver", help = "Target account address.")]
+            receiver: String,
+            #[structopt(long = "amount", help = "Amount of token to transfer.")]
+            amount: Decimal,
+        },
+        AddAllow {
+            #[structopt(long = "target", help = "Account address to add to allow list.")]
+            target: String,
+        },
+        RemoveAllow {
+            #[structopt(long = "target", help = "Account address to remove from allow list.")]
+            target: String,
+        },
+        AddDeny {
+            #[structopt(long = "target", help = "Account address to add to deny list.")]
+            target: String,
+        },
+        RemoveDeny {
+            #[structopt(long = "target", help = "Account address to remove from deny list.")]
+            target: String,
+        },
+        Pause,
+        Unpause,
+    }
+
     let app = {
         let app = App::clap().global_setting(AppSettings::ColoredHelp);
         let matches = app.get_matches();
@@ -205,4 +209,9 @@ async fn main() -> anyhow::Result<()> {
     println!("The outcome is {:#?}", bs);
 
     Ok(())
+}
+
+#[cfg(not(feature = "serde_deprecated"))]
+fn main() {
+    println!("This example requires the 'serde_deprecated' feature to be enabled.");
 }

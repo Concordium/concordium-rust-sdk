@@ -1,3 +1,4 @@
+#[cfg(feature = "serde_deprecated")]
 pub(crate) mod timestamp_millis {
     use serde::Deserialize;
     /// Serialize (via Serde) chrono::DateTime in milliseconds as an u64.
@@ -7,7 +8,6 @@ pub(crate) mod timestamp_millis {
     ) -> Result<S::Ok, S::Error> {
         ser.serialize_i64(dt.timestamp_millis())
     }
-
     /// Deserialize (via Serde) chrono::Duration in milliseconds as an i64.
     pub fn deserialize<'de, D: serde::Deserializer<'de>>(
         des: D,
@@ -18,13 +18,12 @@ pub(crate) mod timestamp_millis {
                 .ok_or_else(|| serde::de::Error::custom("Timestamp out of bounds!"))?)
     }
 }
-
+#[cfg(feature = "serde_deprecated")]
 pub(crate) mod byte_array_hex {
     /// Serialize (via Serde) chrono::DateTime in milliseconds as an u64.
     pub fn serialize<S: serde::Serializer>(dt: &[u8], ser: S) -> Result<S::Ok, S::Error> {
         ser.serialize_str(hex::encode(dt).as_str())
     }
-
     /// Deserialize (via Serde) chrono::Duration in milliseconds as an i64.
     pub fn deserialize<'de, D: serde::Deserializer<'de>, R: TryFrom<Vec<u8>>>(
         des: D,
@@ -32,11 +31,9 @@ pub(crate) mod byte_array_hex {
         struct HexVisitor;
         impl serde::de::Visitor<'_> for HexVisitor {
             type Value = Vec<u8>;
-
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 write!(formatter, "A hex string.")
             }
-
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
             where
                 E: serde::de::Error,
@@ -51,7 +48,7 @@ pub(crate) mod byte_array_hex {
         })
     }
 }
-
+#[cfg(feature = "serde_deprecated")]
 pub(crate) mod account_amounts {
     use concordium_base::{
         common::{types::Amount, SerdeDeserialize, SerdeSerialize},
@@ -59,7 +56,6 @@ pub(crate) mod account_amounts {
     };
     use serde::de::Error;
     use std::collections::BTreeMap;
-
     #[derive(SerdeSerialize, SerdeDeserialize)]
     #[serde(rename_all = "camelCase")]
     struct AccountAmount {
@@ -75,21 +71,18 @@ pub(crate) mod account_amounts {
                 .map(|(&address, &amount)| AccountAmount { address, amount }),
         )
     }
-
     pub fn deserialize<'de, D: serde::Deserializer<'de>>(
         des: D,
     ) -> Result<BTreeMap<AccountAddress, Amount>, D::Error> {
         struct AccountAmountsVisitor;
         impl<'de> serde::de::Visitor<'de> for AccountAmountsVisitor {
             type Value = BTreeMap<AccountAddress, Amount>;
-
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 write!(
                     formatter,
                     "A list of objects with fields 'address' and 'amount'."
                 )
             }
-
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
             where
                 A: serde::de::SeqAccess<'de>,
@@ -108,7 +101,7 @@ pub(crate) mod account_amounts {
         des.deserialize_seq(AccountAmountsVisitor)
     }
 }
-
+#[cfg(feature = "serde_deprecated")]
 pub(crate) mod duration_millis {
     use serde::Deserialize;
     /// Serialize (via Serde) chrono::Duration in milliseconds as an i64.
@@ -118,7 +111,6 @@ pub(crate) mod duration_millis {
     ) -> Result<S::Ok, S::Error> {
         ser.serialize_i64(duration.num_milliseconds())
     }
-
     /// Deserialize (via Serde) chrono::Duration in milliseconds as an i64.
     pub fn deserialize<'de, D: serde::Deserializer<'de>>(
         des: D,
