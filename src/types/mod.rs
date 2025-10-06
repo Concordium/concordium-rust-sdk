@@ -1601,12 +1601,10 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
                                             });
                                         }
                                     }
+                                } else if elements.next().is_none() {
+                                    return Some(ExecutionTree::V1(tree));
                                 } else {
-                                    if elements.next().is_none() {
-                                        return Some(ExecutionTree::V1(tree));
-                                    } else {
-                                        return None;
-                                    }
+                                    return None;
                                 }
                             } else {
                                 partial.events.push(TraceV1::Call { call: tree });
