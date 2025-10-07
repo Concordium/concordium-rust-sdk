@@ -43,15 +43,18 @@ pub enum TraverseError {
     Query(#[from] QueryError),
     #[error("Timed out waiting for finalized blocks.")]
     Elapsed(#[from] Elapsed),
-    #[error("UnknownDataError occured: {0}")]
-    UnkownDataError(#[from] UnknownDataError),
+    #[error("UnknownDataError occurred: {0}")]
+    UnknownDataError(#[from] UnknownDataError),
+    #[error("Other error occurred: ${0}")]
+    OtherError(#[from] anyhow::Error),
 }
 
 impl From<OnFinalizationError> for TraverseError {
     fn from(e: OnFinalizationError) -> Self {
         match e {
             OnFinalizationError::Query(query_error) => query_error.into(),
-            OnFinalizationError::UnkownDataError(err) => TraverseError::UnkownDataError(err),
+            OnFinalizationError::UnknownDataError(err) => TraverseError::UnknownDataError(err),
+            OnFinalizationError::OtherError(err) => TraverseError::OtherError(err),
         }
     }
 }
@@ -62,8 +65,10 @@ impl From<OnFinalizationError> for TraverseError {
 pub enum OnFinalizationError {
     #[error("Failed to query: {0}")]
     Query(#[from] QueryError),
-    #[error("UnknownDataError occured: ${0}")]
-    UnkownDataError(#[from] UnknownDataError),
+    #[error("UnknownDataError occurred: ${0}")]
+    UnknownDataError(#[from] UnknownDataError),
+    #[error("Other error occurred: ${0}")]
+    OtherError(#[from] anyhow::Error),
 }
 
 impl From<tonic::Status> for OnFinalizationError {
@@ -111,7 +116,7 @@ pub type TraverseResult<A> = OnFinalizationResult<A>;
 ///         client: v2::Client,
 ///         ctx: &'a Self::Context,
 ///         fbi: FinalizedBlockInfo,
-///     ) -> QueryResult<Self::Data> {
+///     ) -> OnFinalizationResult<Self::Data> {
 ///         unimplemented!("Implement me.")
 ///     }
 ///
