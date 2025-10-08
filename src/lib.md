@@ -21,7 +21,7 @@ In addition to these, the library re-exports a number of core crates that implem
 
 ## Migration guide: 7 to 8
 
-The SDK major version 8 introduces a lot of minor breaking changes, all with common goal of improving the forward-compatible with Concordium Node API versions.
+The SDK major version 8 introduces a lot of minor breaking changes, all with common goal of improving forward-compatibility with Concordium Node API versions.
 
 #### Motivation
 
