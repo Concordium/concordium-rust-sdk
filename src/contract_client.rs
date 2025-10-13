@@ -451,7 +451,7 @@ impl<Type> ContractInitBuilder<Type> {
             .await?
             .inner;
 
-        let data = match result.details.effects.known_or_else(|| {
+        let data = match result.details.effects.known_or_else(|_unknown| {
             dry_run::DryRunError::CallError(tonic::Status::invalid_argument(
                 "Unexpected response from dry-running a contract initialization.",
             ))
@@ -580,7 +580,7 @@ impl ModuleDeployBuilder {
             .await?
             .inner;
 
-        let module_ref = match result.details.effects.known_or_else(|| {
+        let module_ref = match result.details.effects.known_or_else(|_unknown| {
             dry_run::DryRunError::CallError(tonic::Status::invalid_argument(
                 "Unexpected response from dry-running a module deployment.",
             ))
