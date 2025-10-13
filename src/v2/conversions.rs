@@ -1685,6 +1685,77 @@ impl TryFrom<AuthorizationsV1> for super::types::AuthorizationsV1 {
     }
 }
 
+impl TryFrom<AuthorizationsV0> for super::Level2Keys {
+    type Error = tonic::Status;
+
+    fn try_from(value: AuthorizationsV0) -> Result<Self, Self::Error> {
+        Ok(Self {
+            keys: value
+                .keys
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<_, tonic::Status>>()?,
+            emergency: value.emergency.map(TryInto::try_into).transpose()?,
+            protocol: value.protocol.map(TryInto::try_into).transpose()?,
+            election_difficulty: value
+                .parameter_consensus
+                .map(TryInto::try_into)
+                .transpose()?,
+            euro_per_energy: value
+                .parameter_euro_per_energy
+                .map(TryInto::try_into)
+                .transpose()?,
+            micro_ccd_per_euro: value
+                .parameter_micro_ccd_per_euro
+                .map(TryInto::try_into)
+                .transpose()?,
+            foundation_account: value
+                .parameter_foundation_account
+                .map(TryInto::try_into)
+                .transpose()?,
+            mint_distribution: value
+                .parameter_mint_distribution
+                .map(TryInto::try_into)
+                .transpose()?,
+            transaction_fee_distribution: value
+                .parameter_transaction_fee_distribution
+                .map(TryInto::try_into)
+                .transpose()?,
+            param_gas_rewards: value
+                .parameter_gas_rewards
+                .map(TryInto::try_into)
+                .transpose()?,
+            pool_parameters: value.pool_parameters.map(TryInto::try_into).transpose()?,
+            add_anonymity_revoker: value
+                .add_anonymity_revoker
+                .map(TryInto::try_into)
+                .transpose()?,
+            add_identity_provider: value
+                .add_identity_provider
+                .map(TryInto::try_into)
+                .transpose()?,
+            cooldown_parameters: None,
+            time_parameters: None,
+            create_plt: None,
+        })
+    }
+}
+
+impl TryFrom<AuthorizationsV1> for super::Level2Keys {
+    type Error = tonic::Status;
+
+    fn try_from(value: AuthorizationsV1) -> Result<Self, Self::Error> {
+        let mut keys: Self = value.v0.require()?.try_into()?;
+        keys.cooldown_parameters = value
+            .parameter_cooldown
+            .map(TryInto::try_into)
+            .transpose()?;
+        keys.time_parameters = value.parameter_time.map(TryInto::try_into).transpose()?;
+        keys.create_plt = value.create_plt.map(|x| x.try_into()).transpose()?;
+        Ok(keys)
+    }
+}
+
 impl TryFrom<AccessStructure> for super::types::AccessStructure {
     type Error = tonic::Status;
 
@@ -2591,6 +2662,87 @@ impl TryFrom<ChainParametersV0> for super::ChainParametersV0 {
     }
 }
 
+impl TryFrom<ChainParametersV0> for super::ChainParametersCommon {
+    type Error = tonic::Status;
+
+    fn try_from(value: ChainParametersV0) -> Result<Self, Self::Error> {
+        let cooldown_parameters =
+            value
+                .baker_cooldown_epochs
+                .map(|bce| super::CooldownParameters {
+                    baker_cooldown_epochs: Some(bce.into()),
+                    pool_owner_cooldown: None,
+                    delegator_cooldown: None,
+                });
+        let mint_per_slot = value
+            .mint_distribution
+            .and_then(|md| md.mint_per_slot.map(TryInto::try_into))
+            .transpose()?;
+        let mint_distribution = value.mint_distribution.map(|md| super::MintDistribution {
+            baking_reward: md.baking_reward.map(Into::into),
+            finalization_reward: md.finalization_reward.map(Into::into),
+        });
+        let transaction_fee_distribution =
+            value
+                .transaction_fee_distribution
+                .map(|tfd| super::TransactionFeeDistribution {
+                    baker: tfd.baker.map(Into::into),
+                    gas_account: tfd.gas_account.map(Into::into),
+                });
+        let gas_rewards = value.gas_rewards.map(|gr| super::GasRewards {
+            baker: gr.baker.map(Into::into),
+            finalization_proof: gr.finalization_proof.map(Into::into),
+            account_creation: gr.account_creation.map(Into::into),
+            chain_update: gr.chain_update.map(Into::into),
+        });
+        let staking_parameters =
+            value
+                .minimum_threshold_for_baking
+                .map(|mtfb| super::StakingParameters {
+                    minimum_equity_capital: Some(mtfb.into()),
+                    ..Default::default()
+                });
+        Ok(Self {
+            timeout_parameters: None,
+            election_difficulty: value
+                .election_difficulty
+                .map(TryInto::try_into)
+                .transpose()?,
+            min_block_time: None,
+            block_energy_limit: None,
+            euro_per_energy: value.euro_per_energy.map(TryInto::try_into).transpose()?,
+            micro_ccd_per_euro: value
+                .micro_ccd_per_euro
+                .map(TryInto::try_into)
+                .transpose()?,
+            cooldown_parameters,
+            reward_period_length: None,
+            mint_per_payday: None,
+            mint_per_slot,
+            mint_distribution,
+            account_creation_limit: value
+                .account_creation_limit
+                .map(TryInto::try_into)
+                .transpose()?,
+            transaction_fee_distribution,
+            gas_rewards,
+            foundation_account: value
+                .foundation_account
+                .map(TryInto::try_into)
+                .transpose()?,
+            staking_parameters,
+            finalization_committee_parameters: None,
+            validator_max_missed_rounds: None,
+
+            keys: super::UpdateKeys {
+                root_keys: value.root_keys.map(TryInto::try_into).transpose()?,
+                level_1_keys: value.level1_keys.map(TryInto::try_into).transpose()?,
+                level_2_keys: value.level2_keys.map(TryInto::try_into).transpose()?,
+            },
+        })
+    }
+}
+
 impl TryFrom<ChainParametersV1> for super::ChainParametersV1 {
     type Error = tonic::Status;
 
@@ -2614,6 +2766,114 @@ impl TryFrom<ChainParametersV1> for super::ChainParametersV1 {
                 root_keys: value.root_keys.require()?.try_into()?,
                 level_1_keys: value.level1_keys.require()?.try_into()?,
                 level_2_keys: value.level2_keys.require()?.try_into()?,
+            },
+        })
+    }
+}
+
+impl TryFrom<ChainParametersV1> for super::ChainParametersCommon {
+    type Error = tonic::Status;
+
+    fn try_from(value: ChainParametersV1) -> Result<Self, Self::Error> {
+        let cooldown_parameters = value
+            .cooldown_parameters
+            .map(|cp| super::CooldownParameters {
+                baker_cooldown_epochs: None,
+                pool_owner_cooldown: cp.pool_owner_cooldown.map(Into::into),
+                delegator_cooldown: cp.delegator_cooldown.map(Into::into),
+            });
+        let mint_distribution = value.mint_distribution.map(|md| super::MintDistribution {
+            baking_reward: md.baking_reward.map(Into::into),
+            finalization_reward: md.finalization_reward.map(Into::into),
+        });
+        let transaction_fee_distribution =
+            value
+                .transaction_fee_distribution
+                .map(|tfd| super::TransactionFeeDistribution {
+                    baker: tfd.baker.map(Into::into),
+                    gas_account: tfd.gas_account.map(Into::into),
+                });
+        let gas_rewards = value.gas_rewards.map(|gr| super::GasRewards {
+            baker: gr.baker.map(Into::into),
+            finalization_proof: gr.finalization_proof.map(Into::into),
+            account_creation: gr.account_creation.map(Into::into),
+            chain_update: gr.chain_update.map(Into::into),
+        });
+        let staking_parameters = value
+            .pool_parameters
+            .map(|pp| -> Result<super::StakingParameters, tonic::Status> {
+                Ok(super::StakingParameters {
+                    passive_finalization_commission: pp
+                        .passive_finalization_commission
+                        .map(Into::into),
+                    passive_baking_commission: pp.passive_baking_commission.map(Into::into),
+                    passive_transaction_commission: pp
+                        .passive_transaction_commission
+                        .map(Into::into),
+                    finalization_commission_range: pp
+                        .commission_bounds
+                        .as_ref()
+                        .and_then(|cb| cb.finalization.map(TryInto::try_into))
+                        .transpose()?,
+                    baking_commission_range: pp
+                        .commission_bounds
+                        .as_ref()
+                        .and_then(|cb| cb.baking.map(TryInto::try_into))
+                        .transpose()?,
+                    transaction_commission_range: pp
+                        .commission_bounds
+                        .as_ref()
+                        .and_then(|cb| cb.transaction.map(TryInto::try_into))
+                        .transpose()?,
+                    minimum_equity_capital: pp.minimum_equity_capital.map(Into::into),
+                    capital_bound: pp.capital_bound.map(TryInto::try_into).transpose()?,
+                    leverage_bound: pp.leverage_bound.map(TryInto::try_into).transpose()?,
+                })
+            })
+            .transpose()?;
+        Ok(Self {
+            timeout_parameters: None,
+            election_difficulty: value
+                .election_difficulty
+                .map(TryInto::try_into)
+                .transpose()?,
+            min_block_time: None,
+            block_energy_limit: None,
+            euro_per_energy: value.euro_per_energy.map(TryInto::try_into).transpose()?,
+            micro_ccd_per_euro: value
+                .micro_ccd_per_euro
+                .map(TryInto::try_into)
+                .transpose()?,
+            cooldown_parameters,
+            reward_period_length: value
+                .time_parameters
+                .as_ref()
+                .and_then(|tp| tp.reward_period_length.map(TryInto::try_into))
+                .transpose()?,
+            mint_per_payday: value
+                .time_parameters
+                .as_ref()
+                .and_then(|tp| tp.mint_per_payday.map(TryInto::try_into))
+                .transpose()?,
+            mint_per_slot: None,
+            account_creation_limit: value
+                .account_creation_limit
+                .map(TryInto::try_into)
+                .transpose()?,
+            mint_distribution,
+            transaction_fee_distribution,
+            gas_rewards,
+            foundation_account: value
+                .foundation_account
+                .map(TryInto::try_into)
+                .transpose()?,
+            staking_parameters,
+            finalization_committee_parameters: None,
+            validator_max_missed_rounds: None,
+            keys: super::UpdateKeys {
+                root_keys: value.root_keys.map(TryInto::try_into).transpose()?,
+                level_1_keys: value.level1_keys.map(TryInto::try_into).transpose()?,
+                level_2_keys: value.level2_keys.map(TryInto::try_into).transpose()?,
             },
         })
     }
@@ -2658,6 +2918,141 @@ impl TryFrom<ChainParametersV2> for super::ChainParametersV2 {
     }
 }
 
+impl TryFrom<ChainParametersV2> for super::ChainParametersCommon {
+    type Error = tonic::Status;
+
+    fn try_from(value: ChainParametersV2) -> Result<Self, Self::Error> {
+        let timeout_parameters = value
+            .consensus_parameters
+            .as_ref()
+            .and_then(|cp| {
+                cp.timeout_parameters
+                    .map(|tp| -> Result<super::TimeoutParameters, tonic::Status> {
+                        Ok(super::TimeoutParameters {
+                            base: tp.timeout_base.map(Into::into),
+                            increase: tp.timeout_increase.map(TryInto::try_into).transpose()?,
+                            decrease: tp.timeout_decrease.map(TryInto::try_into).transpose()?,
+                        })
+                    })
+            })
+            .transpose()?;
+        let cooldown_parameters = value
+            .cooldown_parameters
+            .map(|cp| super::CooldownParameters {
+                baker_cooldown_epochs: None,
+                pool_owner_cooldown: cp.pool_owner_cooldown.map(Into::into),
+                delegator_cooldown: cp.delegator_cooldown.map(Into::into),
+            });
+        let mint_distribution = value.mint_distribution.map(|md| super::MintDistribution {
+            baking_reward: md.baking_reward.map(Into::into),
+            finalization_reward: md.finalization_reward.map(Into::into),
+        });
+        let transaction_fee_distribution =
+            value
+                .transaction_fee_distribution
+                .map(|tfd| super::TransactionFeeDistribution {
+                    baker: tfd.baker.map(Into::into),
+                    gas_account: tfd.gas_account.map(Into::into),
+                });
+        let gas_rewards = value.gas_rewards.map(|gr| super::GasRewards {
+            baker: gr.baker.map(Into::into),
+            finalization_proof: None,
+            account_creation: gr.account_creation.map(Into::into),
+            chain_update: gr.chain_update.map(Into::into),
+        });
+        let staking_parameters = value
+            .pool_parameters
+            .map(|pp| -> Result<super::StakingParameters, tonic::Status> {
+                Ok(super::StakingParameters {
+                    passive_finalization_commission: pp
+                        .passive_finalization_commission
+                        .map(Into::into),
+                    passive_baking_commission: pp.passive_baking_commission.map(Into::into),
+                    passive_transaction_commission: pp
+                        .passive_transaction_commission
+                        .map(Into::into),
+                    finalization_commission_range: pp
+                        .commission_bounds
+                        .as_ref()
+                        .and_then(|cb| cb.finalization.map(TryInto::try_into))
+                        .transpose()?,
+                    baking_commission_range: pp
+                        .commission_bounds
+                        .as_ref()
+                        .and_then(|cb| cb.baking.map(TryInto::try_into))
+                        .transpose()?,
+                    transaction_commission_range: pp
+                        .commission_bounds
+                        .as_ref()
+                        .and_then(|cb| cb.transaction.map(TryInto::try_into))
+                        .transpose()?,
+                    minimum_equity_capital: pp.minimum_equity_capital.map(Into::into),
+                    capital_bound: pp.capital_bound.map(TryInto::try_into).transpose()?,
+                    leverage_bound: pp.leverage_bound.map(TryInto::try_into).transpose()?,
+                })
+            })
+            .transpose()?;
+        let finalization_committee_parameters =
+            value.finalization_committee_parameters.map(|fcp| {
+                super::FinalizationCommitteeParameters {
+                    min_finalizers: Some(fcp.minimum_finalizers),
+                    max_finalizers: Some(fcp.maximum_finalizers),
+                    finalizers_relative_stake_threshold: fcp
+                        .finalizer_relative_stake_threshold
+                        .map(Into::into),
+                }
+            });
+        Ok(Self {
+            timeout_parameters,
+            election_difficulty: None,
+            min_block_time: value
+                .consensus_parameters
+                .as_ref()
+                .and_then(|cp| cp.min_block_time.map(Into::into)),
+            block_energy_limit: value
+                .consensus_parameters
+                .as_ref()
+                .and_then(|cp| cp.block_energy_limit.map(Into::into)),
+            euro_per_energy: value.euro_per_energy.map(TryInto::try_into).transpose()?,
+            micro_ccd_per_euro: value
+                .micro_ccd_per_euro
+                .map(TryInto::try_into)
+                .transpose()?,
+            cooldown_parameters,
+            reward_period_length: value
+                .time_parameters
+                .as_ref()
+                .and_then(|tp| tp.reward_period_length.map(TryInto::try_into))
+                .transpose()?,
+            mint_per_payday: value
+                .time_parameters
+                .as_ref()
+                .and_then(|tp| tp.mint_per_payday.map(TryInto::try_into))
+                .transpose()?,
+            mint_per_slot: None,
+            mint_distribution,
+            account_creation_limit: value
+                .account_creation_limit
+                .map(TryInto::try_into)
+                .transpose()?,
+            transaction_fee_distribution,
+            gas_rewards,
+            foundation_account: value
+                .foundation_account
+                .map(TryInto::try_into)
+                .transpose()?,
+            staking_parameters,
+            finalization_committee_parameters,
+            validator_max_missed_rounds: None,
+            keys: super::UpdateKeys {
+                root_keys: value.root_keys.map(TryInto::try_into).transpose()?,
+                level_1_keys: value.level1_keys.map(TryInto::try_into).transpose()?,
+                level_2_keys: value.level2_keys.map(TryInto::try_into).transpose()?,
+            },
+        })
+    }
+}
+
 impl TryFrom<ChainParametersV3> for super::ChainParametersV3 {
     type Error = tonic::Status;
 
@@ -2693,6 +3088,143 @@ impl TryFrom<ChainParametersV3> for super::ChainParametersV3 {
                 root_keys: value.root_keys.require()?.try_into()?,
                 level_1_keys: value.level1_keys.require()?.try_into()?,
                 level_2_keys: value.level2_keys.require()?.try_into()?,
+            },
+        })
+    }
+}
+
+impl TryFrom<ChainParametersV3> for super::ChainParametersCommon {
+    type Error = tonic::Status;
+
+    fn try_from(value: ChainParametersV3) -> Result<Self, Self::Error> {
+        let timeout_parameters = value
+            .consensus_parameters
+            .as_ref()
+            .and_then(|cp| {
+                cp.timeout_parameters
+                    .map(|tp| -> Result<super::TimeoutParameters, tonic::Status> {
+                        Ok(super::TimeoutParameters {
+                            base: tp.timeout_base.map(Into::into),
+                            increase: tp.timeout_increase.map(TryInto::try_into).transpose()?,
+                            decrease: tp.timeout_decrease.map(TryInto::try_into).transpose()?,
+                        })
+                    })
+            })
+            .transpose()?;
+        let cooldown_parameters = value
+            .cooldown_parameters
+            .map(|cp| super::CooldownParameters {
+                baker_cooldown_epochs: None,
+                pool_owner_cooldown: cp.pool_owner_cooldown.map(Into::into),
+                delegator_cooldown: cp.delegator_cooldown.map(Into::into),
+            });
+        let mint_distribution = value.mint_distribution.map(|md| super::MintDistribution {
+            baking_reward: md.baking_reward.map(Into::into),
+            finalization_reward: md.finalization_reward.map(Into::into),
+        });
+        let transaction_fee_distribution =
+            value
+                .transaction_fee_distribution
+                .map(|tfd| super::TransactionFeeDistribution {
+                    baker: tfd.baker.map(Into::into),
+                    gas_account: tfd.gas_account.map(Into::into),
+                });
+        let gas_rewards = value.gas_rewards.map(|gr| super::GasRewards {
+            baker: gr.baker.map(Into::into),
+            finalization_proof: None,
+            account_creation: gr.account_creation.map(Into::into),
+            chain_update: gr.chain_update.map(Into::into),
+        });
+        let staking_parameters = value
+            .pool_parameters
+            .map(|pp| -> Result<super::StakingParameters, tonic::Status> {
+                Ok(super::StakingParameters {
+                    passive_finalization_commission: pp
+                        .passive_finalization_commission
+                        .map(Into::into),
+                    passive_baking_commission: pp.passive_baking_commission.map(Into::into),
+                    passive_transaction_commission: pp
+                        .passive_transaction_commission
+                        .map(Into::into),
+                    finalization_commission_range: pp
+                        .commission_bounds
+                        .as_ref()
+                        .and_then(|cb| cb.finalization.map(TryInto::try_into))
+                        .transpose()?,
+                    baking_commission_range: pp
+                        .commission_bounds
+                        .as_ref()
+                        .and_then(|cb| cb.baking.map(TryInto::try_into))
+                        .transpose()?,
+                    transaction_commission_range: pp
+                        .commission_bounds
+                        .as_ref()
+                        .and_then(|cb| cb.transaction.map(TryInto::try_into))
+                        .transpose()?,
+                    minimum_equity_capital: pp.minimum_equity_capital.map(Into::into),
+                    capital_bound: pp.capital_bound.map(TryInto::try_into).transpose()?,
+                    leverage_bound: pp.leverage_bound.map(TryInto::try_into).transpose()?,
+                })
+            })
+            .transpose()?;
+        let finalization_committee_parameters =
+            value.finalization_committee_parameters.map(|fcp| {
+                super::FinalizationCommitteeParameters {
+                    min_finalizers: Some(fcp.minimum_finalizers),
+                    max_finalizers: Some(fcp.maximum_finalizers),
+                    finalizers_relative_stake_threshold: fcp
+                        .finalizer_relative_stake_threshold
+                        .map(Into::into),
+                }
+            });
+        Ok(Self {
+            timeout_parameters,
+            election_difficulty: None,
+            min_block_time: value
+                .consensus_parameters
+                .as_ref()
+                .and_then(|cp| cp.min_block_time.map(Into::into)),
+            block_energy_limit: value
+                .consensus_parameters
+                .as_ref()
+                .and_then(|cp| cp.block_energy_limit.map(Into::into)),
+            euro_per_energy: value.euro_per_energy.map(TryInto::try_into).transpose()?,
+            micro_ccd_per_euro: value
+                .micro_ccd_per_euro
+                .map(TryInto::try_into)
+                .transpose()?,
+            cooldown_parameters,
+            reward_period_length: value
+                .time_parameters
+                .as_ref()
+                .and_then(|tp| tp.reward_period_length.map(TryInto::try_into))
+                .transpose()?,
+            mint_per_payday: value
+                .time_parameters
+                .as_ref()
+                .and_then(|tp| tp.mint_per_payday.map(TryInto::try_into))
+                .transpose()?,
+            mint_per_slot: None,
+            mint_distribution,
+            account_creation_limit: value
+                .account_creation_limit
+                .map(TryInto::try_into)
+                .transpose()?,
+            transaction_fee_distribution,
+            gas_rewards,
+            foundation_account: value
+                .foundation_account
+                .map(TryInto::try_into)
+                .transpose()?,
+            staking_parameters,
+            finalization_committee_parameters,
+            validator_max_missed_rounds: value
+                .validator_score_parameters
+                .map(|vsp| vsp.maximum_missed_rounds),
+            keys: super::UpdateKeys {
+                root_keys: value.root_keys.map(TryInto::try_into).transpose()?,
+                level_1_keys: value.level1_keys.map(TryInto::try_into).transpose()?,
+                level_2_keys: value.level2_keys.map(TryInto::try_into).transpose()?,
             },
         })
     }

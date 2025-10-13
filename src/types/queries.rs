@@ -313,9 +313,9 @@ pub enum PendingUpdateEffect {
     #[serde(rename = "level1")]
     Level1Keys(HigherLevelAccessStructure<Level1KeysKind>),
     #[serde(rename = "level2V0")]
-    Level2KeysCPV0(Authorizations<ChainParameterVersion0>),
+    Level2KeysCPV0(AuthorizationsV0),
     #[serde(rename = "level2V1")]
-    Level2KeysCPV1(Authorizations<ChainParameterVersion1>),
+    Level2KeysCPV1(AuthorizationsV1),
     #[serde(rename = "protocol")]
     Protocol(ProtocolUpdate),
     #[serde(rename = "electionDifficulty")]
@@ -327,9 +327,9 @@ pub enum PendingUpdateEffect {
     #[serde(rename = "foundationAccount")]
     FoundationAccount(AccountAddress),
     #[serde(rename = "mintDistributionV0")]
-    MintDistributionV0(MintDistribution<ChainParameterVersion0>),
+    MintDistributionV0(MintDistributionV0),
     #[serde(rename = "mintDistributionV1")]
-    MintDistributionV1(MintDistribution<ChainParameterVersion1>),
+    MintDistributionV1(MintDistributionV1),
     #[serde(rename = "transactionFeeDistribution")]
     TransactionFeeDistribution(TransactionFeeDistribution),
     #[serde(rename = "gasRewards")]
