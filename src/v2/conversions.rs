@@ -4,7 +4,7 @@
 use super::{generated::*, upward::Upward, Require};
 use crate::types::{
     queries::{ConcordiumBFTDetails, ProtocolVersionInt},
-    AccountReleaseSchedule, ActiveBakerPoolStatus, UpdateKeysCollectionSkeleton,
+    AccountReleaseSchedule, ActiveBakerPoolStatus,
 };
 use chrono::TimeZone;
 use concordium_base::{
@@ -28,8 +28,12 @@ fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
     let res = A::deserial(&mut cursor);
     match res {
         Ok(v) if cursor.position() == bytes.len() as u64 => Ok(v),
-        _ => Err(tonic::Status::internal(
-            "Unexpected response from the server.",
+        Err(e) => Err(tonic::Status::internal(format!(
+            "Could not deserialize response: {}",
+            e
+        ))),
+        Ok(_) => Err(tonic::Status::internal(
+            "Could not deserialize response: trailing bytes",
         )),
     }
 }
@@ -1697,7 +1701,7 @@ impl TryFrom<AuthorizationsV0> for super::Level2Keys {
                 .collect::<Result<_, tonic::Status>>()?,
             emergency: value.emergency.map(TryInto::try_into).transpose()?,
             protocol: value.protocol.map(TryInto::try_into).transpose()?,
-            election_difficulty: value
+            consensus: value
                 .parameter_consensus
                 .map(TryInto::try_into)
                 .transpose()?,
@@ -2635,102 +2639,166 @@ impl TryFrom<CredentialsPerBlockLimit> for super::types::CredentialsPerBlockLimi
     }
 }
 
-impl TryFrom<ChainParametersV0> for super::ChainParametersV0 {
+impl TryFrom<TimeoutParameters> for super::TimeoutParameters {
     type Error = tonic::Status;
 
-    fn try_from(value: ChainParametersV0) -> Result<Self, Self::Error> {
+    fn try_from(value: TimeoutParameters) -> Result<Self, Self::Error> {
         Ok(Self {
-            election_difficulty: value.election_difficulty.require()?.try_into()?,
-            euro_per_energy: value.euro_per_energy.require()?.try_into()?,
-            micro_ccd_per_euro: value.micro_ccd_per_euro.require()?.try_into()?,
-            baker_cooldown_epochs: value.baker_cooldown_epochs.require()?.into(),
-            account_creation_limit: value.account_creation_limit.require()?.try_into()?,
-            mint_distribution: value.mint_distribution.require()?.try_into()?,
-            transaction_fee_distribution: value
-                .transaction_fee_distribution
-                .require()?
-                .try_into()?,
-            gas_rewards: value.gas_rewards.require()?.try_into()?,
-            foundation_account: value.foundation_account.require()?.try_into()?,
-            minimum_threshold_for_baking: value.minimum_threshold_for_baking.require()?.into(),
-            keys: UpdateKeysCollectionSkeleton {
-                root_keys: value.root_keys.require()?.try_into()?,
-                level_1_keys: value.level1_keys.require()?.try_into()?,
-                level_2_keys: value.level2_keys.require()?.try_into()?,
-            },
+            base: value.timeout_base.map(Into::into),
+            increase: value.timeout_increase.map(TryInto::try_into).transpose()?,
+            decrease: value.timeout_decrease.map(TryInto::try_into).transpose()?,
         })
     }
 }
 
-impl TryFrom<ChainParametersV0> for super::ChainParametersCommon {
+impl From<CooldownParametersCpv1> for super::CooldownParameters {
+    fn from(value: CooldownParametersCpv1) -> Self {
+        Self {
+            baker_cooldown_epochs: None,
+            pool_owner_cooldown: value.pool_owner_cooldown.map(Into::into),
+            delegator_cooldown: value.delegator_cooldown.map(Into::into),
+        }
+    }
+}
+
+impl From<MintDistributionCpv0> for super::MintDistribution {
+    fn from(value: MintDistributionCpv0) -> Self {
+        Self {
+            baking_reward: value.baking_reward.map(Into::into),
+            finalization_reward: value.finalization_reward.map(Into::into),
+        }
+    }
+}
+
+impl From<MintDistributionCpv1> for super::MintDistribution {
+    fn from(value: MintDistributionCpv1) -> Self {
+        Self {
+            baking_reward: value.baking_reward.map(Into::into),
+            finalization_reward: value.finalization_reward.map(Into::into),
+        }
+    }
+}
+
+impl From<TransactionFeeDistribution> for super::TransactionFeeDistribution {
+    fn from(value: TransactionFeeDistribution) -> Self {
+        Self {
+            baker: value.baker.map(Into::into),
+            gas_account: value.gas_account.map(Into::into),
+        }
+    }
+}
+
+impl From<GasRewards> for super::GasRewards {
+    fn from(value: GasRewards) -> Self {
+        Self {
+            baker: value.baker.map(Into::into),
+            finalization_proof: value.finalization_proof.map(Into::into),
+            account_creation: value.account_creation.map(Into::into),
+            chain_update: value.chain_update.map(Into::into),
+        }
+    }
+}
+
+impl From<GasRewardsCpv2> for super::GasRewards {
+    fn from(value: GasRewardsCpv2) -> Self {
+        Self {
+            baker: value.baker.map(Into::into),
+            finalization_proof: None,
+            account_creation: value.account_creation.map(Into::into),
+            chain_update: value.chain_update.map(Into::into),
+        }
+    }
+}
+
+impl TryFrom<PoolParametersCpv1> for super::StakingParameters {
+    type Error = tonic::Status;
+
+    fn try_from(value: PoolParametersCpv1) -> Result<Self, Self::Error> {
+        Ok(Self {
+            passive_finalization_commission: value.passive_finalization_commission.map(Into::into),
+            passive_baking_commission: value.passive_baking_commission.map(Into::into),
+            passive_transaction_commission: value.passive_transaction_commission.map(Into::into),
+            finalization_commission_range: value
+                .commission_bounds
+                .as_ref()
+                .and_then(|cb| cb.finalization.map(TryInto::try_into))
+                .transpose()?,
+            baking_commission_range: value
+                .commission_bounds
+                .as_ref()
+                .and_then(|cb| cb.baking.map(TryInto::try_into))
+                .transpose()?,
+            transaction_commission_range: value
+                .commission_bounds
+                .as_ref()
+                .and_then(|cb| cb.transaction.map(TryInto::try_into))
+                .transpose()?,
+            minimum_equity_capital: value.minimum_equity_capital.map(Into::into),
+            capital_bound: value.capital_bound.map(TryInto::try_into).transpose()?,
+            leverage_bound: value.leverage_bound.map(TryInto::try_into).transpose()?,
+        })
+    }
+}
+
+impl From<FinalizationCommitteeParameters> for super::FinalizationCommitteeParameters {
+    fn from(value: FinalizationCommitteeParameters) -> Self {
+        Self {
+            min_finalizers: Some(value.minimum_finalizers),
+            max_finalizers: Some(value.maximum_finalizers),
+            finalizers_relative_stake_threshold: value
+                .finalizer_relative_stake_threshold
+                .map(Into::into),
+        }
+    }
+}
+
+impl TryFrom<ChainParametersV0> for super::ChainParameters {
     type Error = tonic::Status;
 
     fn try_from(value: ChainParametersV0) -> Result<Self, Self::Error> {
-        let cooldown_parameters =
-            value
+        Ok(Self {
+            timeout_parameters: None,
+            election_difficulty: value
+                .election_difficulty
+                .map(TryInto::try_into)
+                .transpose()?,
+            min_block_time: None,
+            block_energy_limit: None,
+            euro_per_energy: value.euro_per_energy.map(TryInto::try_into).transpose()?,
+            micro_ccd_per_euro: value
+                .micro_ccd_per_euro
+                .map(TryInto::try_into)
+                .transpose()?,
+            cooldown_parameters: value
                 .baker_cooldown_epochs
                 .map(|bce| super::CooldownParameters {
                     baker_cooldown_epochs: Some(bce.into()),
                     pool_owner_cooldown: None,
                     delegator_cooldown: None,
-                });
-        let mint_per_slot = value
-            .mint_distribution
-            .and_then(|md| md.mint_per_slot.map(TryInto::try_into))
-            .transpose()?;
-        let mint_distribution = value.mint_distribution.map(|md| super::MintDistribution {
-            baking_reward: md.baking_reward.map(Into::into),
-            finalization_reward: md.finalization_reward.map(Into::into),
-        });
-        let transaction_fee_distribution =
-            value
-                .transaction_fee_distribution
-                .map(|tfd| super::TransactionFeeDistribution {
-                    baker: tfd.baker.map(Into::into),
-                    gas_account: tfd.gas_account.map(Into::into),
-                });
-        let gas_rewards = value.gas_rewards.map(|gr| super::GasRewards {
-            baker: gr.baker.map(Into::into),
-            finalization_proof: gr.finalization_proof.map(Into::into),
-            account_creation: gr.account_creation.map(Into::into),
-            chain_update: gr.chain_update.map(Into::into),
-        });
-        let staking_parameters =
-            value
-                .minimum_threshold_for_baking
-                .map(|mtfb| super::StakingParameters {
-                    minimum_equity_capital: Some(mtfb.into()),
-                    ..Default::default()
-                });
-        Ok(Self {
-            timeout_parameters: None,
-            election_difficulty: value
-                .election_difficulty
-                .map(TryInto::try_into)
-                .transpose()?,
-            min_block_time: None,
-            block_energy_limit: None,
-            euro_per_energy: value.euro_per_energy.map(TryInto::try_into).transpose()?,
-            micro_ccd_per_euro: value
-                .micro_ccd_per_euro
-                .map(TryInto::try_into)
-                .transpose()?,
-            cooldown_parameters,
+                }),
             reward_period_length: None,
             mint_per_payday: None,
-            mint_per_slot,
-            mint_distribution,
+            mint_per_slot: value
+                .mint_distribution
+                .and_then(|md| md.mint_per_slot.map(TryInto::try_into))
+                .transpose()?,
+            mint_distribution: value.mint_distribution.map(Into::into),
             account_creation_limit: value
                 .account_creation_limit
                 .map(TryInto::try_into)
                 .transpose()?,
-            transaction_fee_distribution,
-            gas_rewards,
+            transaction_fee_distribution: value.transaction_fee_distribution.map(Into::into),
+            gas_rewards: value.gas_rewards.map(Into::into),
             foundation_account: value
                 .foundation_account
                 .map(TryInto::try_into)
                 .transpose()?,
-            staking_parameters,
+            staking_parameters: value.minimum_threshold_for_baking.map(|mtfb| {
+                super::StakingParameters {
+                    minimum_equity_capital: Some(mtfb.into()),
+                    ..Default::default()
+                }
+            }),
             finalization_committee_parameters: None,
             validator_max_missed_rounds: None,
 
@@ -2743,94 +2811,10 @@ impl TryFrom<ChainParametersV0> for super::ChainParametersCommon {
     }
 }
 
-impl TryFrom<ChainParametersV1> for super::ChainParametersV1 {
+impl TryFrom<ChainParametersV1> for super::ChainParameters {
     type Error = tonic::Status;
 
     fn try_from(value: ChainParametersV1) -> Result<Self, Self::Error> {
-        Ok(Self {
-            election_difficulty: value.election_difficulty.require()?.try_into()?,
-            euro_per_energy: value.euro_per_energy.require()?.try_into()?,
-            micro_ccd_per_euro: value.micro_ccd_per_euro.require()?.try_into()?,
-            pool_parameters: value.pool_parameters.require()?.try_into()?,
-            account_creation_limit: value.account_creation_limit.require()?.try_into()?,
-            mint_distribution: value.mint_distribution.require()?.try_into()?,
-            transaction_fee_distribution: value
-                .transaction_fee_distribution
-                .require()?
-                .try_into()?,
-            gas_rewards: value.gas_rewards.require()?.try_into()?,
-            foundation_account: value.foundation_account.require()?.try_into()?,
-            time_parameters: value.time_parameters.require()?.try_into()?,
-            cooldown_parameters: value.cooldown_parameters.require()?.try_into()?,
-            keys: UpdateKeysCollectionSkeleton {
-                root_keys: value.root_keys.require()?.try_into()?,
-                level_1_keys: value.level1_keys.require()?.try_into()?,
-                level_2_keys: value.level2_keys.require()?.try_into()?,
-            },
-        })
-    }
-}
-
-impl TryFrom<ChainParametersV1> for super::ChainParametersCommon {
-    type Error = tonic::Status;
-
-    fn try_from(value: ChainParametersV1) -> Result<Self, Self::Error> {
-        let cooldown_parameters = value
-            .cooldown_parameters
-            .map(|cp| super::CooldownParameters {
-                baker_cooldown_epochs: None,
-                pool_owner_cooldown: cp.pool_owner_cooldown.map(Into::into),
-                delegator_cooldown: cp.delegator_cooldown.map(Into::into),
-            });
-        let mint_distribution = value.mint_distribution.map(|md| super::MintDistribution {
-            baking_reward: md.baking_reward.map(Into::into),
-            finalization_reward: md.finalization_reward.map(Into::into),
-        });
-        let transaction_fee_distribution =
-            value
-                .transaction_fee_distribution
-                .map(|tfd| super::TransactionFeeDistribution {
-                    baker: tfd.baker.map(Into::into),
-                    gas_account: tfd.gas_account.map(Into::into),
-                });
-        let gas_rewards = value.gas_rewards.map(|gr| super::GasRewards {
-            baker: gr.baker.map(Into::into),
-            finalization_proof: gr.finalization_proof.map(Into::into),
-            account_creation: gr.account_creation.map(Into::into),
-            chain_update: gr.chain_update.map(Into::into),
-        });
-        let staking_parameters = value
-            .pool_parameters
-            .map(|pp| -> Result<super::StakingParameters, tonic::Status> {
-                Ok(super::StakingParameters {
-                    passive_finalization_commission: pp
-                        .passive_finalization_commission
-                        .map(Into::into),
-                    passive_baking_commission: pp.passive_baking_commission.map(Into::into),
-                    passive_transaction_commission: pp
-                        .passive_transaction_commission
-                        .map(Into::into),
-                    finalization_commission_range: pp
-                        .commission_bounds
-                        .as_ref()
-                        .and_then(|cb| cb.finalization.map(TryInto::try_into))
-                        .transpose()?,
-                    baking_commission_range: pp
-                        .commission_bounds
-                        .as_ref()
-                        .and_then(|cb| cb.baking.map(TryInto::try_into))
-                        .transpose()?,
-                    transaction_commission_range: pp
-                        .commission_bounds
-                        .as_ref()
-                        .and_then(|cb| cb.transaction.map(TryInto::try_into))
-                        .transpose()?,
-                    minimum_equity_capital: pp.minimum_equity_capital.map(Into::into),
-                    capital_bound: pp.capital_bound.map(TryInto::try_into).transpose()?,
-                    leverage_bound: pp.leverage_bound.map(TryInto::try_into).transpose()?,
-                })
-            })
-            .transpose()?;
         Ok(Self {
             timeout_parameters: None,
             election_difficulty: value
@@ -2844,7 +2828,7 @@ impl TryFrom<ChainParametersV1> for super::ChainParametersCommon {
                 .micro_ccd_per_euro
                 .map(TryInto::try_into)
                 .transpose()?,
-            cooldown_parameters,
+            cooldown_parameters: value.cooldown_parameters.map(Into::into),
             reward_period_length: value
                 .time_parameters
                 .as_ref()
@@ -2860,14 +2844,14 @@ impl TryFrom<ChainParametersV1> for super::ChainParametersCommon {
                 .account_creation_limit
                 .map(TryInto::try_into)
                 .transpose()?,
-            mint_distribution,
-            transaction_fee_distribution,
-            gas_rewards,
+            mint_distribution: value.mint_distribution.map(Into::into),
+            transaction_fee_distribution: value.transaction_fee_distribution.map(Into::into),
+            gas_rewards: value.gas_rewards.map(Into::into),
             foundation_account: value
                 .foundation_account
                 .map(TryInto::try_into)
                 .transpose()?,
-            staking_parameters,
+            staking_parameters: value.pool_parameters.map(TryInto::try_into).transpose()?,
             finalization_committee_parameters: None,
             validator_max_missed_rounds: None,
             keys: super::UpdateKeys {
@@ -2879,131 +2863,16 @@ impl TryFrom<ChainParametersV1> for super::ChainParametersCommon {
     }
 }
 
-impl TryFrom<ChainParametersV2> for super::ChainParametersV2 {
+impl TryFrom<ChainParametersV2> for super::ChainParameters {
     type Error = tonic::Status;
 
     fn try_from(value: ChainParametersV2) -> Result<Self, Self::Error> {
-        let consensus_parameters = value.consensus_parameters.require()?;
-
         Ok(Self {
-            timeout_parameters: consensus_parameters
-                .timeout_parameters
-                .require()?
-                .try_into()?,
-            min_block_time: consensus_parameters.min_block_time.require()?.into(),
-            block_energy_limit: consensus_parameters.block_energy_limit.require()?.into(),
-            euro_per_energy: value.euro_per_energy.require()?.try_into()?,
-            micro_ccd_per_euro: value.micro_ccd_per_euro.require()?.try_into()?,
-            pool_parameters: value.pool_parameters.require()?.try_into()?,
-            account_creation_limit: value.account_creation_limit.require()?.try_into()?,
-            mint_distribution: value.mint_distribution.require()?.try_into()?,
-            transaction_fee_distribution: value
-                .transaction_fee_distribution
-                .require()?
-                .try_into()?,
-            gas_rewards: value.gas_rewards.require()?.try_into()?,
-            foundation_account: value.foundation_account.require()?.try_into()?,
-            time_parameters: value.time_parameters.require()?.try_into()?,
-            cooldown_parameters: value.cooldown_parameters.require()?.try_into()?,
-            finalization_committee_parameters: value
-                .finalization_committee_parameters
-                .require()?
-                .try_into()?,
-            keys: UpdateKeysCollectionSkeleton {
-                root_keys: value.root_keys.require()?.try_into()?,
-                level_1_keys: value.level1_keys.require()?.try_into()?,
-                level_2_keys: value.level2_keys.require()?.try_into()?,
-            },
-        })
-    }
-}
-
-impl TryFrom<ChainParametersV2> for super::ChainParametersCommon {
-    type Error = tonic::Status;
-
-    fn try_from(value: ChainParametersV2) -> Result<Self, Self::Error> {
-        let timeout_parameters = value
-            .consensus_parameters
-            .as_ref()
-            .and_then(|cp| {
-                cp.timeout_parameters
-                    .map(|tp| -> Result<super::TimeoutParameters, tonic::Status> {
-                        Ok(super::TimeoutParameters {
-                            base: tp.timeout_base.map(Into::into),
-                            increase: tp.timeout_increase.map(TryInto::try_into).transpose()?,
-                            decrease: tp.timeout_decrease.map(TryInto::try_into).transpose()?,
-                        })
-                    })
-            })
-            .transpose()?;
-        let cooldown_parameters = value
-            .cooldown_parameters
-            .map(|cp| super::CooldownParameters {
-                baker_cooldown_epochs: None,
-                pool_owner_cooldown: cp.pool_owner_cooldown.map(Into::into),
-                delegator_cooldown: cp.delegator_cooldown.map(Into::into),
-            });
-        let mint_distribution = value.mint_distribution.map(|md| super::MintDistribution {
-            baking_reward: md.baking_reward.map(Into::into),
-            finalization_reward: md.finalization_reward.map(Into::into),
-        });
-        let transaction_fee_distribution =
-            value
-                .transaction_fee_distribution
-                .map(|tfd| super::TransactionFeeDistribution {
-                    baker: tfd.baker.map(Into::into),
-                    gas_account: tfd.gas_account.map(Into::into),
-                });
-        let gas_rewards = value.gas_rewards.map(|gr| super::GasRewards {
-            baker: gr.baker.map(Into::into),
-            finalization_proof: None,
-            account_creation: gr.account_creation.map(Into::into),
-            chain_update: gr.chain_update.map(Into::into),
-        });
-        let staking_parameters = value
-            .pool_parameters
-            .map(|pp| -> Result<super::StakingParameters, tonic::Status> {
-                Ok(super::StakingParameters {
-                    passive_finalization_commission: pp
-                        .passive_finalization_commission
-                        .map(Into::into),
-                    passive_baking_commission: pp.passive_baking_commission.map(Into::into),
-                    passive_transaction_commission: pp
-                        .passive_transaction_commission
-                        .map(Into::into),
-                    finalization_commission_range: pp
-                        .commission_bounds
-                        .as_ref()
-                        .and_then(|cb| cb.finalization.map(TryInto::try_into))
-                        .transpose()?,
-                    baking_commission_range: pp
-                        .commission_bounds
-                        .as_ref()
-                        .and_then(|cb| cb.baking.map(TryInto::try_into))
-                        .transpose()?,
-                    transaction_commission_range: pp
-                        .commission_bounds
-                        .as_ref()
-                        .and_then(|cb| cb.transaction.map(TryInto::try_into))
-                        .transpose()?,
-                    minimum_equity_capital: pp.minimum_equity_capital.map(Into::into),
-                    capital_bound: pp.capital_bound.map(TryInto::try_into).transpose()?,
-                    leverage_bound: pp.leverage_bound.map(TryInto::try_into).transpose()?,
-                })
-            })
-            .transpose()?;
-        let finalization_committee_parameters =
-            value.finalization_committee_parameters.map(|fcp| {
-                super::FinalizationCommitteeParameters {
-                    min_finalizers: Some(fcp.minimum_finalizers),
-                    max_finalizers: Some(fcp.maximum_finalizers),
-                    finalizers_relative_stake_threshold: fcp
-                        .finalizer_relative_stake_threshold
-                        .map(Into::into),
-                }
-            });
-        Ok(Self {
-            timeout_parameters,
+            timeout_parameters: value
+                .consensus_parameters
+                .as_ref()
+                .and_then(|cp| cp.timeout_parameters.map(TryInto::try_into))
+                .transpose()?,
             election_difficulty: None,
             min_block_time: value
                 .consensus_parameters
@@ -3018,7 +2887,7 @@ impl TryFrom<ChainParametersV2> for super::ChainParametersCommon {
                 .micro_ccd_per_euro
                 .map(TryInto::try_into)
                 .transpose()?,
-            cooldown_parameters,
+            cooldown_parameters: value.cooldown_parameters.map(Into::into),
             reward_period_length: value
                 .time_parameters
                 .as_ref()
@@ -3030,19 +2899,21 @@ impl TryFrom<ChainParametersV2> for super::ChainParametersCommon {
                 .and_then(|tp| tp.mint_per_payday.map(TryInto::try_into))
                 .transpose()?,
             mint_per_slot: None,
-            mint_distribution,
             account_creation_limit: value
                 .account_creation_limit
                 .map(TryInto::try_into)
                 .transpose()?,
-            transaction_fee_distribution,
-            gas_rewards,
+            mint_distribution: value.mint_distribution.map(Into::into),
+            transaction_fee_distribution: value.transaction_fee_distribution.map(Into::into),
+            gas_rewards: value.gas_rewards.map(Into::into),
             foundation_account: value
                 .foundation_account
                 .map(TryInto::try_into)
                 .transpose()?,
-            staking_parameters,
-            finalization_committee_parameters,
+            staking_parameters: value.pool_parameters.map(TryInto::try_into).transpose()?,
+            finalization_committee_parameters: value
+                .finalization_committee_parameters
+                .map(Into::into),
             validator_max_missed_rounds: None,
             keys: super::UpdateKeys {
                 root_keys: value.root_keys.map(TryInto::try_into).transpose()?,
@@ -3053,132 +2924,16 @@ impl TryFrom<ChainParametersV2> for super::ChainParametersCommon {
     }
 }
 
-impl TryFrom<ChainParametersV3> for super::ChainParametersV3 {
+impl TryFrom<ChainParametersV3> for super::ChainParameters {
     type Error = tonic::Status;
 
     fn try_from(value: ChainParametersV3) -> Result<Self, Self::Error> {
-        let consensus_parameters = value.consensus_parameters.require()?;
-
         Ok(Self {
-            timeout_parameters: consensus_parameters
-                .timeout_parameters
-                .require()?
-                .try_into()?,
-            min_block_time: consensus_parameters.min_block_time.require()?.into(),
-            block_energy_limit: consensus_parameters.block_energy_limit.require()?.into(),
-            euro_per_energy: value.euro_per_energy.require()?.try_into()?,
-            micro_ccd_per_euro: value.micro_ccd_per_euro.require()?.try_into()?,
-            pool_parameters: value.pool_parameters.require()?.try_into()?,
-            account_creation_limit: value.account_creation_limit.require()?.try_into()?,
-            mint_distribution: value.mint_distribution.require()?.try_into()?,
-            transaction_fee_distribution: value
-                .transaction_fee_distribution
-                .require()?
-                .try_into()?,
-            gas_rewards: value.gas_rewards.require()?.try_into()?,
-            foundation_account: value.foundation_account.require()?.try_into()?,
-            time_parameters: value.time_parameters.require()?.try_into()?,
-            cooldown_parameters: value.cooldown_parameters.require()?.try_into()?,
-            finalization_committee_parameters: value
-                .finalization_committee_parameters
-                .require()?
-                .try_into()?,
-            validator_score_parameters: value.validator_score_parameters.require()?.try_into()?,
-            keys: UpdateKeysCollectionSkeleton {
-                root_keys: value.root_keys.require()?.try_into()?,
-                level_1_keys: value.level1_keys.require()?.try_into()?,
-                level_2_keys: value.level2_keys.require()?.try_into()?,
-            },
-        })
-    }
-}
-
-impl TryFrom<ChainParametersV3> for super::ChainParametersCommon {
-    type Error = tonic::Status;
-
-    fn try_from(value: ChainParametersV3) -> Result<Self, Self::Error> {
-        let timeout_parameters = value
-            .consensus_parameters
-            .as_ref()
-            .and_then(|cp| {
-                cp.timeout_parameters
-                    .map(|tp| -> Result<super::TimeoutParameters, tonic::Status> {
-                        Ok(super::TimeoutParameters {
-                            base: tp.timeout_base.map(Into::into),
-                            increase: tp.timeout_increase.map(TryInto::try_into).transpose()?,
-                            decrease: tp.timeout_decrease.map(TryInto::try_into).transpose()?,
-                        })
-                    })
-            })
-            .transpose()?;
-        let cooldown_parameters = value
-            .cooldown_parameters
-            .map(|cp| super::CooldownParameters {
-                baker_cooldown_epochs: None,
-                pool_owner_cooldown: cp.pool_owner_cooldown.map(Into::into),
-                delegator_cooldown: cp.delegator_cooldown.map(Into::into),
-            });
-        let mint_distribution = value.mint_distribution.map(|md| super::MintDistribution {
-            baking_reward: md.baking_reward.map(Into::into),
-            finalization_reward: md.finalization_reward.map(Into::into),
-        });
-        let transaction_fee_distribution =
-            value
-                .transaction_fee_distribution
-                .map(|tfd| super::TransactionFeeDistribution {
-                    baker: tfd.baker.map(Into::into),
-                    gas_account: tfd.gas_account.map(Into::into),
-                });
-        let gas_rewards = value.gas_rewards.map(|gr| super::GasRewards {
-            baker: gr.baker.map(Into::into),
-            finalization_proof: None,
-            account_creation: gr.account_creation.map(Into::into),
-            chain_update: gr.chain_update.map(Into::into),
-        });
-        let staking_parameters = value
-            .pool_parameters
-            .map(|pp| -> Result<super::StakingParameters, tonic::Status> {
-                Ok(super::StakingParameters {
-                    passive_finalization_commission: pp
-                        .passive_finalization_commission
-                        .map(Into::into),
-                    passive_baking_commission: pp.passive_baking_commission.map(Into::into),
-                    passive_transaction_commission: pp
-                        .passive_transaction_commission
-                        .map(Into::into),
-                    finalization_commission_range: pp
-                        .commission_bounds
-                        .as_ref()
-                        .and_then(|cb| cb.finalization.map(TryInto::try_into))
-                        .transpose()?,
-                    baking_commission_range: pp
-                        .commission_bounds
-                        .as_ref()
-                        .and_then(|cb| cb.baking.map(TryInto::try_into))
-                        .transpose()?,
-                    transaction_commission_range: pp
-                        .commission_bounds
-                        .as_ref()
-                        .and_then(|cb| cb.transaction.map(TryInto::try_into))
-                        .transpose()?,
-                    minimum_equity_capital: pp.minimum_equity_capital.map(Into::into),
-                    capital_bound: pp.capital_bound.map(TryInto::try_into).transpose()?,
-                    leverage_bound: pp.leverage_bound.map(TryInto::try_into).transpose()?,
-                })
-            })
-            .transpose()?;
-        let finalization_committee_parameters =
-            value.finalization_committee_parameters.map(|fcp| {
-                super::FinalizationCommitteeParameters {
-                    min_finalizers: Some(fcp.minimum_finalizers),
-                    max_finalizers: Some(fcp.maximum_finalizers),
-                    finalizers_relative_stake_threshold: fcp
-                        .finalizer_relative_stake_threshold
-                        .map(Into::into),
-                }
-            });
-        Ok(Self {
-            timeout_parameters,
+            timeout_parameters: value
+                .consensus_parameters
+                .as_ref()
+                .and_then(|cp| cp.timeout_parameters.map(TryInto::try_into))
+                .transpose()?,
             election_difficulty: None,
             min_block_time: value
                 .consensus_parameters
@@ -3193,7 +2948,7 @@ impl TryFrom<ChainParametersV3> for super::ChainParametersCommon {
                 .micro_ccd_per_euro
                 .map(TryInto::try_into)
                 .transpose()?,
-            cooldown_parameters,
+            cooldown_parameters: value.cooldown_parameters.map(Into::into),
             reward_period_length: value
                 .time_parameters
                 .as_ref()
@@ -3205,19 +2960,21 @@ impl TryFrom<ChainParametersV3> for super::ChainParametersCommon {
                 .and_then(|tp| tp.mint_per_payday.map(TryInto::try_into))
                 .transpose()?,
             mint_per_slot: None,
-            mint_distribution,
             account_creation_limit: value
                 .account_creation_limit
                 .map(TryInto::try_into)
                 .transpose()?,
-            transaction_fee_distribution,
-            gas_rewards,
+            mint_distribution: value.mint_distribution.map(Into::into),
+            transaction_fee_distribution: value.transaction_fee_distribution.map(Into::into),
+            gas_rewards: value.gas_rewards.map(Into::into),
             foundation_account: value
                 .foundation_account
                 .map(TryInto::try_into)
                 .transpose()?,
-            staking_parameters,
-            finalization_committee_parameters,
+            staking_parameters: value.pool_parameters.map(TryInto::try_into).transpose()?,
+            finalization_committee_parameters: value
+                .finalization_committee_parameters
+                .map(Into::into),
             validator_max_missed_rounds: value
                 .validator_score_parameters
                 .map(|vsp| vsp.maximum_missed_rounds),
@@ -3235,10 +2992,10 @@ impl TryFrom<ChainParameters> for super::ChainParameters {
 
     fn try_from(value: ChainParameters) -> Result<Self, Self::Error> {
         match value.parameters.require()? {
-            chain_parameters::Parameters::V0(v0) => Ok(Self::V0(v0.try_into()?)),
-            chain_parameters::Parameters::V1(v1) => Ok(Self::V1(v1.try_into()?)),
-            chain_parameters::Parameters::V2(v2) => Ok(Self::V2(v2.try_into()?)),
-            chain_parameters::Parameters::V3(v3) => Ok(Self::V3(v3.try_into()?)),
+            chain_parameters::Parameters::V0(v0) => v0.try_into(),
+            chain_parameters::Parameters::V1(v1) => v1.try_into(),
+            chain_parameters::Parameters::V2(v2) => v2.try_into(),
+            chain_parameters::Parameters::V3(v3) => v3.try_into(),
         }
     }
 }
@@ -4544,6 +4301,12 @@ impl TryFrom<ConsensusDetailedStatus> for super::types::queries::ConsensusDetail
 
 #[cfg(test)]
 mod test {
+    use concordium_base::{
+        base::{self, UpdateKeyPair},
+        common::{Deserial, Serial},
+    };
+    use rand::{rngs::StdRng, SeedableRng};
+
     use super::*;
 
     #[test]
@@ -4594,5 +4357,657 @@ mod test {
         let to = QBranch::try_from(from).expect("Failed to convert branch");
 
         assert_eq!(to, to_target);
+    }
+
+    /// Generate an `UpdatePublicKey` and its serialized representation.
+    fn gen_public_key(rng: &mut StdRng) -> (base::UpdatePublicKey, Vec<u8>) {
+        let key = base::UpdatePublicKey::from(&UpdateKeyPair::generate(rng));
+        let mut buffer = Vec::with_capacity(33);
+        key.serial(&mut buffer);
+        // Drop the first byte which indicates the key is Ed25519.
+        let bytes = buffer[1..].to_vec();
+        // Deserialize the serialized representation so that the key is
+        // represented normalized (i.e. with the Z coordinate being 1 in the
+        // projective representation).
+        let norm_key = base::UpdatePublicKey::deserial(&mut &buffer[..]).unwrap();
+        (norm_key, bytes)
+    }
+
+    #[test]
+    fn test_try_from_chain_parameters_v0() {
+        let mut rng = StdRng::seed_from_u64(0);
+        let (root_key, root_key_bytes) = gen_public_key(&mut rng);
+        let (level_1_key, level_1_key_bytes) = gen_public_key(&mut rng);
+        let (level_2_key_1, level_2_key_1_bytes) = gen_public_key(&mut rng);
+        let (level_2_key_2, level_2_key_2_bytes) = gen_public_key(&mut rng);
+        let cpv0 = ChainParametersV0 {
+            election_difficulty: Some(ElectionDifficulty {
+                value: Some(AmountFraction {
+                    parts_per_hundred_thousand: 11111,
+                }),
+            }),
+            euro_per_energy: Some(ExchangeRate {
+                value: Some(Ratio {
+                    numerator: 13,
+                    denominator: 17,
+                }),
+            }),
+            micro_ccd_per_euro: Some(ExchangeRate {
+                value: Some(Ratio {
+                    numerator: 19,
+                    denominator: 23,
+                }),
+            }),
+            baker_cooldown_epochs: Some(Epoch { value: 29 }),
+            account_creation_limit: Some(CredentialsPerBlockLimit { value: 31 }),
+            mint_distribution: Some(MintDistributionCpv0 {
+                mint_per_slot: Some(MintRate {
+                    mantissa: 37,
+                    exponent: 41,
+                }),
+                baking_reward: Some(AmountFraction {
+                    parts_per_hundred_thousand: 43,
+                }),
+                finalization_reward: Some(AmountFraction {
+                    parts_per_hundred_thousand: 47,
+                }),
+            }),
+            transaction_fee_distribution: Some(TransactionFeeDistribution {
+                baker: Some(AmountFraction {
+                    parts_per_hundred_thousand: 53,
+                }),
+                gas_account: Some(AmountFraction {
+                    parts_per_hundred_thousand: 59,
+                }),
+            }),
+            gas_rewards: Some(GasRewards {
+                baker: Some(AmountFraction {
+                    parts_per_hundred_thousand: 61,
+                }),
+                finalization_proof: Some(AmountFraction {
+                    parts_per_hundred_thousand: 67,
+                }),
+                account_creation: Some(AmountFraction {
+                    parts_per_hundred_thousand: 71,
+                }),
+                chain_update: Some(AmountFraction {
+                    parts_per_hundred_thousand: 73,
+                }),
+            }),
+            foundation_account: Some(AccountAddress {
+                value: vec![79u8; 32],
+            }),
+            minimum_threshold_for_baking: Some(Amount { value: 83 }),
+            root_keys: Some(HigherLevelKeys {
+                keys: vec![UpdatePublicKey {
+                    value: root_key_bytes,
+                }],
+                threshold: Some(UpdateKeysThreshold { value: 97 }),
+            }),
+            level1_keys: Some(HigherLevelKeys {
+                keys: vec![UpdatePublicKey {
+                    value: level_1_key_bytes,
+                }],
+                threshold: Some(UpdateKeysThreshold { value: 103 }),
+            }),
+            level2_keys: Some(AuthorizationsV0 {
+                keys: vec![
+                    UpdatePublicKey {
+                        value: level_2_key_1_bytes,
+                    },
+                    UpdatePublicKey {
+                        value: level_2_key_2_bytes,
+                    },
+                ],
+                emergency: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 113 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 127 }),
+                }),
+                protocol: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 131 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 137 }),
+                }),
+                parameter_consensus: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 139 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 149 }),
+                }),
+                parameter_euro_per_energy: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 151 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 157 }),
+                }),
+                parameter_micro_ccd_per_euro: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 173 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 179 }),
+                }),
+                parameter_foundation_account: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 181 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 191 }),
+                }),
+                parameter_mint_distribution: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 193 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 197 }),
+                }),
+                parameter_transaction_fee_distribution: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 199 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 211 }),
+                }),
+                parameter_gas_rewards: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 223 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 227 }),
+                }),
+                pool_parameters: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 229 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 233 }),
+                }),
+                add_anonymity_revoker: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 239 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 241 }),
+                }),
+                add_identity_provider: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 251 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 257 }),
+                }),
+            }),
+        };
+        let params = ChainParameters {
+            parameters: Some(chain_parameters::Parameters::V0(cpv0)),
+        };
+        let converted = crate::v2::ChainParameters::try_from(params)
+            .expect("Failed to convert chain parameters v0");
+        let expected = crate::v2::ChainParameters {
+            timeout_parameters: None,
+            election_difficulty: Some(base::ElectionDifficulty::new_unchecked(11111)),
+            min_block_time: None,
+            block_energy_limit: None,
+            euro_per_energy: Some(base::ExchangeRate::new_unchecked(13, 17)),
+            micro_ccd_per_euro: Some(base::ExchangeRate::new_unchecked(19, 23)),
+            cooldown_parameters: Some(crate::v2::CooldownParameters {
+                baker_cooldown_epochs: Some(base::Epoch::from(29)),
+                pool_owner_cooldown: None,
+                delegator_cooldown: None,
+            }),
+            reward_period_length: None,
+            mint_per_payday: None,
+            mint_per_slot: Some(base::MintRate {
+                mantissa: 37,
+                exponent: 41,
+            }),
+            account_creation_limit: Some(base::CredentialsPerBlockLimit::from(31)),
+            mint_distribution: Some(crate::v2::MintDistribution {
+                baking_reward: Some(base::AmountFraction::new_unchecked(43)),
+                finalization_reward: Some(base::AmountFraction::new_unchecked(47)),
+            }),
+            transaction_fee_distribution: Some(crate::v2::TransactionFeeDistribution {
+                baker: Some(base::AmountFraction::new_unchecked(53)),
+                gas_account: Some(base::AmountFraction::new_unchecked(59)),
+            }),
+            gas_rewards: Some(crate::v2::GasRewards {
+                baker: Some(base::AmountFraction::new_unchecked(61)),
+                finalization_proof: Some(base::AmountFraction::new_unchecked(67)),
+                account_creation: Some(base::AmountFraction::new_unchecked(71)),
+                chain_update: Some(base::AmountFraction::new_unchecked(73)),
+            }),
+            foundation_account: Some(concordium_base::contracts_common::AccountAddress(
+                [79u8; 32],
+            )),
+            staking_parameters: Some(crate::v2::StakingParameters {
+                minimum_equity_capital: Some(
+                    concordium_base::contracts_common::Amount::from_micro_ccd(83),
+                ),
+                ..Default::default()
+            }),
+            finalization_committee_parameters: None,
+            validator_max_missed_rounds: None,
+            keys: crate::v2::UpdateKeys {
+                root_keys: Some(concordium_base::updates::HigherLevelAccessStructure::<
+                    concordium_base::updates::RootKeysKind,
+                > {
+                    keys: vec![crate::v2::UpdatePublicKey::from(
+                        crate::id::types::VerifyKey::from(root_key),
+                    )],
+                    threshold: 97.try_into().unwrap(),
+                    _phantom: Default::default(),
+                }),
+                level_1_keys: Some(concordium_base::updates::HigherLevelAccessStructure::<
+                    concordium_base::updates::Level1KeysKind,
+                > {
+                    keys: vec![crate::v2::UpdatePublicKey::from(
+                        crate::id::types::VerifyKey::from(level_1_key),
+                    )],
+                    threshold: 103.try_into().unwrap(),
+                    _phantom: Default::default(),
+                }),
+                level_2_keys: Some(crate::v2::Level2Keys {
+                    keys: vec![
+                        crate::v2::UpdatePublicKey::from(crate::id::types::VerifyKey::from(
+                            level_2_key_1,
+                        )),
+                        crate::v2::UpdatePublicKey::from(crate::id::types::VerifyKey::from(
+                            level_2_key_2,
+                        )),
+                    ],
+                    emergency: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(113)].into(),
+                        threshold: 127.try_into().unwrap(),
+                    }),
+                    protocol: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(131)].into(),
+                        threshold: 137.try_into().unwrap(),
+                    }),
+                    consensus: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(139)].into(),
+                        threshold: 149.try_into().unwrap(),
+                    }),
+                    euro_per_energy: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(151)].into(),
+                        threshold: 157.try_into().unwrap(),
+                    }),
+                    micro_ccd_per_euro: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(173)].into(),
+                        threshold: 179.try_into().unwrap(),
+                    }),
+                    foundation_account: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(181)].into(),
+                        threshold: 191.try_into().unwrap(),
+                    }),
+                    mint_distribution: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(193)].into(),
+                        threshold: 197.try_into().unwrap(),
+                    }),
+                    transaction_fee_distribution: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(199)].into(),
+                        threshold: 211.try_into().unwrap(),
+                    }),
+                    param_gas_rewards: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(223)].into(),
+                        threshold: 227.try_into().unwrap(),
+                    }),
+                    pool_parameters: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(229)].into(),
+                        threshold: 233.try_into().unwrap(),
+                    }),
+                    add_anonymity_revoker: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(239)].into(),
+                        threshold: 241.try_into().unwrap(),
+                    }),
+                    add_identity_provider: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(251)].into(),
+                        threshold: 257.try_into().unwrap(),
+                    }),
+                    cooldown_parameters: None,
+                    time_parameters: None,
+                    create_plt: None,
+                }),
+            },
+        };
+        // We compare the debug representations to avoid having to implement PartialEq
+        // on all types.
+        assert_eq!(format!("{:?}", converted), format!("{:?}", expected));
+    }
+
+    #[test]
+    fn test_try_from_chain_parameters_v1() {
+        let mut rng = StdRng::seed_from_u64(1);
+        let (root_key, root_key_bytes) = gen_public_key(&mut rng);
+        let (level_1_key, level_1_key_bytes) = gen_public_key(&mut rng);
+        let (level_2_key_1, level_2_key_1_bytes) = gen_public_key(&mut rng);
+        let (level_2_key_2, level_2_key_2_bytes) = gen_public_key(&mut rng);
+        let cpv1 = ChainParametersV1 {
+            election_difficulty: Some(ElectionDifficulty {
+                value: Some(AmountFraction {
+                    parts_per_hundred_thousand: 21111,
+                }),
+            }),
+            euro_per_energy: Some(ExchangeRate {
+                value: Some(Ratio {
+                    numerator: 2,
+                    denominator: 3,
+                }),
+            }),
+            micro_ccd_per_euro: Some(ExchangeRate {
+                value: Some(Ratio {
+                    numerator: 4,
+                    denominator: 5,
+                }),
+            }),
+            cooldown_parameters: Some(CooldownParametersCpv1 {
+                pool_owner_cooldown: Some(DurationSeconds { value: 6 }),
+                delegator_cooldown: Some(DurationSeconds { value: 7 }),
+            }),
+            time_parameters: Some(TimeParametersCpv1 {
+                reward_period_length: Some(RewardPeriodLength {
+                    value: Some(Epoch { value: 8 }),
+                }),
+                mint_per_payday: Some(MintRate {
+                    mantissa: 9,
+                    exponent: 10,
+                }),
+            }),
+            account_creation_limit: Some(CredentialsPerBlockLimit { value: 11 }),
+            mint_distribution: Some(MintDistributionCpv1 {
+                baking_reward: Some(AmountFraction {
+                    parts_per_hundred_thousand: 12,
+                }),
+                finalization_reward: Some(AmountFraction {
+                    parts_per_hundred_thousand: 13,
+                }),
+            }),
+            transaction_fee_distribution: Some(TransactionFeeDistribution {
+                baker: Some(AmountFraction {
+                    parts_per_hundred_thousand: 14,
+                }),
+                gas_account: Some(AmountFraction {
+                    parts_per_hundred_thousand: 15,
+                }),
+            }),
+            gas_rewards: Some(GasRewards {
+                baker: Some(AmountFraction {
+                    parts_per_hundred_thousand: 16,
+                }),
+                finalization_proof: Some(AmountFraction {
+                    parts_per_hundred_thousand: 17,
+                }),
+                account_creation: Some(AmountFraction {
+                    parts_per_hundred_thousand: 18,
+                }),
+                chain_update: Some(AmountFraction {
+                    parts_per_hundred_thousand: 19,
+                }),
+            }),
+            foundation_account: Some(AccountAddress {
+                value: vec![20u8; 32],
+            }),
+            pool_parameters: Some(PoolParametersCpv1 {
+                passive_finalization_commission: Some(AmountFraction {
+                    parts_per_hundred_thousand: 21,
+                }),
+                passive_baking_commission: Some(AmountFraction {
+                    parts_per_hundred_thousand: 22,
+                }),
+                passive_transaction_commission: Some(AmountFraction {
+                    parts_per_hundred_thousand: 23,
+                }),
+                commission_bounds: Some(CommissionRanges {
+                    finalization: Some(InclusiveRangeAmountFraction {
+                        min: Some(AmountFraction {
+                            parts_per_hundred_thousand: 24,
+                        }),
+                        max: Some(AmountFraction {
+                            parts_per_hundred_thousand: 25,
+                        }),
+                    }),
+                    baking: Some(InclusiveRangeAmountFraction {
+                        min: Some(AmountFraction {
+                            parts_per_hundred_thousand: 26,
+                        }),
+                        max: Some(AmountFraction {
+                            parts_per_hundred_thousand: 27,
+                        }),
+                    }),
+                    transaction: Some(InclusiveRangeAmountFraction {
+                        min: Some(AmountFraction {
+                            parts_per_hundred_thousand: 28,
+                        }),
+                        max: Some(AmountFraction {
+                            parts_per_hundred_thousand: 29,
+                        }),
+                    }),
+                }),
+                minimum_equity_capital: Some(Amount { value: 30 }),
+                capital_bound: Some(CapitalBound {
+                    value: Some(AmountFraction {
+                        parts_per_hundred_thousand: 31,
+                    }),
+                }),
+                leverage_bound: Some(LeverageFactor {
+                    value: Some(Ratio {
+                        numerator: 33,
+                        denominator: 32,
+                    }),
+                }),
+            }),
+            root_keys: Some(HigherLevelKeys {
+                keys: vec![UpdatePublicKey {
+                    value: root_key_bytes,
+                }],
+                threshold: Some(UpdateKeysThreshold { value: 34 }),
+            }),
+            level1_keys: Some(HigherLevelKeys {
+                keys: vec![UpdatePublicKey {
+                    value: level_1_key_bytes,
+                }],
+                threshold: Some(UpdateKeysThreshold { value: 35 }),
+            }),
+            level2_keys: Some(AuthorizationsV1 {
+                v0: Some(AuthorizationsV0 {
+                    keys: vec![
+                        UpdatePublicKey {
+                            value: level_2_key_1_bytes,
+                        },
+                        UpdatePublicKey {
+                            value: level_2_key_2_bytes,
+                        },
+                    ],
+                    emergency: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 113 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 127 }),
+                    }),
+                    protocol: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 131 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 137 }),
+                    }),
+                    parameter_consensus: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 139 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 149 }),
+                    }),
+                    parameter_euro_per_energy: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 151 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 157 }),
+                    }),
+                    parameter_micro_ccd_per_euro: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 173 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 179 }),
+                    }),
+                    parameter_foundation_account: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 181 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 191 }),
+                    }),
+                    parameter_mint_distribution: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 193 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 197 }),
+                    }),
+                    parameter_transaction_fee_distribution: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 199 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 211 }),
+                    }),
+                    parameter_gas_rewards: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 223 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 227 }),
+                    }),
+                    pool_parameters: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 229 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 233 }),
+                    }),
+                    add_anonymity_revoker: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 239 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 241 }),
+                    }),
+                    add_identity_provider: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 251 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 257 }),
+                    }),
+                }),
+                parameter_cooldown: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 263 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 269 }),
+                }),
+                parameter_time: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 271 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 277 }),
+                }),
+                create_plt: None,
+            }),
+        };
+        let params = ChainParameters {
+            parameters: Some(chain_parameters::Parameters::V1(cpv1)),
+        };
+        let converted = crate::v2::ChainParameters::try_from(params)
+            .expect("Failed to convert chain parameters v1");
+        let expected = crate::v2::ChainParameters {
+            timeout_parameters: None,
+            election_difficulty: Some(base::ElectionDifficulty::new_unchecked(21111)),
+            min_block_time: None,
+            block_energy_limit: None,
+            euro_per_energy: Some(base::ExchangeRate::new_unchecked(2, 3)),
+            micro_ccd_per_euro: Some(base::ExchangeRate::new_unchecked(4, 5)),
+            cooldown_parameters: Some(crate::v2::CooldownParameters {
+                baker_cooldown_epochs: None,
+                pool_owner_cooldown: Some(base::DurationSeconds::from(6)),
+                delegator_cooldown: Some(base::DurationSeconds::from(7)),
+            }),
+            reward_period_length: Some(updates::RewardPeriodLength::from(base::Epoch::from(8))),
+            mint_per_payday: Some(base::MintRate {
+                mantissa: 9,
+                exponent: 10,
+            }),
+            mint_per_slot: None,
+            account_creation_limit: Some(base::CredentialsPerBlockLimit::from(11)),
+            mint_distribution: Some(crate::v2::MintDistribution {
+                baking_reward: Some(base::AmountFraction::new_unchecked(12)),
+                finalization_reward: Some(base::AmountFraction::new_unchecked(13)),
+            }),
+            transaction_fee_distribution: Some(crate::v2::TransactionFeeDistribution {
+                baker: Some(base::AmountFraction::new_unchecked(14)),
+                gas_account: Some(base::AmountFraction::new_unchecked(15)),
+            }),
+            gas_rewards: Some(crate::v2::GasRewards {
+                baker: Some(base::AmountFraction::new_unchecked(16)),
+                finalization_proof: Some(base::AmountFraction::new_unchecked(17)),
+                account_creation: Some(base::AmountFraction::new_unchecked(18)),
+                chain_update: Some(base::AmountFraction::new_unchecked(19)),
+            }),
+            foundation_account: Some(concordium_base::contracts_common::AccountAddress(
+                [20u8; 32],
+            )),
+            staking_parameters: Some(crate::v2::StakingParameters {
+                passive_finalization_commission: Some(base::AmountFraction::new_unchecked(21)),
+                passive_baking_commission: Some(base::AmountFraction::new_unchecked(22)),
+                passive_transaction_commission: Some(base::AmountFraction::new_unchecked(23)),
+                finalization_commission_range: Some(base::InclusiveRange {
+                    min: base::AmountFraction::new_unchecked(24),
+                    max: base::AmountFraction::new_unchecked(25),
+                }),
+                baking_commission_range: Some(base::InclusiveRange {
+                    min: base::AmountFraction::new_unchecked(26),
+                    max: base::AmountFraction::new_unchecked(27),
+                }),
+                transaction_commission_range: Some(base::InclusiveRange {
+                    min: base::AmountFraction::new_unchecked(28),
+                    max: base::AmountFraction::new_unchecked(29),
+                }),
+                minimum_equity_capital: Some(
+                    concordium_base::contracts_common::Amount::from_micro_ccd(30),
+                ),
+                capital_bound: Some(base::CapitalBound {
+                    bound: base::AmountFraction::new_unchecked(31),
+                }),
+                leverage_bound: Some(base::LeverageFactor {
+                    numerator: 33,
+                    denominator: 32,
+                }),
+            }),
+            finalization_committee_parameters: None,
+            validator_max_missed_rounds: None,
+            keys: crate::v2::UpdateKeys {
+                root_keys: Some(concordium_base::updates::HigherLevelAccessStructure::<
+                    concordium_base::updates::RootKeysKind,
+                > {
+                    keys: vec![crate::v2::UpdatePublicKey::from(
+                        crate::id::types::VerifyKey::from(root_key),
+                    )],
+                    threshold: 34.try_into().unwrap(),
+                    _phantom: Default::default(),
+                }),
+                level_1_keys: Some(concordium_base::updates::HigherLevelAccessStructure::<
+                    concordium_base::updates::Level1KeysKind,
+                > {
+                    keys: vec![crate::v2::UpdatePublicKey::from(
+                        crate::id::types::VerifyKey::from(level_1_key),
+                    )],
+                    threshold: 35.try_into().unwrap(),
+                    _phantom: Default::default(),
+                }),
+                level_2_keys: Some(crate::v2::Level2Keys {
+                    keys: vec![
+                        crate::v2::UpdatePublicKey::from(crate::id::types::VerifyKey::from(
+                            level_2_key_1,
+                        )),
+                        crate::v2::UpdatePublicKey::from(crate::id::types::VerifyKey::from(
+                            level_2_key_2,
+                        )),
+                    ],
+                    emergency: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(113)].into(),
+                        threshold: 127.try_into().unwrap(),
+                    }),
+                    protocol: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(131)].into(),
+                        threshold: 137.try_into().unwrap(),
+                    }),
+                    consensus: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(139)].into(),
+                        threshold: 149.try_into().unwrap(),
+                    }),
+                    euro_per_energy: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(151)].into(),
+                        threshold: 157.try_into().unwrap(),
+                    }),
+                    micro_ccd_per_euro: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(173)].into(),
+                        threshold: 179.try_into().unwrap(),
+                    }),
+                    foundation_account: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(181)].into(),
+                        threshold: 191.try_into().unwrap(),
+                    }),
+                    mint_distribution: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(193)].into(),
+                        threshold: 197.try_into().unwrap(),
+                    }),
+                    transaction_fee_distribution: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(199)].into(),
+                        threshold: 211.try_into().unwrap(),
+                    }),
+                    param_gas_rewards: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(223)].into(),
+                        threshold: 227.try_into().unwrap(),
+                    }),
+                    pool_parameters: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(229)].into(),
+                        threshold: 233.try_into().unwrap(),
+                    }),
+                    add_anonymity_revoker: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(239)].into(),
+                        threshold: 241.try_into().unwrap(),
+                    }),
+                    add_identity_provider: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(251)].into(),
+                        threshold: 257.try_into().unwrap(),
+                    }),
+                    cooldown_parameters: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(263)].into(),
+                        threshold: 269.try_into().unwrap(),
+                    }),
+                    time_parameters: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(271)].into(),
+                        threshold: 277.try_into().unwrap(),
+                    }),
+                    create_plt: None,
+                }),
+            },
+        };
+        // We compare the debug representations to avoid having to implement PartialEq
+        // on all types.
+        assert_eq!(format!("{:?}", converted), format!("{:?}", expected));
     }
 }

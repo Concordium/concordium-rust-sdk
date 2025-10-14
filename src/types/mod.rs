@@ -20,8 +20,7 @@ use concordium_base::{
     common::{
         self,
         types::{Amount, CredentialIndex, Timestamp, TransactionTime},
-        Buffer, Deserial, Get, ParseResult, ReadBytesExt, SerdeDeserialize, SerdeSerialize, Serial,
-        Versioned,
+        SerdeDeserialize, SerdeSerialize, Versioned,
     },
     contracts_common::{Duration, EntrypointName, Parameter},
     encrypted_transfers::{
@@ -2530,42 +2529,6 @@ pub use concordium_base::{
     transactions::{Memo, RegisteredData, TransactionType},
     updates::*,
 };
-
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-/// The current collection of keys allowed to do updates.
-/// Parametrized by the chain parameter version.
-pub struct UpdateKeysCollectionSkeleton<Auths> {
-    pub root_keys: HigherLevelAccessStructure<RootKeysKind>,
-    #[serde(rename = "level1Keys")]
-    pub level_1_keys: HigherLevelAccessStructure<Level1KeysKind>,
-    #[serde(rename = "level2Keys")]
-    pub level_2_keys: Auths,
-}
-
-impl<Auths: Serial> Serial for UpdateKeysCollectionSkeleton<Auths> {
-    fn serial<B: Buffer>(&self, out: &mut B) {
-        self.root_keys.serial(out);
-        self.level_1_keys.serial(out);
-        self.level_2_keys.serial(out);
-    }
-}
-
-impl<Auths: Deserial> Deserial for UpdateKeysCollectionSkeleton<Auths> {
-    fn deserial<R: ReadBytesExt>(source: &mut R) -> ParseResult<Self> {
-        let root_keys = source.get()?;
-        let level_1_keys = source.get()?;
-        let level_2_keys = source.get()?;
-        Ok(Self {
-            root_keys,
-            level_1_keys,
-            level_2_keys,
-        })
-    }
-}
-
-pub type UpdateKeysCollectionV0 = UpdateKeysCollectionSkeleton<AuthorizationsV0>;
-pub type UpdateKeysCollectionV1 = UpdateKeysCollectionSkeleton<AuthorizationsV1>;
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(tag = "tag")]

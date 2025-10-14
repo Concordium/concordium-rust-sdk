@@ -23,8 +23,8 @@ use concordium_base::{
     base::{
         AccountIndex, AmountFraction, BlockHeight, CapitalBound, CommissionRanges,
         CredentialsPerBlockLimit, DurationSeconds, ElectionDifficulty, Epoch, ExchangeRate,
-        GenesisIndex, InclusiveRange, LeverageFactor, MintDistributionV0, MintDistributionV1,
-        MintRate, PartsPerHundredThousands, UpdatePublicKey,
+        GenesisIndex, InclusiveRange, LeverageFactor, MintDistributionV1, MintRate,
+        PartsPerHundredThousands, UpdatePublicKey,
     },
     common::{
         self,
@@ -39,7 +39,7 @@ use concordium_base::{
     updates::{
         self, AccessStructure, AuthorizationsV0, AuthorizationsV1, GASRewards, GASRewardsV1,
         HigherLevelAccessStructure, Level1KeysKind, PoolParameters, RewardPeriodLength,
-        RootKeysKind, TimeParameters, ValidatorScoreParameters,
+        RootKeysKind,
     },
 };
 pub use endpoints::{QueryError, QueryResult, RPCError, RPCResult};
@@ -637,8 +637,8 @@ pub struct Level2Keys {
     pub emergency: Option<AccessStructure>,
     /// Access structure for protocol updates.
     pub protocol: Option<AccessStructure>,
-    /// Access structure for updating the election difficulty.
-    pub election_difficulty: Option<AccessStructure>,
+    /// Access structure for updating the consensus parameters.
+    pub consensus: Option<AccessStructure>,
     /// Access structure for updating the euro to energy exchange rate.
     pub euro_per_energy: Option<AccessStructure>,
     /// Access structure for updating the micro CCD per euro exchange rate.
@@ -671,6 +671,20 @@ pub struct Level2Keys {
     pub create_plt: Option<AccessStructure>,
 }
 
+impl Level2Keys {
+    pub fn construct_update_signer(
+        &self,
+        update_key_indices: &AccessStructure,
+        actual_keys: impl IntoIterator<Item = concordium_base::base::UpdateKeyPair>,
+    ) -> Option<impl concordium_base::updates::UpdateSigner> {
+        concordium_base::updates::construct_update_signer_worker(
+            &self.keys,
+            update_key_indices,
+            actual_keys,
+        )
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum Level2KeysConversionError {
     #[error("missing required field `{0}`")]
@@ -692,12 +706,9 @@ impl TryFrom<Level2Keys> for AuthorizationsV0 {
         let protocol = value
             .protocol
             .ok_or(Level2KeysConversionError::MissingField("protocol"))?;
-        let election_difficulty =
-            value
-                .election_difficulty
-                .ok_or(Level2KeysConversionError::MissingField(
-                    "election_difficulty",
-                ))?;
+        let election_difficulty = value
+            .consensus
+            .ok_or(Level2KeysConversionError::MissingField("consensus"))?;
         let euro_per_energy = value
             .euro_per_energy
             .ok_or(Level2KeysConversionError::MissingField("euro_per_energy"))?;
@@ -929,7 +940,7 @@ impl TryFrom<FinalizationCommitteeParameters>
 }
 
 #[derive(Debug, Clone)]
-pub struct ChainParametersCommon {
+pub struct ChainParameters {
     /// Timeout parameters for the consensus protocol introduced in protocol
     /// version 6.
     pub timeout_parameters: Option<TimeoutParameters>,
@@ -982,233 +993,50 @@ pub struct ChainParametersCommon {
     pub keys: UpdateKeys,
 }
 
+/// The exchange rate between `microCCD` and `NRG`.
 #[derive(Debug, Clone)]
-pub struct ExchangeRates {
-    /// Euro per energy exchange rate.
-    pub euro_per_energy: ExchangeRate,
-    /// Micro CCD per Euro exchange rate.
-    pub micro_cdd_per_uero: ExchangeRate,
+pub struct EnergyRate {
+    pub micro_ccd_per_energy: num::rational::Ratio<u128>,
 }
 
-#[derive(Debug, Clone)]
-/// Values of chain parameters that can be updated via chain updates.
-/// This applies to protocol version 1-3.
-pub struct ChainParametersV0 {
-    /// Election difficulty for consensus lottery.
-    pub election_difficulty: ElectionDifficulty,
-    /// Euro per energy exchange rate.
-    pub euro_per_energy: ExchangeRate,
-    /// Micro ccd per euro exchange rate.
-    pub micro_ccd_per_euro: ExchangeRate,
-    /// Extra number of epochs before reduction in stake, or baker
-    /// deregistration is completed.
-    pub baker_cooldown_epochs: Epoch,
-    /// The limit for the number of account creations in a block.
-    pub account_creation_limit: CredentialsPerBlockLimit,
-    /// Parameters related to the distribution of newly minted CCD.
-    pub mint_distribution: MintDistributionV0,
-    /// Parameters related to the distribution of transaction fees.
-    pub transaction_fee_distribution: concordium_base::updates::TransactionFeeDistribution,
-    /// Parameters related to the distribution of the GAS account.
-    pub gas_rewards: GASRewards,
-    /// Address of the foundation account.
-    pub foundation_account: AccountAddress,
-    /// Minimum threshold for becoming a baker.
-    pub minimum_threshold_for_baking: Amount,
-    /// Keys allowed to do updates.
-    pub keys: types::UpdateKeysCollectionV0,
-}
-
-#[derive(Debug, Clone)]
-/// Values of chain parameters that can be updated via chain updates.
-/// This applies to protocol version 4 and 5.
-pub struct ChainParametersV1 {
-    /// Election difficulty for consensus lottery.
-    pub election_difficulty: ElectionDifficulty,
-    /// Euro per energy exchange rate.
-    pub euro_per_energy: ExchangeRate,
-    /// Micro ccd per euro exchange rate.
-    pub micro_ccd_per_euro: ExchangeRate,
-    pub cooldown_parameters: updates::CooldownParameters,
-    pub time_parameters: TimeParameters,
-    /// The limit for the number of account creations in a block.
-    pub account_creation_limit: CredentialsPerBlockLimit,
-    /// Parameters related to the distribution of newly minted CCD.
-    pub mint_distribution: MintDistributionV1,
-    /// Parameters related to the distribution of transaction fees.
-    pub transaction_fee_distribution: concordium_base::updates::TransactionFeeDistribution,
-    /// Parameters related to the distribution of the GAS account.
-    pub gas_rewards: GASRewards,
-    /// Address of the foundation account.
-    pub foundation_account: AccountAddress,
-    /// Parameters for baker pools.
-    pub pool_parameters: PoolParameters,
-    /// Keys allowed to do updates.
-    pub keys: types::UpdateKeysCollectionV1,
-}
-
-#[derive(Debug, Clone)]
-/// Values of chain parameters that can be updated via chain updates.
-/// This applies to protocol version 6 and 7.
-pub struct ChainParametersV2 {
-    /// Consensus protocol version 2 timeout parameters.
-    pub timeout_parameters: concordium_base::updates::TimeoutParameters,
-    /// Minimum time interval between blocks.
-    pub min_block_time: Duration,
-    /// Maximum energy allowed per block.
-    pub block_energy_limit: Energy,
-    /// Euro per energy exchange rate.
-    pub euro_per_energy: ExchangeRate,
-    /// Micro ccd per euro exchange rate.
-    pub micro_ccd_per_euro: ExchangeRate,
-    /// Parameters related to cooldowns when staking.
-    pub cooldown_parameters: updates::CooldownParameters,
-    /// Parameters related mint rate and reward period.
-    pub time_parameters: TimeParameters,
-    /// The limit for the number of account creations in a block.
-    pub account_creation_limit: CredentialsPerBlockLimit,
-    /// Parameters related to the distribution of newly minted CCD.
-    pub mint_distribution: MintDistributionV1,
-    /// Parameters related to the distribution of transaction fees.
-    pub transaction_fee_distribution: concordium_base::updates::TransactionFeeDistribution,
-    /// Parameters related to the distribution from the GAS account.
-    pub gas_rewards: GASRewardsV1,
-    /// Address of the foundation account.
-    pub foundation_account: AccountAddress,
-    /// Parameters for baker pools.
-    pub pool_parameters: PoolParameters,
-    /// The finalization committee parameters.
-    pub finalization_committee_parameters: updates::FinalizationCommitteeParameters,
-    /// Keys allowed to do updates.
-    pub keys: types::UpdateKeysCollectionV1,
-}
-
-#[derive(Debug, Clone)]
-/// Values of chain parameters that can be updated via chain updates.
-/// This applies to protocol version 8 and up.
-pub struct ChainParametersV3 {
-    /// Consensus protocol version 2 timeout parameters.
-    pub timeout_parameters: concordium_base::updates::TimeoutParameters,
-    /// Minimum time interval between blocks.
-    pub min_block_time: Duration,
-    /// Maximum energy allowed per block.
-    pub block_energy_limit: Energy,
-    /// Euro per energy exchange rate.
-    pub euro_per_energy: ExchangeRate,
-    /// Micro ccd per euro exchange rate.
-    pub micro_ccd_per_euro: ExchangeRate,
-    /// Parameters related to cooldowns when staking.
-    pub cooldown_parameters: updates::CooldownParameters,
-    /// Parameters related mint rate and reward period.
-    pub time_parameters: TimeParameters,
-    /// The limit for the number of account creations in a block.
-    pub account_creation_limit: CredentialsPerBlockLimit,
-    /// Parameters related to the distribution of newly minted CCD.
-    pub mint_distribution: MintDistributionV1,
-    /// Parameters related to the distribution of transaction fees.
-    pub transaction_fee_distribution: concordium_base::updates::TransactionFeeDistribution,
-    /// Parameters related to the distribution from the GAS account.
-    pub gas_rewards: GASRewardsV1,
-    /// Address of the foundation account.
-    pub foundation_account: AccountAddress,
-    /// Parameters for baker pools.
-    pub pool_parameters: PoolParameters,
-    /// The finalization committee parameters.
-    pub finalization_committee_parameters: updates::FinalizationCommitteeParameters,
-    /// Validator score parameters.
-    pub validator_score_parameters: ValidatorScoreParameters,
-    /// Keys allowed to do updates.
-    pub keys: types::UpdateKeysCollectionV1,
-}
-
-/// Chain parameters. See [`ChainParametersV0`] and [`ChainParametersV1`] for
-/// details. `V0` parameters apply to protocol version `1..=3`, and `V1`
-/// parameters apply to protocol versions `4` and up.
-#[derive(Debug, Clone)]
-pub enum ChainParameters {
-    V0(ChainParametersV0),
-    V1(ChainParametersV1),
-    V2(ChainParametersV2),
-    V3(ChainParametersV3),
-}
-
-impl ChainParameters {
-    /// Get the keys for parameter updates that are common to all versions.
-    pub fn common_update_keys(&self) -> &AuthorizationsV0 {
-        match self {
-            Self::V0(data) => &data.keys.level_2_keys,
-            Self::V1(data) => &data.keys.level_2_keys.v0,
-            Self::V2(data) => &data.keys.level_2_keys.v0,
-            Self::V3(data) => &data.keys.level_2_keys.v0,
-        }
+impl EnergyRate {
+    /// Get the cost as a CCD `Amount` for the given `Energy` amount at this
+    /// exchange rate.
+    pub fn ccd_cost(&self, nrg: Energy) -> Amount {
+        let numer = BigUint::from(*self.micro_ccd_per_energy.numer()) * nrg.energy;
+        let denomer = BigUint::from(*self.micro_ccd_per_energy.denom());
+        let cost = num::rational::Ratio::new(numer, denomer);
+        let i = cost.ceil().to_integer();
+        // The next line should be a no-op when the values are coming from the chain
+        let micro = i % u64::MAX;
+        Amount::from_micro_ccd(micro.to_u64().expect("Value is known to be under u64::MAX"))
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum EnergyRateConversionError {
+    #[error("missing required field `{0}`")]
+    MissingField(&'static str),
 }
 
 impl ChainParameters {
     /// Compute the exchange rate between `microCCD` and `NRG`.
-    pub fn micro_ccd_per_energy(&self) -> num::rational::Ratio<u128> {
-        let (num, denom) = match self {
-            ChainParameters::V0(v0) => {
-                let x = v0.micro_ccd_per_euro;
-                let y = v0.euro_per_energy;
-                (
-                    u128::from(x.numerator()) * u128::from(y.numerator()),
-                    u128::from(x.denominator()) * u128::from(y.denominator()),
-                )
-            }
-            ChainParameters::V1(v1) => {
-                let x = v1.micro_ccd_per_euro;
-                let y = v1.euro_per_energy;
-                (
-                    u128::from(x.numerator()) * u128::from(y.numerator()),
-                    u128::from(x.denominator()) * u128::from(y.denominator()),
-                )
-            }
-            ChainParameters::V2(v2) => {
-                let x = v2.micro_ccd_per_euro;
-                let y = v2.euro_per_energy;
-                (
-                    u128::from(x.numerator()) * u128::from(y.numerator()),
-                    u128::from(x.denominator()) * u128::from(y.denominator()),
-                )
-            }
-            ChainParameters::V3(v3) => {
-                let x = v3.micro_ccd_per_euro;
-                let y = v3.euro_per_energy;
-                (
-                    u128::from(x.numerator()) * u128::from(y.numerator()),
-                    u128::from(x.denominator()) * u128::from(y.denominator()),
-                )
-            }
-        };
-        num::rational::Ratio::new(num, denom)
-    }
-
-    /// Get the CCD cost of the given amount of energy for the current chain
-    /// parameters.
-    pub fn ccd_cost(&self, nrg: Energy) -> Amount {
-        let ratio = self.micro_ccd_per_energy();
-        let numer = BigUint::from(*ratio.numer()) * nrg.energy;
-        let denomer = BigUint::from(*ratio.denom());
-        let cost = num::rational::Ratio::new(numer, denomer);
-        let i = cost.ceil().to_integer();
-        // The next line should be a no-op when the values are coming from the chain
-        // since the amount should always fit a u64. With a 3_000_000 maximum
-        // NRG limit the exchange rate would have to be more than 6148914691236
-        // microCCD per NRG (6148914 CCD per NRG) for this to occur. But even in that
-        // case this behaviour here matches the node behaviour.
-        let micro = i % u64::MAX;
-        Amount::from_micro_ccd(micro.to_u64().expect("Value is known to be under u64::MAX"))
-    }
-
-    /// The foundation account that gets the foundation tax.
-    pub fn foundation_account(&self) -> AccountAddress {
-        match self {
-            ChainParameters::V0(v0) => v0.foundation_account,
-            ChainParameters::V1(v1) => v1.foundation_account,
-            ChainParameters::V2(v2) => v2.foundation_account,
-            ChainParameters::V3(v3) => v3.foundation_account,
-        }
+    pub fn energy_rate(&self) -> Result<EnergyRate, EnergyRateConversionError> {
+        let x = self
+            .micro_ccd_per_euro
+            .as_ref()
+            .ok_or(EnergyRateConversionError::MissingField(
+                "micro_ccd_per_euro",
+            ))?;
+        let y = self
+            .euro_per_energy
+            .as_ref()
+            .ok_or(EnergyRateConversionError::MissingField("euro_per_energy"))?;
+        let num = u128::from(x.numerator()) * u128::from(y.numerator());
+        let denom = u128::from(x.denominator()) * u128::from(y.denominator());
+        Ok(EnergyRate {
+            micro_ccd_per_energy: num::rational::Ratio::new(num, denom),
+        })
     }
 }
 
