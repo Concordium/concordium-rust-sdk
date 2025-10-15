@@ -1,13 +1,10 @@
 //! Helpers and trait implementations to convert from proto generated types to
 //! their Rust equivalents.
 
-use super::{generated::*, Require};
-use crate::{
-    types::{
-        queries::ConcordiumBFTDetails, AccountReleaseSchedule, ActiveBakerPoolStatus,
-        UpdateKeysCollectionSkeleton,
-    },
-    v2::generated::{block_item_summary::Details, BlockCertificates},
+use super::{generated::*, upward::Upward, Require};
+use crate::types::{
+    queries::{ConcordiumBFTDetails, ProtocolVersionInt},
+    AccountReleaseSchedule, ActiveBakerPoolStatus, UpdateKeysCollectionSkeleton,
 };
 use chrono::TimeZone;
 use concordium_base::{
@@ -20,6 +17,7 @@ use concordium_base::{
             InitialCredentialDeploymentValues,
         },
     },
+    smart_contracts::WasmVersionInt,
     updates,
 };
 use cooldown::CooldownStatus;
@@ -33,6 +31,18 @@ fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
         _ => Err(tonic::Status::internal(
             "Unexpected response from the server.",
         )),
+    }
+}
+
+/// Convert from the 0-based protobuf representation to the 1-based internal
+/// representation of a [ProtocolVersionInt].
+fn protocol_version_int_from_enum(tag_number: i32) -> Result<ProtocolVersionInt, tonic::Status> {
+    if tag_number < 0 {
+        Err(tonic::Status::internal(format!(
+            "Invalid protocol version: {tag_number}"
+        )))
+    } else {
+        Ok(ProtocolVersionInt(tag_number as u64 + 1))
     }
 }
 
@@ -565,7 +575,8 @@ impl TryFrom<BakerPoolInfo> for super::types::BakerPoolInfo {
     type Error = tonic::Status;
 
     fn try_from(value: BakerPoolInfo) -> Result<Self, Self::Error> {
-        let open_status = value.open_status().into();
+        let open_status = Upward::from(OpenStatus::try_from(value.open_status).ok())
+            .map(super::types::OpenStatus::from);
         let metadata_url = value
             .url
             .try_into()
@@ -579,11 +590,11 @@ impl TryFrom<BakerPoolInfo> for super::types::BakerPoolInfo {
     }
 }
 
-impl TryFrom<AccountStakingInfo> for super::types::AccountStakingInfo {
+impl TryFrom<account_staking_info::StakingInfo> for super::types::AccountStakingInfo {
     type Error = tonic::Status;
 
-    fn try_from(value: AccountStakingInfo) -> Result<Self, Self::Error> {
-        match value.staking_info.require()? {
+    fn try_from(value: account_staking_info::StakingInfo) -> Result<Self, Self::Error> {
+        match value {
             account_staking_info::StakingInfo::Baker(bsi) => {
                 let staked_amount = bsi.staked_amount.require()?.into();
                 let restake_earnings = bsi.restake_earnings;
@@ -656,12 +667,17 @@ impl TryFrom<ReleaseSchedule> for super::types::AccountReleaseSchedule {
     }
 }
 
-impl TryFrom<AccountVerifyKey> for crate::id::types::VerifyKey {
+impl TryFrom<AccountVerifyKey> for Upward<crate::id::types::VerifyKey> {
     type Error = tonic::Status;
 
     fn try_from(value: AccountVerifyKey) -> Result<Self, Self::Error> {
-        match value.key.require()? {
-            account_verify_key::Key::Ed25519Key(v) => Ok(Self::Ed25519VerifyKey(consume(&v)?)),
+        let Some(key) = value.key else {
+            return Ok(Upward::Unknown(()));
+        };
+        match key {
+            account_verify_key::Key::Ed25519Key(v) => Ok(Upward::Known(
+                crate::id::types::VerifyKey::Ed25519VerifyKey(consume(&v)?),
+            )),
         }
     }
 }
@@ -721,26 +737,25 @@ impl TryFrom<ArThreshold> for crate::id::secret_sharing::Threshold {
     }
 }
 
-impl TryFrom<CredentialPublicKeys> for crate::id::types::CredentialPublicKeys {
+impl TryFrom<CredentialPublicKeys> for Upward<crate::id::types::CredentialPublicKeys> {
     type Error = tonic::Status;
 
     fn try_from(value: CredentialPublicKeys) -> Result<Self, Self::Error> {
-        Ok(Self {
-            keys: value
-                .keys
-                .into_iter()
-                .map(|(k, v)| {
-                    if let Ok(k) = u8::try_from(k) {
-                        let k = k.into();
-                        let v = v.try_into()?;
-                        Ok((k, v))
-                    } else {
-                        Err(tonic::Status::internal("Unexpected key index."))
-                    }
-                })
-                .collect::<Result<_, tonic::Status>>()?,
+        let mut keys = BTreeMap::new();
+        for (index, key) in value.keys {
+            let k = u8::try_from(index)
+                .map_err(|_| tonic::Status::internal("Unexpected key index."))?
+                .into();
+
+            let Upward::Known(v) = key.try_into()? else {
+                return Ok(Upward::Unknown(()));
+            };
+            keys.insert(k, v);
+        }
+        Ok(Upward::Known(crate::id::types::CredentialPublicKeys {
+            keys,
             threshold: value.threshold.require()?.try_into()?,
-        })
+        }))
     }
 }
 
@@ -854,23 +869,45 @@ impl TryFrom<CredentialCommitments> for crate::id::types::CredentialDeploymentCo
     }
 }
 
-impl TryFrom<AccountCredential> for AccountCredentialWithoutProofs<ArCurve, AttributeKind> {
+impl TryFrom<AccountCredential> for Upward<AccountCredentialWithoutProofs<ArCurve, AttributeKind>> {
     type Error = tonic::Status;
 
-    fn try_from(value: AccountCredential) -> Result<Self, Self::Error> {
-        match value.credential_values.require()? {
+    fn try_from(message: AccountCredential) -> Result<Self, Self::Error> {
+        let Some(values) = message.credential_values else {
+            return Ok(Upward::Unknown(()));
+        };
+        values.try_into()
+    }
+}
+
+impl TryFrom<account_credential::CredentialValues>
+    for Upward<AccountCredentialWithoutProofs<ArCurve, AttributeKind>>
+{
+    type Error = tonic::Status;
+
+    fn try_from(cred: account_credential::CredentialValues) -> Result<Self, Self::Error> {
+        match cred {
             account_credential::CredentialValues::Initial(ic) => {
+                let Upward::Known(cred_account) = ic.keys.require()?.try_into()? else {
+                    return Ok(Upward::Unknown(()));
+                };
                 let icdv = InitialCredentialDeploymentValues {
-                    cred_account: ic.keys.require()?.try_into()?,
+                    cred_account,
                     reg_id: ic.cred_id.require()?.try_into()?,
                     ip_identity: ic.ip_id.require()?.into(),
                     policy: ic.policy.require()?.try_into()?,
                 };
-                Ok(Self::Initial { icdv })
+                Ok(Upward::Known(AccountCredentialWithoutProofs::Initial {
+                    icdv,
+                }))
             }
             account_credential::CredentialValues::Normal(nc) => {
+                let Upward::Known(cred_key_info) = nc.keys.require()?.try_into()? else {
+                    return Ok(Upward::Unknown(()));
+                };
+
                 let cdv = CredentialDeploymentValues {
-                    cred_key_info: nc.keys.require()?.try_into()?,
+                    cred_key_info,
                     cred_id: nc.cred_id.require()?.try_into()?,
                     ip_identity: nc.ip_id.require()?.into(),
                     threshold: nc.ar_threshold.require()?.try_into()?,
@@ -888,7 +925,10 @@ impl TryFrom<AccountCredential> for AccountCredentialWithoutProofs<ArCurve, Attr
                     policy: nc.policy.require()?.try_into()?,
                 };
                 let commitments = nc.commitments.require()?.try_into()?;
-                Ok(Self::Normal { cdv, commitments })
+                Ok(Upward::Known(AccountCredentialWithoutProofs::Normal {
+                    cdv,
+                    commitments,
+                }))
             }
         }
     }
@@ -964,14 +1004,8 @@ impl TryFrom<Cooldown> for super::types::Cooldown {
 
     fn try_from(cd: Cooldown) -> Result<Self, Self::Error> {
         Ok(Self {
-            status: CooldownStatus::try_from(cd.status)
-                .map_err(|_| {
-                    tonic::Status::invalid_argument(format!(
-                        "unknown cooldown status value {}",
-                        cd.status
-                    ))
-                })?
-                .into(),
+            status: Upward::from(CooldownStatus::try_from(cd.status).ok())
+                .map(super::types::CooldownStatus::from),
             end_time: cd.end_time.require()?.into(),
             amount: cd.amount.require()?.into(),
         })
@@ -1004,8 +1038,10 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
         let account_encrypted_amount = encrypted_balance.require()?.try_into()?;
         let account_encryption_key = encryption_key.require()?.try_into()?;
         let account_index = index.require()?.into();
-        let account_stake: Option<super::types::AccountStakingInfo> = match stake {
-            Some(stake) => Some(stake.try_into()?),
+        let account_stake: Option<Upward<super::types::AccountStakingInfo>> = match stake {
+            Some(stake) => Some(Upward::from(
+                stake.staking_info.map(TryInto::try_into).transpose()?,
+            )),
             None => None,
         };
         let account_address = address.require()?.try_into()?;
@@ -1023,10 +1059,11 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
         // fallback calculation and instead require the available balance field to
         // always be present.
         let available_balance = available_balance.map(|ab| ab.into()).unwrap_or_else(|| {
-            let active_stake = account_stake
-                .as_ref()
-                .map(|s| s.staked_amount())
-                .unwrap_or_default();
+            let active_stake = if let Some(Upward::Known(staking_info)) = &account_stake {
+                staking_info.staked_amount()
+            } else {
+                Default::default()
+            };
 
             let inactive_stake = cooldowns.iter().map(|cd| cd.amount).sum();
 
@@ -1041,6 +1078,7 @@ impl TryFrom<AccountInfo> for super::types::AccountInfo {
             // locked amount.
             account_amount - locked_amount
         });
+
         let tokens = tokens
             .into_iter()
             .map(|token| token.try_into())
@@ -1299,9 +1337,7 @@ impl TryFrom<UpdateInstruction> for concordium_base::updates::UpdateInstruction 
         };
         let signatures: concordium_base::updates::UpdateInstructionSignature =
             value.signatures.require()?.try_into()?;
-
-        let payload = consume(&payload)?;
-
+        let payload = updates::EncodedUpdatePayload::from(payload);
         Ok(Self {
             header,
             payload,
@@ -1311,22 +1347,39 @@ impl TryFrom<UpdateInstruction> for concordium_base::updates::UpdateInstruction 
 }
 
 impl TryFrom<BlockItem>
-    for concordium_base::transactions::BlockItem<concordium_base::transactions::EncodedPayload>
+    for Upward<
+        concordium_base::transactions::BlockItem<concordium_base::transactions::EncodedPayload>,
+    >
 {
     type Error = tonic::Status;
 
     fn try_from(value: BlockItem) -> Result<Self, Self::Error> {
-        match value.block_item.require()? {
+        if let Some(item) = value.block_item {
+            Ok(Upward::Known(item.try_into()?))
+        } else {
+            Ok(Upward::Unknown(()))
+        }
+    }
+}
+
+impl TryFrom<block_item::BlockItem>
+    for concordium_base::transactions::BlockItem<concordium_base::transactions::EncodedPayload>
+{
+    type Error = tonic::Status;
+
+    fn try_from(item: block_item::BlockItem) -> Result<Self, Self::Error> {
+        type Item =
+            concordium_base::transactions::BlockItem<concordium_base::transactions::EncodedPayload>;
+        let out = match item {
             block_item::BlockItem::AccountTransaction(at) => {
-                Ok(Self::AccountTransaction(at.try_into()?))
+                Item::AccountTransaction(at.try_into()?)
             }
             block_item::BlockItem::CredentialDeployment(cd) => {
-                Ok(Self::CredentialDeployment(Box::new(cd.try_into()?)))
+                Item::CredentialDeployment(Box::new(cd.try_into()?))
             }
-            block_item::BlockItem::UpdateInstruction(ui) => {
-                Ok(Self::UpdateInstruction(ui.try_into()?))
-            }
-        }
+            block_item::BlockItem::UpdateInstruction(ui) => Item::UpdateInstruction(ui.try_into()?),
+        };
+        Ok(out)
     }
 }
 
@@ -1337,7 +1390,7 @@ impl TryFrom<AccountTransactionDetails> for super::types::AccountTransactionDeta
         Ok(Self {
             cost: v.cost.require()?.into(),
             sender: v.sender.require()?.try_into()?,
-            effects: v.effects.require()?.try_into()?,
+            effects: Upward::from(v.effects.map(TryFrom::try_from).transpose()?),
         })
     }
 }
@@ -1350,39 +1403,52 @@ impl TryFrom<BlockItemSummary> for super::types::BlockItemSummary {
             index: value.index.require()?.into(),
             energy_cost: value.energy_cost.require()?.into(),
             hash: value.hash.require()?.try_into()?,
-            details: match value.details.require()? {
-                block_item_summary::Details::AccountTransaction(v) => {
-                    super::types::BlockItemSummaryDetails::AccountTransaction(v.try_into()?)
-                }
-                block_item_summary::Details::AccountCreation(v) => {
-                    super::types::BlockItemSummaryDetails::AccountCreation(
-                        super::types::AccountCreationDetails {
-                            credential_type: v.credential_type().into(),
-                            address: v.address.require()?.try_into()?,
-                            reg_id: v.reg_id.require()?.try_into()?,
-                        },
-                    )
-                }
-                block_item_summary::Details::Update(v) => {
-                    super::types::BlockItemSummaryDetails::Update(super::types::UpdateDetails {
-                        effective_time: v.effective_time.require()?.into(),
-                        payload: v.payload.require()?.try_into()?,
-                    })
-                }
-                Details::TokenCreation(v) => {
-                    super::types::BlockItemSummaryDetails::TokenCreationDetails(
-                        super::types::TokenCreationDetails {
-                            create_plt: v.create_plt.require()?.try_into()?,
-                            events: v
-                                .events
-                                .into_iter()
-                                .map(TryInto::try_into)
-                                .collect::<Result<_, tonic::Status>>()?,
-                        },
-                    )
-                }
-            },
+            details: Upward::from(value.details.map(TryFrom::try_from).transpose()?),
         })
+    }
+}
+
+impl TryFrom<block_item_summary::Details> for super::types::BlockItemSummaryDetails {
+    type Error = tonic::Status;
+
+    fn try_from(value: block_item_summary::Details) -> Result<Self, Self::Error> {
+        let out = match value {
+            block_item_summary::Details::AccountTransaction(v) => {
+                super::types::BlockItemSummaryDetails::AccountTransaction(v.try_into()?)
+            }
+            block_item_summary::Details::AccountCreation(v) => {
+                super::types::BlockItemSummaryDetails::AccountCreation(
+                    super::types::AccountCreationDetails {
+                        credential_type: v.credential_type().into(),
+                        address: v.address.require()?.try_into()?,
+                        reg_id: v.reg_id.require()?.try_into()?,
+                    },
+                )
+            }
+            block_item_summary::Details::Update(v) => {
+                super::types::BlockItemSummaryDetails::Update(super::types::UpdateDetails {
+                    effective_time: v.effective_time.require()?.into(),
+                    payload: Upward::from(
+                        v.payload
+                            .map(super::types::UpdatePayload::try_from)
+                            .transpose()?,
+                    ),
+                })
+            }
+            block_item_summary::Details::TokenCreation(v) => {
+                super::types::BlockItemSummaryDetails::TokenCreationDetails(
+                    super::types::TokenCreationDetails {
+                        create_plt: v.create_plt.require()?.try_into()?,
+                        events: v
+                            .events
+                            .into_iter()
+                            .map(TryInto::try_into)
+                            .collect::<Result<_, tonic::Status>>()?,
+                    },
+                )
+            }
+        };
+        Ok(out)
     }
 }
 
@@ -1707,7 +1773,11 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                         ),
                     }
                 },
-                reject_reason: n.reject_reason.require()?.try_into()?,
+                reject_reason: n
+                    .reject_reason
+                    .map(super::types::RejectReason::try_from)
+                    .transpose()?
+                    .into(),
             }),
             account_transaction_effects::Effect::AccountTransfer(at) => {
                 let amount = at.amount.require()?.into();
@@ -1729,7 +1799,13 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
             account_transaction_effects::Effect::ContractInitialized(cie) => {
                 Ok(Self::ContractInitialized {
                     data: super::types::ContractInitializedEvent {
-                        contract_version: cie.contract_version().into(),
+                        contract_version: u8::try_from(cie.contract_version)
+                            .map(WasmVersionInt)
+                            .map_err(|err| {
+                                tonic::Status::internal(format!(
+                                    "Could not map contract version from i32 to u8: {err}"
+                                ))
+                            })?,
                         origin_ref: cie.origin_ref.require()?.try_into()?,
                         address: cie.address.require()?.into(),
                         amount: cie.amount.require()?.into(),
@@ -1743,7 +1819,14 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                 let effects = cui
                     .effects
                     .into_iter()
-                    .map(TryFrom::try_from)
+                    .map(|trace| {
+                        Ok(Upward::from(
+                            trace
+                                .element
+                                .map(super::types::ContractTraceElement::try_from)
+                                .transpose()?,
+                        ))
+                    })
                     .collect::<Result<_, tonic::Status>>()?;
                 Ok(Self::ContractUpdateIssued { effects })
             }
@@ -1852,7 +1935,14 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                 data: bc
                     .events
                     .into_iter()
-                    .map(TryInto::try_into)
+                    .map(|event| {
+                        Ok(Upward::from(
+                            event
+                                .event
+                                .map(super::types::BakerEvent::try_from)
+                                .transpose()?,
+                        ))
+                    })
                     .collect::<Result<_, tonic::Status>>()?,
             }),
             account_transaction_effects::Effect::DelegationConfigured(dc) => {
@@ -1860,7 +1950,14 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                     data: dc
                         .events
                         .into_iter()
-                        .map(TryInto::try_into)
+                        .map(|event| {
+                            Ok(Upward::from(
+                                event
+                                    .event
+                                    .map(super::types::DelegationEvent::try_from)
+                                    .transpose()?,
+                            ))
+                        })
                         .collect::<Result<_, tonic::Status>>()?,
                 })
             }
@@ -1877,11 +1974,11 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
     }
 }
 
-impl TryFrom<ContractTraceElement> for super::types::ContractTraceElement {
+impl TryFrom<contract_trace_element::Element> for super::types::ContractTraceElement {
     type Error = tonic::Status;
 
-    fn try_from(e: ContractTraceElement) -> Result<Self, Self::Error> {
-        Ok(match e.element.require()? {
+    fn try_from(element: contract_trace_element::Element) -> Result<Self, Self::Error> {
+        Ok(match element {
             contract_trace_element::Element::Updated(u) => {
                 super::types::ContractTraceElement::Updated {
                     data: u.try_into()?,
@@ -1917,11 +2014,11 @@ impl TryFrom<ContractTraceElement> for super::types::ContractTraceElement {
     }
 }
 
-impl TryFrom<DelegationEvent> for super::types::DelegationEvent {
+impl TryFrom<delegation_event::Event> for super::types::DelegationEvent {
     type Error = tonic::Status;
 
-    fn try_from(value: DelegationEvent) -> Result<Self, Self::Error> {
-        Ok(match value.event.require()? {
+    fn try_from(value: delegation_event::Event) -> Result<Self, Self::Error> {
+        Ok(match value {
             delegation_event::Event::DelegationStakeIncreased(v) => {
                 Self::DelegationStakeIncreased {
                     delegator_id: v.delegator_id.require()?.try_into()?,
@@ -1969,11 +2066,11 @@ impl TryFrom<DelegatorId> for super::types::DelegatorId {
     }
 }
 
-impl TryFrom<BakerEvent> for super::types::BakerEvent {
+impl TryFrom<baker_event::Event> for super::types::BakerEvent {
     type Error = tonic::Status;
 
-    fn try_from(value: BakerEvent) -> Result<Self, Self::Error> {
-        Ok(match value.event.require()? {
+    fn try_from(value: baker_event::Event) -> Result<Self, Self::Error> {
+        Ok(match value {
             baker_event::Event::BakerAdded(v) => Self::BakerAdded {
                 data: Box::new(super::types::BakerAddedEvent {
                     keys_event: v.keys_event.require()?.try_into()?,
@@ -2000,7 +2097,8 @@ impl TryFrom<BakerEvent> for super::types::BakerEvent {
                 data: Box::new(v.try_into()?),
             },
             baker_event::Event::BakerSetOpenStatus(v) => {
-                let open_status = v.open_status().into();
+                let open_status = Upward::from(OpenStatus::try_from(v.open_status).ok())
+                    .map(super::types::OpenStatus::from);
                 Self::BakerSetOpenStatus {
                     baker_id: v.baker_id.require()?.into(),
                     open_status,
@@ -2131,7 +2229,13 @@ impl TryFrom<InstanceUpdatedEvent> for super::types::InstanceUpdatedEvent {
 
     fn try_from(value: InstanceUpdatedEvent) -> Result<Self, Self::Error> {
         Ok(Self {
-            contract_version: value.contract_version().into(),
+            contract_version: u8::try_from(value.contract_version)
+                .map(WasmVersionInt)
+                .map_err(|err| {
+                    tonic::Status::internal(format!(
+                        "Could not map contract version from i32 to u8: {err}"
+                    ))
+                })?,
             address: value.address.require()?.into(),
             instigator: value.instigator.require()?.try_into()?,
             amount: value.amount.require()?.into(),
@@ -2139,15 +2243,6 @@ impl TryFrom<InstanceUpdatedEvent> for super::types::InstanceUpdatedEvent {
             receive_name: value.receive_name.require()?.try_into()?,
             events: value.events.into_iter().map(Into::into).collect(),
         })
-    }
-}
-
-impl From<ContractVersion> for super::types::smart_contracts::WasmVersion {
-    fn from(value: ContractVersion) -> Self {
-        match value {
-            ContractVersion::V0 => Self::V0,
-            ContractVersion::V1 => Self::V1,
-        }
     }
 }
 
@@ -2348,9 +2443,7 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
     type Error = tonic::Status;
 
     fn try_from(value: ConsensusInfo) -> Result<Self, Self::Error> {
-        let protocol_version = ProtocolVersion::try_from(value.protocol_version)
-            .map_err(|_| tonic::Status::internal("Unknown protocol version"))?
-            .into();
+        let protocol_version = protocol_version_int_from_enum(value.protocol_version)?;
         Ok(Self {
             last_finalized_block_height: value.last_finalized_block_height.require()?.into(),
             block_arrive_latency_e_m_s_d: value.block_arrive_latency_emsd,
@@ -2391,7 +2484,7 @@ impl TryFrom<ConsensusInfo> for super::types::queries::ConsensusInfo {
             genesis_index: value.genesis_index.require()?.into(),
             current_era_genesis_block: value.current_era_genesis_block.require()?.try_into()?,
             current_era_genesis_time: value.current_era_genesis_time.require()?.try_into()?,
-            concordium_bft_status: if protocol_version <= super::types::ProtocolVersion::P5 {
+            concordium_bft_status: if protocol_version <= super::types::ProtocolVersion::P5.into() {
                 None
             } else {
                 Some(ConcordiumBFTDetails {
@@ -2416,7 +2509,7 @@ impl TryFrom<InvokeInstanceResponse> for super::types::smart_contracts::InvokeCo
         let result = match response.result.require()? {
             invoke_instance_response::Result::Failure(value) => InvokeContractResult::Failure {
                 return_value: value.return_value.map(|b| ReturnValue { value: b }),
-                reason: value.reason.require()?.try_into()?,
+                reason: Upward::from(value.reason.map(TryFrom::try_from).transpose()?),
                 used_energy: value.used_energy.require()?.into(),
             },
             invoke_instance_response::Result::Success(value) => InvokeContractResult::Success {
@@ -2424,7 +2517,14 @@ impl TryFrom<InvokeInstanceResponse> for super::types::smart_contracts::InvokeCo
                 events: value
                     .effects
                     .into_iter()
-                    .map(TryFrom::try_from)
+                    .map(|trace| {
+                        Ok(Upward::from(
+                            trace
+                                .element
+                                .map(super::types::ContractTraceElement::try_from)
+                                .transpose()?,
+                        ))
+                    })
                     .collect::<Result<_, tonic::Status>>()?,
                 used_energy: value.used_energy.require()?.into(),
             },
@@ -2655,14 +2755,8 @@ impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
     type Error = tonic::Status;
 
     fn try_from(value: BlockInfo) -> Result<Self, Self::Error> {
-        let protocol_version = ProtocolVersion::try_from(value.protocol_version)
-            .map_err(|_| {
-                tonic::Status::internal(format!(
-                    "Unknown protocol version: {}",
-                    value.protocol_version
-                ))
-            })?
-            .into();
+        let protocol_version = protocol_version_int_from_enum(value.protocol_version)?;
+
         Ok(Self {
             transactions_size: value.transactions_size.into(),
             block_parent: value.parent_block.require()?.try_into()?,
@@ -2673,7 +2767,7 @@ impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
             block_receive_time: value.receive_time.require()?.try_into()?,
             transaction_count: value.transaction_count.into(),
             transaction_energy_cost: value.transactions_energy_cost.require()?.into(),
-            block_slot: if protocol_version <= super::types::ProtocolVersion::P5 {
+            block_slot: if protocol_version <= super::types::ProtocolVersion::P5.into() {
                 Some(value.slot_number.require()?.into())
             } else {
                 None
@@ -2685,12 +2779,12 @@ impl TryFrom<BlockInfo> for super::types::queries::BlockInfo {
             genesis_index: value.genesis_index.require()?.into(),
             block_baker: value.baker.map(|b| b.into()),
             protocol_version,
-            round: if protocol_version >= super::types::ProtocolVersion::P6 {
+            round: if protocol_version >= super::types::ProtocolVersion::P6.into() {
                 Some(value.round.require()?.into())
             } else {
                 None
             },
-            epoch: if protocol_version >= super::types::ProtocolVersion::P6 {
+            epoch: if protocol_version >= super::types::ProtocolVersion::P6.into() {
                 Some(value.epoch.require()?.into())
             } else {
                 None
@@ -2823,14 +2917,7 @@ impl TryFrom<TokenomicsInfo> for super::types::RewardsOverview {
         match value.tokenomics.require()? {
             tokenomics_info::Tokenomics::V0(value) => Ok(Self::V0 {
                 data: super::types::CommonRewardData {
-                    protocol_version: ProtocolVersion::try_from(value.protocol_version)
-                        .map_err(|_| {
-                            tonic::Status::internal(format!(
-                                "Unknown protocol version: {}",
-                                value.protocol_version
-                            ))
-                        })?
-                        .into(),
+                    protocol_version: protocol_version_int_from_enum(value.protocol_version)?,
                     total_amount: value.total_amount.require()?.into(),
                     total_encrypted_amount: value.total_encrypted_amount.require()?.into(),
                     baking_reward_account: value.baking_reward_account.require()?.into(),
@@ -2843,14 +2930,7 @@ impl TryFrom<TokenomicsInfo> for super::types::RewardsOverview {
             }),
             tokenomics_info::Tokenomics::V1(value) => Ok(Self::V1 {
                 common: super::types::CommonRewardData {
-                    protocol_version: ProtocolVersion::try_from(value.protocol_version)
-                        .map_err(|_| {
-                            tonic::Status::internal(format!(
-                                "Unknown protocol version: {}",
-                                value.protocol_version
-                            ))
-                        })?
-                        .into(),
+                    protocol_version: protocol_version_int_from_enum(value.protocol_version)?,
                     total_amount: value.total_amount.require()?.into(),
                     total_encrypted_amount: value.total_encrypted_amount.require()?.into(),
                     baking_reward_account: value.baking_reward_account.require()?.into(),
@@ -2962,11 +3042,11 @@ impl TryFrom<block_special_event::AccountAmounts>
     }
 }
 
-impl TryFrom<BlockSpecialEvent> for super::types::SpecialTransactionOutcome {
+impl TryFrom<block_special_event::Event> for super::types::SpecialTransactionOutcome {
     type Error = tonic::Status;
 
-    fn try_from(message: BlockSpecialEvent) -> Result<Self, Self::Error> {
-        let event = match message.event.require()? {
+    fn try_from(special_event: block_special_event::Event) -> Result<Self, Self::Error> {
+        let event = match special_event {
             block_special_event::Event::BakingRewards(event) => Self::BakingRewards {
                 baker_rewards: event.baker_rewards.require()?.try_into()?,
                 remainder: event.remainder.require()?.into(),
@@ -3032,6 +3112,18 @@ impl TryFrom<BlockSpecialEvent> for super::types::SpecialTransactionOutcome {
             }
         };
         Ok(event)
+    }
+}
+
+impl TryFrom<BlockSpecialEvent> for Upward<super::types::SpecialTransactionOutcome> {
+    type Error = tonic::Status;
+
+    fn try_from(message: BlockSpecialEvent) -> Result<Self, Self::Error> {
+        let event = message
+            .event
+            .map(super::types::SpecialTransactionOutcome::try_from)
+            .transpose()?;
+        Ok(Upward::from(event))
     }
 }
 
@@ -3279,125 +3371,98 @@ impl TryFrom<PendingUpdate> for super::types::queries::PendingUpdate {
     type Error = tonic::Status;
 
     fn try_from(message: PendingUpdate) -> Result<Self, Self::Error> {
-        use super::types::queries::PendingUpdateEffect;
         let effective_time = message.effective_time.require()?.into();
-        match message.effect.require()? {
-            pending_update::Effect::RootKeys(e) => {
-                let hk = e.try_into()?;
-                Ok(Self {
-                    effective_time,
-                    effect: PendingUpdateEffect::RootKeys(hk),
-                })
-            }
+        let effect = message
+            .effect
+            .map(super::types::queries::PendingUpdateEffect::try_from)
+            .transpose()?
+            .into();
+        Ok(Self {
+            effective_time,
+            effect,
+        })
+    }
+}
+
+impl TryFrom<pending_update::Effect> for super::types::queries::PendingUpdateEffect {
+    type Error = tonic::Status;
+
+    fn try_from(effect: pending_update::Effect) -> Result<Self, Self::Error> {
+        use super::types::queries::PendingUpdateEffect;
+        let out = match effect {
+            pending_update::Effect::RootKeys(e) => PendingUpdateEffect::RootKeys(e.try_into()?),
             pending_update::Effect::Level1Keys(l1) => {
-                let l1 = l1.try_into()?;
-                Ok(Self {
-                    effective_time,
-                    effect: PendingUpdateEffect::Level1Keys(l1),
-                })
+                PendingUpdateEffect::Level1Keys(l1.try_into()?)
             }
             pending_update::Effect::Level2KeysCpv0(l2) => {
-                let l2 = l2.try_into()?;
-                Ok(Self {
-                    effective_time,
-                    effect: PendingUpdateEffect::Level2KeysCPV0(l2),
-                })
+                PendingUpdateEffect::Level2KeysCPV0(l2.try_into()?)
             }
             pending_update::Effect::Level2KeysCpv1(l2) => {
-                let l2 = l2.try_into()?;
-                Ok(Self {
-                    effective_time,
-                    effect: PendingUpdateEffect::Level2KeysCPV1(l2),
-                })
+                PendingUpdateEffect::Level2KeysCPV1(l2.try_into()?)
             }
-            pending_update::Effect::Protocol(p) => {
-                let p = p.try_into()?;
-                Ok(Self {
-                    effective_time,
-                    effect: PendingUpdateEffect::Protocol(p),
-                })
+            pending_update::Effect::Protocol(p) => PendingUpdateEffect::Protocol(p.try_into()?),
+            pending_update::Effect::ElectionDifficulty(ed) => {
+                PendingUpdateEffect::ElectionDifficulty(ed.try_into()?)
             }
-            pending_update::Effect::ElectionDifficulty(ed) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::ElectionDifficulty(ed.try_into()?),
-            }),
-            pending_update::Effect::EuroPerEnergy(ee) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::EuroPerEnergy(ee.try_into()?),
-            }),
-            pending_update::Effect::MicroCcdPerEuro(mpe) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::MicroCcdPerEnergy(mpe.try_into()?),
-            }),
-            pending_update::Effect::FoundationAccount(fa) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::FoundationAccount(fa.try_into()?),
-            }),
-            pending_update::Effect::MintDistributionCpv0(md) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::MintDistributionV0(md.try_into()?),
-            }),
-            pending_update::Effect::MintDistributionCpv1(md) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::MintDistributionV1(md.try_into()?),
-            }),
-            pending_update::Effect::TransactionFeeDistribution(tfd) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::TransactionFeeDistribution(tfd.try_into()?),
-            }),
-            pending_update::Effect::GasRewards(gr) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::GasRewards(gr.try_into()?),
-            }),
-            pending_update::Effect::PoolParametersCpv0(pp) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::PoolParametersV0(pp.try_into()?),
-            }),
-            pending_update::Effect::PoolParametersCpv1(pp) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::PoolParametersV1(pp.try_into()?),
-            }),
-            pending_update::Effect::AddAnonymityRevoker(aar) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::AddAnonymityRevoker(aar.try_into()?),
-            }),
-            pending_update::Effect::AddIdentityProvider(aidp) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::AddIdentityProvider(Box::new(aidp.try_into()?)),
-            }),
-            pending_update::Effect::CooldownParameters(cdp) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::CooldownParameters(cdp.try_into()?),
-            }),
-            pending_update::Effect::TimeParameters(tp) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::TimeParameters(tp.try_into()?),
-            }),
-            pending_update::Effect::GasRewardsCpv2(update) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::GasRewardsV1(update.try_into()?),
-            }),
-            pending_update::Effect::TimeoutParameters(update) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::TimeoutParameters(update.try_into()?),
-            }),
-            pending_update::Effect::MinBlockTime(update) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::MinBlockTime(update.into()),
-            }),
-            pending_update::Effect::BlockEnergyLimit(update) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::BlockEnergyLimit(update.into()),
-            }),
-            pending_update::Effect::FinalizationCommitteeParameters(update) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::FinalizationCommitteeParameters(update.try_into()?),
-            }),
-            pending_update::Effect::ValidatorScoreParameters(update) => Ok(Self {
-                effective_time,
-                effect: PendingUpdateEffect::ValidatorScoreParameters(update.try_into()?),
-            }),
-        }
+            pending_update::Effect::EuroPerEnergy(ee) => {
+                PendingUpdateEffect::EuroPerEnergy(ee.try_into()?)
+            }
+            pending_update::Effect::MicroCcdPerEuro(mpe) => {
+                PendingUpdateEffect::MicroCcdPerEnergy(mpe.try_into()?)
+            }
+            pending_update::Effect::FoundationAccount(fa) => {
+                PendingUpdateEffect::FoundationAccount(fa.try_into()?)
+            }
+            pending_update::Effect::MintDistributionCpv0(md) => {
+                PendingUpdateEffect::MintDistributionV0(md.try_into()?)
+            }
+            pending_update::Effect::MintDistributionCpv1(md) => {
+                PendingUpdateEffect::MintDistributionV1(md.try_into()?)
+            }
+            pending_update::Effect::TransactionFeeDistribution(tfd) => {
+                PendingUpdateEffect::TransactionFeeDistribution(tfd.try_into()?)
+            }
+            pending_update::Effect::GasRewards(gr) => {
+                PendingUpdateEffect::GasRewards(gr.try_into()?)
+            }
+            pending_update::Effect::PoolParametersCpv0(pp) => {
+                PendingUpdateEffect::PoolParametersV0(pp.try_into()?)
+            }
+            pending_update::Effect::PoolParametersCpv1(pp) => {
+                PendingUpdateEffect::PoolParametersV1(pp.try_into()?)
+            }
+            pending_update::Effect::AddAnonymityRevoker(aar) => {
+                PendingUpdateEffect::AddAnonymityRevoker(aar.try_into()?)
+            }
+            pending_update::Effect::AddIdentityProvider(aidp) => {
+                PendingUpdateEffect::AddIdentityProvider(Box::new(aidp.try_into()?))
+            }
+            pending_update::Effect::CooldownParameters(cdp) => {
+                PendingUpdateEffect::CooldownParameters(cdp.try_into()?)
+            }
+            pending_update::Effect::TimeParameters(tp) => {
+                PendingUpdateEffect::TimeParameters(tp.try_into()?)
+            }
+            pending_update::Effect::GasRewardsCpv2(update) => {
+                PendingUpdateEffect::GasRewardsV1(update.try_into()?)
+            }
+            pending_update::Effect::TimeoutParameters(update) => {
+                PendingUpdateEffect::TimeoutParameters(update.try_into()?)
+            }
+            pending_update::Effect::MinBlockTime(update) => {
+                PendingUpdateEffect::MinBlockTime(update.into())
+            }
+            pending_update::Effect::BlockEnergyLimit(update) => {
+                PendingUpdateEffect::BlockEnergyLimit(update.into())
+            }
+            pending_update::Effect::FinalizationCommitteeParameters(update) => {
+                PendingUpdateEffect::FinalizationCommitteeParameters(update.try_into()?)
+            }
+            pending_update::Effect::ValidatorScoreParameters(update) => {
+                PendingUpdateEffect::ValidatorScoreParameters(update.try_into()?)
+            }
+        };
+        Ok(out)
     }
 }
 

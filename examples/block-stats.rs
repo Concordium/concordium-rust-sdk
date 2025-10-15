@@ -89,6 +89,9 @@ async fn main() -> anyhow::Result<()> {
             .await?
             .response
             .try_fold(0, |count, ev| async move {
+                let v2::Upward::Known(ev) = ev else {
+                    return Ok(count);
+                };
                 let add = match ev {
                     SpecialTransactionOutcome::PaydayFoundationReward { .. } => 1u32,
                     SpecialTransactionOutcome::PaydayAccountReward { .. } => 1u32,

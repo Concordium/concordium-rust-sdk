@@ -9,6 +9,39 @@ use concordium_base::{
 };
 use std::net::IpAddr;
 
+/// Integer representation of the protocol version.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    SerdeSerialize,
+    SerdeDeserialize,
+    Hash,
+    derive_more::Display,
+)]
+#[display(fmt = "P{_0}")]
+#[serde(transparent)]
+#[repr(transparent)]
+pub struct ProtocolVersionInt(pub u64);
+
+impl TryFrom<ProtocolVersionInt> for ProtocolVersion {
+    type Error = UnknownProtocolVersion;
+
+    fn try_from(value: ProtocolVersionInt) -> Result<Self, Self::Error> {
+        ProtocolVersion::try_from(value.0)
+    }
+}
+
+impl From<ProtocolVersion> for ProtocolVersionInt {
+    fn from(value: ProtocolVersion) -> Self {
+        Self(value.into())
+    }
+}
+
 #[derive(SerdeDeserialize, Debug, SerdeSerialize)]
 #[serde(rename_all = "camelCase")]
 /// Metadata about a given block.
@@ -57,7 +90,7 @@ pub struct BlockInfo {
     /// going to always be `Some`.
     pub block_baker: Option<BakerId>,
     /// Protocol version to which the block belongs.
-    pub protocol_version: ProtocolVersion,
+    pub protocol_version: ProtocolVersionInt,
     /// The round of the block. Present from protocol version 6.
     pub round: Option<Round>,
     /// The epoch of the block. Present from protocol version 6.
@@ -145,7 +178,7 @@ pub struct ConsensusInfo {
     /// The time (local time of the node) that a block was last received.
     pub block_last_received_time: Option<chrono::DateTime<chrono::Utc>>,
     /// Currently active protocol version.
-    pub protocol_version: ProtocolVersion,
+    pub protocol_version: ProtocolVersionInt,
     /// The number of chain restarts via a protocol update. An effected
     /// protocol update instruction might not change the protocol version
     /// specified in the previous field, but it always increments the genesis
@@ -269,7 +302,7 @@ pub struct PendingUpdate {
     /// Time when it will become effective.
     pub effective_time: TransactionTime,
     /// The effect the update will have.
-    pub effect: PendingUpdateEffect,
+    pub effect: Upward<PendingUpdateEffect>,
 }
 
 #[derive(Debug, Clone, SerdeSerialize, SerdeDeserialize)]

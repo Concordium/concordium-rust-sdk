@@ -27,8 +27,8 @@ pub enum CredentialLookupError {
     QueryError(#[from] v2::QueryError),
     #[error("Unable to query CIS4 contract: {0}")]
     Cis4QueryError(#[from] Cis4QueryError),
-    #[error("Credential {cred_id} no longer present on account: {account}")]
-    CredentialNotPresent {
+    #[error("Credential {cred_id} no longer present or of unknown type on account: {account}")]
+    CredentialNotPresentOrUnknown {
         cred_id: CredentialRegistrationID,
         account: AccountAddress,
     },
@@ -36,6 +36,8 @@ pub enum CredentialLookupError {
     InitialCredential { cred_id: CredentialRegistrationID },
     #[error("Unexpected response from the node: {0}")]
     InvalidResponse(String),
+    #[error("Unknown stored credential for {cred_id}. Updating the rust-sdk to a version compatible with the node will resolve this issue.")]
+    UnknownCredential { cred_id: CredentialRegistrationID },
 }
 
 /// The public cryptographic data of a credential together with its current
@@ -80,24 +82,27 @@ pub async fn verify_credential_metadata(
             let ai = client
                 .get_account_info(&cred_id.into(), BlockIdentifier::LastFinal)
                 .await?;
-            let Some(cred) = ai
-                .response
-                .account_credentials
-                .values()
-                .find(|cred| cred.value.cred_id() == cred_id.as_ref())
-            else {
-                return Err(CredentialLookupError::CredentialNotPresent {
+            let Some(cred) = ai.response.account_credentials.values().find(|cred| {
+                cred.value
+                    .as_ref()
+                    .is_known_and(|c| c.cred_id() == cred_id.as_ref())
+            }) else {
+                return Err(CredentialLookupError::CredentialNotPresentOrUnknown {
                     cred_id,
                     account: ai.response.account_address,
                 });
             };
-            if cred.value.issuer() != issuer {
+            let c = cred
+                .value
+                .as_ref()
+                .known_or(CredentialLookupError::UnknownCredential { cred_id })?;
+            if c.issuer() != issuer {
                 return Err(CredentialLookupError::InconsistentIssuer {
                     stated: issuer,
-                    actual: cred.value.issuer(),
+                    actual: c.issuer(),
                 });
             }
-            match &cred.value {
+            match &c {
                 concordium_base::id::types::AccountCredentialWithoutProofs::Initial { .. } => {
                     Err(CredentialLookupError::InitialCredential { cred_id })
                 }

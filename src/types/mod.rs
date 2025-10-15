@@ -1,8 +1,5 @@
 //! Type definitions used throughout the rest of the SDK.
-use anyhow::Context;
-pub use concordium_base::hashes;
-// re-export to maintain backwards compatibility.
-pub use concordium_base::id::types::CredentialType;
+
 pub mod block_certificates;
 pub mod network;
 pub mod queries;
@@ -10,9 +7,13 @@ pub mod smart_contracts;
 mod summary_helper;
 pub mod transactions;
 
-use crate::{constants::*, protocol_level_tokens};
+use anyhow::Context;
+pub use concordium_base::hashes;
+// re-export to maintain backwards compatibility.
+use crate::{constants::*, protocol_level_tokens, v2::upward::Upward};
 pub use concordium_base::{
     base::*,
+    id::types::CredentialType,
     smart_contracts::{ContractTraceElement, InstanceUpdatedEvent},
 };
 use concordium_base::{
@@ -259,6 +260,20 @@ pub struct BakerInfo {
     pub baker_aggregation_verify_key: BakerAggregationVerifyKey,
 }
 
+/// Additional information about a baking pool.
+/// This information is added with the introduction of delegation in protocol
+/// version 4.
+#[derive(SerdeSerialize, SerdeDeserialize, PartialEq, Eq, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BakerPoolInfo {
+    /// Whether the pool allows delegators.
+    pub open_status: Upward<OpenStatus>,
+    /// The URL that links to the metadata about the pool.
+    pub metadata_url: UrlText,
+    /// The commission rates charged by the pool owner.
+    pub commission_rates: CommissionRates,
+}
+
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum AccountStakingInfo {
@@ -334,7 +349,11 @@ pub struct Cooldown {
     pub amount: Amount,
 
     /// The status of the cooldown.
-    pub status: CooldownStatus,
+    ///
+    /// Note future versions of the Concordium Node API might introduce new
+    /// variants of cooldowns, therefore each event is wrapped in
+    /// [`Upward`] potentially representing some future unknown data.
+    pub status: Upward<CooldownStatus>,
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq, Clone)]
@@ -355,7 +374,7 @@ pub struct AccountInfo {
     /// with index 0.
     pub account_credentials: std::collections::BTreeMap<
         CredentialIndex,
-        Versioned<AccountCredentialWithoutProofs<ArCurve, AttributeKind>>,
+        Versioned<Upward<AccountCredentialWithoutProofs<ArCurve, AttributeKind>>>,
     >,
     /// Lower bound on how many credentials must sign any given transaction from
     /// this account.
@@ -373,10 +392,14 @@ pub struct AccountInfo {
     #[serde(default)]
     /// `Some` if and only if the account is a baker or delegator. In that case
     /// it is the information about the baker or delegator.
+    ///
+    /// Note future versions of the Concordium Node API might introduce new
+    /// variants of [`AccountStakingInfo`], therefore each event is wrapped in
+    /// [`Upward`] potentially representing some future unknown data.
     // this is a bit of a hacky way of JSON parsing, and **relies** on
     // the account staking info serde instance being "untagged"
     #[serde(rename = "accountBaker", alias = "accountDelegation")]
-    pub account_stake: Option<AccountStakingInfo>,
+    pub account_stake: Option<Upward<AccountStakingInfo>>,
     /// Canonical address of the account.
     pub account_address: AccountAddress,
 
@@ -407,27 +430,28 @@ impl AccountInfo {
     }
 }
 
-impl From<&AccountInfo> for AccountAccessStructure {
+impl From<&AccountInfo> for Upward<AccountAccessStructure> {
     fn from(value: &AccountInfo) -> Self {
-        Self {
-            keys: value
-                .account_credentials
-                .iter()
-                .map(|(idx, v)| {
-                    let key = match v.value {
-                        crate::id::types::AccountCredentialWithoutProofs::Initial { ref icdv } => {
-                            icdv.cred_account.clone()
-                        }
-                        crate::id::types::AccountCredentialWithoutProofs::Normal {
-                            ref cdv,
-                            ..
-                        } => cdv.cred_key_info.clone(),
-                    };
-                    (*idx, key)
+        let keys = value
+            .account_credentials
+            .iter()
+            .map(|(idx, v)| {
+                v.value.as_ref().map(|x| match x {
+                    crate::id::types::AccountCredentialWithoutProofs::Initial { ref icdv } => {
+                        (*idx, icdv.cred_account.clone())
+                    }
+                    crate::id::types::AccountCredentialWithoutProofs::Normal {
+                        ref cdv, ..
+                    } => (*idx, cdv.cred_key_info.clone()),
                 })
-                .collect(),
-            threshold: value.account_threshold,
-        }
+            })
+            .collect::<Upward<Vec<(CredentialIndex, CredentialPublicKeys)>>>();
+        let threshold = value.account_threshold;
+
+        keys.map(|ks| AccountAccessStructure {
+            keys: ks.into_iter().collect(),
+            threshold,
+        })
     }
 }
 
@@ -553,7 +577,7 @@ impl RewardsOverview {
 pub struct CommonRewardData {
     /// Protocol version that applies to these rewards. V0 variant
     /// only exists for protocol versions 1, 2, and 3.
-    pub protocol_version: ProtocolVersion,
+    pub protocol_version: queries::ProtocolVersionInt,
     /// The total CCD in existence.
     pub total_amount: Amount,
     /// The total CCD in encrypted balances.
@@ -589,7 +613,7 @@ mod rewards_overview {
         type Error = anyhow::Error;
 
         fn try_from(value: RewardsDataRaw) -> Result<Self, Self::Error> {
-            if value.common.protocol_version <= ProtocolVersion::P3 {
+            if value.common.protocol_version <= ProtocolVersion::P3.into() {
                 Ok(Self::V0 { data: value.common })
             } else {
                 let foundation_transaction_rewards =
@@ -1142,13 +1166,15 @@ pub struct FinalizationSummaryParty {
     pub signed: bool,
 }
 
-#[derive(SerdeDeserialize, SerdeSerialize, Debug, Clone)]
-#[serde(
-    try_from = "summary_helper::BlockItemSummary",
-    into = "summary_helper::BlockItemSummary"
-)]
+#[derive(SerdeDeserialize, Debug, Clone)]
+#[serde(try_from = "summary_helper::BlockItemSummary")]
 /// Summary of the outcome of a block item in structured form.
 /// The summary determines which transaction type it was.
+///
+/// Note the serde::Serialize implementation will produce a runtime error if any
+/// of the content contains [`Upward::Unknown`].
+/// The serde::Serialize implementation for this type is now deprecated and will
+/// be removed.
 pub struct BlockItemSummary {
     /// Index of the transaction in the block where it is included.
     pub index: TransactionIndex,
@@ -1159,105 +1185,67 @@ pub struct BlockItemSummary {
     /// Details that are specific to different transaction types.
     /// For successful transactions there is a one to one mapping of transaction
     /// types and variants (together with subvariants) of this type.
-    pub details: BlockItemSummaryDetails,
+    pub details: Upward<BlockItemSummaryDetails>,
 }
 
 impl BlockItemSummary {
     /// Return whether the transaction was successful, i.e., the intended effect
     /// happened.
-    pub fn is_success(&self) -> bool {
-        match &self.details {
-            BlockItemSummaryDetails::AccountTransaction(ad) => ad.is_rejected().is_none(),
-            BlockItemSummaryDetails::AccountCreation(_) => true,
-            BlockItemSummaryDetails::Update(_) => true,
-            BlockItemSummaryDetails::TokenCreationDetails(_) => true,
-        }
+    ///
+    /// Returns [`Upward::Unknown`] when encountering unfamiliar data from newer
+    /// versions of the node to stay forward-compatible.
+    pub fn is_success(&self) -> Upward<bool> {
+        self.details
+            .as_ref()
+            .map(BlockItemSummaryDetails::is_success)
     }
 
     /// Return whether the transaction has failed to achieve the intended
     /// effects.
-    pub fn is_reject(&self) -> bool {
-        self.is_rejected_account_transaction().is_some()
+    ///
+    /// Returns [`Upward::Unknown`] when encountering unfamiliar data from newer
+    /// versions of the node to stay forward-compatible, in case future block
+    /// items include some notion of being rejected as well.
+    pub fn is_reject(&self) -> Upward<bool> {
+        self.details
+            .as_ref()
+            .map(BlockItemSummaryDetails::is_reject)
     }
 
     /// Return `Some` if the result corresponds to a rejected account
     /// transaction. This returns `Some` if and only if
     /// [`is_reject`](Self::is_reject) returns `true`.
-    pub fn is_rejected_account_transaction(&self) -> Option<&RejectReason> {
-        match &self.details {
-            BlockItemSummaryDetails::AccountTransaction(ad) => ad.is_rejected(),
-            BlockItemSummaryDetails::AccountCreation(_) => None,
-            BlockItemSummaryDetails::Update(_) => None,
-            BlockItemSummaryDetails::TokenCreationDetails(_) => None,
-        }
+    pub fn is_rejected_account_transaction(&self) -> Option<Upward<&RejectReason>> {
+        self.details.as_known()?.account_transaction_reject_reason()
     }
 
+    /// Return the account address signing the
+    /// `[BlockItemSummaryDetails::AccountTransaction]` otherwise `[None]`.
     pub fn sender_account(&self) -> Option<AccountAddress> {
-        match &self.details {
-            BlockItemSummaryDetails::AccountTransaction(at) => Some(at.sender),
-            BlockItemSummaryDetails::AccountCreation(_) => None,
-            BlockItemSummaryDetails::Update(_) => None,
-            BlockItemSummaryDetails::TokenCreationDetails(_) => None,
-        }
+        self.details.as_known()?.sender_account()
     }
 
-    pub fn affected_contracts(&self) -> Vec<ContractAddress> {
-        if let BlockItemSummaryDetails::AccountTransaction(at) = &self.details {
-            match &at.effects {
-                AccountTransactionEffects::ContractInitialized { data } => vec![data.address],
-                AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                    let mut seen = HashSet::new();
-                    let mut addresses = Vec::new();
-                    for effect in effects {
-                        match effect {
-                            ContractTraceElement::Updated { data } => {
-                                if seen.insert(data.address) {
-                                    addresses.push(data.address);
-                                }
-                            }
-                            ContractTraceElement::Transferred { .. } => (),
-                            ContractTraceElement::Interrupted { .. } => (),
-                            ContractTraceElement::Resumed { .. } => (),
-                            ContractTraceElement::Upgraded { .. } => (),
-                        }
-                    }
-                    addresses
-                }
-                _ => Vec::new(),
-            }
-        } else {
-            Vec::new()
-        }
+    /// Return the list of smart contract addresses affected by the block
+    /// summary.
+    ///
+    /// Returns [`Upward::Unknown`] when encountering unfamiliar data from newer
+    /// versions of the node to stay forward-compatible.
+    pub fn affected_contracts(&self) -> Upward<Vec<Upward<ContractAddress>>> {
+        self.details
+            .as_ref()
+            .and_then(BlockItemSummaryDetails::affected_contracts)
     }
 
     /// If the block item is a smart contract update transaction then return the
     /// execution tree.
-    pub fn contract_update(self) -> Option<ExecutionTree> {
-        if let BlockItemSummaryDetails::AccountTransaction(at) = self.details {
-            match at.effects {
-                AccountTransactionEffects::ContractInitialized { .. } => None,
-                AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                    execution_tree(effects)
-                }
-                _ => None,
-            }
-        } else {
-            None
-        }
+    pub fn contract_update(self) -> Option<Upward<ExecutionTree>> {
+        self.details.known()?.contract_update()
     }
 
     /// If the block item is a smart contract init transaction then
     /// return the initialization data.
     pub fn contract_init(&self) -> Option<&ContractInitializedEvent> {
-        if let BlockItemSummaryDetails::AccountTransaction(at) = &self.details {
-            match &at.effects {
-                AccountTransactionEffects::ContractInitialized { data } => Some(data),
-                AccountTransactionEffects::ContractUpdateIssued { .. } => None,
-                _ => None,
-            }
-        } else {
-            None
-        }
+        self.details.as_known()?.contract_init()
     }
 
     /// If the block item is a smart contract update transaction then return
@@ -1265,121 +1253,33 @@ impl BlockItemSummary {
     /// logs that were produced.
     pub fn contract_update_logs(
         &self,
-    ) -> Option<impl Iterator<Item = (ContractAddress, &[smart_contracts::ContractEvent])> + '_>
-    {
-        if let BlockItemSummaryDetails::AccountTransaction(at) = &self.details {
-            match &at.effects {
-                AccountTransactionEffects::ContractInitialized { .. } => None,
-                AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                    let iter = effects.iter().flat_map(|effect| match effect {
-                        ContractTraceElement::Updated { data } => {
-                            Some((data.address, &data.events[..]))
-                        }
-                        ContractTraceElement::Transferred { .. } => None,
-                        ContractTraceElement::Interrupted { address, events } => {
-                            Some((*address, &events[..]))
-                        }
-                        ContractTraceElement::Resumed { .. } => None,
-                        ContractTraceElement::Upgraded { .. } => None,
-                    });
-                    Some(iter)
-                }
-                _ => None,
-            }
-        } else {
-            None
-        }
+    ) -> Option<
+        impl Iterator<Item = Upward<(ContractAddress, &[smart_contracts::ContractEvent])>> + '_,
+    > {
+        self.details.as_known()?.contract_update_logs()
     }
 
     /// Return the list of addresses affected by the block summary.
-    /// These are addresses that have their CCD balance or plt token balance
+    /// These are addresses that have their CCD balance or PLT token balance
     /// changed as part of the block summary.
-    pub fn affected_addresses(&self) -> Vec<AccountAddress> {
-        match &self.details {
-            BlockItemSummaryDetails::AccountTransaction(at) => match &at.effects {
-                AccountTransactionEffects::None { .. } => vec![at.sender],
-                AccountTransactionEffects::ModuleDeployed { .. } => vec![at.sender],
-                AccountTransactionEffects::ContractInitialized { .. } => vec![at.sender],
-                AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                    let mut seen = BTreeSet::new();
-                    seen.insert(at.sender);
-                    let mut addresses = vec![at.sender];
-                    for effect in effects {
-                        match effect {
-                            ContractTraceElement::Updated { .. } => (),
-                            ContractTraceElement::Transferred { to, .. } => {
-                                if seen.insert(*to) {
-                                    addresses.push(*to);
-                                }
-                            }
-                            ContractTraceElement::Interrupted { .. } => (),
-                            ContractTraceElement::Resumed { .. } => (),
-                            ContractTraceElement::Upgraded { .. } => (),
-                        }
-                    }
-                    addresses
-                }
-                AccountTransactionEffects::AccountTransfer { to, .. } => {
-                    if *to == at.sender {
-                        vec![at.sender]
-                    } else {
-                        vec![at.sender, *to]
-                    }
-                }
-                AccountTransactionEffects::AccountTransferWithMemo { to, .. } => {
-                    if *to == at.sender {
-                        vec![at.sender]
-                    } else {
-                        vec![at.sender, *to]
-                    }
-                }
-                AccountTransactionEffects::BakerAdded { .. } => vec![at.sender],
-                AccountTransactionEffects::BakerRemoved { .. } => vec![at.sender],
-                AccountTransactionEffects::BakerStakeUpdated { .. } => vec![at.sender],
-                AccountTransactionEffects::BakerRestakeEarningsUpdated { .. } => {
-                    vec![at.sender]
-                }
-                AccountTransactionEffects::BakerKeysUpdated { .. } => vec![at.sender],
-                AccountTransactionEffects::EncryptedAmountTransferred { removed, added } => {
-                    vec![removed.account, added.receiver]
-                }
-                AccountTransactionEffects::EncryptedAmountTransferredWithMemo {
-                    removed,
-                    added,
-                    ..
-                } => vec![removed.account, added.receiver],
-                AccountTransactionEffects::TransferredToEncrypted { data } => {
-                    vec![data.account]
-                }
-                AccountTransactionEffects::TransferredToPublic { removed, .. } => {
-                    vec![removed.account]
-                }
-                AccountTransactionEffects::TransferredWithSchedule { to, .. } => {
-                    vec![at.sender, *to]
-                }
-                AccountTransactionEffects::TransferredWithScheduleAndMemo { to, .. } => {
-                    vec![at.sender, *to]
-                }
-                AccountTransactionEffects::CredentialKeysUpdated { .. } => vec![at.sender],
-                AccountTransactionEffects::CredentialsUpdated { .. } => vec![at.sender],
-                AccountTransactionEffects::DataRegistered { .. } => vec![at.sender],
-                AccountTransactionEffects::BakerConfigured { .. } => vec![at.sender],
-                AccountTransactionEffects::DelegationConfigured { .. } => vec![at.sender],
-                AccountTransactionEffects::TokenUpdate { events } => {
-                    let mut addresses = BTreeSet::new();
-                    addresses.insert(at.sender);
-                    add_token_event_addresses(&mut addresses, events);
-                    addresses.into_iter().collect()
-                }
-            },
-            BlockItemSummaryDetails::AccountCreation(_) => Vec::new(),
-            BlockItemSummaryDetails::Update(_) => Vec::new(),
-            BlockItemSummaryDetails::TokenCreationDetails(token_creation_details) => {
-                let mut addresses = BTreeSet::new();
-                add_token_event_addresses(&mut addresses, &token_creation_details.events);
-                addresses.into_iter().collect()
-            }
-        }
+    ///
+    /// Returns [`Upward::Unknown`] when encountering unfamiliar data from newer
+    /// versions of the node to stay forward-compatible.
+    pub fn affected_addresses(&self) -> Upward<Vec<AccountAddress>> {
+        self.details
+            .as_ref()
+            .and_then(BlockItemSummaryDetails::affected_addresses)
+    }
+}
+
+impl SerdeSerialize for BlockItemSummary {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        summary_helper::BlockItemSummary::try_from(self.clone())
+            .map_err(|_| serde::ser::Error::custom("Cannot serialize Upward::Unknown due"))?
+            .serialize(serializer)
     }
 }
 
@@ -1424,7 +1324,12 @@ impl ExecutionTree {
     /// Return a set of contract addresses that appear in this execution
     /// tree, together with a set of [receive names](OwnedReceiveName) that
     /// were called for that contract address.
-    pub fn affected_addresses(&self) -> BTreeMap<ContractAddress, BTreeSet<OwnedReceiveName>> {
+    ///
+    /// Returns [`Upward::Unknown`] if any branch in the execution tree contains
+    /// [`Upward::Unknown`] data.
+    pub fn affected_addresses(
+        &self,
+    ) -> Upward<BTreeMap<ContractAddress, BTreeSet<OwnedReceiveName>>> {
         let mut addresses = BTreeMap::<ContractAddress, BTreeSet<_>>::new();
         let mut todo = vec![self];
         while let Some(head) = todo.pop() {
@@ -1435,6 +1340,9 @@ impl ExecutionTree {
                         .or_default()
                         .insert(v0.top_level.receive_name.clone());
                     for rest in &v0.rest {
+                        let Upward::Known(rest) = rest else {
+                            return Upward::Unknown(());
+                        };
                         if let TraceV0::Call(call) = rest {
                             todo.push(call);
                         }
@@ -1446,6 +1354,9 @@ impl ExecutionTree {
                         .or_default()
                         .insert(v1.receive_name.clone());
                     for event in &v1.events {
+                        let Upward::Known(event) = event else {
+                            return Upward::Unknown(());
+                        };
                         if let TraceV1::Call { call } = event {
                             todo.push(call);
                         }
@@ -1453,7 +1364,7 @@ impl ExecutionTree {
                 }
             }
         }
-        addresses
+        Upward::Known(addresses)
     }
 
     /// Get an iterator over the events logged by the contracts that were called
@@ -1461,14 +1372,20 @@ impl ExecutionTree {
     /// `(address, entrypoint, logs)` where the meaning is that the contract
     /// at the given address, while executing the entrypoint `entrypoint`
     /// produced the `logs`. Note that the `logs` might be an empty slice.
+    ///
+    /// Each item of the iterator is wrapped into an `Upward` type.
+    /// If the SDK is not fully compatible with the Concordium node,
+    /// it can occur that new events in the execution tree occur that are unknown
+    /// to the SDK or some of the execution traces are unknown.
+    /// Items of `Unknown` are inserted in the iterator in that case.
     pub fn events(
         &self,
     ) -> impl Iterator<
-        Item = (
+        Item = Upward<(
             ContractAddress,
             EntrypointName<'_>,
             &[smart_contracts::ContractEvent],
-        ),
+        )>,
     > + '_ {
         // An auxiliary type used to store the list of next items produced by
         // the [`EventsIterator`]
@@ -1489,16 +1406,16 @@ impl ExecutionTree {
         }
 
         impl<'a> Iterator for LogsIterator<'a> {
-            type Item = (
+            type Item = Upward<(
                 ContractAddress,
                 EntrypointName<'a>,
                 &'a [smart_contracts::ContractEvent],
-            );
+            )>;
 
             fn next(&mut self) -> Option<Self::Item> {
                 while let Some(next) = self.next.pop() {
                     match next {
-                        LogsIteratorNext::Events(r) => return Some(r),
+                        LogsIteratorNext::Events(r) => return Some(Upward::Known(r)),
                         LogsIteratorNext::Tree(next) => match next {
                             ExecutionTree::V0(v0) => {
                                 let rv = (
@@ -1510,14 +1427,20 @@ impl ExecutionTree {
                                     &v0.top_level.events[..],
                                 );
                                 for rest in v0.rest.iter().rev() {
+                                    let Upward::Known(rest) = rest else {
+                                        return Some(Upward::Unknown(()));
+                                    };
                                     if let TraceV0::Call(call) = rest {
                                         self.next.push(LogsIteratorNext::Tree(call));
                                     }
                                 }
-                                return Some(rv);
+                                return Some(Upward::Known(rv));
                             }
                             ExecutionTree::V1(v1) => {
                                 for event in v1.events.iter().rev() {
+                                    let Upward::Known(event) = event else {
+                                        return Some(Upward::Unknown(()));
+                                    };
                                     match event {
                                         TraceV1::Events { events } => {
                                             self.next.push(LogsIteratorNext::Events((
@@ -1551,13 +1474,23 @@ impl ExecutionTree {
 /// This will fail if the list was not generated correctly, but if the list of
 /// trace elements is coming from the node it will always be in the correct
 /// format.
-pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTree> {
+///
+/// The return type is wrapped into an `Upward` type.
+/// If the SDK is not fully compatible with the Concordium node,
+/// it can occur that the `contractTraceElements` pass through a smart contract with a version that is unkonwn to this SDK.
+/// As the assumption is that new smart contract versions require a different execution tree to be accurated represented/executed,
+/// this function will return `Unknown` in that case.
+/// If some of the `contractTraceElements` are `Unknown` to this SDK, but otherwise pass through smart contracts with known versions,
+/// an execution tree can be constructed that contains all trace elements (potentially `Unknown` trace elements).
+pub fn execution_tree(
+    elements: Vec<Upward<ContractTraceElement>>,
+) -> Option<Upward<ExecutionTree>> {
     #[derive(Debug)]
     struct PartialTree {
         address: ContractAddress,
         /// Whether the matching resume was seen for the interrupt.
         resumed: bool,
-        events: Vec<TraceV1>,
+        events: Vec<Upward<TraceV1>>,
     }
 
     #[derive(Debug)]
@@ -1571,6 +1504,20 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
     let mut stack: Vec<Worker> = Vec::new();
     let mut elements = elements.into_iter();
     while let Some(element) = elements.next() {
+        let Upward::Known(element) = element else {
+            // When we encounter some future unknown trace element, we extend the events of
+            // the current node in the execution tree. This assumes that the
+            // very first trace element is known and that future trace elements does not
+            // model control flow events interrupting with `Resumed` and `Interrupted`.
+            let last = stack.last_mut()?;
+            match last {
+                Worker::V0(v0) => v0.rest.push(Upward::Unknown(())),
+                Worker::Partial(partial) => {
+                    partial.events.push(Upward::Unknown(()));
+                }
+            }
+            continue;
+        };
         match element {
             ContractTraceElement::Updated {
                 data:
@@ -1585,8 +1532,8 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
                     },
             } => {
                 if let Some(end) = stack.pop() {
-                    let tree = match contract_version {
-                        WasmVersion::V0 => ExecutionTree::V0(ExecutionTreeV0 {
+                    let tree = match WasmVersion::try_from(contract_version) {
+                        Ok(WasmVersion::V0) => ExecutionTree::V0(ExecutionTreeV0 {
                             top_level: UpdateV0 {
                                 address,
                                 instigator,
@@ -1597,18 +1544,20 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
                             },
                             rest: Vec::new(),
                         }),
-                        WasmVersion::V1 => ExecutionTree::V1(ExecutionTreeV1 {
+                        Ok(WasmVersion::V1) => ExecutionTree::V1(ExecutionTreeV1 {
                             address,
                             instigator,
                             amount,
                             message,
                             receive_name,
-                            events: vec![TraceV1::Events { events }],
+                            events: vec![Upward::Known(TraceV1::Events { events })],
                         }),
+                        Err(_) => return Some(Upward::Unknown(())), // return immediately if unknown
                     };
+
                     match end {
                         Worker::V0(mut v0) => {
-                            v0.rest.push(TraceV0::Call(tree));
+                            v0.rest.push(Upward::Known(TraceV0::Call(tree)));
                             stack.push(Worker::V0(v0));
                         }
                         Worker::Partial(mut partial) => {
@@ -1622,32 +1571,36 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
                                 if let Some(last) = stack.last_mut() {
                                     match last {
                                         Worker::V0(v0) => {
-                                            v0.rest.push(TraceV0::Call(ExecutionTree::V1(tree)));
+                                            v0.rest.push(Upward::Known(TraceV0::Call(
+                                                ExecutionTree::V1(tree),
+                                            )));
                                         }
                                         Worker::Partial(v0) => {
-                                            v0.events.push(TraceV1::Call {
+                                            v0.events.push(Upward::Known(TraceV1::Call {
                                                 call: ExecutionTree::V1(tree),
-                                            });
+                                            }));
                                         }
                                     }
                                 } else {
                                     // and return it.
                                     if elements.next().is_none() {
-                                        return Some(ExecutionTree::V1(tree));
+                                        return Some(Upward::Known(ExecutionTree::V1(tree)));
                                     } else {
                                         return None;
                                     }
                                 }
                             } else {
-                                partial.events.push(TraceV1::Call { call: tree });
+                                partial
+                                    .events
+                                    .push(Upward::Known(TraceV1::Call { call: tree }));
                                 stack.push(Worker::Partial(partial));
                             }
                         }
                     }
                 } else {
                     // no stack yet
-                    match contract_version {
-                        WasmVersion::V0 => stack.push(Worker::V0(ExecutionTreeV0 {
+                    match WasmVersion::try_from(contract_version) {
+                        Ok(WasmVersion::V0) => stack.push(Worker::V0(ExecutionTreeV0 {
                             top_level: UpdateV0 {
                                 address,
                                 instigator,
@@ -1658,44 +1611,52 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
                             },
                             rest: Vec::new(),
                         })),
-                        WasmVersion::V1 => {
+                        Ok(WasmVersion::V1) => {
                             let tree = ExecutionTreeV1 {
                                 address,
                                 instigator,
                                 amount,
                                 message,
                                 receive_name,
-                                events: vec![TraceV1::Events { events }],
+                                events: vec![Upward::Known(TraceV1::Events { events })],
                             };
                             // and return it.
                             if elements.next().is_none() {
-                                return Some(ExecutionTree::V1(tree));
+                                return Some(Upward::Known(ExecutionTree::V1(tree)));
                             } else {
                                 return None;
                             }
                         }
+                        Err(_) => return Some(Upward::Unknown(())), // return immediately if unknown
                     }
                 }
             }
             ContractTraceElement::Transferred { from, amount, to } => {
                 let last = stack.last_mut()?;
                 match last {
-                    Worker::V0(v0) => v0.rest.push(TraceV0::Transfer { from, amount, to }),
+                    Worker::V0(v0) => {
+                        v0.rest
+                            .push(Upward::Known(TraceV0::Transfer { from, amount, to }))
+                    }
                     Worker::Partial(partial) => {
-                        partial.events.push(TraceV1::Transfer { from, amount, to });
+                        partial
+                            .events
+                            .push(Upward::Known(TraceV1::Transfer { from, amount, to }));
                     }
                 }
             }
             ContractTraceElement::Interrupted { address, events } => match stack.last_mut() {
                 Some(Worker::Partial(partial)) if partial.resumed => {
                     partial.resumed = false;
-                    partial.events.push(TraceV1::Events { events })
+                    partial
+                        .events
+                        .push(Upward::Known(TraceV1::Events { events }))
                 }
                 _ => {
                     stack.push(Worker::Partial(PartialTree {
                         address,
                         resumed: false,
-                        events: vec![TraceV1::Events { events }],
+                        events: vec![Upward::Known(TraceV1::Events { events })],
                     }));
                 }
             },
@@ -1708,9 +1669,9 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
                         let Worker::Partial(partial) = stack.last_mut()? else {
                             return None;
                         };
-                        partial.events.push(TraceV1::Call {
+                        partial.events.push(Upward::Known(TraceV1::Call {
                             call: ExecutionTree::V0(v0),
-                        });
+                        }));
                         partial.resumed = true;
                     }
                     Worker::Partial(mut partial) => {
@@ -1730,7 +1691,9 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
                     return None;
                 }
                 // Put an upgrade event to the list, and continue.
-                partial.events.push(TraceV1::Upgrade { from, to });
+                partial
+                    .events
+                    .push(Upward::Known(TraceV1::Upgrade { from, to }));
             }
         }
     }
@@ -1738,7 +1701,7 @@ pub fn execution_tree(elements: Vec<ContractTraceElement>) -> Option<ExecutionTr
         return None;
     };
     if stack.is_empty() {
-        Some(ExecutionTree::V0(v0))
+        Some(Upward::Known(ExecutionTree::V0(v0)))
     } else {
         None
     }
@@ -1767,7 +1730,7 @@ pub struct UpdateV0 {
 /// generated by subsequent calls, not directly by the top-level call.
 pub struct ExecutionTreeV0 {
     pub top_level: UpdateV0,
-    pub rest: Vec<TraceV0>,
+    pub rest: Vec<Upward<TraceV0>>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -1802,7 +1765,7 @@ pub struct ExecutionTreeV1 {
     pub receive_name: OwnedReceiveName,
     /// A sequence of calls, transfers, etc. performed by the contract, in the
     /// order that they took effect.
-    pub events: Vec<TraceV1>,
+    pub events: Vec<Upward<TraceV1>>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -1844,6 +1807,230 @@ pub enum BlockItemSummaryDetails {
     /// The summary is of a token creation update.
     TokenCreationDetails(TokenCreationDetails),
 }
+impl BlockItemSummaryDetails {
+    /// Extract the [`BlockItemSummaryDetails::AccountTransaction`] if relevant
+    /// otherwise [`None`].
+    pub fn account_transaction(self) -> Option<AccountTransactionDetails> {
+        if let Self::AccountTransaction(details) = self {
+            Some(details)
+        } else {
+            None
+        }
+    }
+
+    /// Borrow the [`BlockItemSummaryDetails::AccountTransaction`] if relevant
+    /// otherwise [`None`].
+    pub fn as_account_transaction(&self) -> Option<&AccountTransactionDetails> {
+        if let Self::AccountTransaction(details) = &self {
+            Some(details)
+        } else {
+            None
+        }
+    }
+
+    /// Return whether the transaction was successful, i.e., the intended effect
+    /// happened.
+    pub fn is_success(&self) -> bool {
+        match self {
+            BlockItemSummaryDetails::AccountTransaction(ad) => ad.is_rejected().is_none(),
+            BlockItemSummaryDetails::AccountCreation(_) => true,
+            BlockItemSummaryDetails::Update(_) => true,
+            BlockItemSummaryDetails::TokenCreationDetails(_) => true,
+        }
+    }
+
+    /// Return whether the transaction has failed to achieve the intended
+    /// effects.
+    pub fn is_reject(&self) -> bool {
+        if let Self::AccountTransaction(details) = self {
+            details.is_rejected().is_some()
+        } else {
+            false
+        }
+    }
+
+    /// Return `Some` if the result corresponds to a rejected account
+    /// transaction. This returns `Some` if and only if
+    /// [`is_reject`](Self::is_reject) returns `true`.
+    pub fn account_transaction_reject_reason(&self) -> Option<Upward<&RejectReason>> {
+        self.as_account_transaction()?.is_rejected()
+    }
+
+    /// Return the account address signing the
+    /// `[BlockItemSummaryDetails::AccountTransaction]` otherwise `[None]`.
+    pub fn sender_account(&self) -> Option<AccountAddress> {
+        Some(self.as_account_transaction()?.sender)
+    }
+
+    /// Return the list of smart contract addresses affected by the block
+    /// summary.
+    ///
+    /// Returns [`Upward::Unknown`] when encountering unfamiliar data from newer
+    /// versions of the node to stay forward-compatible.
+    fn affected_contracts(&self) -> Upward<Vec<Upward<ContractAddress>>> {
+        if let Some(at) = self.as_account_transaction() {
+            at.effects
+                .as_ref()
+                .map(AccountTransactionEffects::affected_contracts)
+        } else {
+            Upward::Known(Vec::new())
+        }
+    }
+
+    /// If the block item is a smart contract update transaction then return the
+    /// execution tree.
+    pub fn contract_update(self) -> Option<Upward<ExecutionTree>> {
+        match self.account_transaction()?.effects.known()? {
+            AccountTransactionEffects::ContractInitialized { .. } => None,
+            AccountTransactionEffects::ContractUpdateIssued { effects } => execution_tree(effects),
+            _ => None,
+        }
+    }
+
+    /// If the block item is a smart contract init transaction then
+    /// return the initialization data.
+    pub fn contract_init(&self) -> Option<&ContractInitializedEvent> {
+        match self.as_account_transaction()?.effects.as_known()? {
+            AccountTransactionEffects::ContractInitialized { data } => Some(data),
+            AccountTransactionEffects::ContractUpdateIssued { .. } => None,
+            _ => None,
+        }
+    }
+
+    /// If the block item is a smart contract update transaction then return
+    /// an iterator over pairs of a contract address that was affected, and the
+    /// logs that were produced.
+    pub fn contract_update_logs(
+        &self,
+    ) -> Option<
+        impl Iterator<Item = Upward<(ContractAddress, &[smart_contracts::ContractEvent])>> + '_,
+    > {
+        match self.as_account_transaction()?.effects.as_known()? {
+            AccountTransactionEffects::ContractInitialized { .. } => None,
+            AccountTransactionEffects::ContractUpdateIssued { effects } => {
+                let iter = effects.iter().flat_map(|effect| {
+                    let Upward::Known(effect) = effect else {
+                        return Some(Upward::Unknown(()));
+                    };
+
+                    match effect {
+                        ContractTraceElement::Updated { data } => {
+                            Some(Upward::Known((data.address, &data.events[..])))
+                        }
+                        ContractTraceElement::Transferred { .. } => None,
+                        ContractTraceElement::Interrupted { address, events } => {
+                            Some(Upward::Known((*address, &events[..])))
+                        }
+                        ContractTraceElement::Resumed { .. } => None,
+                        ContractTraceElement::Upgraded { .. } => None,
+                    }
+                });
+                Some(iter)
+            }
+            _ => None,
+        }
+    }
+
+    /// Return the list of addresses affected by the block summary.
+    /// These are addresses that have their CCD balance or plt token balance
+    /// changed as part of the block summary.
+    fn affected_addresses(&self) -> Upward<Vec<AccountAddress>> {
+        let out = match self {
+            BlockItemSummaryDetails::AccountTransaction(at) => {
+                let Upward::Known(effects) = &at.effects else {
+                    return Upward::Unknown(());
+                };
+                match effects {
+                    AccountTransactionEffects::None { .. } => vec![at.sender],
+                    AccountTransactionEffects::ModuleDeployed { .. } => vec![at.sender],
+                    AccountTransactionEffects::ContractInitialized { .. } => vec![at.sender],
+                    AccountTransactionEffects::ContractUpdateIssued { effects } => {
+                        let mut seen = BTreeSet::new();
+                        seen.insert(at.sender);
+                        let mut addresses = vec![at.sender];
+                        for effect in effects {
+                            let Upward::Known(effect) = effect else {
+                                return Upward::Unknown(());
+                            };
+                            match effect {
+                                ContractTraceElement::Updated { .. } => (),
+                                ContractTraceElement::Transferred { to, .. } => {
+                                    if seen.insert(*to) {
+                                        addresses.push(*to);
+                                    }
+                                }
+                                ContractTraceElement::Interrupted { .. } => (),
+                                ContractTraceElement::Resumed { .. } => (),
+                                ContractTraceElement::Upgraded { .. } => (),
+                            }
+                        }
+                        addresses
+                    }
+                    AccountTransactionEffects::AccountTransfer { to, .. } => {
+                        if *to == at.sender {
+                            vec![at.sender]
+                        } else {
+                            vec![at.sender, *to]
+                        }
+                    }
+                    AccountTransactionEffects::AccountTransferWithMemo { to, .. } => {
+                        if *to == at.sender {
+                            vec![at.sender]
+                        } else {
+                            vec![at.sender, *to]
+                        }
+                    }
+                    AccountTransactionEffects::BakerAdded { .. } => vec![at.sender],
+                    AccountTransactionEffects::BakerRemoved { .. } => vec![at.sender],
+                    AccountTransactionEffects::BakerStakeUpdated { .. } => vec![at.sender],
+                    AccountTransactionEffects::BakerRestakeEarningsUpdated { .. } => {
+                        vec![at.sender]
+                    }
+                    AccountTransactionEffects::BakerKeysUpdated { .. } => vec![at.sender],
+                    AccountTransactionEffects::EncryptedAmountTransferred { removed, added } => {
+                        vec![removed.account, added.receiver]
+                    }
+                    AccountTransactionEffects::EncryptedAmountTransferredWithMemo {
+                        removed,
+                        added,
+                        ..
+                    } => vec![removed.account, added.receiver],
+                    AccountTransactionEffects::TransferredToEncrypted { data } => {
+                        vec![data.account]
+                    }
+                    AccountTransactionEffects::TransferredToPublic { removed, .. } => {
+                        vec![removed.account]
+                    }
+                    AccountTransactionEffects::TransferredWithSchedule { to, .. } => {
+                        vec![at.sender, *to]
+                    }
+                    AccountTransactionEffects::TransferredWithScheduleAndMemo { to, .. } => {
+                        vec![at.sender, *to]
+                    }
+                    AccountTransactionEffects::CredentialKeysUpdated { .. } => vec![at.sender],
+                    AccountTransactionEffects::CredentialsUpdated { .. } => vec![at.sender],
+                    AccountTransactionEffects::DataRegistered { .. } => vec![at.sender],
+                    AccountTransactionEffects::BakerConfigured { .. } => vec![at.sender],
+                    AccountTransactionEffects::DelegationConfigured { .. } => vec![at.sender],
+                    AccountTransactionEffects::TokenUpdate { events } => {
+                        let mut addresses = BTreeSet::new();
+                        addresses.insert(at.sender);
+                        add_token_event_addresses(&mut addresses, events);
+                        addresses.into_iter().collect()
+                    }
+                }
+            }
+            BlockItemSummaryDetails::AccountCreation(_) => Vec::new(),
+            BlockItemSummaryDetails::Update(_) => Vec::new(),
+            BlockItemSummaryDetails::TokenCreationDetails(token_creation_details) => {
+                let mut addresses = BTreeSet::new();
+                add_token_event_addresses(&mut addresses, &token_creation_details.events);
+                addresses.into_iter().collect()
+            }
+        };
+        Upward::Known(out)
+    }
+}
 
 #[derive(Debug, Clone)]
 /// Details of an account transaction. This always has a sender and is paid for,
@@ -1855,7 +2042,7 @@ pub struct AccountTransactionDetails {
     /// Sender of the transaction.
     pub sender: AccountAddress,
     /// Effects of the account transaction, if any.
-    pub effects: AccountTransactionEffects,
+    pub effects: Upward<AccountTransactionEffects>,
 }
 
 impl AccountTransactionDetails {
@@ -1864,13 +2051,20 @@ impl AccountTransactionDetails {
     /// [AccountTransactionEffects::None]
     /// variant in case the transaction failed with serialization failure
     /// reason.
-    pub fn transaction_type(&self) -> Option<TransactionType> {
-        self.effects.transaction_type()
+    ///
+    /// To remain forward-compatible the `TransactionType` is wrapped in
+    /// [`Upward`] for representing future unknown transaction types introduced
+    /// in a newer node API version.
+    pub fn transaction_type(&self) -> Option<Upward<TransactionType>> {
+        let Upward::Known(effects) = self.effects.as_ref() else {
+            return Some(Upward::Unknown(()));
+        };
+        effects.transaction_type().map(Upward::Known)
     }
 
     /// Return [`Some`] if the transaction has been rejected.
-    pub fn is_rejected(&self) -> Option<&RejectReason> {
-        self.effects.is_rejected()
+    pub fn is_rejected(&self) -> Option<Upward<&RejectReason>> {
+        self.effects.as_known()?.is_rejected()
     }
 }
 
@@ -1926,6 +2120,47 @@ impl AccountTransactionEffects {
             AccountTransactionEffects::TokenUpdate { .. } => Some(TokenUpdate),
         }
     }
+
+    /// Return [`Some`] if the transaction has been rejected.
+    pub fn is_rejected(&self) -> Option<Upward<&RejectReason>> {
+        if let Self::None { reject_reason, .. } = self {
+            Some(reject_reason.as_ref())
+        } else {
+            None
+        }
+    }
+
+    fn affected_contracts(&self) -> Vec<Upward<ContractAddress>> {
+        match self {
+            AccountTransactionEffects::ContractInitialized { data } => {
+                vec![Upward::Known(data.address)]
+            }
+            AccountTransactionEffects::ContractUpdateIssued { effects } => {
+                let mut seen = HashSet::new();
+                let mut addresses = Vec::new();
+
+                for effect in effects {
+                    let Upward::Known(effect) = effect else {
+                        addresses.push(Upward::Unknown(()));
+                        continue;
+                    };
+                    match effect {
+                        ContractTraceElement::Updated { data } => {
+                            if seen.insert(data.address) {
+                                addresses.push(Upward::Known(data.address));
+                            }
+                        }
+                        ContractTraceElement::Transferred { .. } => (),
+                        ContractTraceElement::Interrupted { .. } => (),
+                        ContractTraceElement::Resumed { .. } => (),
+                        ContractTraceElement::Upgraded { .. } => (),
+                    }
+                }
+                addresses
+            }
+            _ => Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1953,7 +2188,7 @@ pub enum AccountTransactionEffects {
         /// In case of serialization failure this will be None.
         transaction_type: Option<TransactionType>,
         /// Reason for rejection of the transaction
-        reject_reason: RejectReason,
+        reject_reason: Upward<RejectReason>,
     },
     /// A module was deployed. This corresponds to
     /// [`DeployModule`](transactions::Payload::DeployModule) transaction
@@ -1967,7 +2202,9 @@ pub enum AccountTransactionEffects {
     /// A contract update transaction was issued and produced the given trace.
     /// This is the result of [Update](transactions::Payload::Update)
     /// transaction.
-    ContractUpdateIssued { effects: Vec<ContractTraceElement> },
+    ContractUpdateIssued {
+        effects: Vec<Upward<ContractTraceElement>>,
+    },
     /// A simple account to account transfer occurred. This is the result of a
     /// successful [`Transfer`](transactions::Payload::Transfer) transaction.
     AccountTransfer {
@@ -2098,26 +2335,23 @@ pub enum AccountTransactionEffects {
     DataRegistered { data: RegisteredData },
     /// A baker was configured. The details of what happened are contained in
     /// the list of [baker events](BakerEvent).
-    BakerConfigured { data: Vec<BakerEvent> },
+    ///
+    /// Note future versions of the Concordium Node API might introduce new
+    /// kinds of baker events, therefore each event is wrapped in [`Upward`]
+    /// potentially representing some future unknown data.
+    BakerConfigured { data: Vec<Upward<BakerEvent>> },
     /// An account configured delegation. The details of what happened are
     /// contained in the list of [delegation events](DelegationEvent).
-    DelegationConfigured { data: Vec<DelegationEvent> },
+    ///
+    /// Note future versions of the Concordium Node API might introduce new
+    /// kinds of delegation events, therefore each event is wrapped in
+    /// [`Upward`] potentially representing some future unknown data.
+    DelegationConfigured { data: Vec<Upward<DelegationEvent>> },
     /// Effect of a successful token update.
     TokenUpdate {
         /// Events produced by the update.
         events: Vec<protocol_level_tokens::TokenEvent>,
     },
-}
-
-impl AccountTransactionEffects {
-    /// Return [`Some`] if the transaction has been rejected.
-    pub fn is_rejected(&self) -> Option<&RejectReason> {
-        if let Self::None { reject_reason, .. } = self {
-            Some(reject_reason)
-        } else {
-            None
-        }
-    }
 }
 
 /// Events that may happen as a result of the
@@ -2197,7 +2431,7 @@ pub enum BakerEvent {
         /// Baker's id
         baker_id: BakerId,
         /// The open status.
-        open_status: OpenStatus,
+        open_status: Upward<OpenStatus>,
     },
     /// Updated metadata url for baker pool
     BakerSetMetadataURL {
@@ -2266,12 +2500,12 @@ pub struct AccountCreationDetails {
 /// cases.
 pub struct UpdateDetails {
     pub effective_time: TransactionTime,
-    pub payload: UpdatePayload,
+    pub payload: Upward<UpdatePayload>,
 }
 
 impl UpdateDetails {
-    pub fn update_type(&self) -> UpdateType {
-        self.payload.update_type()
+    pub fn update_type(&self) -> Upward<UpdateType> {
+        self.payload.as_ref().map(UpdatePayload::update_type)
     }
 }
 
@@ -2357,8 +2591,8 @@ pub struct EncryptedSelfAmountAddedEvent {
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ContractInitializedEvent {
-    #[serde(default)]
-    pub contract_version: smart_contracts::WasmVersion,
+    #[serde(default = "smart_contracts::WasmVersionInt::zero_version")]
+    pub contract_version: smart_contracts::WasmVersionInt,
     #[serde(rename = "ref")]
     /// Module with the source code of the contract.
     pub origin_ref: smart_contracts::ModuleReference,
@@ -2937,7 +3171,11 @@ pub enum NodeDetails {
     Bootstrapper,
     /// The node is a regular node and is eligible for
     /// running the consensus protocol.
-    Node(NodeConsensusStatus),
+    ///
+    /// Since there might be new variants of [`NodeConsensusStatus`] in a future
+    /// version of the Concordium Node API this type is wrapped in
+    /// [`Upward`].
+    Node(Upward<NodeConsensusStatus>),
 }
 
 #[derive(Debug)]
@@ -2952,7 +3190,10 @@ pub struct NodeInfo {
     /// Information related to the network for the node.
     pub network_info: NetworkInfo,
     /// Information related to consensus for the node.
-    pub details: NodeDetails,
+    ///
+    /// Since there might be new variants of [`NodeDetails`] in a future version
+    /// of the Concordium Node API this type is wrapped in [`Upward`].
+    pub details: Upward<NodeDetails>,
 }
 
 /// A baker that has won a round in consensus version 1.

@@ -4,6 +4,7 @@
 use clap::AppSettings;
 use concordium_rust_sdk::{
     common::types::Amount,
+    types::AccountStakingInfo,
     v2::{self, BlockIdentifier},
 };
 use futures::{Future, TryStreamExt};
@@ -107,11 +108,13 @@ async fn main() -> anyhow::Result<()> {
             let mut client = closure_client.clone();
             async move {
                 let info = client.get_account_info(&acc.into(), &block).await?.response;
-                let additional_stake = info
-                    .account_stake
-                    .map_or(Amount::zero(), |baker_delegator| {
-                        baker_delegator.staked_amount()
-                    });
+                let additional_stake =
+                    info.account_stake
+                        .map_or(Amount::zero(), |baker_delegator| {
+                            baker_delegator
+                                .as_ref()
+                                .map_or(Amount::zero(), AccountStakingInfo::staked_amount)
+                        });
                 let additional_liquid_amount = info.account_amount
                     - std::cmp::max(additional_stake, info.account_release_schedule.total);
                 Ok::<_, anyhow::Error>((

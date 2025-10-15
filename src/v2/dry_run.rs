@@ -3,7 +3,7 @@ use super::{
         self, account_transaction_payload, dry_run_error_response, dry_run_request,
         DryRunInvokeInstance, DryRunMintToAccount, DryRunSignature, DryRunStateOperation,
     },
-    AccountIdentifier, IntoBlockIdentifier,
+    AccountIdentifier, IntoBlockIdentifier, Upward,
 };
 use crate::{
     types::{
@@ -350,7 +350,7 @@ pub struct InvokeInstanceSuccess {
     /// The return value for a V1 contract call. Absent for a V0 contract call.
     pub return_value: Option<ReturnValue>,
     /// The effects produced by contract execution.
-    pub events: Vec<ContractTraceElement>,
+    pub events: Vec<Upward<ContractTraceElement>>,
     /// The energy used by the execution.
     pub used_energy: Energy,
 }
@@ -396,7 +396,14 @@ impl TryFrom<Option<Result<generated::DryRunResponse, tonic::Status>>>
                             events: result
                                 .effects
                                 .into_iter()
-                                .map(TryFrom::try_from)
+                                .map(|trace| {
+                                    Ok(Upward::from(
+                                        trace
+                                            .element
+                                            .map(ContractTraceElement::try_from)
+                                            .transpose()?,
+                                    ))
+                                })
                                 .collect::<Result<_, tonic::Status>>()?,
                             used_energy: result.used_energy.require()?.into(),
                         };

@@ -4,6 +4,8 @@ use concordium_base::common::{SerdeDeserialize, SerdeSerialize};
 use derive_more::{Display, From, FromStr, Into};
 use std::{fmt, net::IpAddr, num::ParseIntError};
 
+use crate::v2::Upward;
+
 #[repr(transparent)]
 #[derive(Debug)]
 pub struct RemotePeerId {
@@ -62,7 +64,11 @@ pub struct Peer {
     /// The id of the peer.
     pub peer_id: PeerId,
     /// Catchup status of the peer.
-    pub consensus_info: PeerConsensusInfo,
+    ///
+    /// Since there might be new variants of [`PeerConsensusInfo`] in a future
+    /// version of the Concordium Node API this type is wrapped in
+    /// [`Upward`].
+    pub consensus_info: Upward<PeerConsensusInfo>,
     /// Network statistics for the peer.
     pub network_stats: NetworkStats,
     /// The address of the peer
@@ -76,7 +82,11 @@ pub enum PeerConsensusInfo {
     /// no catchup status.
     Bootstrapper,
     /// Regular nodes do have a catchup status.
-    Node(PeerCatchupStatus),
+    ///
+    /// Since there might be new variants of [`PeerCatchupStatus`] in a future
+    /// version of the Concordium Node API this type is wrapped in
+    /// [`Upward`].
+    Node(Upward<PeerCatchupStatus>),
 }
 
 /// The catch up status of the peer.

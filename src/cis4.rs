@@ -8,7 +8,7 @@
 use crate::{
     contract_client::*,
     types::{transactions, RejectReason},
-    v2::IntoBlockIdentifier,
+    v2::{self, IntoBlockIdentifier},
 };
 pub use concordium_base::{cis2_types::MetadataUrl, cis4_types::*};
 use concordium_base::{
@@ -37,12 +37,17 @@ pub enum Cis4QueryError {
 
     /// The node rejected the invocation.
     #[error("Rejected by the node: {0:?}.")]
-    NodeRejected(crate::types::RejectReason),
+    NodeRejected(v2::Upward<crate::types::RejectReason>),
 }
 
+impl From<v2::Upward<RejectReason>> for Cis4QueryError {
+    fn from(value: v2::Upward<RejectReason>) -> Self {
+        Self::NodeRejected(value)
+    }
+}
 impl From<RejectReason> for Cis4QueryError {
     fn from(value: RejectReason) -> Self {
-        Self::NodeRejected(value)
+        Self::NodeRejected(v2::Upward::Known(value))
     }
 }
 
@@ -50,9 +55,9 @@ impl Cis4QueryError {
     /// Check if the error variant is a logic error, i.e., the query
     /// was received by the node which attempted to execute it, and it failed.
     /// If so, extract the reason for execution failure.
-    pub fn is_contract_error(&self) -> Option<&crate::types::RejectReason> {
+    pub fn is_contract_error(&self) -> Option<v2::Upward<&crate::types::RejectReason>> {
         if let Self::NodeRejected(e) = self {
-            Some(e)
+            Some(e.as_ref())
         } else {
             None
         }
@@ -76,7 +81,7 @@ pub enum Cis4TransactionError {
 
     /// The node rejected the invocation.
     #[error("Rejected by the node: {0:?}.")]
-    NodeRejected(crate::types::RejectReason),
+    NodeRejected(v2::Upward<crate::types::RejectReason>),
 }
 
 /// Transaction metadata for CIS-4 update transactions.

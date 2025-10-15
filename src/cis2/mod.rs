@@ -6,7 +6,11 @@
 //! functions for querying and making transactions to smart contract.
 mod types;
 
-use crate::{contract_client::*, types as sdk_types, v2::IntoBlockIdentifier};
+use crate::{
+    contract_client::*,
+    types as sdk_types,
+    v2::{self, IntoBlockIdentifier},
+};
 use concordium_base::{
     base::Energy,
     contracts_common::{Address, Amount},
@@ -48,7 +52,7 @@ pub enum Cis2TransactionError {
     #[error("Invalid updateOperator parameter: {0}")]
     InvalidUpdateOperatorParams(#[from] NewUpdateOperatorParamsError),
 
-    /// A general RPC error occured.
+    /// A general RPC error occurred.
     #[error("RPC error: {0}")]
     RPCError(#[from] crate::endpoints::RPCError),
 }
@@ -75,7 +79,7 @@ pub enum Cis2DryRunError {
 
     /// The node rejected the invocation.
     #[error("Rejected by the node: {0:?}.")]
-    NodeRejected(sdk_types::RejectReason),
+    NodeRejected(v2::Upward<sdk_types::RejectReason>),
 }
 
 /// Error which can occur when invoking a query such as `balanceOf` and
@@ -98,7 +102,7 @@ pub enum Cis2QueryError {
     #[error("Invalid tokenMetadata parameter: {0}")]
     InvalidTokenMetadataParams(#[from] NewTokenMetadataQueryParamsError),
 
-    /// A general RPC error occured.
+    /// A general RPC error occurred.
     #[error("RPC error: {0}")]
     RPCError(#[from] super::v2::QueryError),
 
@@ -108,22 +112,32 @@ pub enum Cis2QueryError {
 
     /// The node rejected the invocation.
     #[error("Rejected by the node: {0:?}.")]
-    NodeRejected(sdk_types::RejectReason),
+    NodeRejected(v2::Upward<sdk_types::RejectReason>),
 }
 
 // This is implemented manually, since deriving it using thiserror requires
 // `RejectReason` to implement std::error::Error.
+impl From<v2::Upward<sdk_types::RejectReason>> for Cis2QueryError {
+    fn from(err: v2::Upward<sdk_types::RejectReason>) -> Self {
+        Self::NodeRejected(err)
+    }
+}
 impl From<sdk_types::RejectReason> for Cis2QueryError {
     fn from(err: sdk_types::RejectReason) -> Self {
-        Self::NodeRejected(err)
+        Self::NodeRejected(v2::Upward::Known(err))
     }
 }
 
 // This is implemented manually, since deriving it using thiserror requires
 // `RejectReason` to implement std::error::Error.
+impl From<v2::Upward<sdk_types::RejectReason>> for Cis2DryRunError {
+    fn from(err: v2::Upward<sdk_types::RejectReason>) -> Self {
+        Self::NodeRejected(err)
+    }
+}
 impl From<sdk_types::RejectReason> for Cis2DryRunError {
     fn from(err: sdk_types::RejectReason) -> Self {
-        Self::NodeRejected(err)
+        Self::NodeRejected(v2::Upward::Known(err))
     }
 }
 

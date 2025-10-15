@@ -19,6 +19,7 @@ use crate::{
     },
 };
 use anyhow::Context;
+pub use concordium_base::common::upward::{self, Upward};
 use concordium_base::{
     base::{
         AccountIndex, BlockHeight, ChainParameterVersion0, ChainParameterVersion1,
@@ -1173,27 +1174,36 @@ impl TryFrom<generated::PeersInfo> for types::network::PeersInfo {
             .into_iter()
             .map(|peer| {
                 // Parse the catchup status of the peer.
-                let peer_consensus_info = match peer.consensus_info.require()? {
-                    generated::peers_info::peer::ConsensusInfo::Bootstrapper(_) => {
-                        types::network::PeerConsensusInfo::Bootstrapper
-                    }
-                    generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(0) => {
-                        types::network::PeerConsensusInfo::Node(
-                            types::network::PeerCatchupStatus::UpToDate,
-                        )
-                    }
-                    generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(1) => {
-                        types::network::PeerConsensusInfo::Node(
-                            types::network::PeerCatchupStatus::Pending,
-                        )
-                    }
-                    generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(2) => {
-                        types::network::PeerConsensusInfo::Node(
-                            types::network::PeerCatchupStatus::CatchingUp,
-                        )
-                    }
-                    _ => anyhow::bail!("Malformed catchup status from peer."),
-                };
+                let peer_consensus_info =
+                    Upward::from(peer.consensus_info).and_then(|info| match info {
+                        generated::peers_info::peer::ConsensusInfo::Bootstrapper(_) => {
+                            Upward::Known(types::network::PeerConsensusInfo::Bootstrapper)
+                        }
+                        generated::peers_info::peer::ConsensusInfo::NodeCatchupStatus(status) => {
+                            let Upward::Known(status) = Upward::from(
+                                generated::peers_info::peer::CatchupStatus::try_from(status).ok(),
+                            ) else {
+                                return Upward::Known(types::network::PeerConsensusInfo::Node(
+                                    Upward::Unknown(()),
+                                ));
+                            };
+                            let status = match status {
+                                generated::peers_info::peer::CatchupStatus::Uptodate => {
+                                    types::network::PeerCatchupStatus::UpToDate
+                                }
+                                generated::peers_info::peer::CatchupStatus::Pending => {
+                                    types::network::PeerCatchupStatus::Pending
+                                }
+                                generated::peers_info::peer::CatchupStatus::Catchingup => {
+                                    types::network::PeerCatchupStatus::CatchingUp
+                                }
+                            };
+
+                            Upward::Known(types::network::PeerConsensusInfo::Node(Upward::Known(
+                                status,
+                            )))
+                        }
+                    });
                 // Parse the network statistics for the peer.
                 let stats = peer.network_stats.require()?;
                 let network_stats = types::network::NetworkStats {
@@ -1239,6 +1249,45 @@ impl IntoRequest<crate::v2::generated::PeerToBan> for types::network::PeerToBan 
     }
 }
 
+impl TryFrom<generated::node_info::Details> for types::NodeDetails {
+    type Error = anyhow::Error;
+
+    fn try_from(details: generated::node_info::Details) -> Result<Self, Self::Error> {
+        match details {
+            generated::node_info::Details::Bootstrapper(_) => Ok(types::NodeDetails::Bootstrapper),
+            generated::node_info::Details::Node(status) => {
+                let Upward::Known(consensus_status) = Upward::from(status.consensus_status) else {
+                    return Ok(types::NodeDetails::Node(Upward::Unknown(())));
+                };
+                let consensus_status = match consensus_status {
+                    generated::node_info::node::ConsensusStatus::NotRunning(_) => {
+                        types::NodeConsensusStatus::ConsensusNotRunning
+                    }
+                    generated::node_info::node::ConsensusStatus::Passive(_) => {
+                        types::NodeConsensusStatus::ConsensusPassive
+                    }
+                    generated::node_info::node::ConsensusStatus::Active(baker) => {
+                        let baker_id = baker.baker_id.require()?.into();
+                        let Upward::Known(status) = Upward::from(baker.status) else {
+                            return Ok(types::NodeDetails::Node(Upward::Unknown(())));
+                        };
+
+                        match status {
+                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(0) => types::NodeConsensusStatus::NotInCommittee(baker_id),
+                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(1) => types::NodeConsensusStatus::AddedButNotActiveInCommittee(baker_id),
+                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(2) => types::NodeConsensusStatus::AddedButWrongKeys(baker_id),
+                            generated::node_info::baker_consensus_info::Status::ActiveBakerCommitteeInfo(_) => types::NodeConsensusStatus::Baker(baker_id),
+                            generated::node_info::baker_consensus_info::Status::ActiveFinalizerCommitteeInfo(_) => types::NodeConsensusStatus::Finalizer(baker_id),
+                            _ => anyhow::bail!("Malformed baker status")
+                        }
+                    }
+                };
+                Ok(types::NodeDetails::Node(Upward::Known(consensus_status)))
+            }
+        }
+    }
+}
+
 impl TryFrom<generated::NodeInfo> for types::NodeInfo {
     type Error = anyhow::Error;
 
@@ -1251,31 +1300,9 @@ impl TryFrom<generated::NodeInfo> for types::NodeInfo {
             node_info.peer_uptime.require()?.value,
         ))?;
         let network_info = node_info.network_info.require()?.try_into()?;
-        let details = match node_info.details.require()? {
-            generated::node_info::Details::Bootstrapper(_) => types::NodeDetails::Bootstrapper,
-            generated::node_info::Details::Node(status) => {
-                let consensus_status = match status.consensus_status.require()? {
-                    generated::node_info::node::ConsensusStatus::NotRunning(_) => {
-                        types::NodeConsensusStatus::ConsensusNotRunning
-                    }
-                    generated::node_info::node::ConsensusStatus::Passive(_) => {
-                        types::NodeConsensusStatus::ConsensusPassive
-                    }
-                    generated::node_info::node::ConsensusStatus::Active(baker) => {
-                        let baker_id = baker.baker_id.require()?.into();
-                        match baker.status.require()? {
-                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(0) => types::NodeConsensusStatus::NotInCommittee(baker_id),
-                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(1) => types::NodeConsensusStatus::AddedButNotActiveInCommittee(baker_id),
-                            generated::node_info::baker_consensus_info::Status::PassiveCommitteeInfo(2) => types::NodeConsensusStatus::AddedButWrongKeys(baker_id),
-                            generated::node_info::baker_consensus_info::Status::ActiveBakerCommitteeInfo(_) => types::NodeConsensusStatus::Baker(baker_id),
-                            generated::node_info::baker_consensus_info::Status::ActiveFinalizerCommitteeInfo(_) => types::NodeConsensusStatus::Finalizer(baker_id),
-                            _ => anyhow::bail!("Malformed baker status")
-                        }
-                    }
-                };
-                types::NodeDetails::Node(consensus_status)
-            }
-        };
+        let details = Upward::from(node_info.details)
+            .map(types::NodeDetails::try_from)
+            .transpose()?;
         Ok(types::NodeInfo {
             version,
             local_time,
@@ -1814,6 +1841,10 @@ impl Client {
         let block_hash = special_events.block_hash;
 
         while let Some(event) = special_events.response.next().await.transpose()? {
+            let Upward::Known(event) = event else {
+                // Ignore new unknown block special events.
+                continue;
+            };
             let has_payday_event = matches!(
                 event,
                 SpecialTransactionOutcome::PaydayPoolReward { .. }
@@ -2168,7 +2199,7 @@ impl Client {
     /// returned.
     ///
     /// This endpoint is not expected to return a large amount of data in most
-    /// cases, but in bad network condtions it might.
+    /// cases, but in bad network conditions it might.
     pub async fn get_account_non_finalized_transactions(
         &mut self,
         account_address: &AccountAddress,
@@ -2188,11 +2219,13 @@ impl Client {
     /// If the block does not exist [`QueryError::NotFound`] is returned.
     /// The stream will end when all the block items in the given block have
     /// been returned.
+    /// To allow for forward-compatibility [`Upward::Unknown`] is returned
+    /// if/when encountering a unknown future type of [`BlockItem`].
     pub async fn get_block_items(
         &mut self,
         bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<
-        QueryResponse<impl Stream<Item = Result<BlockItem<EncodedPayload>, tonic::Status>>>,
+        QueryResponse<impl Stream<Item = Result<Upward<BlockItem<EncodedPayload>>, tonic::Status>>>,
     > {
         let response = self
             .client
@@ -2221,18 +2254,29 @@ impl Client {
     /// The return value is a triple of the [`BlockItem`], the hash of the block
     /// in which it is finalized, and the outcome in the form of
     /// [`BlockItemSummary`].
+    /// To allow for forward-compatibility [`Upward::Unknown`] is returned
+    /// if/when encountering a unknown future type of [`BlockItem`].
     pub async fn get_finalized_block_item(
         &mut self,
         th: TransactionHash,
-    ) -> endpoints::QueryResult<(BlockItem<EncodedPayload>, BlockHash, BlockItemSummary)> {
+    ) -> endpoints::QueryResult<(
+        Upward<BlockItem<EncodedPayload>>,
+        BlockHash,
+        BlockItemSummary,
+    )> {
         let status = self.get_block_item_status(&th).await?;
         let Some((bh, status)) = status.is_finalized() else {
             return Err(QueryError::NotFound);
         };
-        let mut response = self.get_block_items(bh).await?.response;
+        let mut response = self
+            .client
+            .get_block_items(&bh.into_block_identifier())
+            .await?
+            .into_inner();
         while let Some(tx) = response.try_next().await? {
-            if tx.hash() == th {
-                return Ok((tx, *bh, status.clone()));
+            let tx_hash = TransactionHash::try_from(tx.hash.clone().require()?)?;
+            if tx_hash == th {
+                return Ok((tx.try_into()?, *bh, status.clone()));
             }
         }
         Err(endpoints::QueryError::NotFound)
@@ -2445,7 +2489,9 @@ impl Client {
         &mut self,
         bi: impl IntoBlockIdentifier,
     ) -> endpoints::QueryResult<
-        QueryResponse<impl Stream<Item = Result<types::SpecialTransactionOutcome, tonic::Status>>>,
+        QueryResponse<
+            impl Stream<Item = Result<Upward<types::SpecialTransactionOutcome>, tonic::Status>>,
+        >,
     > {
         let response = self
             .client

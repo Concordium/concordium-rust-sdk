@@ -1,9 +1,87 @@
 ## Unreleased changes
+
 - Removed authorization from `TokenClient` validation.
 - Added `validate_mint`, `validate_burn`, `validate_allow_list_update`, `validate_deny_list_update` methods to `TokenClient`.
 - Added `update_token_info` method to `TokenClient`.
 - Added `Validation` as a separate enum for `TokenClient` operations.
 - Remove use of `CborTokenHolder` wrapper.
+
+- Introduce `ProtocolVersionInt` newtype, wrapping the `u64` representation of the `ProtocolVersion`. This type is forward-compatible, meaning future protocol versions can be represented using this type.
+- BREAKING: Change type `ProtocolVersion` to  `ProtocolVersionInt` for field `protocol_version` in the types listed below. Now introducing new protocol versions in `ProtocolVersion` does not result in RPC parsing errors, and consumers of this library can write more applications that are more forward-compatible.
+  - `BlockInfo`
+  - `ConsensusInfo`
+  - `CommonRewardData`
+- Introduce `Upward<A, R = ()>` for representing types, which might get extended in a future version of the Concordium Node API and allows the consumer of this library to decide how to handle some unknown future data, like new transaction types and chain events.
+- Use the `WasmVersionInt` defined in `concordium-base` for the wasm version (smart contract version) to make it forward-compatible.
+- Changed the `Indexer` module to use a new `OnFinalizationError` and the new result types `OnFinalizationResult`/`TraverseResult` when traversing and processing blocks. The indexer's errors/results can now represent the `Unknown` types as part of adding forward-compatibility.
+- BREAKING: Change types related to gRPC API responses to wrap `Upward` for values which might be extended in a future version of the API of the Concordium Node.
+
+  The changes are for:
+  - Type `BlockItemSummary` field `details`.
+  - Method `BlockItemSummary::affected_addresses` return value.
+  - Method `BlockItemSummary::affected_contracts` return value.
+  - Type `AccountTransactionDetails` field `effects`.
+  - Method `AccountTransactionDetails::transaction_type` return value.
+  - Method `Client::get_block_special_events` response stream items.
+  - Associated type `Indexer::Data` for `indexer::BlockEventsIndexer`.
+  - Method `Client::get_block_items` response stream items.
+  - Method `Client::get_finalized_block_item` return type.
+  - Type `PendingUpdate` field `effect`.
+  - Type `ViewError::QueryFailed`.
+  - Type `ContractInitError::Failed`.
+  - Type `ContractUpdateError::Failed`.
+  - Type `ContractInitHandle::Failed`.
+  - Type `Cis2DryRunError::NodeRejected`.
+  - Type `Cis2QueryError::NodeRejected`.
+  - Type `Cis3PermitDryRunError::NodeRejected`.
+  - Type `Cis3SupportsPermitError::NodeRejected`.
+  - Type `Cis4QueryError::NodeRejected`.
+  - Method `Cis4QueryError::is_contract_error` return value.
+  - Type `Cis4TransactionError::NodeRejected`.
+  - Type `ModuleDeployError::Failed`.
+  - Type `DryRunModuleDeployError::Failed`.
+  - Type `RejectedTransaction` field `reason`.
+  - Method `ContractClient::view<P, A, E>` require `E` to implement `From<v2::Upward<RejectReason>>`.
+  - Method `ContractClient::view_raw<A, E>` require `E` to implement `From<v2::Upward<RejectReason>>`.
+  - Method `ContractClient::invoke_raw<E>` require `E` to implement `From<v2::Upward<RejectReason>>`.
+  - Method `ContractClient::dry_run_update<P, E>` require `E` to implement `From<v2::Upward<RejectReason>>`.
+  - Method `ContractClient::dry_run_update<P, E>` require `E` to implement `From<v2::Upward<RejectReason>>`.
+  - Method `BlockItemSummary::is_rejected_account_transaction` return value.
+  - Method `BlockItemSummaryDetails::is_rejected` return value.
+  - Method `AccountTransactionEffects::is_rejected` return value.
+  - Type `AccountTransactionEffects` field `reject_reason`.
+  - Type `InvokeContractResult` field `reason`.
+  - Type `UpdateInstruction` field `payload` now needs to be decoded on-demand, ensuring errors due to new variants for `UpdatePayload` can be handled separately and the rest of `UpdateInstruction` can still be read.
+  - Type `UpdateDetails` field `payload` is wrapped.
+  - Method `UpdateDetails::update_type` return type is wrapped.
+  - Type `AccountTransactionEffects::BakerConfigured` field `data` from `Vec<BakerEvent>` to `Vec<Upward<BakerEvent>>`.
+  - Type `AccountTransactionEffects::DelegationConfigured` field `data` from `Vec<DelegationEvent>` to `Vec<Upward<DelegationEvent>>`.
+  - Type `InvokeContractResult` field `events` of `Success` variant is now `Vec<Upward<ContractTraceElement>>`.
+  - Type `InvokeInstanceSuccess` field `events` is now `Vec<Upward<ContractTraceElement>>`.
+  - Method `ContractUpdateBuilder::events` return type from `&[ContractTraceElement]` to `&[Upward<ContractTraceElement>]`.
+  - Associated type `Indexer::Data` for `AffectedContractIndexer` now wraps the affected contract addresses in `Upward`.
+  - Type `AccountTransactionEffects` field `effects` of `ContractUpdateIssued` variant is now `Vec<Upward<ContractTraceElement>>`.
+  - Method `BlockItemSummary::contract_update_logs` now wraps the iterator items in `Upward`.
+  - Method `BlockItemSummaryDetails::contract_update_logs` now wraps the iterator items in `Upward`.
+  - Method `AccountTransactionEffects::affected_addresses` now wraps the return type in `Upward`.
+  - Method `ExecutionTree::affected_addresses` now wraps the return type in `Upward`.
+  - Method `ExecutionTree::events` now wraps the `Iterator::Item` in `Upward`.
+  - Method `ExecutionTree::execution_tree` return type was changed from `Option<ExecutionTree>` to `Option<Upward<ExecutionTree>>`
+  - Method `ExecutionTree::contract_update` now wraps return type in `Upward`.
+  - Function `execution_tree` parameter changed from `Vec<Upward<ContractTraceElement>>` to `Vec<ContractTraceElement>`.
+  - Type `ExecutionTreeV0` field `rest` change from `Vec<TraceV0>` to `Vec<Upward<TraceV0>>`.
+  - Type `ExecutionTreeV1` field `events` change from `Vec<TraceV1>` to `Vec<Upward<TraceV1>>`.
+  - Type `NodeDetails` variant `Node` is now wrapped in `Upward`.
+  - Type `NodeInfo` field `details` is now wrapped in `Upward`.
+  - Type `Peer` field `consensus_info` is now wrapped in `Upward`.
+  - Type `PeerConsensusInfo::Node` unnamed field is now wrapped in `Upward`.
+  - Type `AccountInfo` field `account_stake` changes from `Option<AccountStakingInfo>` to `Option<Upward<AccountStakingInfo>>`.
+  - Type `Cooldown` field `status` is now wrapped in `Upward`.
+  - Type `BakerEvent::BakerSetOpenStatus` field `open_status` is now wrapped in `Upward`.
+  - Type `AccountInfo` field `account_credentials` change from `BTreeMap<CredentialIndex,Versioned<AccountCredentialWithoutProofs<ArCurve, AttributeKind>>>` to `BTreeMap<CredentialIndex,Versioned<Upward<AccountCredentialWithoutProofs<ArCurve, AttributeKind>>>>`.
+  - Type `BakerPoolInfo` moved from `concordium-base` to the `rust-sdk`.
+  - Type `Event`/`BakerPoolInfo` field `open_status` is now wrapped in `Upward`.
+  - Bubble `Upward` from new variants of `VerifyKey` to `Upward<AccountCredentialWithoutProofs<...>>` in `AccountInfo::account_credentials`.
 
 ## 7.0.0
 

@@ -47,7 +47,8 @@ async fn main() -> anyhow::Result<()> {
             while let Some(event) = events.next().await.transpose()? {
                 if event
                     .affected_contracts()
-                    .contains(&ContractAddress::new(866, 0))
+                    .known_or_err()?
+                    .contains(&v2::Upward::Known(ContractAddress::new(866, 0)))
                 {
                     println!(
                         "Transaction {} with sender {}.",

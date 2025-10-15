@@ -7,7 +7,7 @@ use concordium_rust_sdk::{
     id,
     id::types::AccountAddress,
     types::{AccountStakingInfo, CredentialType},
-    v2::{self, BlockIdentifier},
+    v2::{self, upward::UnknownDataError, BlockIdentifier},
 };
 use futures::TryStreamExt;
 use serde::Serializer;
@@ -111,7 +111,7 @@ async fn main() -> anyhow::Result<()> {
         for res in futures::future::join_all(handles).await {
             let (acc, info) = res??;
             let is_baker = if let Some(account_stake) = info.account_stake {
-                match account_stake {
+                match account_stake.known_or_err()? {
                     AccountStakingInfo::Baker { staked_amount, .. } => {
                         num_bakers += 1;
                         total_staked_amount += staked_amount;
@@ -119,7 +119,6 @@ async fn main() -> anyhow::Result<()> {
                     }
                     AccountStakingInfo::Delegated { staked_amount, .. } => {
                         total_delegated_amount += staked_amount;
-
                         false
                     }
                 }
@@ -129,18 +128,18 @@ async fn main() -> anyhow::Result<()> {
 
             total_amount += info.account_amount;
 
-            let acc_type =
-                info.account_credentials
-                    .get(&0.into())
-                    .map_or(CredentialType::Normal, |cdi| match cdi.value {
-                        id::types::AccountCredentialWithoutProofs::Initial { .. } => {
-                            num_initial += 1;
-                            CredentialType::Initial
-                        }
-                        id::types::AccountCredentialWithoutProofs::Normal { .. } => {
-                            CredentialType::Normal
-                        }
-                    });
+            let acc_type = info.account_credentials.get(&0.into()).map_or(
+                Ok::<_, UnknownDataError>(CredentialType::Normal),
+                |cdi| match cdi.value.as_ref().known_or_err()? {
+                    id::types::AccountCredentialWithoutProofs::Initial { .. } => {
+                        num_initial += 1;
+                        Ok(CredentialType::Initial)
+                    }
+                    id::types::AccountCredentialWithoutProofs::Normal { .. } => {
+                        Ok(CredentialType::Normal)
+                    }
+                },
+            )?;
 
             let row = Row {
                 address: acc,

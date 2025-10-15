@@ -15,7 +15,7 @@ use crate::{
     v2::{
         self,
         dry_run::{self, DryRunTransaction},
-        BlockIdentifier, Client,
+        BlockIdentifier, Client, Upward,
     },
 };
 use concordium_base::{
@@ -94,7 +94,7 @@ pub enum ViewError {
     #[error("Invalid receive name: {0}")]
     InvalidName(#[from] NewReceiveNameError),
     #[error("Node rejected with reason: {0:#?}")]
-    QueryFailed(RejectReason),
+    QueryFailed(v2::Upward<RejectReason>),
     #[error("Response was not as expected: {0}")]
     InvalidResponse(#[from] contracts_common::ParseError),
     #[error("Network error: {0}")]
@@ -103,8 +103,8 @@ pub enum ViewError {
     ParameterError(#[from] ExceedsParameterSize),
 }
 
-impl From<RejectReason> for ViewError {
-    fn from(value: RejectReason) -> Self {
+impl From<v2::Upward<RejectReason>> for ViewError {
+    fn from(value: v2::Upward<RejectReason>) -> Self {
         Self::QueryFailed(value)
     }
 }
@@ -274,7 +274,7 @@ pub enum ContractInitError {
     #[error("The status of the transaction could not be ascertained: {0}")]
     Query(#[from] QueryError),
     #[error("Contract update failed with reason: {0:?}")]
-    Failed(RejectReason),
+    Failed(v2::Upward<RejectReason>),
 }
 
 impl<Type> ContractInitHandle<Type> {
@@ -298,21 +298,35 @@ impl<Type> ContractInitHandle<Type> {
                 RPCError::CallError(tonic::Status::invalid_argument(msg)),
             )))
         };
-
-        match result.details {
-            crate::types::BlockItemSummaryDetails::AccountTransaction(at) => match at.effects {
-                AccountTransactionEffects::ContractInitialized { data } => {
-                    let contract_client = ContractClient::create(self.client, data.address).await?;
-                    Ok((contract_client, data.events))
+        let v2::upward::Upward::Known(details) = result.details else {
+            return mk_error(
+                "Expected smart contract initialization status, but received unknown block item \
+                 details.",
+            );
+        };
+        match details {
+            crate::types::BlockItemSummaryDetails::AccountTransaction(at) => {
+                let v2::upward::Upward::Known(effects) = at.effects else {
+                    return mk_error(
+                        "Expected smart contract initialization status, but received unknown \
+                         block item details.",
+                    );
+                };
+                match effects {
+                    AccountTransactionEffects::ContractInitialized { data } => {
+                        let contract_client =
+                            ContractClient::create(self.client, data.address).await?;
+                        Ok((contract_client, data.events))
+                    }
+                    AccountTransactionEffects::None {
+                        transaction_type: _,
+                        reject_reason,
+                    } => Err(ContractInitError::Failed(reject_reason)),
+                    _ => mk_error(
+                        "Expected smart contract initialization status, but did not receive it.",
+                    ),
                 }
-                AccountTransactionEffects::None {
-                    transaction_type: _,
-                    reject_reason,
-                } => Err(ContractInitError::Failed(reject_reason)),
-                _ => mk_error(
-                    "Expected smart contract initialization status, but did not receive it.",
-                ),
-            },
+            }
             crate::types::BlockItemSummaryDetails::AccountCreation(_) => mk_error(
                 "Expected smart contract initialization status, but received account creation.",
             ),
@@ -349,7 +363,7 @@ impl<Type> ContractInitHandle<Type> {
 /// An error that may occur when attempting to dry run a new instance creation.
 pub enum DryRunNewInstanceError {
     #[error("Dry run succeeded, but contract initialization failed due to {0:#?}.")]
-    Failed(RejectReason),
+    Failed(v2::Upward<RejectReason>),
     #[error("Dry run failed: {0}")]
     DryRun(#[from] dry_run::DryRunError),
     #[error("Parameter too large: {0}")]
@@ -365,8 +379,8 @@ pub enum DryRunNewInstanceError {
     },
 }
 
-impl From<RejectReason> for DryRunNewInstanceError {
-    fn from(value: RejectReason) -> Self {
+impl From<v2::Upward<RejectReason>> for DryRunNewInstanceError {
+    fn from(value: v2::Upward<RejectReason>) -> Self {
         Self::Failed(value)
     }
 }
@@ -437,7 +451,11 @@ impl<Type> ContractInitBuilder<Type> {
             .await?
             .inner;
 
-        let data = match result.details.effects {
+        let data = match result.details.effects.known_or_else(|_unknown| {
+            dry_run::DryRunError::CallError(tonic::Status::invalid_argument(
+                "Unexpected response from dry-running a contract initialization.",
+            ))
+        })? {
             AccountTransactionEffects::None {
                 transaction_type: _,
                 reject_reason,
@@ -502,7 +520,7 @@ pub type ModuleDeployBuilder = TransactionBuilder<false, ModuleReference>;
 /// deployment.
 pub enum DryRunModuleDeployError {
     #[error("Dry run succeeded, but module deployment failed due to {0:#?}.")]
-    Failed(RejectReason),
+    Failed(v2::Upward<RejectReason>),
     #[error("Dry run failed: {0}")]
     DryRun(#[from] dry_run::DryRunError),
     #[error("Node query error: {0}")]
@@ -520,12 +538,15 @@ impl DryRunModuleDeployError {
         let Self::Failed(reason) = self else {
             return false;
         };
-        matches!(reason, RejectReason::ModuleHashAlreadyExists { .. })
+        matches!(
+            reason,
+            v2::Upward::Known(RejectReason::ModuleHashAlreadyExists { .. })
+        )
     }
 }
 
-impl From<RejectReason> for DryRunModuleDeployError {
-    fn from(value: RejectReason) -> Self {
+impl From<v2::Upward<RejectReason>> for DryRunModuleDeployError {
+    fn from(value: v2::Upward<RejectReason>) -> Self {
         Self::Failed(value)
     }
 }
@@ -559,7 +580,11 @@ impl ModuleDeployBuilder {
             .await?
             .inner;
 
-        let module_ref = match result.details.effects {
+        let module_ref = match result.details.effects.known_or_else(|_unknown| {
+            dry_run::DryRunError::CallError(tonic::Status::invalid_argument(
+                "Unexpected response from dry-running a module deployment.",
+            ))
+        })? {
             AccountTransactionEffects::None {
                 transaction_type: _,
                 reject_reason,
@@ -568,7 +593,7 @@ impl ModuleDeployBuilder {
             _ => {
                 return Err(
                     dry_run::DryRunError::CallError(tonic::Status::invalid_argument(
-                        "Unexpected response from dry-running a contract initialization.",
+                        "Unexpected response from dry-running a module deployment.",
                     ))
                     .into(),
                 )
@@ -621,7 +646,7 @@ pub enum ModuleDeployError {
     #[error("The status of the transaction could not be ascertained: {0}")]
     Query(#[from] QueryError),
     #[error("Module deployment failed with reason: {0:?}")]
-    Failed(RejectReason),
+    Failed(v2::Upward<RejectReason>),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -652,19 +677,33 @@ impl ModuleDeployHandle {
             )))
         };
 
-        match result.details {
-            crate::types::BlockItemSummaryDetails::AccountTransaction(at) => match at.effects {
-                AccountTransactionEffects::ModuleDeployed { module_ref } => Ok(ModuleDeployData {
-                    energy: result.energy_cost,
-                    cost: at.cost,
-                    module_reference: module_ref,
-                }),
-                AccountTransactionEffects::None {
-                    transaction_type: _,
-                    reject_reason,
-                } => Err(ModuleDeployError::Failed(reject_reason)),
-                _ => mk_error("Expected module deploy status, but did not receive it."),
-            },
+        let v2::upward::Upward::Known(details) = result.details else {
+            return mk_error(
+                "Expected  module deploy status, but received unknown block item details.",
+            );
+        };
+        match details {
+            crate::types::BlockItemSummaryDetails::AccountTransaction(at) => {
+                let v2::upward::Upward::Known(effects) = at.effects else {
+                    return mk_error(
+                        "Expected  module deploy status, but received unknown block item effect.",
+                    );
+                };
+                match effects {
+                    AccountTransactionEffects::ModuleDeployed { module_ref } => {
+                        Ok(ModuleDeployData {
+                            energy: result.energy_cost,
+                            cost: at.cost,
+                            module_reference: module_ref,
+                        })
+                    }
+                    AccountTransactionEffects::None {
+                        transaction_type: _,
+                        reject_reason,
+                    } => Err(ModuleDeployError::Failed(reject_reason)),
+                    _ => mk_error("Expected module deploy status, but did not receive it."),
+                }
+            }
             crate::types::BlockItemSummaryDetails::AccountCreation(_) => {
                 mk_error("Expected module deploy status, but received account creation.")
             }
@@ -792,7 +831,7 @@ pub struct RejectedTransaction {
     /// The return value of the transaction.
     pub return_value: Option<ReturnValue>,
     /// The reject reason of the transaction.
-    pub reason: RejectReason,
+    pub reason: Upward<RejectReason>,
     /// An optional human-readable decoded reason for the reject reason.
     /// This is only available if the reject reason is a smart contract logical
     /// revert and a valid error schema is available for decoding, or the
@@ -1272,7 +1311,7 @@ impl<Type> ContractClient<Type> {
     ) -> Result<A, E>
     where
         E: From<NewReceiveNameError>
-            + From<RejectReason>
+            + From<v2::Upward<RejectReason>>
             + From<contracts_common::ParseError>
             + From<v2::QueryError>
             + From<ExceedsParameterSize>,
@@ -1290,7 +1329,7 @@ impl<Type> ContractClient<Type> {
     ) -> Result<A, E>
     where
         E: From<NewReceiveNameError>
-            + From<RejectReason>
+            + From<v2::Upward<RejectReason>>
             + From<contracts_common::ParseError>
             + From<v2::QueryError>,
     {
@@ -1320,7 +1359,7 @@ impl<Type> ContractClient<Type> {
         bi: impl v2::IntoBlockIdentifier,
     ) -> Result<InvokeContractResult, E>
     where
-        E: From<NewReceiveNameError> + From<RejectReason> + From<v2::QueryError>,
+        E: From<NewReceiveNameError> + From<v2::Upward<RejectReason>> + From<v2::QueryError>,
     {
         let contract_name = self.contract_name.as_contract_name().contract_name();
         let method = OwnedReceiveName::try_from(format!("{contract_name}.{entrypoint}"))?;
@@ -1357,7 +1396,7 @@ impl<Type> ContractClient<Type> {
     ) -> Result<ContractUpdateBuilder, E>
     where
         E: From<NewReceiveNameError>
-            + From<RejectReason>
+            + From<v2::Upward<RejectReason>>
             + From<v2::QueryError>
             + From<ExceedsParameterSize>,
     {
@@ -1404,7 +1443,7 @@ impl<Type> ContractClient<Type> {
         message: OwnedParameter,
     ) -> Result<ContractUpdateBuilder, E>
     where
-        E: From<NewReceiveNameError> + From<RejectReason> + From<v2::QueryError>,
+        E: From<NewReceiveNameError> + From<v2::Upward<RejectReason>> + From<v2::QueryError>,
     {
         let contract_name = self.contract_name.as_contract_name().contract_name();
         let receive_name = OwnedReceiveName::try_from(format!("{contract_name}.{entrypoint}"))?;
@@ -1499,11 +1538,13 @@ impl<Type> ContractClient<Type> {
                 return_value,
                 used_energy,
             } => {
-                let decoded_reason = decode_smart_contract_revert(
-                    return_value.as_ref(),
-                    &reason,
-                    (*self.schema).as_ref(),
-                );
+                let decoded_reason = reason.as_ref().known().and_then(|reason| {
+                    decode_smart_contract_revert(
+                        return_value.as_ref(),
+                        reason,
+                        (*self.schema).as_ref(),
+                    )
+                });
 
                 Ok(InvokeContractOutcome::Failure(RejectedTransaction {
                     payload: transactions::Payload::Update { payload },
@@ -1601,7 +1642,7 @@ impl<Type> ContractClient<Type> {
 /// Users do not directly interact with values of this type.
 pub struct ContractUpdateInner {
     return_value: Option<ReturnValue>,
-    events: Vec<ContractTraceElement>,
+    events: Vec<Upward<ContractTraceElement>>,
 }
 
 /// A builder to simplify sending smart contract updates.
@@ -1627,7 +1668,11 @@ impl ContractUpdateBuilder {
     }
 
     /// Get the events generated from the dry-run.
-    pub fn events(&self) -> &[ContractTraceElement] {
+    ///
+    /// Since newer versions of the Concordium Node API might introduce new
+    /// variants of [`ContractTraceElement`] the result might contain
+    /// [`Upward::Unknown`].
+    pub fn events(&self) -> &[Upward<ContractTraceElement>] {
         &self.inner.events
     }
 }
@@ -1657,7 +1702,7 @@ pub enum ContractUpdateError {
     #[error("The status of the transaction could not be ascertained: {0}")]
     Query(#[from] QueryError),
     #[error("Contract update failed with reason: {0:?}")]
-    Failed(RejectReason),
+    Failed(v2::Upward<RejectReason>),
 }
 
 impl ContractUpdateHandle {
@@ -1678,29 +1723,42 @@ impl ContractUpdateHandle {
                 RPCError::CallError(tonic::Status::invalid_argument(msg)),
             )))
         };
-
-        match result.details {
-            crate::types::BlockItemSummaryDetails::AccountTransaction(at) => match at.effects {
-                AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                    let Some(execution_tree) = crate::types::execution_tree(effects) else {
-                        return mk_error(
-                            "Expected smart contract update, but received invalid execution tree.",
-                        );
-                    };
-                    Ok(ContractUpdateInfo {
-                        execution_tree,
-                        energy_cost: result.energy_cost,
-                        cost: at.cost,
-                        transaction_hash: self.tx_hash,
-                        sender: at.sender,
-                    })
+        let v2::upward::Upward::Known(details) = result.details else {
+            return mk_error(
+                "Expected smart contract update status, but received unknown block item details.",
+            );
+        };
+        match details {
+            crate::types::BlockItemSummaryDetails::AccountTransaction(at) => {
+                let v2::upward::Upward::Known(effects) = at.effects else {
+                    return mk_error(
+                        "Expected smart contract update status, but received unknown block item \
+                         effects.",
+                    );
+                };
+                match effects {
+                    AccountTransactionEffects::ContractUpdateIssued { effects } => {
+                        let Some(execution_tree) = crate::types::execution_tree(effects) else {
+                            return mk_error(
+                                "Expected smart contract update, but received invalid execution \
+                                 tree.",
+                            );
+                        };
+                        Ok(ContractUpdateInfo {
+                            execution_tree,
+                            energy_cost: result.energy_cost,
+                            cost: at.cost,
+                            transaction_hash: self.tx_hash,
+                            sender: at.sender,
+                        })
+                    }
+                    AccountTransactionEffects::None {
+                        transaction_type: _,
+                        reject_reason,
+                    } => Err(ContractUpdateError::Failed(reject_reason)),
+                    _ => mk_error("Expected smart contract update status, but did not receive it."),
                 }
-                AccountTransactionEffects::None {
-                    transaction_type: _,
-                    reject_reason,
-                } => Err(ContractUpdateError::Failed(reject_reason)),
-                _ => mk_error("Expected smart contract update status, but did not receive it."),
-            },
+            }
             crate::types::BlockItemSummaryDetails::AccountCreation(_) => {
                 mk_error("Expected smart contract update status, but received account creation.")
             }

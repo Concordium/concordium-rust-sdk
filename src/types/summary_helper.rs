@@ -15,7 +15,10 @@ use super::{
     RejectReason, TransactionIndex, TransactionType, UpdatePayload, UrlText,
 };
 
-use crate::types::Address;
+use crate::{
+    types::Address,
+    v2::upward::{UnknownDataError, Upward},
+};
 use concordium_base::{
     common::{
         types::{Amount, Timestamp, TransactionTime},
@@ -258,7 +261,7 @@ pub(crate) enum Event {
         /// Baker account
         account: AccountAddress,
         /// The open status.
-        open_status: OpenStatus,
+        open_status: Upward<OpenStatus>,
     },
     /// Updated metadata url for baker pool
     #[serde(rename_all = "camelCase")]
@@ -498,9 +501,11 @@ impl TryFrom<Event> for super::ContractTraceElement {
     }
 }
 
-impl From<super::BlockItemSummary> for BlockItemSummary {
-    fn from(bi: super::BlockItemSummary) -> Self {
-        match bi.details {
+impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
+    type Error = UnknownDataError;
+
+    fn try_from(bi: super::BlockItemSummary) -> Result<Self, Self::Error> {
+        let out = match bi.details.known_or_err()? {
             super::BlockItemSummaryDetails::AccountTransaction(
                 super::AccountTransactionDetails {
                     cost,
@@ -526,14 +531,14 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                         },
                     )
                 };
-                let (transaction_type, result) = match effects {
+                let (transaction_type, result) = match effects.known_or_err()? {
                     super::AccountTransactionEffects::None {
                         transaction_type,
                         reject_reason,
                     } => (
                         transaction_type,
                         BlockItemResult::Reject {
-                            reject_reason: Box::new(reject_reason),
+                            reject_reason: Box::new(reject_reason.known_or_err()?),
                         },
                     ),
                     super::AccountTransactionEffects::ModuleDeployed { module_ref } => {
@@ -547,7 +552,10 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                         Event::ContractInitialized { data },
                     ),
                     super::AccountTransactionEffects::ContractUpdateIssued { effects } => {
-                        let events = effects.into_iter().map(Event::from).collect::<Vec<_>>();
+                        let events = effects
+                            .into_iter()
+                            .map(|element| element.known_or_err().map(Event::from))
+                            .collect::<Result<Vec<_>, _>>()?;
                         (
                             Some(TransactionType::Update),
                             BlockItemResult::Success { events },
@@ -727,162 +735,166 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                         let ty = TransactionType::ConfigureBaker;
                         let events = data
                             .into_iter()
-                            .map(|ev| match ev {
-                                super::BakerEvent::BakerAdded { data } => {
-                                    Event::BakerAdded { data }
-                                }
-                                super::BakerEvent::BakerRemoved { baker_id } => {
-                                    Event::BakerRemoved {
+                            .map(|ev| {
+                                Ok(match ev.known_or_err()? {
+                                    super::BakerEvent::BakerAdded { data } => {
+                                        Event::BakerAdded { data }
+                                    }
+                                    super::BakerEvent::BakerRemoved { baker_id } => {
+                                        Event::BakerRemoved {
+                                            baker_id,
+                                            account: sender,
+                                        }
+                                    }
+                                    super::BakerEvent::BakerStakeIncreased {
+                                        baker_id,
+                                        new_stake,
+                                    } => Event::BakerStakeIncreased {
                                         baker_id,
                                         account: sender,
-                                    }
-                                }
-                                super::BakerEvent::BakerStakeIncreased {
-                                    baker_id,
-                                    new_stake,
-                                } => Event::BakerStakeIncreased {
-                                    baker_id,
-                                    account: sender,
-                                    new_stake,
-                                },
-                                super::BakerEvent::BakerStakeDecreased {
-                                    baker_id,
-                                    new_stake,
-                                } => Event::BakerStakeDecreased {
-                                    baker_id,
-                                    account: sender,
-                                    new_stake,
-                                },
-                                super::BakerEvent::BakerSetOpenStatus {
-                                    baker_id,
-                                    open_status,
-                                } => Event::BakerSetOpenStatus {
-                                    baker_id,
-                                    account: sender,
-                                    open_status,
-                                },
-                                super::BakerEvent::BakerSetMetadataURL {
-                                    baker_id,
-                                    metadata_url,
-                                } => Event::BakerSetMetadataURL {
-                                    baker_id,
-                                    account: sender,
-                                    metadata_url,
-                                },
-                                super::BakerEvent::BakerSetTransactionFeeCommission {
-                                    baker_id,
-                                    transaction_fee_commission,
-                                } => Event::BakerSetTransactionFeeCommission {
-                                    baker_id,
-                                    account: sender,
-                                    transaction_fee_commission,
-                                },
-                                super::BakerEvent::BakerSetBakingRewardCommission {
-                                    baker_id,
-                                    baking_reward_commission,
-                                } => Event::BakerSetBakingRewardCommission {
-                                    baker_id,
-                                    account: sender,
-                                    baking_reward_commission,
-                                },
-                                super::BakerEvent::BakerSetFinalizationRewardCommission {
-                                    baker_id,
-                                    finalization_reward_commission,
-                                } => Event::BakerSetFinalizationRewardCommission {
-                                    baker_id,
-                                    account: sender,
-                                    finalization_reward_commission,
-                                },
-                                super::BakerEvent::BakerRestakeEarningsUpdated {
-                                    baker_id,
-                                    restake_earnings,
-                                } => Event::BakerSetRestakeEarnings {
-                                    baker_id,
-                                    account: sender,
-                                    restake_earnings,
-                                },
-                                super::BakerEvent::BakerKeysUpdated { data } => {
-                                    Event::BakerKeysUpdated { data }
-                                }
-                                super::BakerEvent::DelegationRemoved { delegator_id } => {
-                                    Event::DelegationRemoved {
-                                        delegator_id,
-                                        account: sender,
-                                    }
-                                }
-                                super::BakerEvent::BakerSuspended { baker_id } => {
-                                    Event::BakerSuspended {
+                                        new_stake,
+                                    },
+                                    super::BakerEvent::BakerStakeDecreased {
+                                        baker_id,
+                                        new_stake,
+                                    } => Event::BakerStakeDecreased {
                                         baker_id,
                                         account: sender,
-                                    }
-                                }
-                                super::BakerEvent::BakerResumed { baker_id } => {
-                                    Event::BakerResumed {
+                                        new_stake,
+                                    },
+                                    super::BakerEvent::BakerSetOpenStatus {
+                                        baker_id,
+                                        open_status,
+                                    } => Event::BakerSetOpenStatus {
                                         baker_id,
                                         account: sender,
+                                        open_status,
+                                    },
+                                    super::BakerEvent::BakerSetMetadataURL {
+                                        baker_id,
+                                        metadata_url,
+                                    } => Event::BakerSetMetadataURL {
+                                        baker_id,
+                                        account: sender,
+                                        metadata_url,
+                                    },
+                                    super::BakerEvent::BakerSetTransactionFeeCommission {
+                                        baker_id,
+                                        transaction_fee_commission,
+                                    } => Event::BakerSetTransactionFeeCommission {
+                                        baker_id,
+                                        account: sender,
+                                        transaction_fee_commission,
+                                    },
+                                    super::BakerEvent::BakerSetBakingRewardCommission {
+                                        baker_id,
+                                        baking_reward_commission,
+                                    } => Event::BakerSetBakingRewardCommission {
+                                        baker_id,
+                                        account: sender,
+                                        baking_reward_commission,
+                                    },
+                                    super::BakerEvent::BakerSetFinalizationRewardCommission {
+                                        baker_id,
+                                        finalization_reward_commission,
+                                    } => Event::BakerSetFinalizationRewardCommission {
+                                        baker_id,
+                                        account: sender,
+                                        finalization_reward_commission,
+                                    },
+                                    super::BakerEvent::BakerRestakeEarningsUpdated {
+                                        baker_id,
+                                        restake_earnings,
+                                    } => Event::BakerSetRestakeEarnings {
+                                        baker_id,
+                                        account: sender,
+                                        restake_earnings,
+                                    },
+                                    super::BakerEvent::BakerKeysUpdated { data } => {
+                                        Event::BakerKeysUpdated { data }
                                     }
-                                }
+                                    super::BakerEvent::DelegationRemoved { delegator_id } => {
+                                        Event::DelegationRemoved {
+                                            delegator_id,
+                                            account: sender,
+                                        }
+                                    }
+                                    super::BakerEvent::BakerSuspended { baker_id } => {
+                                        Event::BakerSuspended {
+                                            baker_id,
+                                            account: sender,
+                                        }
+                                    }
+                                    super::BakerEvent::BakerResumed { baker_id } => {
+                                        Event::BakerResumed {
+                                            baker_id,
+                                            account: sender,
+                                        }
+                                    }
+                                })
                             })
-                            .collect();
+                            .collect::<Result<_, _>>()?;
                         (Some(ty), BlockItemResult::Success { events })
                     }
                     super::AccountTransactionEffects::DelegationConfigured { data } => {
                         let ty = TransactionType::ConfigureDelegation;
                         let events = data
                             .into_iter()
-                            .map(|ev| match ev {
-                                super::DelegationEvent::DelegationStakeIncreased {
-                                    delegator_id,
-                                    new_stake,
-                                } => Event::DelegationStakeIncreased {
-                                    delegator_id,
-                                    account: sender,
-                                    new_stake,
-                                },
-                                super::DelegationEvent::DelegationStakeDecreased {
-                                    delegator_id,
-                                    new_stake,
-                                } => Event::DelegationStakeDecreased {
-                                    delegator_id,
-                                    account: sender,
-                                    new_stake,
-                                },
-                                super::DelegationEvent::DelegationSetRestakeEarnings {
-                                    delegator_id,
-                                    restake_earnings,
-                                } => Event::DelegationSetRestakeEarnings {
-                                    delegator_id,
-                                    account: sender,
-                                    restake_earnings,
-                                },
-                                super::DelegationEvent::DelegationSetDelegationTarget {
-                                    delegator_id,
-                                    delegation_target,
-                                } => Event::DelegationSetDelegationTarget {
-                                    delegator_id,
-                                    account: sender,
-                                    delegation_target,
-                                },
-                                super::DelegationEvent::DelegationAdded { delegator_id } => {
-                                    Event::DelegationAdded {
+                            .map(|ev| {
+                                Ok(match ev.known_or_err()? {
+                                    super::DelegationEvent::DelegationStakeIncreased {
+                                        delegator_id,
+                                        new_stake,
+                                    } => Event::DelegationStakeIncreased {
                                         delegator_id,
                                         account: sender,
-                                    }
-                                }
-                                super::DelegationEvent::DelegationRemoved { delegator_id } => {
-                                    Event::DelegationRemoved {
+                                        new_stake,
+                                    },
+                                    super::DelegationEvent::DelegationStakeDecreased {
+                                        delegator_id,
+                                        new_stake,
+                                    } => Event::DelegationStakeDecreased {
                                         delegator_id,
                                         account: sender,
-                                    }
-                                }
-                                super::DelegationEvent::BakerRemoved { baker_id } => {
-                                    Event::BakerRemoved {
-                                        baker_id,
+                                        new_stake,
+                                    },
+                                    super::DelegationEvent::DelegationSetRestakeEarnings {
+                                        delegator_id,
+                                        restake_earnings,
+                                    } => Event::DelegationSetRestakeEarnings {
+                                        delegator_id,
                                         account: sender,
+                                        restake_earnings,
+                                    },
+                                    super::DelegationEvent::DelegationSetDelegationTarget {
+                                        delegator_id,
+                                        delegation_target,
+                                    } => Event::DelegationSetDelegationTarget {
+                                        delegator_id,
+                                        account: sender,
+                                        delegation_target,
+                                    },
+                                    super::DelegationEvent::DelegationAdded { delegator_id } => {
+                                        Event::DelegationAdded {
+                                            delegator_id,
+                                            account: sender,
+                                        }
                                     }
-                                }
+                                    super::DelegationEvent::DelegationRemoved { delegator_id } => {
+                                        Event::DelegationRemoved {
+                                            delegator_id,
+                                            account: sender,
+                                        }
+                                    }
+                                    super::DelegationEvent::BakerRemoved { baker_id } => {
+                                        Event::BakerRemoved {
+                                            baker_id,
+                                            account: sender,
+                                        }
+                                    }
+                                })
                             })
-                            .collect();
+                            .collect::<Result<_, _>>()?;
                         (Some(ty), BlockItemResult::Success { events })
                     }
                     super::AccountTransactionEffects::TokenUpdate { events } => {
@@ -925,20 +937,23 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
             super::BlockItemSummaryDetails::Update(super::UpdateDetails {
                 effective_time,
                 payload,
-            }) => BlockItemSummary {
-                sender: None,
-                hash: bi.hash,
-                cost: Amount::zero(),
-                energy_cost: bi.energy_cost,
-                summary_type: BlockItemType::Update(payload.update_type()),
-                result: BlockItemResult::Success {
-                    events: vec![Event::UpdateEnqueued {
-                        effective_time,
-                        payload,
-                    }],
-                },
-                index: bi.index,
-            },
+            }) => {
+                let payload = payload.known_or_err()?;
+                BlockItemSummary {
+                    sender: None,
+                    hash: bi.hash,
+                    cost: Amount::zero(),
+                    energy_cost: bi.energy_cost,
+                    summary_type: BlockItemType::Update(payload.update_type()),
+                    result: BlockItemResult::Success {
+                        events: vec![Event::UpdateEnqueued {
+                            effective_time,
+                            payload,
+                        }],
+                    },
+                    index: bi.index,
+                }
+            }
             super::BlockItemSummaryDetails::TokenCreationDetails(token_creation_details) => {
                 let mut events = vec![Event::TokenCreated {
                     payload: token_creation_details.create_plt,
@@ -960,7 +975,8 @@ impl From<super::BlockItemSummary> for BlockItemSummary {
                     index: bi.index,
                 }
             }
-        }
+        };
+        Ok(out)
     }
 }
 
@@ -1002,10 +1018,10 @@ fn convert_account_transaction(
         Ok(super::AccountTransactionDetails {
             cost,
             sender,
-            effects: super::AccountTransactionEffects::None {
+            effects: Upward::Known(super::AccountTransactionEffects::None {
                 transaction_type: ty,
-                reject_reason,
-            },
+                reject_reason: Upward::Known(reject_reason),
+            }),
         })
     };
 
@@ -1013,7 +1029,7 @@ fn convert_account_transaction(
         Ok(super::AccountTransactionDetails {
             cost,
             sender,
-            effects,
+            effects: Upward::Known(effects),
         })
     };
 
@@ -1047,7 +1063,7 @@ fn convert_account_transaction(
         TransactionType::Update => {
             let effects = events
                 .into_iter()
-                .map(super::ContractTraceElement::try_from)
+                .map(|event| super::ContractTraceElement::try_from(event).map(Upward::Known))
                 .collect::<Result<_, _>>()?;
             mk_success(super::AccountTransactionEffects::ContractUpdateIssued { effects })
         }
@@ -1392,6 +1408,7 @@ fn convert_account_transaction(
                         other_event
                     ))),
                 })
+                .map(|result| result.map(Upward::Known))
                 .collect::<Result<_, ConversionError>>()?;
             mk_success(super::AccountTransactionEffects::BakerConfigured { data })
         }
@@ -1448,6 +1465,7 @@ fn convert_account_transaction(
                         other_event
                     ))),
                 })
+                .map(|result| result.map(Upward::Known))
                 .collect::<Result<_, ConversionError>>()?;
             mk_success(super::AccountTransactionEffects::DelegationConfigured { data })
         }
@@ -1501,7 +1519,9 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
                     index,
                     energy_cost,
                     hash,
-                    details: super::BlockItemSummaryDetails::AccountTransaction(details),
+                    details: Upward::Known(super::BlockItemSummaryDetails::AccountTransaction(
+                        details,
+                    )),
                 })
             }
             BlockItemType::CredentialDeployment(credential_type) => {
@@ -1529,7 +1549,7 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
                     address,
                     reg_id,
                 };
-                let details = super::BlockItemSummaryDetails::AccountCreation(acd);
+                let details = Upward::Known(super::BlockItemSummaryDetails::AccountCreation(acd));
                 Ok(super::BlockItemSummary {
                     index: value.index,
                     energy_cost: value.energy_cost,
@@ -1555,7 +1575,7 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
 
                                 Ok(super::UpdateDetails {
                                     effective_time: *effective_time,
-                                    payload: payload.clone(),
+                                    payload: Upward::Known(payload.clone()),
                                 })
                             }
                             Event::TokenCreated { payload } => Ok(super::UpdateDetails {
@@ -1564,14 +1584,14 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
                                 // transactions are not queued and instead take
                                 // effect immediately.
                                 effective_time: TransactionTime { seconds: 0 },
-                                payload: UpdatePayload::CreatePlt(payload.clone()),
+                                payload: Upward::Known(UpdatePayload::CreatePlt(payload.clone())),
                             }),
                             _ => Err(ConversionError::InvalidUpdateResult),
                         }
                     }
                     BlockItemResult::Reject { .. } => return Err(ConversionError::FailedUpdate),
                 }?;
-                let details = super::BlockItemSummaryDetails::Update(ud);
+                let details = Upward::Known(super::BlockItemSummaryDetails::Update(ud));
                 Ok(super::BlockItemSummary {
                     index: value.index,
                     energy_cost: value.energy_cost,
