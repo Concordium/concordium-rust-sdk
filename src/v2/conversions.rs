@@ -4302,8 +4302,9 @@ impl TryFrom<ConsensusDetailedStatus> for super::types::queries::ConsensusDetail
 #[cfg(test)]
 mod test {
     use concordium_base::{
-        base::{self, UpdateKeyPair},
+        base::{self, PartsPerHundredThousands, UpdateKeyPair},
         common::{Deserial, Serial},
+        contracts_common,
     };
     use rand::{rngs::StdRng, SeedableRng};
 
@@ -4547,13 +4548,9 @@ mod test {
                 account_creation: Some(base::AmountFraction::new_unchecked(71)),
                 chain_update: Some(base::AmountFraction::new_unchecked(73)),
             }),
-            foundation_account: Some(concordium_base::contracts_common::AccountAddress(
-                [79u8; 32],
-            )),
+            foundation_account: Some(contracts_common::AccountAddress([79u8; 32])),
             staking_parameters: Some(crate::v2::StakingParameters {
-                minimum_equity_capital: Some(
-                    concordium_base::contracts_common::Amount::from_micro_ccd(83),
-                ),
+                minimum_equity_capital: Some(contracts_common::Amount::from_micro_ccd(83)),
                 ..Default::default()
             }),
             finalization_committee_parameters: None,
@@ -4886,9 +4883,7 @@ mod test {
                 account_creation: Some(base::AmountFraction::new_unchecked(18)),
                 chain_update: Some(base::AmountFraction::new_unchecked(19)),
             }),
-            foundation_account: Some(concordium_base::contracts_common::AccountAddress(
-                [20u8; 32],
-            )),
+            foundation_account: Some(contracts_common::AccountAddress([20u8; 32])),
             staking_parameters: Some(crate::v2::StakingParameters {
                 passive_finalization_commission: Some(base::AmountFraction::new_unchecked(21)),
                 passive_baking_commission: Some(base::AmountFraction::new_unchecked(22)),
@@ -4905,9 +4900,7 @@ mod test {
                     min: base::AmountFraction::new_unchecked(28),
                     max: base::AmountFraction::new_unchecked(29),
                 }),
-                minimum_equity_capital: Some(
-                    concordium_base::contracts_common::Amount::from_micro_ccd(30),
-                ),
+                minimum_equity_capital: Some(contracts_common::Amount::from_micro_ccd(30)),
                 capital_bound: Some(base::CapitalBound {
                     bound: base::AmountFraction::new_unchecked(31),
                 }),
@@ -5003,6 +4996,802 @@ mod test {
                         threshold: 277.try_into().unwrap(),
                     }),
                     create_plt: None,
+                }),
+            },
+        };
+        // We compare the debug representations to avoid having to implement PartialEq
+        // on all types.
+        assert_eq!(format!("{:?}", converted), format!("{:?}", expected));
+    }
+
+    #[test]
+    fn test_try_from_chain_parameters_v2() {
+        let mut rng = StdRng::seed_from_u64(1);
+        let (root_key, root_key_bytes) = gen_public_key(&mut rng);
+        let (level_1_key, level_1_key_bytes) = gen_public_key(&mut rng);
+        let (level_2_key_1, level_2_key_1_bytes) = gen_public_key(&mut rng);
+        let (level_2_key_2, level_2_key_2_bytes) = gen_public_key(&mut rng);
+        let cpv2 = ChainParametersV2 {
+            consensus_parameters: Some(ConsensusParametersV1 {
+                timeout_parameters: Some(TimeoutParameters {
+                    timeout_base: Some(Duration { value: 500 }),
+                    timeout_increase: Some(Ratio {
+                        numerator: 502,
+                        denominator: 501,
+                    }),
+                    timeout_decrease: Some(Ratio {
+                        numerator: 503,
+                        denominator: 504,
+                    }),
+                }),
+                min_block_time: Some(Duration { value: 505 }),
+                block_energy_limit: Some(Energy { value: 506 }),
+            }),
+            euro_per_energy: Some(ExchangeRate {
+                value: Some(Ratio {
+                    numerator: 2,
+                    denominator: 3,
+                }),
+            }),
+            micro_ccd_per_euro: Some(ExchangeRate {
+                value: Some(Ratio {
+                    numerator: 4,
+                    denominator: 5,
+                }),
+            }),
+            cooldown_parameters: Some(CooldownParametersCpv1 {
+                pool_owner_cooldown: Some(DurationSeconds { value: 6 }),
+                delegator_cooldown: Some(DurationSeconds { value: 7 }),
+            }),
+            time_parameters: Some(TimeParametersCpv1 {
+                reward_period_length: Some(RewardPeriodLength {
+                    value: Some(Epoch { value: 8 }),
+                }),
+                mint_per_payday: Some(MintRate {
+                    mantissa: 9,
+                    exponent: 10,
+                }),
+            }),
+            account_creation_limit: Some(CredentialsPerBlockLimit { value: 11 }),
+            mint_distribution: Some(MintDistributionCpv1 {
+                baking_reward: Some(AmountFraction {
+                    parts_per_hundred_thousand: 12,
+                }),
+                finalization_reward: Some(AmountFraction {
+                    parts_per_hundred_thousand: 13,
+                }),
+            }),
+            transaction_fee_distribution: Some(TransactionFeeDistribution {
+                baker: Some(AmountFraction {
+                    parts_per_hundred_thousand: 14,
+                }),
+                gas_account: Some(AmountFraction {
+                    parts_per_hundred_thousand: 15,
+                }),
+            }),
+            gas_rewards: Some(GasRewardsCpv2 {
+                baker: Some(AmountFraction {
+                    parts_per_hundred_thousand: 16,
+                }),
+                account_creation: Some(AmountFraction {
+                    parts_per_hundred_thousand: 18,
+                }),
+                chain_update: Some(AmountFraction {
+                    parts_per_hundred_thousand: 19,
+                }),
+            }),
+            foundation_account: Some(AccountAddress {
+                value: vec![20u8; 32],
+            }),
+            pool_parameters: Some(PoolParametersCpv1 {
+                passive_finalization_commission: Some(AmountFraction {
+                    parts_per_hundred_thousand: 21,
+                }),
+                passive_baking_commission: Some(AmountFraction {
+                    parts_per_hundred_thousand: 22,
+                }),
+                passive_transaction_commission: Some(AmountFraction {
+                    parts_per_hundred_thousand: 23,
+                }),
+                commission_bounds: Some(CommissionRanges {
+                    finalization: Some(InclusiveRangeAmountFraction {
+                        min: Some(AmountFraction {
+                            parts_per_hundred_thousand: 24,
+                        }),
+                        max: Some(AmountFraction {
+                            parts_per_hundred_thousand: 25,
+                        }),
+                    }),
+                    baking: Some(InclusiveRangeAmountFraction {
+                        min: Some(AmountFraction {
+                            parts_per_hundred_thousand: 26,
+                        }),
+                        max: Some(AmountFraction {
+                            parts_per_hundred_thousand: 27,
+                        }),
+                    }),
+                    transaction: Some(InclusiveRangeAmountFraction {
+                        min: Some(AmountFraction {
+                            parts_per_hundred_thousand: 28,
+                        }),
+                        max: Some(AmountFraction {
+                            parts_per_hundred_thousand: 29,
+                        }),
+                    }),
+                }),
+                minimum_equity_capital: Some(Amount { value: 30 }),
+                capital_bound: Some(CapitalBound {
+                    value: Some(AmountFraction {
+                        parts_per_hundred_thousand: 31,
+                    }),
+                }),
+                leverage_bound: Some(LeverageFactor {
+                    value: Some(Ratio {
+                        numerator: 33,
+                        denominator: 32,
+                    }),
+                }),
+            }),
+            root_keys: Some(HigherLevelKeys {
+                keys: vec![UpdatePublicKey {
+                    value: root_key_bytes,
+                }],
+                threshold: Some(UpdateKeysThreshold { value: 34 }),
+            }),
+            level1_keys: Some(HigherLevelKeys {
+                keys: vec![UpdatePublicKey {
+                    value: level_1_key_bytes,
+                }],
+                threshold: Some(UpdateKeysThreshold { value: 35 }),
+            }),
+            level2_keys: Some(AuthorizationsV1 {
+                v0: Some(AuthorizationsV0 {
+                    keys: vec![
+                        UpdatePublicKey {
+                            value: level_2_key_1_bytes,
+                        },
+                        UpdatePublicKey {
+                            value: level_2_key_2_bytes,
+                        },
+                    ],
+                    emergency: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 113 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 127 }),
+                    }),
+                    protocol: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 131 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 137 }),
+                    }),
+                    parameter_consensus: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 139 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 149 }),
+                    }),
+                    parameter_euro_per_energy: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 151 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 157 }),
+                    }),
+                    parameter_micro_ccd_per_euro: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 173 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 179 }),
+                    }),
+                    parameter_foundation_account: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 181 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 191 }),
+                    }),
+                    parameter_mint_distribution: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 193 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 197 }),
+                    }),
+                    parameter_transaction_fee_distribution: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 199 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 211 }),
+                    }),
+                    parameter_gas_rewards: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 223 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 227 }),
+                    }),
+                    pool_parameters: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 229 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 233 }),
+                    }),
+                    add_anonymity_revoker: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 239 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 241 }),
+                    }),
+                    add_identity_provider: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 251 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 257 }),
+                    }),
+                }),
+                parameter_cooldown: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 263 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 269 }),
+                }),
+                parameter_time: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 271 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 277 }),
+                }),
+                create_plt: None,
+            }),
+            finalization_committee_parameters: Some(FinalizationCommitteeParameters {
+                minimum_finalizers: 601,
+                maximum_finalizers: 602,
+                finalizer_relative_stake_threshold: Some(AmountFraction {
+                    parts_per_hundred_thousand: 603,
+                }),
+            }),
+        };
+        let params = ChainParameters {
+            parameters: Some(chain_parameters::Parameters::V2(cpv2)),
+        };
+        let converted = crate::v2::ChainParameters::try_from(params)
+            .expect("Failed to convert chain parameters v1");
+        let expected = crate::v2::ChainParameters {
+            timeout_parameters: Some(crate::v2::TimeoutParameters {
+                base: Some(contracts_common::Duration::from_millis(500)),
+                increase: Some(concordium_base::common::types::Ratio::new_unchecked(
+                    502, 501,
+                )),
+                decrease: Some(concordium_base::common::types::Ratio::new_unchecked(
+                    503, 504,
+                )),
+            }),
+            election_difficulty: None,
+            min_block_time: Some(contracts_common::Duration::from_millis(505)),
+            block_energy_limit: Some(base::Energy::from(506)),
+            euro_per_energy: Some(base::ExchangeRate::new_unchecked(2, 3)),
+            micro_ccd_per_euro: Some(base::ExchangeRate::new_unchecked(4, 5)),
+            cooldown_parameters: Some(crate::v2::CooldownParameters {
+                baker_cooldown_epochs: None,
+                pool_owner_cooldown: Some(base::DurationSeconds::from(6)),
+                delegator_cooldown: Some(base::DurationSeconds::from(7)),
+            }),
+            reward_period_length: Some(updates::RewardPeriodLength::from(base::Epoch::from(8))),
+            mint_per_payday: Some(base::MintRate {
+                mantissa: 9,
+                exponent: 10,
+            }),
+            mint_per_slot: None,
+            account_creation_limit: Some(base::CredentialsPerBlockLimit::from(11)),
+            mint_distribution: Some(crate::v2::MintDistribution {
+                baking_reward: Some(base::AmountFraction::new_unchecked(12)),
+                finalization_reward: Some(base::AmountFraction::new_unchecked(13)),
+            }),
+            transaction_fee_distribution: Some(crate::v2::TransactionFeeDistribution {
+                baker: Some(base::AmountFraction::new_unchecked(14)),
+                gas_account: Some(base::AmountFraction::new_unchecked(15)),
+            }),
+            gas_rewards: Some(crate::v2::GasRewards {
+                baker: Some(base::AmountFraction::new_unchecked(16)),
+                finalization_proof: None,
+                account_creation: Some(base::AmountFraction::new_unchecked(18)),
+                chain_update: Some(base::AmountFraction::new_unchecked(19)),
+            }),
+            foundation_account: Some(contracts_common::AccountAddress([20u8; 32])),
+            staking_parameters: Some(crate::v2::StakingParameters {
+                passive_finalization_commission: Some(base::AmountFraction::new_unchecked(21)),
+                passive_baking_commission: Some(base::AmountFraction::new_unchecked(22)),
+                passive_transaction_commission: Some(base::AmountFraction::new_unchecked(23)),
+                finalization_commission_range: Some(base::InclusiveRange {
+                    min: base::AmountFraction::new_unchecked(24),
+                    max: base::AmountFraction::new_unchecked(25),
+                }),
+                baking_commission_range: Some(base::InclusiveRange {
+                    min: base::AmountFraction::new_unchecked(26),
+                    max: base::AmountFraction::new_unchecked(27),
+                }),
+                transaction_commission_range: Some(base::InclusiveRange {
+                    min: base::AmountFraction::new_unchecked(28),
+                    max: base::AmountFraction::new_unchecked(29),
+                }),
+                minimum_equity_capital: Some(contracts_common::Amount::from_micro_ccd(30)),
+                capital_bound: Some(base::CapitalBound {
+                    bound: base::AmountFraction::new_unchecked(31),
+                }),
+                leverage_bound: Some(base::LeverageFactor {
+                    numerator: 33,
+                    denominator: 32,
+                }),
+            }),
+            finalization_committee_parameters: Some(crate::v2::FinalizationCommitteeParameters {
+                min_finalizers: Some(601),
+                max_finalizers: Some(602),
+                finalizers_relative_stake_threshold: Some(PartsPerHundredThousands::new_unchecked(
+                    603,
+                )),
+            }),
+            validator_max_missed_rounds: None,
+            keys: crate::v2::UpdateKeys {
+                root_keys: Some(concordium_base::updates::HigherLevelAccessStructure::<
+                    concordium_base::updates::RootKeysKind,
+                > {
+                    keys: vec![crate::v2::UpdatePublicKey::from(
+                        crate::id::types::VerifyKey::from(root_key),
+                    )],
+                    threshold: 34.try_into().unwrap(),
+                    _phantom: Default::default(),
+                }),
+                level_1_keys: Some(concordium_base::updates::HigherLevelAccessStructure::<
+                    concordium_base::updates::Level1KeysKind,
+                > {
+                    keys: vec![crate::v2::UpdatePublicKey::from(
+                        crate::id::types::VerifyKey::from(level_1_key),
+                    )],
+                    threshold: 35.try_into().unwrap(),
+                    _phantom: Default::default(),
+                }),
+                level_2_keys: Some(crate::v2::Level2Keys {
+                    keys: vec![
+                        crate::v2::UpdatePublicKey::from(crate::id::types::VerifyKey::from(
+                            level_2_key_1,
+                        )),
+                        crate::v2::UpdatePublicKey::from(crate::id::types::VerifyKey::from(
+                            level_2_key_2,
+                        )),
+                    ],
+                    emergency: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(113)].into(),
+                        threshold: 127.try_into().unwrap(),
+                    }),
+                    protocol: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(131)].into(),
+                        threshold: 137.try_into().unwrap(),
+                    }),
+                    consensus: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(139)].into(),
+                        threshold: 149.try_into().unwrap(),
+                    }),
+                    euro_per_energy: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(151)].into(),
+                        threshold: 157.try_into().unwrap(),
+                    }),
+                    micro_ccd_per_euro: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(173)].into(),
+                        threshold: 179.try_into().unwrap(),
+                    }),
+                    foundation_account: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(181)].into(),
+                        threshold: 191.try_into().unwrap(),
+                    }),
+                    mint_distribution: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(193)].into(),
+                        threshold: 197.try_into().unwrap(),
+                    }),
+                    transaction_fee_distribution: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(199)].into(),
+                        threshold: 211.try_into().unwrap(),
+                    }),
+                    param_gas_rewards: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(223)].into(),
+                        threshold: 227.try_into().unwrap(),
+                    }),
+                    pool_parameters: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(229)].into(),
+                        threshold: 233.try_into().unwrap(),
+                    }),
+                    add_anonymity_revoker: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(239)].into(),
+                        threshold: 241.try_into().unwrap(),
+                    }),
+                    add_identity_provider: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(251)].into(),
+                        threshold: 257.try_into().unwrap(),
+                    }),
+                    cooldown_parameters: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(263)].into(),
+                        threshold: 269.try_into().unwrap(),
+                    }),
+                    time_parameters: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(271)].into(),
+                        threshold: 277.try_into().unwrap(),
+                    }),
+                    create_plt: None,
+                }),
+            },
+        };
+        // We compare the debug representations to avoid having to implement PartialEq
+        // on all types.
+        assert_eq!(format!("{:?}", converted), format!("{:?}", expected));
+    }
+
+    #[test]
+    fn test_try_from_chain_parameters_v3() {
+        let mut rng = StdRng::seed_from_u64(1);
+        let (root_key, root_key_bytes) = gen_public_key(&mut rng);
+        let (level_1_key, level_1_key_bytes) = gen_public_key(&mut rng);
+        let (level_2_key_1, level_2_key_1_bytes) = gen_public_key(&mut rng);
+        let (level_2_key_2, level_2_key_2_bytes) = gen_public_key(&mut rng);
+        let cpv3 = ChainParametersV3 {
+            consensus_parameters: Some(ConsensusParametersV1 {
+                timeout_parameters: Some(TimeoutParameters {
+                    timeout_base: Some(Duration { value: 500 }),
+                    timeout_increase: Some(Ratio {
+                        numerator: 502,
+                        denominator: 501,
+                    }),
+                    timeout_decrease: Some(Ratio {
+                        numerator: 503,
+                        denominator: 504,
+                    }),
+                }),
+                min_block_time: Some(Duration { value: 505 }),
+                block_energy_limit: Some(Energy { value: 506 }),
+            }),
+            euro_per_energy: Some(ExchangeRate {
+                value: Some(Ratio {
+                    numerator: 2,
+                    denominator: 3,
+                }),
+            }),
+            micro_ccd_per_euro: Some(ExchangeRate {
+                value: Some(Ratio {
+                    numerator: 4,
+                    denominator: 5,
+                }),
+            }),
+            cooldown_parameters: Some(CooldownParametersCpv1 {
+                pool_owner_cooldown: Some(DurationSeconds { value: 6 }),
+                delegator_cooldown: Some(DurationSeconds { value: 7 }),
+            }),
+            time_parameters: Some(TimeParametersCpv1 {
+                reward_period_length: Some(RewardPeriodLength {
+                    value: Some(Epoch { value: 8 }),
+                }),
+                mint_per_payday: Some(MintRate {
+                    mantissa: 9,
+                    exponent: 10,
+                }),
+            }),
+            account_creation_limit: Some(CredentialsPerBlockLimit { value: 11 }),
+            mint_distribution: Some(MintDistributionCpv1 {
+                baking_reward: Some(AmountFraction {
+                    parts_per_hundred_thousand: 12,
+                }),
+                finalization_reward: Some(AmountFraction {
+                    parts_per_hundred_thousand: 13,
+                }),
+            }),
+            transaction_fee_distribution: Some(TransactionFeeDistribution {
+                baker: Some(AmountFraction {
+                    parts_per_hundred_thousand: 14,
+                }),
+                gas_account: Some(AmountFraction {
+                    parts_per_hundred_thousand: 15,
+                }),
+            }),
+            gas_rewards: Some(GasRewardsCpv2 {
+                baker: Some(AmountFraction {
+                    parts_per_hundred_thousand: 16,
+                }),
+                account_creation: Some(AmountFraction {
+                    parts_per_hundred_thousand: 18,
+                }),
+                chain_update: Some(AmountFraction {
+                    parts_per_hundred_thousand: 19,
+                }),
+            }),
+            foundation_account: Some(AccountAddress {
+                value: vec![20u8; 32],
+            }),
+            pool_parameters: Some(PoolParametersCpv1 {
+                passive_finalization_commission: Some(AmountFraction {
+                    parts_per_hundred_thousand: 21,
+                }),
+                passive_baking_commission: Some(AmountFraction {
+                    parts_per_hundred_thousand: 22,
+                }),
+                passive_transaction_commission: Some(AmountFraction {
+                    parts_per_hundred_thousand: 23,
+                }),
+                commission_bounds: Some(CommissionRanges {
+                    finalization: Some(InclusiveRangeAmountFraction {
+                        min: Some(AmountFraction {
+                            parts_per_hundred_thousand: 24,
+                        }),
+                        max: Some(AmountFraction {
+                            parts_per_hundred_thousand: 25,
+                        }),
+                    }),
+                    baking: Some(InclusiveRangeAmountFraction {
+                        min: Some(AmountFraction {
+                            parts_per_hundred_thousand: 26,
+                        }),
+                        max: Some(AmountFraction {
+                            parts_per_hundred_thousand: 27,
+                        }),
+                    }),
+                    transaction: Some(InclusiveRangeAmountFraction {
+                        min: Some(AmountFraction {
+                            parts_per_hundred_thousand: 28,
+                        }),
+                        max: Some(AmountFraction {
+                            parts_per_hundred_thousand: 29,
+                        }),
+                    }),
+                }),
+                minimum_equity_capital: Some(Amount { value: 30 }),
+                capital_bound: Some(CapitalBound {
+                    value: Some(AmountFraction {
+                        parts_per_hundred_thousand: 31,
+                    }),
+                }),
+                leverage_bound: Some(LeverageFactor {
+                    value: Some(Ratio {
+                        numerator: 33,
+                        denominator: 32,
+                    }),
+                }),
+            }),
+            root_keys: Some(HigherLevelKeys {
+                keys: vec![UpdatePublicKey {
+                    value: root_key_bytes,
+                }],
+                threshold: Some(UpdateKeysThreshold { value: 34 }),
+            }),
+            level1_keys: Some(HigherLevelKeys {
+                keys: vec![UpdatePublicKey {
+                    value: level_1_key_bytes,
+                }],
+                threshold: Some(UpdateKeysThreshold { value: 35 }),
+            }),
+            level2_keys: Some(AuthorizationsV1 {
+                v0: Some(AuthorizationsV0 {
+                    keys: vec![
+                        UpdatePublicKey {
+                            value: level_2_key_1_bytes,
+                        },
+                        UpdatePublicKey {
+                            value: level_2_key_2_bytes,
+                        },
+                    ],
+                    emergency: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 113 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 127 }),
+                    }),
+                    protocol: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 131 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 137 }),
+                    }),
+                    parameter_consensus: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 139 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 149 }),
+                    }),
+                    parameter_euro_per_energy: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 151 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 157 }),
+                    }),
+                    parameter_micro_ccd_per_euro: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 173 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 179 }),
+                    }),
+                    parameter_foundation_account: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 181 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 191 }),
+                    }),
+                    parameter_mint_distribution: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 193 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 197 }),
+                    }),
+                    parameter_transaction_fee_distribution: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 199 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 211 }),
+                    }),
+                    parameter_gas_rewards: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 223 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 227 }),
+                    }),
+                    pool_parameters: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 229 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 233 }),
+                    }),
+                    add_anonymity_revoker: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 239 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 241 }),
+                    }),
+                    add_identity_provider: Some(AccessStructure {
+                        access_public_keys: vec![UpdateKeysIndex { value: 251 }],
+                        access_threshold: Some(UpdateKeysThreshold { value: 257 }),
+                    }),
+                }),
+                parameter_cooldown: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 263 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 269 }),
+                }),
+                parameter_time: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 271 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 277 }),
+                }),
+                create_plt: Some(AccessStructure {
+                    access_public_keys: vec![
+                        UpdateKeysIndex { value: 281 },
+                        UpdateKeysIndex { value: 283 },
+                    ],
+                    access_threshold: Some(UpdateKeysThreshold { value: 293 }),
+                }),
+            }),
+            finalization_committee_parameters: Some(FinalizationCommitteeParameters {
+                minimum_finalizers: 601,
+                maximum_finalizers: 602,
+                finalizer_relative_stake_threshold: Some(AmountFraction {
+                    parts_per_hundred_thousand: 603,
+                }),
+            }),
+            validator_score_parameters: Some(ValidatorScoreParameters {
+                maximum_missed_rounds: 607,
+            }),
+        };
+        let params = ChainParameters {
+            parameters: Some(chain_parameters::Parameters::V3(cpv3)),
+        };
+        let converted = crate::v2::ChainParameters::try_from(params)
+            .expect("Failed to convert chain parameters v1");
+        let expected = crate::v2::ChainParameters {
+            timeout_parameters: Some(crate::v2::TimeoutParameters {
+                base: Some(contracts_common::Duration::from_millis(500)),
+                increase: Some(concordium_base::common::types::Ratio::new_unchecked(
+                    502, 501,
+                )),
+                decrease: Some(concordium_base::common::types::Ratio::new_unchecked(
+                    503, 504,
+                )),
+            }),
+            election_difficulty: None,
+            min_block_time: Some(contracts_common::Duration::from_millis(505)),
+            block_energy_limit: Some(base::Energy::from(506)),
+            euro_per_energy: Some(base::ExchangeRate::new_unchecked(2, 3)),
+            micro_ccd_per_euro: Some(base::ExchangeRate::new_unchecked(4, 5)),
+            cooldown_parameters: Some(crate::v2::CooldownParameters {
+                baker_cooldown_epochs: None,
+                pool_owner_cooldown: Some(base::DurationSeconds::from(6)),
+                delegator_cooldown: Some(base::DurationSeconds::from(7)),
+            }),
+            reward_period_length: Some(updates::RewardPeriodLength::from(base::Epoch::from(8))),
+            mint_per_payday: Some(base::MintRate {
+                mantissa: 9,
+                exponent: 10,
+            }),
+            mint_per_slot: None,
+            account_creation_limit: Some(base::CredentialsPerBlockLimit::from(11)),
+            mint_distribution: Some(crate::v2::MintDistribution {
+                baking_reward: Some(base::AmountFraction::new_unchecked(12)),
+                finalization_reward: Some(base::AmountFraction::new_unchecked(13)),
+            }),
+            transaction_fee_distribution: Some(crate::v2::TransactionFeeDistribution {
+                baker: Some(base::AmountFraction::new_unchecked(14)),
+                gas_account: Some(base::AmountFraction::new_unchecked(15)),
+            }),
+            gas_rewards: Some(crate::v2::GasRewards {
+                baker: Some(base::AmountFraction::new_unchecked(16)),
+                finalization_proof: None,
+                account_creation: Some(base::AmountFraction::new_unchecked(18)),
+                chain_update: Some(base::AmountFraction::new_unchecked(19)),
+            }),
+            foundation_account: Some(contracts_common::AccountAddress([20u8; 32])),
+            staking_parameters: Some(crate::v2::StakingParameters {
+                passive_finalization_commission: Some(base::AmountFraction::new_unchecked(21)),
+                passive_baking_commission: Some(base::AmountFraction::new_unchecked(22)),
+                passive_transaction_commission: Some(base::AmountFraction::new_unchecked(23)),
+                finalization_commission_range: Some(base::InclusiveRange {
+                    min: base::AmountFraction::new_unchecked(24),
+                    max: base::AmountFraction::new_unchecked(25),
+                }),
+                baking_commission_range: Some(base::InclusiveRange {
+                    min: base::AmountFraction::new_unchecked(26),
+                    max: base::AmountFraction::new_unchecked(27),
+                }),
+                transaction_commission_range: Some(base::InclusiveRange {
+                    min: base::AmountFraction::new_unchecked(28),
+                    max: base::AmountFraction::new_unchecked(29),
+                }),
+                minimum_equity_capital: Some(contracts_common::Amount::from_micro_ccd(30)),
+                capital_bound: Some(base::CapitalBound {
+                    bound: base::AmountFraction::new_unchecked(31),
+                }),
+                leverage_bound: Some(base::LeverageFactor {
+                    numerator: 33,
+                    denominator: 32,
+                }),
+            }),
+            finalization_committee_parameters: Some(crate::v2::FinalizationCommitteeParameters {
+                min_finalizers: Some(601),
+                max_finalizers: Some(602),
+                finalizers_relative_stake_threshold: Some(PartsPerHundredThousands::new_unchecked(
+                    603,
+                )),
+            }),
+            validator_max_missed_rounds: Some(607),
+            keys: crate::v2::UpdateKeys {
+                root_keys: Some(concordium_base::updates::HigherLevelAccessStructure::<
+                    concordium_base::updates::RootKeysKind,
+                > {
+                    keys: vec![crate::v2::UpdatePublicKey::from(
+                        crate::id::types::VerifyKey::from(root_key),
+                    )],
+                    threshold: 34.try_into().unwrap(),
+                    _phantom: Default::default(),
+                }),
+                level_1_keys: Some(concordium_base::updates::HigherLevelAccessStructure::<
+                    concordium_base::updates::Level1KeysKind,
+                > {
+                    keys: vec![crate::v2::UpdatePublicKey::from(
+                        crate::id::types::VerifyKey::from(level_1_key),
+                    )],
+                    threshold: 35.try_into().unwrap(),
+                    _phantom: Default::default(),
+                }),
+                level_2_keys: Some(crate::v2::Level2Keys {
+                    keys: vec![
+                        crate::v2::UpdatePublicKey::from(crate::id::types::VerifyKey::from(
+                            level_2_key_1,
+                        )),
+                        crate::v2::UpdatePublicKey::from(crate::id::types::VerifyKey::from(
+                            level_2_key_2,
+                        )),
+                    ],
+                    emergency: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(113)].into(),
+                        threshold: 127.try_into().unwrap(),
+                    }),
+                    protocol: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(131)].into(),
+                        threshold: 137.try_into().unwrap(),
+                    }),
+                    consensus: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(139)].into(),
+                        threshold: 149.try_into().unwrap(),
+                    }),
+                    euro_per_energy: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(151)].into(),
+                        threshold: 157.try_into().unwrap(),
+                    }),
+                    micro_ccd_per_euro: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(173)].into(),
+                        threshold: 179.try_into().unwrap(),
+                    }),
+                    foundation_account: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(181)].into(),
+                        threshold: 191.try_into().unwrap(),
+                    }),
+                    mint_distribution: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(193)].into(),
+                        threshold: 197.try_into().unwrap(),
+                    }),
+                    transaction_fee_distribution: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(199)].into(),
+                        threshold: 211.try_into().unwrap(),
+                    }),
+                    param_gas_rewards: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(223)].into(),
+                        threshold: 227.try_into().unwrap(),
+                    }),
+                    pool_parameters: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(229)].into(),
+                        threshold: 233.try_into().unwrap(),
+                    }),
+                    add_anonymity_revoker: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(239)].into(),
+                        threshold: 241.try_into().unwrap(),
+                    }),
+                    add_identity_provider: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(251)].into(),
+                        threshold: 257.try_into().unwrap(),
+                    }),
+                    cooldown_parameters: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(263)].into(),
+                        threshold: 269.try_into().unwrap(),
+                    }),
+                    time_parameters: Some(crate::v2::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(271)].into(),
+                        threshold: 277.try_into().unwrap(),
+                    }),
+                    create_plt: Some(crate::v2::AccessStructure {
+                        authorized_keys: [
+                            base::UpdateKeysIndex::from(281),
+                            base::UpdateKeysIndex::from(283),
+                        ]
+                        .into(),
+                        threshold: 293.try_into().unwrap(),
+                    }),
                 }),
             },
         };
