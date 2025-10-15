@@ -52,7 +52,7 @@ pub enum Cis2TransactionError {
     #[error("Invalid updateOperator parameter: {0}")]
     InvalidUpdateOperatorParams(#[from] NewUpdateOperatorParamsError),
 
-    /// A general RPC error occured.
+    /// A general RPC error occurred.
     #[error("RPC error: {0}")]
     RPCError(#[from] crate::endpoints::RPCError),
 }
@@ -102,7 +102,7 @@ pub enum Cis2QueryError {
     #[error("Invalid tokenMetadata parameter: {0}")]
     InvalidTokenMetadataParams(#[from] NewTokenMetadataQueryParamsError),
 
-    /// A general RPC error occured.
+    /// A general RPC error occurred.
     #[error("RPC error: {0}")]
     RPCError(#[from] super::v2::QueryError),
 

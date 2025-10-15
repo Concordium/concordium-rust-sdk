@@ -27,7 +27,7 @@ pub enum CredentialLookupError {
     QueryError(#[from] v2::QueryError),
     #[error("Unable to query CIS4 contract: {0}")]
     Cis4QueryError(#[from] Cis4QueryError),
-    #[error("Credential {cred_id} no longer present or of unkown type on account: {account}")]
+    #[error("Credential {cred_id} no longer present or of unknown type on account: {account}")]
     CredentialNotPresentOrUnknown {
         cred_id: CredentialRegistrationID,
         account: AccountAddress,

@@ -40,7 +40,7 @@ pub enum Cis3PermitError {
     #[error("Invalid receive name: {0}")]
     InvalidReceiveName(#[from] concordium_contracts_common::NewReceiveNameError),
 
-    /// A general RPC error occured.
+    /// A general RPC error occurred.
     #[error("RPC error: {0}")]
     RPCError(#[from] crate::endpoints::RPCError),
 }
@@ -52,7 +52,7 @@ pub enum Cis3PermitDryRunError {
     #[error("Invalid receive name: {0}")]
     InvalidReceiveName(#[from] concordium_contracts_common::NewReceiveNameError),
 
-    /// A general RPC error occured.
+    /// A general RPC error occurred.
     #[error("RPC error: {0}")]
     RPCError(#[from] crate::endpoints::RPCError),
 
@@ -77,7 +77,7 @@ pub enum Cis3SupportsPermitError {
     #[error("Invalid supportsPermit parameter: {0}")]
     InvalidParams(#[from] NewSupportsPermitQueryParamsError),
 
-    /// A general RPC error occured.
+    /// A general RPC error occurred.
     #[error("RPC error: {0}")]
     RPCError(#[from] super::v2::QueryError),
 

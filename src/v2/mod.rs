@@ -19,6 +19,7 @@ use crate::{
     },
 };
 use anyhow::Context;
+pub use concordium_base::common::upward::{self, Upward};
 use concordium_base::{
     base::{
         AccountIndex, AmountFraction, BlockHeight, CapitalBound, CommissionRanges,
@@ -52,13 +53,11 @@ pub use tonic::{
     transport::{Endpoint, Error},
     Code, Status,
 };
-pub use upward::Upward;
 
 use self::dry_run::WithRemainingQuota;
 
 mod conversions;
 pub mod dry_run;
-pub mod upward;
 #[path = "generated/mod.rs"]
 #[allow(
     clippy::large_enum_variant,
