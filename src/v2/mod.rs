@@ -24,8 +24,8 @@ use concordium_base::{
     base::{
         AccountIndex, AmountFraction, BlockHeight, CapitalBound, CommissionRanges,
         CredentialsPerBlockLimit, DurationSeconds, ElectionDifficulty, Epoch, ExchangeRate,
-        GenesisIndex, InclusiveRange, LeverageFactor, MintDistributionV1, MintRate,
-        PartsPerHundredThousands, UpdatePublicKey,
+        GenesisIndex, InclusiveRange, LeverageFactor, MintRate, PartsPerHundredThousands,
+        UpdatePublicKey,
     },
     common::{
         self,
@@ -38,8 +38,7 @@ use concordium_base::{
     hashes::HashFromStrError,
     transactions::{BlockItem, EncodedPayload, PayloadLike},
     updates::{
-        self, AccessStructure, AuthorizationsV0, AuthorizationsV1, GASRewards, GASRewardsV1,
-        HigherLevelAccessStructure, Level1KeysKind, PoolParameters, RewardPeriodLength,
+        AccessStructure, HigherLevelAccessStructure, Level1KeysKind, RewardPeriodLength,
         RootKeysKind,
     },
 };
@@ -390,7 +389,7 @@ pub enum MintDistributionConversionError {
     MissingField(&'static str),
 }
 
-impl TryFrom<MintDistribution> for MintDistributionV1 {
+impl TryFrom<MintDistribution> for types::MintDistributionV1 {
     type Error = MintDistributionConversionError;
     fn try_from(value: MintDistribution) -> Result<Self, Self::Error> {
         let baking_reward =
@@ -430,7 +429,7 @@ pub enum TransactionFeeDistributionConversionError {
     MissingFields(&'static str),
 }
 
-impl TryFrom<TransactionFeeDistribution> for concordium_base::updates::TransactionFeeDistribution {
+impl TryFrom<TransactionFeeDistribution> for types::TransactionFeeDistribution {
     type Error = TransactionFeeDistributionConversionError;
     fn try_from(value: TransactionFeeDistribution) -> Result<Self, Self::Error> {
         let baker = value
@@ -482,7 +481,7 @@ pub enum GASRewardsConversionError {
     MissingField(&'static str),
 }
 
-impl TryFrom<GasRewards> for GASRewards {
+impl TryFrom<GasRewards> for types::GASRewards {
     type Error = GASRewardsConversionError;
     fn try_from(value: GasRewards) -> Result<Self, Self::Error> {
         let baker = value
@@ -509,7 +508,7 @@ impl TryFrom<GasRewards> for GASRewards {
     }
 }
 
-impl TryFrom<GasRewards> for GASRewardsV1 {
+impl TryFrom<GasRewards> for types::GASRewardsV1 {
     type Error = GASRewardsConversionError;
     fn try_from(value: GasRewards) -> Result<Self, Self::Error> {
         let baker = value
@@ -569,7 +568,7 @@ pub enum StakingParametersConversionError {
     MissingField(&'static str),
 }
 
-impl TryFrom<StakingParameters> for PoolParameters {
+impl TryFrom<StakingParameters> for types::PoolParameters {
     type Error = StakingParametersConversionError;
     fn try_from(value: StakingParameters) -> Result<Self, Self::Error> {
         let passive_finalization_commission = value.passive_finalization_commission.ok_or(
@@ -690,7 +689,7 @@ pub enum Level2KeysConversionError {
     MissingField(&'static str),
 }
 
-impl TryFrom<Level2Keys> for AuthorizationsV0 {
+impl TryFrom<Level2Keys> for types::AuthorizationsV0 {
     type Error = Level2KeysConversionError;
 
     fn try_from(value: Level2Keys) -> Result<Self, Self::Error> {
@@ -768,7 +767,7 @@ impl TryFrom<Level2Keys> for AuthorizationsV0 {
     }
 }
 
-impl TryFrom<Level2Keys> for AuthorizationsV1 {
+impl TryFrom<Level2Keys> for types::AuthorizationsV1 {
     type Error = Level2KeysConversionError;
 
     fn try_from(mut value: Level2Keys) -> Result<Self, Self::Error> {
@@ -784,7 +783,7 @@ impl TryFrom<Level2Keys> for AuthorizationsV1 {
             .take()
             .ok_or(Level2KeysConversionError::MissingField("time_parameters"))?;
         let create_plt = value.create_plt.take();
-        let v0: AuthorizationsV0 = value.try_into()?;
+        let v0: types::AuthorizationsV0 = value.try_into()?;
         Ok(Self {
             v0,
             cooldown_parameters,
@@ -826,7 +825,7 @@ pub enum TimeoutParametersConversionError {
     MissingField(&'static str),
 }
 
-impl TryFrom<TimeoutParameters> for concordium_base::updates::TimeoutParameters {
+impl TryFrom<TimeoutParameters> for types::TimeoutParameters {
     type Error = TimeoutParametersConversionError;
     fn try_from(value: TimeoutParameters) -> Result<Self, Self::Error> {
         let base = value
@@ -870,7 +869,7 @@ pub enum CooldownParametersConversionError {
     MissingField(&'static str),
 }
 
-impl TryFrom<CooldownParameters> for updates::CooldownParameters {
+impl TryFrom<CooldownParameters> for types::CooldownParameters {
     type Error = CooldownParametersConversionError;
     fn try_from(value: CooldownParameters) -> Result<Self, Self::Error> {
         let pool_owner_cooldown =
@@ -914,9 +913,7 @@ pub enum FinalizationCommitteeParametersConversionError {
     MissingField(&'static str),
 }
 
-impl TryFrom<FinalizationCommitteeParameters>
-    for concordium_base::updates::FinalizationCommitteeParameters
-{
+impl TryFrom<FinalizationCommitteeParameters> for types::FinalizationCommitteeParameters {
     type Error = FinalizationCommitteeParametersConversionError;
     fn try_from(value: FinalizationCommitteeParameters) -> Result<Self, Self::Error> {
         let min_finalizers = value.min_finalizers.ok_or(
