@@ -111,7 +111,11 @@
   - `v2::CooldownParameters` (convertible to `types::CooldownParameters`);
   - `v2::FinalizationCommitteeParameters` (convertible to `types::FinalizationCommitteeParameters`).
 - `v2::EnergyRate` with `ccd_cost` for computing Energy costs in CCD.
-- BREAKING: `v2::ChainParameters` no longer provides `micro_cd_per_energy`, which is replaced by `energy_rate`; `ccd_cost` is also removed, which should be replaced by calling `ccd_cost` on the energy rate instead; the `foundation_account` getter function is removed, and should be replaced by direct access to the `foundation_account` field.
+- BREAKING: Changes to `v2::ChainParameters`:
+  - no longer provides `micro_cd_per_energy`, which is replaced by `energy_rate`;
+  - `ccd_cost` is removed, which should be replaced by calling `ccd_cost` on the energy rate instead;
+  - the `foundation_account` getter function is removed, and should be replaced by direct access to the `foundation_account` field;
+  - `common_update_keys` is removed, and instead `keys.level_2_keys` should be used, which can be used to construct an `UpdateSigner`, or converted to `types::AuthorizationsV0`.
 
 ## 7.0.0
 
