@@ -675,11 +675,7 @@ impl Level2Keys {
         update_key_indices: &AccessStructure,
         actual_keys: impl IntoIterator<Item = concordium_base::base::UpdateKeyPair>,
     ) -> Option<impl concordium_base::updates::UpdateSigner> {
-        concordium_base::updates::construct_update_signer_worker(
-            &self.keys,
-            update_key_indices,
-            actual_keys,
-        )
+        concordium_base::updates::find_authorized_keys(&self.keys, update_key_indices, actual_keys)
     }
 }
 
