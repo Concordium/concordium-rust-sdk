@@ -53,12 +53,18 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Could not obtain chain parameters")?;
 
-    // find the key indices to sign with
-    let signer = params
+    let keys = params
         .response
-        .common_update_keys()
+        .keys
+        .level_2_keys
+        .context("No level 2 keys in chain parameters.")?;
+
+    // find the key indices to sign with
+    let signer = keys
         .construct_update_signer(
-            &params.response.common_update_keys().micro_gtu_per_euro,
+            keys.micro_ccd_per_euro
+                .as_ref()
+                .context("Missing uCCD:EUR exchange rate update keys.")?,
             kps,
         )
         .context("Invalid keys supplied.")?;
@@ -69,12 +75,10 @@ async fn main() -> anyhow::Result<()> {
         .response
         .micro_ccd_per_euro;
 
-    let exchange_rate = match &params.response {
-        v2::ChainParameters::V0(v0) => v0.micro_ccd_per_euro,
-        v2::ChainParameters::V1(v1) => v1.micro_ccd_per_euro,
-        v2::ChainParameters::V2(v2) => v2.micro_ccd_per_euro,
-        v2::ChainParameters::V3(v3) => v3.micro_ccd_per_euro,
-    };
+    let exchange_rate = params
+        .response
+        .micro_ccd_per_euro
+        .context("No exchange rate in chain parameters.")?;
 
     let effective_time = 0.into(); // immediate effect
     let timeout =

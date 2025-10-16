@@ -99,10 +99,19 @@ async fn main() -> anyhow::Result<()> {
         .context("Could not obtain chain parameters.")?
         .response;
 
+    let keys = summary
+        .keys
+        .level_2_keys
+        .context("No level 2 keys in chain parameters.")?;
+
     // find the key indices to sign with
-    let signer = summary
-        .common_update_keys()
-        .construct_update_signer(&summary.common_update_keys().protocol, kps)
+    let signer = keys
+        .construct_update_signer(
+            keys.protocol
+                .as_ref()
+                .context("Missing protocol update keys")?,
+            kps,
+        )
         .context("Could not construct signer.")?;
 
     let mut seq_number = client
@@ -134,6 +143,8 @@ async fn main() -> anyhow::Result<()> {
         specification_auxiliary_data: Vec::new(),
     };
 
+    let pool_parameters_keys = keys.pool_parameters.context("Missing pool parameters")?;
+
     let params_p4 = ProtocolUpdateDataP4 {
         update_default_commission_rate: CommissionRates {
             finalization: "1".parse().unwrap(),
@@ -141,14 +152,8 @@ async fn main() -> anyhow::Result<()> {
             transaction: "0.1".parse().unwrap(),
         },
         update_default_pool_state: OpenStatus::OpenForAll,
-        update_cooldown_parameters_access_structure: summary
-            .common_update_keys()
-            .pool_parameters
-            .clone(),
-        update_time_parameters_access_structure: summary
-            .common_update_keys()
-            .pool_parameters
-            .clone(),
+        update_cooldown_parameters_access_structure: pool_parameters_keys.clone(),
+        update_time_parameters_access_structure: pool_parameters_keys.clone(),
         update_cooldown_parameters: CooldownParameters {
             pool_owner_cooldown: 1800.into(),
             delegator_cooldown: 900.into(),
