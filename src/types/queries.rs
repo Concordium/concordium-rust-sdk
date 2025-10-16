@@ -28,6 +28,23 @@ use std::net::IpAddr;
 #[repr(transparent)]
 pub struct ProtocolVersionInt(pub u64);
 
+/// from ProtocolVersion enum conversion to ProtocolVersionInt
+impl ProtocolVersionInt {
+    pub const fn from_enum(protocol_version: ProtocolVersion) -> Self {
+        match protocol_version {
+            ProtocolVersion::P1 => Self(1),
+            ProtocolVersion::P2 => Self(2),
+            ProtocolVersion::P3 => Self(3),
+            ProtocolVersion::P4 => Self(4),
+            ProtocolVersion::P5 => Self(5),
+            ProtocolVersion::P6 => Self(6),
+            ProtocolVersion::P7 => Self(7),
+            ProtocolVersion::P8 => Self(8),
+            ProtocolVersion::P9 => Self(9),
+        }
+    }
+}
+
 impl TryFrom<ProtocolVersionInt> for ProtocolVersion {
     type Error = UnknownProtocolVersion;
 
