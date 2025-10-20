@@ -2757,7 +2757,7 @@ impl TryFrom<ChainParametersV0> for super::ChainParameters {
 
     fn try_from(value: ChainParametersV0) -> Result<Self, Self::Error> {
         Ok(Self {
-            timeout_parameters: None,
+            timeout_parameters: Default::default(),
             election_difficulty: value
                 .election_difficulty
                 .map(TryInto::try_into)
@@ -2775,31 +2775,36 @@ impl TryFrom<ChainParametersV0> for super::ChainParameters {
                     baker_cooldown_epochs: Some(bce.into()),
                     pool_owner_cooldown: None,
                     delegator_cooldown: None,
-                }),
+                })
+                .unwrap_or_default(),
             reward_period_length: None,
             mint_per_payday: None,
             mint_per_slot: value
                 .mint_distribution
                 .and_then(|md| md.mint_per_slot.map(TryInto::try_into))
                 .transpose()?,
-            mint_distribution: value.mint_distribution.map(Into::into),
+            mint_distribution: value.mint_distribution.map(Into::into).unwrap_or_default(),
             account_creation_limit: value
                 .account_creation_limit
                 .map(TryInto::try_into)
                 .transpose()?,
-            transaction_fee_distribution: value.transaction_fee_distribution.map(Into::into),
-            gas_rewards: value.gas_rewards.map(Into::into),
+            transaction_fee_distribution: value
+                .transaction_fee_distribution
+                .map(Into::into)
+                .unwrap_or_default(),
+            gas_rewards: value.gas_rewards.map(Into::into).unwrap_or_default(),
             foundation_account: value
                 .foundation_account
                 .map(TryInto::try_into)
                 .transpose()?,
-            staking_parameters: value.minimum_threshold_for_baking.map(|mtfb| {
-                super::StakingParameters {
+            staking_parameters: value
+                .minimum_threshold_for_baking
+                .map(|mtfb| super::StakingParameters {
                     minimum_equity_capital: Some(mtfb.into()),
                     ..Default::default()
-                }
-            }),
-            finalization_committee_parameters: None,
+                })
+                .unwrap_or_default(),
+            finalization_committee_parameters: Default::default(),
             validator_max_missed_rounds: None,
 
             keys: super::UpdateKeys {
@@ -2816,7 +2821,7 @@ impl TryFrom<ChainParametersV1> for super::ChainParameters {
 
     fn try_from(value: ChainParametersV1) -> Result<Self, Self::Error> {
         Ok(Self {
-            timeout_parameters: None,
+            timeout_parameters: Default::default(),
             election_difficulty: value
                 .election_difficulty
                 .map(TryInto::try_into)
@@ -2828,7 +2833,10 @@ impl TryFrom<ChainParametersV1> for super::ChainParameters {
                 .micro_ccd_per_euro
                 .map(TryInto::try_into)
                 .transpose()?,
-            cooldown_parameters: value.cooldown_parameters.map(Into::into),
+            cooldown_parameters: value
+                .cooldown_parameters
+                .map(Into::into)
+                .unwrap_or_default(),
             reward_period_length: value
                 .time_parameters
                 .as_ref()
@@ -2844,15 +2852,22 @@ impl TryFrom<ChainParametersV1> for super::ChainParameters {
                 .account_creation_limit
                 .map(TryInto::try_into)
                 .transpose()?,
-            mint_distribution: value.mint_distribution.map(Into::into),
-            transaction_fee_distribution: value.transaction_fee_distribution.map(Into::into),
-            gas_rewards: value.gas_rewards.map(Into::into),
+            mint_distribution: value.mint_distribution.map(Into::into).unwrap_or_default(),
+            transaction_fee_distribution: value
+                .transaction_fee_distribution
+                .map(Into::into)
+                .unwrap_or_default(),
+            gas_rewards: value.gas_rewards.map(Into::into).unwrap_or_default(),
             foundation_account: value
                 .foundation_account
                 .map(TryInto::try_into)
                 .transpose()?,
-            staking_parameters: value.pool_parameters.map(TryInto::try_into).transpose()?,
-            finalization_committee_parameters: None,
+            staking_parameters: value
+                .pool_parameters
+                .map(TryInto::try_into)
+                .transpose()?
+                .unwrap_or_default(),
+            finalization_committee_parameters: Default::default(),
             validator_max_missed_rounds: None,
             keys: super::UpdateKeys {
                 root_keys: value.root_keys.map(TryInto::try_into).transpose()?,
@@ -2872,7 +2887,8 @@ impl TryFrom<ChainParametersV2> for super::ChainParameters {
                 .consensus_parameters
                 .as_ref()
                 .and_then(|cp| cp.timeout_parameters.map(TryInto::try_into))
-                .transpose()?,
+                .transpose()?
+                .unwrap_or_default(),
             election_difficulty: None,
             min_block_time: value
                 .consensus_parameters
@@ -2887,7 +2903,10 @@ impl TryFrom<ChainParametersV2> for super::ChainParameters {
                 .micro_ccd_per_euro
                 .map(TryInto::try_into)
                 .transpose()?,
-            cooldown_parameters: value.cooldown_parameters.map(Into::into),
+            cooldown_parameters: value
+                .cooldown_parameters
+                .map(Into::into)
+                .unwrap_or_default(),
             reward_period_length: value
                 .time_parameters
                 .as_ref()
@@ -2903,17 +2922,25 @@ impl TryFrom<ChainParametersV2> for super::ChainParameters {
                 .account_creation_limit
                 .map(TryInto::try_into)
                 .transpose()?,
-            mint_distribution: value.mint_distribution.map(Into::into),
-            transaction_fee_distribution: value.transaction_fee_distribution.map(Into::into),
-            gas_rewards: value.gas_rewards.map(Into::into),
+            mint_distribution: value.mint_distribution.map(Into::into).unwrap_or_default(),
+            transaction_fee_distribution: value
+                .transaction_fee_distribution
+                .map(Into::into)
+                .unwrap_or_default(),
+            gas_rewards: value.gas_rewards.map(Into::into).unwrap_or_default(),
             foundation_account: value
                 .foundation_account
                 .map(TryInto::try_into)
                 .transpose()?,
-            staking_parameters: value.pool_parameters.map(TryInto::try_into).transpose()?,
+            staking_parameters: value
+                .pool_parameters
+                .map(TryInto::try_into)
+                .transpose()?
+                .unwrap_or_default(),
             finalization_committee_parameters: value
                 .finalization_committee_parameters
-                .map(Into::into),
+                .map(Into::into)
+                .unwrap_or_default(),
             validator_max_missed_rounds: None,
             keys: super::UpdateKeys {
                 root_keys: value.root_keys.map(TryInto::try_into).transpose()?,
@@ -2933,7 +2960,8 @@ impl TryFrom<ChainParametersV3> for super::ChainParameters {
                 .consensus_parameters
                 .as_ref()
                 .and_then(|cp| cp.timeout_parameters.map(TryInto::try_into))
-                .transpose()?,
+                .transpose()?
+                .unwrap_or_default(),
             election_difficulty: None,
             min_block_time: value
                 .consensus_parameters
@@ -2948,7 +2976,10 @@ impl TryFrom<ChainParametersV3> for super::ChainParameters {
                 .micro_ccd_per_euro
                 .map(TryInto::try_into)
                 .transpose()?,
-            cooldown_parameters: value.cooldown_parameters.map(Into::into),
+            cooldown_parameters: value
+                .cooldown_parameters
+                .map(Into::into)
+                .unwrap_or_default(),
             reward_period_length: value
                 .time_parameters
                 .as_ref()
@@ -2964,17 +2995,25 @@ impl TryFrom<ChainParametersV3> for super::ChainParameters {
                 .account_creation_limit
                 .map(TryInto::try_into)
                 .transpose()?,
-            mint_distribution: value.mint_distribution.map(Into::into),
-            transaction_fee_distribution: value.transaction_fee_distribution.map(Into::into),
-            gas_rewards: value.gas_rewards.map(Into::into),
+            mint_distribution: value.mint_distribution.map(Into::into).unwrap_or_default(),
+            transaction_fee_distribution: value
+                .transaction_fee_distribution
+                .map(Into::into)
+                .unwrap_or_default(),
+            gas_rewards: value.gas_rewards.map(Into::into).unwrap_or_default(),
             foundation_account: value
                 .foundation_account
                 .map(TryInto::try_into)
                 .transpose()?,
-            staking_parameters: value.pool_parameters.map(TryInto::try_into).transpose()?,
+            staking_parameters: value
+                .pool_parameters
+                .map(TryInto::try_into)
+                .transpose()?
+                .unwrap_or_default(),
             finalization_committee_parameters: value
                 .finalization_committee_parameters
-                .map(Into::into),
+                .map(Into::into)
+                .unwrap_or_default(),
             validator_max_missed_rounds: value
                 .validator_score_parameters
                 .map(|vsp| vsp.maximum_missed_rounds),
@@ -4516,17 +4555,17 @@ mod test {
         let converted = crate::v2::ChainParameters::try_from(params)
             .expect("Failed to convert chain parameters v0");
         let expected = crate::v2::ChainParameters {
-            timeout_parameters: None,
+            timeout_parameters: Default::default(),
             election_difficulty: Some(base::ElectionDifficulty::new_unchecked(11111)),
             min_block_time: None,
             block_energy_limit: None,
             euro_per_energy: Some(base::ExchangeRate::new_unchecked(13, 17)),
             micro_ccd_per_euro: Some(base::ExchangeRate::new_unchecked(19, 23)),
-            cooldown_parameters: Some(crate::v2::CooldownParameters {
+            cooldown_parameters: crate::v2::CooldownParameters {
                 baker_cooldown_epochs: Some(base::Epoch::from(29)),
                 pool_owner_cooldown: None,
                 delegator_cooldown: None,
-            }),
+            },
             reward_period_length: None,
             mint_per_payday: None,
             mint_per_slot: Some(base::MintRate {
@@ -4534,26 +4573,26 @@ mod test {
                 exponent: 41,
             }),
             account_creation_limit: Some(base::CredentialsPerBlockLimit::from(31)),
-            mint_distribution: Some(crate::v2::MintDistribution {
+            mint_distribution: crate::v2::MintDistribution {
                 baking_reward: Some(base::AmountFraction::new_unchecked(43)),
                 finalization_reward: Some(base::AmountFraction::new_unchecked(47)),
-            }),
-            transaction_fee_distribution: Some(crate::v2::TransactionFeeDistribution {
+            },
+            transaction_fee_distribution: crate::v2::TransactionFeeDistribution {
                 baker: Some(base::AmountFraction::new_unchecked(53)),
                 gas_account: Some(base::AmountFraction::new_unchecked(59)),
-            }),
-            gas_rewards: Some(crate::v2::GasRewards {
+            },
+            gas_rewards: crate::v2::GasRewards {
                 baker: Some(base::AmountFraction::new_unchecked(61)),
                 finalization_proof: Some(base::AmountFraction::new_unchecked(67)),
                 account_creation: Some(base::AmountFraction::new_unchecked(71)),
                 chain_update: Some(base::AmountFraction::new_unchecked(73)),
-            }),
+            },
             foundation_account: Some(contracts_common::AccountAddress([79u8; 32])),
-            staking_parameters: Some(crate::v2::StakingParameters {
+            staking_parameters: crate::v2::StakingParameters {
                 minimum_equity_capital: Some(contracts_common::Amount::from_micro_ccd(83)),
                 ..Default::default()
-            }),
-            finalization_committee_parameters: None,
+            },
+            finalization_committee_parameters: Default::default(),
             validator_max_missed_rounds: None,
             keys: crate::v2::UpdateKeys {
                 root_keys: Some(concordium_base::updates::HigherLevelAccessStructure::<
@@ -4851,17 +4890,17 @@ mod test {
         let converted = crate::v2::ChainParameters::try_from(params)
             .expect("Failed to convert chain parameters v1");
         let expected = crate::v2::ChainParameters {
-            timeout_parameters: None,
+            timeout_parameters: Default::default(),
             election_difficulty: Some(base::ElectionDifficulty::new_unchecked(21111)),
             min_block_time: None,
             block_energy_limit: None,
             euro_per_energy: Some(base::ExchangeRate::new_unchecked(2, 3)),
             micro_ccd_per_euro: Some(base::ExchangeRate::new_unchecked(4, 5)),
-            cooldown_parameters: Some(crate::v2::CooldownParameters {
+            cooldown_parameters: crate::v2::CooldownParameters {
                 baker_cooldown_epochs: None,
                 pool_owner_cooldown: Some(base::DurationSeconds::from(6)),
                 delegator_cooldown: Some(base::DurationSeconds::from(7)),
-            }),
+            },
             reward_period_length: Some(updates::RewardPeriodLength::from(base::Epoch::from(8))),
             mint_per_payday: Some(base::MintRate {
                 mantissa: 9,
@@ -4869,22 +4908,22 @@ mod test {
             }),
             mint_per_slot: None,
             account_creation_limit: Some(base::CredentialsPerBlockLimit::from(11)),
-            mint_distribution: Some(crate::v2::MintDistribution {
+            mint_distribution: crate::v2::MintDistribution {
                 baking_reward: Some(base::AmountFraction::new_unchecked(12)),
                 finalization_reward: Some(base::AmountFraction::new_unchecked(13)),
-            }),
-            transaction_fee_distribution: Some(crate::v2::TransactionFeeDistribution {
+            },
+            transaction_fee_distribution: crate::v2::TransactionFeeDistribution {
                 baker: Some(base::AmountFraction::new_unchecked(14)),
                 gas_account: Some(base::AmountFraction::new_unchecked(15)),
-            }),
-            gas_rewards: Some(crate::v2::GasRewards {
+            },
+            gas_rewards: crate::v2::GasRewards {
                 baker: Some(base::AmountFraction::new_unchecked(16)),
                 finalization_proof: Some(base::AmountFraction::new_unchecked(17)),
                 account_creation: Some(base::AmountFraction::new_unchecked(18)),
                 chain_update: Some(base::AmountFraction::new_unchecked(19)),
-            }),
+            },
             foundation_account: Some(contracts_common::AccountAddress([20u8; 32])),
-            staking_parameters: Some(crate::v2::StakingParameters {
+            staking_parameters: crate::v2::StakingParameters {
                 passive_finalization_commission: Some(base::AmountFraction::new_unchecked(21)),
                 passive_baking_commission: Some(base::AmountFraction::new_unchecked(22)),
                 passive_transaction_commission: Some(base::AmountFraction::new_unchecked(23)),
@@ -4908,8 +4947,8 @@ mod test {
                     numerator: 33,
                     denominator: 32,
                 }),
-            }),
-            finalization_committee_parameters: None,
+            },
+            finalization_committee_parameters: Default::default(),
             validator_max_missed_rounds: None,
             keys: crate::v2::UpdateKeys {
                 root_keys: Some(concordium_base::updates::HigherLevelAccessStructure::<
@@ -5227,7 +5266,7 @@ mod test {
         let converted = crate::v2::ChainParameters::try_from(params)
             .expect("Failed to convert chain parameters v1");
         let expected = crate::v2::ChainParameters {
-            timeout_parameters: Some(crate::v2::TimeoutParameters {
+            timeout_parameters: crate::v2::TimeoutParameters {
                 base: Some(contracts_common::Duration::from_millis(500)),
                 increase: Some(concordium_base::common::types::Ratio::new_unchecked(
                     502, 501,
@@ -5235,17 +5274,17 @@ mod test {
                 decrease: Some(concordium_base::common::types::Ratio::new_unchecked(
                     503, 504,
                 )),
-            }),
+            },
             election_difficulty: None,
             min_block_time: Some(contracts_common::Duration::from_millis(505)),
             block_energy_limit: Some(base::Energy::from(506)),
             euro_per_energy: Some(base::ExchangeRate::new_unchecked(2, 3)),
             micro_ccd_per_euro: Some(base::ExchangeRate::new_unchecked(4, 5)),
-            cooldown_parameters: Some(crate::v2::CooldownParameters {
+            cooldown_parameters: crate::v2::CooldownParameters {
                 baker_cooldown_epochs: None,
                 pool_owner_cooldown: Some(base::DurationSeconds::from(6)),
                 delegator_cooldown: Some(base::DurationSeconds::from(7)),
-            }),
+            },
             reward_period_length: Some(updates::RewardPeriodLength::from(base::Epoch::from(8))),
             mint_per_payday: Some(base::MintRate {
                 mantissa: 9,
@@ -5253,22 +5292,22 @@ mod test {
             }),
             mint_per_slot: None,
             account_creation_limit: Some(base::CredentialsPerBlockLimit::from(11)),
-            mint_distribution: Some(crate::v2::MintDistribution {
+            mint_distribution: crate::v2::MintDistribution {
                 baking_reward: Some(base::AmountFraction::new_unchecked(12)),
                 finalization_reward: Some(base::AmountFraction::new_unchecked(13)),
-            }),
-            transaction_fee_distribution: Some(crate::v2::TransactionFeeDistribution {
+            },
+            transaction_fee_distribution: crate::v2::TransactionFeeDistribution {
                 baker: Some(base::AmountFraction::new_unchecked(14)),
                 gas_account: Some(base::AmountFraction::new_unchecked(15)),
-            }),
-            gas_rewards: Some(crate::v2::GasRewards {
+            },
+            gas_rewards: crate::v2::GasRewards {
                 baker: Some(base::AmountFraction::new_unchecked(16)),
                 finalization_proof: None,
                 account_creation: Some(base::AmountFraction::new_unchecked(18)),
                 chain_update: Some(base::AmountFraction::new_unchecked(19)),
-            }),
+            },
             foundation_account: Some(contracts_common::AccountAddress([20u8; 32])),
-            staking_parameters: Some(crate::v2::StakingParameters {
+            staking_parameters: crate::v2::StakingParameters {
                 passive_finalization_commission: Some(base::AmountFraction::new_unchecked(21)),
                 passive_baking_commission: Some(base::AmountFraction::new_unchecked(22)),
                 passive_transaction_commission: Some(base::AmountFraction::new_unchecked(23)),
@@ -5292,14 +5331,14 @@ mod test {
                     numerator: 33,
                     denominator: 32,
                 }),
-            }),
-            finalization_committee_parameters: Some(crate::v2::FinalizationCommitteeParameters {
+            },
+            finalization_committee_parameters: crate::v2::FinalizationCommitteeParameters {
                 min_finalizers: Some(601),
                 max_finalizers: Some(602),
                 finalizers_relative_stake_threshold: Some(PartsPerHundredThousands::new_unchecked(
                     603,
                 )),
-            }),
+            },
             validator_max_missed_rounds: None,
             keys: crate::v2::UpdateKeys {
                 root_keys: Some(concordium_base::updates::HigherLevelAccessStructure::<
@@ -5626,7 +5665,7 @@ mod test {
         let converted = crate::v2::ChainParameters::try_from(params)
             .expect("Failed to convert chain parameters v1");
         let expected = crate::v2::ChainParameters {
-            timeout_parameters: Some(crate::v2::TimeoutParameters {
+            timeout_parameters: crate::v2::TimeoutParameters {
                 base: Some(contracts_common::Duration::from_millis(500)),
                 increase: Some(concordium_base::common::types::Ratio::new_unchecked(
                     502, 501,
@@ -5634,17 +5673,17 @@ mod test {
                 decrease: Some(concordium_base::common::types::Ratio::new_unchecked(
                     503, 504,
                 )),
-            }),
+            },
             election_difficulty: None,
             min_block_time: Some(contracts_common::Duration::from_millis(505)),
             block_energy_limit: Some(base::Energy::from(506)),
             euro_per_energy: Some(base::ExchangeRate::new_unchecked(2, 3)),
             micro_ccd_per_euro: Some(base::ExchangeRate::new_unchecked(4, 5)),
-            cooldown_parameters: Some(crate::v2::CooldownParameters {
+            cooldown_parameters: crate::v2::CooldownParameters {
                 baker_cooldown_epochs: None,
                 pool_owner_cooldown: Some(base::DurationSeconds::from(6)),
                 delegator_cooldown: Some(base::DurationSeconds::from(7)),
-            }),
+            },
             reward_period_length: Some(updates::RewardPeriodLength::from(base::Epoch::from(8))),
             mint_per_payday: Some(base::MintRate {
                 mantissa: 9,
@@ -5652,22 +5691,22 @@ mod test {
             }),
             mint_per_slot: None,
             account_creation_limit: Some(base::CredentialsPerBlockLimit::from(11)),
-            mint_distribution: Some(crate::v2::MintDistribution {
+            mint_distribution: crate::v2::MintDistribution {
                 baking_reward: Some(base::AmountFraction::new_unchecked(12)),
                 finalization_reward: Some(base::AmountFraction::new_unchecked(13)),
-            }),
-            transaction_fee_distribution: Some(crate::v2::TransactionFeeDistribution {
+            },
+            transaction_fee_distribution: crate::v2::TransactionFeeDistribution {
                 baker: Some(base::AmountFraction::new_unchecked(14)),
                 gas_account: Some(base::AmountFraction::new_unchecked(15)),
-            }),
-            gas_rewards: Some(crate::v2::GasRewards {
+            },
+            gas_rewards: crate::v2::GasRewards {
                 baker: Some(base::AmountFraction::new_unchecked(16)),
                 finalization_proof: None,
                 account_creation: Some(base::AmountFraction::new_unchecked(18)),
                 chain_update: Some(base::AmountFraction::new_unchecked(19)),
-            }),
+            },
             foundation_account: Some(contracts_common::AccountAddress([20u8; 32])),
-            staking_parameters: Some(crate::v2::StakingParameters {
+            staking_parameters: crate::v2::StakingParameters {
                 passive_finalization_commission: Some(base::AmountFraction::new_unchecked(21)),
                 passive_baking_commission: Some(base::AmountFraction::new_unchecked(22)),
                 passive_transaction_commission: Some(base::AmountFraction::new_unchecked(23)),
@@ -5691,14 +5730,14 @@ mod test {
                     numerator: 33,
                     denominator: 32,
                 }),
-            }),
-            finalization_committee_parameters: Some(crate::v2::FinalizationCommitteeParameters {
+            },
+            finalization_committee_parameters: crate::v2::FinalizationCommitteeParameters {
                 min_finalizers: Some(601),
                 max_finalizers: Some(602),
                 finalizers_relative_stake_threshold: Some(PartsPerHundredThousands::new_unchecked(
                     603,
                 )),
-            }),
+            },
             validator_max_missed_rounds: Some(607),
             keys: crate::v2::UpdateKeys {
                 root_keys: Some(concordium_base::updates::HigherLevelAccessStructure::<

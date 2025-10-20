@@ -375,7 +375,7 @@ pub struct FinalizedBlockInfo {
 /// The mint distribution determines how newly-minted CCDs are distributed.
 /// The fractions must sum to at most 1, and the remaining fraction is
 /// allocated to the foundation account.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MintDistribution {
     /// Fraction of newly minted CCD allocated to baker rewards.
     pub baking_reward: Option<AmountFraction>,
@@ -415,7 +415,7 @@ impl TryFrom<MintDistribution> for types::MintDistributionV1 {
 /// These are distributed among the block baker (pool), the GAS account,
 /// and the foundation account. `baker + gas_account <= 1` must hold,
 /// with the remainder going to the foundation account.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TransactionFeeDistribution {
     /// Fraction of transaction fees allocated to the block baker.
     pub baker: Option<AmountFraction>,
@@ -458,7 +458,7 @@ impl TryFrom<TransactionFeeDistribution> for types::TransactionFeeDistribution {
 /// account for the first transaction, and then 1/10 of the remaining 9/10
 /// for the second transaction, resulting in a total of 19/100 of the GAS
 /// account being credited to the baker.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct GasRewards {
     /// `BakerPrevTransFrac`: fraction of the previous gas account paid to the
     /// baker.
@@ -789,7 +789,7 @@ impl TryFrom<Level2Keys> for types::AuthorizationsV1 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct UpdateKeys {
     /// Root keys. Authorized to update the root keys, level 1 keys, and level 2
     /// keys.
@@ -803,7 +803,7 @@ pub struct UpdateKeys {
 
 /// Timeout parameters for the new consensus protocol introduced in protocol
 /// version 6.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TimeoutParameters {
     /// The base timeout duration for blocks.
     pub base: Option<Duration>,
@@ -841,7 +841,7 @@ impl TryFrom<TimeoutParameters> for types::TimeoutParameters {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CooldownParameters {
     /// Extra number of epochs before reduction in stake, or baker
     /// deregistration is completed.
@@ -889,7 +889,7 @@ impl TryFrom<CooldownParameters> for types::CooldownParameters {
 
 /// Finalization committee parameters. These parameters control which validators
 /// are in the finalization committee.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct FinalizationCommitteeParameters {
     /// Minimum number of bakers to include in the finalization committee before
     /// the 'finalizer_relative_stake_threshold' takes effect.
@@ -931,11 +931,11 @@ impl TryFrom<FinalizationCommitteeParameters> for types::FinalizationCommitteePa
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ChainParameters {
     /// Timeout parameters for the consensus protocol introduced in protocol
     /// version 6.
-    pub timeout_parameters: Option<TimeoutParameters>,
+    pub timeout_parameters: TimeoutParameters,
     /// Election difficulty for consensus lottery.
     /// Supported in protocol versions 1 to 5.
     pub election_difficulty: Option<ElectionDifficulty>,
@@ -950,7 +950,7 @@ pub struct ChainParameters {
     /// Micro ccd per euro exchange rate.
     pub micro_ccd_per_euro: Option<ExchangeRate>,
     /// Parameters related to cooldowns when staking.
-    pub cooldown_parameters: Option<CooldownParameters>,
+    pub cooldown_parameters: CooldownParameters,
     /// The length of a reward period (pay day) as a number of epochs.
     /// Supported from protocol version 4.
     pub reward_period_length: Option<RewardPeriodLength>,
@@ -963,20 +963,20 @@ pub struct ChainParameters {
     /// The limit for the number of account creations in a block.
     pub account_creation_limit: Option<CredentialsPerBlockLimit>,
     /// Distribution of newly-minted CCDs.
-    pub mint_distribution: Option<MintDistribution>,
+    pub mint_distribution: MintDistribution,
     /// Parameters related to the distribution of transaction fees.
-    pub transaction_fee_distribution: Option<TransactionFeeDistribution>,
+    pub transaction_fee_distribution: TransactionFeeDistribution,
     /// Parameters related to the distribution of the GAS account.
-    pub gas_rewards: Option<GasRewards>,
+    pub gas_rewards: GasRewards,
     /// Address of the foundation account.
     pub foundation_account: Option<AccountAddress>,
     /// Parameters related to staking and pools.
     /// For protocol versions 1-3 this only contains the minimum threshold
     /// for baking. From protocol version 4, this includes the pool parameters.
-    pub staking_parameters: Option<StakingParameters>,
+    pub staking_parameters: StakingParameters,
     /// The finalization committee parameters.
     /// Supported from protocol version 6.
-    pub finalization_committee_parameters: Option<FinalizationCommitteeParameters>,
+    pub finalization_committee_parameters: FinalizationCommitteeParameters,
     /// Maximum number of consecutive rounds a validator is allowed to miss
     /// without being suspended as a validator.
     /// Supported from protocol version 8.
