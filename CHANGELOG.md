@@ -116,6 +116,7 @@
   - `ccd_cost` is removed, which should be replaced by calling `ccd_cost` on the energy rate instead;
   - the `foundation_account` getter function is removed, and should be replaced by direct access to the `foundation_account` field;
   - `common_update_keys` is removed, and instead `keys.level_2_keys` should be used, which can be used to construct an `UpdateSigner`, or converted to `types::AuthorizationsV0`.
+- BREAKING: The parameter of `PendingUpdateEffect::AddAnonymityRevoker` is now `Box`ed.
 
 ## 7.0.0
 

@@ -324,7 +324,7 @@ pub struct PendingUpdate {
 
 #[derive(Debug, Clone, SerdeSerialize, SerdeDeserialize)]
 #[serde(tag = "updateType", content = "update")]
-#[allow(clippy::large_enum_variant)]
+//#[allow(clippy::large_enum_variant)]
 pub enum PendingUpdateEffect {
     #[serde(rename = "root")]
     RootKeys(HigherLevelAccessStructure<RootKeysKind>),
@@ -357,7 +357,7 @@ pub enum PendingUpdateEffect {
     #[serde(rename = "poolParametersV1")]
     PoolParametersV1(PoolParameters),
     #[serde(rename = "addAnonymityRevoker")]
-    AddAnonymityRevoker(id::types::ArInfo<id::constants::ArCurve>),
+    AddAnonymityRevoker(Box<id::types::ArInfo<id::constants::ArCurve>>),
     #[serde(rename = "addIdentityProvider")]
     AddIdentityProvider(Box<id::types::IpInfo<id::constants::IpPairing>>),
     #[serde(rename = "cooldownParametersV1")]

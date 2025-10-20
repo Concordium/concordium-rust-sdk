@@ -3721,7 +3721,7 @@ impl TryFrom<pending_update::Effect> for super::types::queries::PendingUpdateEff
                 PendingUpdateEffect::PoolParametersV1(pp.try_into()?)
             }
             pending_update::Effect::AddAnonymityRevoker(aar) => {
-                PendingUpdateEffect::AddAnonymityRevoker(aar.try_into()?)
+                PendingUpdateEffect::AddAnonymityRevoker(Box::new(aar.try_into()?))
             }
             pending_update::Effect::AddIdentityProvider(aidp) => {
                 PendingUpdateEffect::AddIdentityProvider(Box::new(aidp.try_into()?))
