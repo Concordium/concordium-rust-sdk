@@ -1,18 +1,16 @@
 //! Functionality for retrieving, verifying, and registering web3id credentials.
 
+use std::collections::BTreeMap;
+
 use crate::{
     cis4::{Cis4Contract, Cis4QueryError},
     v2::{self, BlockIdentifier, IntoBlockIdentifier},
 };
 pub use concordium_base::web3id::*;
 use concordium_base::{
-    base::CredentialRegistrationID,
-    cis4_types::CredentialStatus,
-    contracts_common::AccountAddress,
-    id::{constants::ArCurve, types::IpIdentity},
-    web3id,
+    base::CredentialRegistrationID, cis4_types::CredentialStatus, contracts_common::AccountAddress, id::{constants::{ArCurve, IpPairing}, types::{ArInfos, IpIdentity}}, web3id
 };
-use futures::TryStreamExt;
+use futures::{TryFutureExt, TryStreamExt};
 
 #[derive(thiserror::Error, Debug)]
 pub enum CredentialLookupError {
@@ -46,7 +44,7 @@ pub struct CredentialWithMetadata {
     /// The status of the credential at a point in time.
     pub status: CredentialStatus,
     /// The extra public inputs needed for verification.
-    pub inputs: CredentialsInputs<ArCurve>,
+    pub inputs: CredentialsInputs<IpPairing, ArCurve>,
 }
 
 /// Retrieve and validate credential metadata in a particular block.
@@ -146,6 +144,61 @@ pub async fn verify_credential_metadata(
 
             Ok(CredentialWithMetadata { status, inputs })
         }
+
+        // TODO - Identity handling for credential
+        CredentialMetadata::Identity { issuer, validity } => {
+
+            // get all the identity providers at current block
+            let identity_providers = client.get_identity_providers(bi).await?
+                .response
+                .try_collect::<Vec<_>>()
+                .map_err(|_e| CredentialLookupError::InvalidResponse("Error getting identity providers".into()))
+                .await?;
+
+            // find the matching identity provider info
+            let matching_idp = identity_providers.iter()
+                .find(|idp| {
+                    idp.ip_identity.0 == issuer.0
+                })
+                .ok_or( CredentialLookupError::InvalidResponse("Error occurred while getting matching identity provider".into()))?;
+
+            // get anonymity revokers
+            let anonymity_revokers = client.get_anonymity_revokers(bi).await?.response
+                .try_collect::<Vec<_>>()
+                .map_err(|e| 
+                    CredentialLookupError::InvalidResponse("Error while getting annonymity revokers.".into(),
+                ))
+                .await?;
+
+            // create a new BTreeMap to hold the Anonymity revoker identity -> the anonymity revoker info
+            let mut anonymity_revoker_infos = BTreeMap::new();
+
+            for ar in anonymity_revokers {
+                anonymity_revoker_infos.insert(ar.ar_identity, ar);
+            }
+
+            // build inputs
+            let inputs = CredentialsInputs::Identity { ip_info: matching_idp.clone(), ars_infos: ArInfos { anonymity_revokers: anonymity_revoker_infos } };
+
+            // TODO - change me, probably need to do something similar to how we handle the account - where we check the validity created at and valid to
+            // validity.created_at
+            // validity.valid_to
+            let now = client.get_block_info(bi).await?.response.block_slot_time;
+
+            // TODO temporary dummy status for now
+            let status = CredentialStatus::Active; 
+            /* 
+            let status = if &validity.valid_to.year < YearMonth::now() {
+                CredentialStatus::Expired
+            } else if &validity.valid_to >= YearMonth::now() {
+                CredentialStatus::Active
+            } else {
+                CredentialStatus::NotActivated
+            };
+            */
+            
+            Ok(CredentialWithMetadata { inputs: inputs, status: status})
+        }
     }
 }
 
@@ -160,7 +213,7 @@ pub async fn verify_credential_metadata(
 pub async fn get_public_data(
     client: &mut v2::Client,
     network: web3id::did::Network,
-    presentation: &web3id::Presentation<ArCurve, web3id::Web3IdAttribute>,
+    presentation: &web3id::Presentation<IpPairing, ArCurve, web3id::Web3IdAttribute>,
     bi: impl IntoBlockIdentifier,
 ) -> Result<Vec<CredentialWithMetadata>, CredentialLookupError> {
     let block = bi.into_block_identifier();
