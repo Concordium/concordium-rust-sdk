@@ -364,7 +364,7 @@ impl From<EpochIdentifier> for generated::EpochRequest {
 }
 
 /// Information of a finalized block.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct FinalizedBlockInfo {
     /// The block hash for the finalized block.
     pub block_hash: BlockHash,
@@ -375,7 +375,7 @@ pub struct FinalizedBlockInfo {
 /// The mint distribution determines how newly-minted CCDs are distributed.
 /// The fractions must sum to at most 1, and the remaining fraction is
 /// allocated to the foundation account.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct MintDistribution {
     /// Fraction of newly minted CCD allocated to baker rewards.
     pub baking_reward: Option<AmountFraction>,
@@ -415,7 +415,7 @@ impl TryFrom<MintDistribution> for types::MintDistributionV1 {
 /// These are distributed among the block baker (pool), the GAS account,
 /// and the foundation account. `baker + gas_account <= 1` must hold,
 /// with the remainder going to the foundation account.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct TransactionFeeDistribution {
     /// Fraction of transaction fees allocated to the block baker.
     pub baker: Option<AmountFraction>,
@@ -423,6 +423,7 @@ pub struct TransactionFeeDistribution {
     pub gas_account: Option<AmountFraction>,
 }
 
+/// An error resulting from conversion from [`TransactionFeeDistribution`].
 #[derive(thiserror::Error, Debug)]
 pub enum TransactionFeeDistributionConversionError {
     #[error("missing required field `{0}`")]
@@ -458,7 +459,7 @@ impl TryFrom<TransactionFeeDistribution> for types::TransactionFeeDistribution {
 /// account for the first transaction, and then 1/10 of the remaining 9/10
 /// for the second transaction, resulting in a total of 19/100 of the GAS
 /// account being credited to the baker.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct GasRewards {
     /// `BakerPrevTransFrac`: fraction of the previous gas account paid to the
     /// baker.
@@ -475,30 +476,31 @@ pub struct GasRewards {
     pub chain_update: Option<AmountFraction>,
 }
 
+/// An error resulting from a conversion from [`GasRewards`].
 #[derive(thiserror::Error, Debug)]
-pub enum GASRewardsConversionError {
+pub enum GasRewardsConversionError {
     #[error("missing required field `{0}`")]
     MissingField(&'static str),
 }
 
 impl TryFrom<GasRewards> for types::GASRewards {
-    type Error = GASRewardsConversionError;
+    type Error = GasRewardsConversionError;
     fn try_from(value: GasRewards) -> Result<Self, Self::Error> {
         let baker = value
             .baker
-            .ok_or(GASRewardsConversionError::MissingField("baker"))?;
+            .ok_or(GasRewardsConversionError::MissingField("baker"))?;
         let finalization_proof =
             value
                 .finalization_proof
-                .ok_or(GASRewardsConversionError::MissingField(
+                .ok_or(GasRewardsConversionError::MissingField(
                     "finalization_proof",
                 ))?;
         let account_creation = value
             .account_creation
-            .ok_or(GASRewardsConversionError::MissingField("account_creation"))?;
+            .ok_or(GasRewardsConversionError::MissingField("account_creation"))?;
         let chain_update = value
             .chain_update
-            .ok_or(GASRewardsConversionError::MissingField("chain_update"))?;
+            .ok_or(GasRewardsConversionError::MissingField("chain_update"))?;
         Ok(Self {
             baker,
             finalization_proof,
@@ -509,17 +511,17 @@ impl TryFrom<GasRewards> for types::GASRewards {
 }
 
 impl TryFrom<GasRewards> for types::GASRewardsV1 {
-    type Error = GASRewardsConversionError;
+    type Error = GasRewardsConversionError;
     fn try_from(value: GasRewards) -> Result<Self, Self::Error> {
         let baker = value
             .baker
-            .ok_or(GASRewardsConversionError::MissingField("baker"))?;
+            .ok_or(GasRewardsConversionError::MissingField("baker"))?;
         let account_creation = value
             .account_creation
-            .ok_or(GASRewardsConversionError::MissingField("account_creation"))?;
+            .ok_or(GasRewardsConversionError::MissingField("account_creation"))?;
         let chain_update = value
             .chain_update
-            .ok_or(GASRewardsConversionError::MissingField("chain_update"))?;
+            .ok_or(GasRewardsConversionError::MissingField("chain_update"))?;
         Ok(Self {
             baker,
             account_creation,
@@ -530,7 +532,7 @@ impl TryFrom<GasRewards> for types::GASRewardsV1 {
 
 /// Parameters related to staking and pools. This generalizes the
 /// "minimum threshold for baking" and the "pool parameters".
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct StakingParameters {
     /// Fraction of finalization rewards charged by the passive delegation.
     /// Supported from protocol version 4.
@@ -562,6 +564,7 @@ pub struct StakingParameters {
     pub leverage_bound: Option<LeverageFactor>,
 }
 
+/// An error resulting from conversion from [`StakingParameters`].
 #[derive(thiserror::Error, Debug)]
 pub enum StakingParametersConversionError {
     #[error("missing required field `{0}`")]
@@ -628,7 +631,7 @@ impl TryFrom<StakingParameters> for types::PoolParameters {
 }
 
 /// The keys and authorizations for level 2 chain updates.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Level2Keys {
     pub keys: Vec<UpdatePublicKey>,
     /// Access structure for emergency updates.
@@ -679,6 +682,7 @@ impl Level2Keys {
     }
 }
 
+/// An error resulting from a conversion from [`Level2Keys`].
 #[derive(thiserror::Error, Debug)]
 pub enum Level2KeysConversionError {
     #[error("missing required field `{0}`")]
@@ -789,7 +793,8 @@ impl TryFrom<Level2Keys> for types::AuthorizationsV1 {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+/// The public keys used for performing chain updates.
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct UpdateKeys {
     /// Root keys. Authorized to update the root keys, level 1 keys, and level 2
     /// keys.
@@ -803,7 +808,7 @@ pub struct UpdateKeys {
 
 /// Timeout parameters for the new consensus protocol introduced in protocol
 /// version 6.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct TimeoutParameters {
     /// The base timeout duration for blocks.
     pub base: Option<Duration>,
@@ -815,6 +820,7 @@ pub struct TimeoutParameters {
     pub decrease: Option<Ratio>,
 }
 
+/// An error resulting from conversion from [`TimeoutParameters`].
 #[derive(thiserror::Error, Debug)]
 pub enum TimeoutParametersConversionError {
     #[error("missing required field `{0}`")]
@@ -841,7 +847,9 @@ impl TryFrom<TimeoutParameters> for types::TimeoutParameters {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+/// The parameters that affect cooldown, i.e., the period of time between
+/// stake being reduced and the stake becoming available to spend.
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct CooldownParameters {
     /// Extra number of epochs before reduction in stake, or baker
     /// deregistration is completed.
@@ -859,6 +867,7 @@ pub struct CooldownParameters {
     pub delegator_cooldown: Option<DurationSeconds>,
 }
 
+/// An error resulting from conversion from [`CooldownParameters`].
 #[derive(thiserror::Error, Debug)]
 pub enum CooldownParametersConversionError {
     #[error("missing required field `{0}`")]
@@ -889,7 +898,7 @@ impl TryFrom<CooldownParameters> for types::CooldownParameters {
 
 /// Finalization committee parameters. These parameters control which validators
 /// are in the finalization committee.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct FinalizationCommitteeParameters {
     /// Minimum number of bakers to include in the finalization committee before
     /// the 'finalizer_relative_stake_threshold' takes effect.
@@ -903,6 +912,7 @@ pub struct FinalizationCommitteeParameters {
     pub finalizers_relative_stake_threshold: Option<PartsPerHundredThousands>,
 }
 
+/// An error resulting from conversion from [`FinalizationCommitteeParameters`].
 #[derive(thiserror::Error, Debug)]
 pub enum FinalizationCommitteeParametersConversionError {
     #[error("missing required field `{0}`")]
@@ -931,7 +941,11 @@ impl TryFrom<FinalizationCommitteeParameters> for types::FinalizationCommitteePa
     }
 }
 
-#[derive(Debug, Clone, Default)]
+/// The parameters that govern the behavior of the blockchain.
+/// Which parameters are available depends on the protocol version, and so
+/// all parameters are treated as optional in this structure in order
+/// to support existing and future changes.
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct ChainParameters {
     /// Timeout parameters for the consensus protocol introduced in protocol
     /// version 6.
@@ -1005,6 +1019,7 @@ impl EnergyRate {
     }
 }
 
+/// An error resulting from conversion from [`EnergyRate`].
 #[derive(thiserror::Error, Debug)]
 pub enum EnergyRateConversionError {
     #[error("missing required field `{0}`")]

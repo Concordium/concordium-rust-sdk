@@ -324,7 +324,6 @@ pub struct PendingUpdate {
 
 #[derive(Debug, Clone, SerdeSerialize, SerdeDeserialize)]
 #[serde(tag = "updateType", content = "update")]
-//#[allow(clippy::large_enum_variant)]
 pub enum PendingUpdateEffect {
     #[serde(rename = "root")]
     RootKeys(HigherLevelAccessStructure<RootKeysKind>),

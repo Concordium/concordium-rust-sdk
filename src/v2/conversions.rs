@@ -1749,14 +1749,16 @@ impl TryFrom<AuthorizationsV1> for super::Level2Keys {
     type Error = tonic::Status;
 
     fn try_from(value: AuthorizationsV1) -> Result<Self, Self::Error> {
-        let mut keys: Self = value.v0.require()?.try_into()?;
-        keys.cooldown_parameters = value
-            .parameter_cooldown
-            .map(TryInto::try_into)
-            .transpose()?;
-        keys.time_parameters = value.parameter_time.map(TryInto::try_into).transpose()?;
-        keys.create_plt = value.create_plt.map(|x| x.try_into()).transpose()?;
-        Ok(keys)
+        let keys: Self = value.v0.require()?.try_into()?;
+        Ok(Self {
+            cooldown_parameters: value
+                .parameter_cooldown
+                .map(TryInto::try_into)
+                .transpose()?,
+            time_parameters: value.parameter_time.map(TryInto::try_into).transpose()?,
+            create_plt: value.create_plt.map(|x| x.try_into()).transpose()?,
+            ..keys
+        })
     }
 }
 
