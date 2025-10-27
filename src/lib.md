@@ -75,34 +75,7 @@ The prior functions on `ChainParameters` have been removed, and should be migrat
 The `ChainParameters::common_update_keys()` function was removed.
 Instead `keys.level_2_keys : Option<Level2Keys>` should be used.
 The [`Level2Keys`](v2::Level2Keys) `struct` provides the level 2 keys and access structures.
-For signing chain updates, use [`construct_update_signer()`](v2::Level2Keys::construct_update_signer), for instance as:
-
-```rust,no_compile
-let params = client
-    .get_block_chain_parameters(&BlockIdentifier::LastFinal)
-    .await
-    .context("Could not obtain chain parameters")?;
-
-let keys = params
-    .response
-    .keys
-    .level_2_keys
-    .context("No level 2 keys in chain parameters.")?;
-
-let signer = keys
-    .construct_update_signer(
-        keys.micro_ccd_per_euro
-            .as_ref()
-            .context("Missing uCCD:EUR exchange rate update keys.")?,
-        kps,
-    )
-    .context("Invalid keys supplied.")?;
-
-let block_item: BlockItem<Payload> =
-    update::update(&signer, seq_number, effective_time, timeout, payload).into();
-```
-
-Constructing updates to the level 2 keys requires an [`AuthorizationsV1`](types::AuthorizationsV1) (or for old protocol versions, [`AuthorizationsV0`](types::AuthorizationsV0)) which can be obtained with `Level2Keys::try_into()`.
+For signing chain updates, use [`construct_update_signer()`](v2::Level2Keys::construct_update_signer).
 
 The `ChainParameters::micro_ccd_per_energy()` and `ChainParameters::ccd_cost()` functions were removed.
 Instead, use [`energy_rate()`](v2::ChainParameters::energy_rate) to obtain an [`EnergyRate`](v2::EnergyRate), which encapsulates the [`micro_ccd_per_energy`](v2::EnergyRate::micro_ccd_per_energy) exchange rate.
