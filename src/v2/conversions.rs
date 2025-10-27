@@ -4678,9 +4678,7 @@ mod test {
                 }),
             },
         };
-        // We compare the debug representations to avoid having to implement PartialEq
-        // on all types.
-        assert_eq!(format!("{:?}", converted), format!("{:?}", expected));
+        assert_eq!(converted, expected);
     }
 
     #[test]
@@ -5040,9 +5038,7 @@ mod test {
                 }),
             },
         };
-        // We compare the debug representations to avoid having to implement PartialEq
-        // on all types.
-        assert_eq!(format!("{:?}", converted), format!("{:?}", expected));
+        assert_eq!(converted, expected);
     }
 
     #[test]
@@ -5430,9 +5426,7 @@ mod test {
                 }),
             },
         };
-        // We compare the debug representations to avoid having to implement PartialEq
-        // on all types.
-        assert_eq!(format!("{:?}", converted), format!("{:?}", expected));
+        assert_eq!(converted, expected);
     }
 
     #[test]
@@ -5836,8 +5830,6 @@ mod test {
                 }),
             },
         };
-        // We compare the debug representations to avoid having to implement PartialEq
-        // on all types.
-        assert_eq!(format!("{:?}", converted), format!("{:?}", expected));
+        assert_eq!(converted, expected);
     }
 }
