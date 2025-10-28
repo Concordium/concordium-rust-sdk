@@ -3,8 +3,7 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    cis4::{Cis4Contract, Cis4QueryError},
-    v2::{self, BlockIdentifier, IntoBlockIdentifier},
+    cis4::{Cis4Contract, Cis4QueryError}, types::{self, AccountInfo}, v2::{self, AccountIdentifier, BlockIdentifier, Client, IntoBlockIdentifier}
 };
 use chrono::{DateTime, Utc};
 pub use concordium_base::web3id::*;
@@ -12,6 +11,10 @@ use concordium_base::{
     base::CredentialRegistrationID, cis4_types::CredentialStatus, contracts_common::AccountAddress, id::{constants::{ArCurve, IpPairing}, types::{ArInfos, IpIdentity}}, web3id
 };
 use futures::{TryFutureExt, TryStreamExt};
+use tokio_stream::Stream;
+use tonic::transport::Endpoint;
+use crate::v2::QueryResponse;
+use crate::endpoints;
 
 #[derive(thiserror::Error, Debug)]
 pub enum CredentialLookupError {
@@ -38,6 +41,63 @@ pub enum CredentialLookupError {
     #[error("Unknown stored credential for {cred_id}. Updating the rust-sdk to a version compatible with the node will resolve this issue.")]
     UnknownCredential { cred_id: CredentialRegistrationID },
 }
+
+/// Trait abstraction for the GRPC client for functions we use
+pub trait GrpcClient: Clone + Send + Sync + 'static {
+    async fn get_identity_providers(
+        &mut self,
+        bi: BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<impl Stream<Item = Result<crate::id::types::IpInfo<crate::id::constants::IpPairing>,tonic::Status>>>>;
+
+    async fn get_anonymity_revokers(
+        &mut self,
+        bi: BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<impl Stream<Item = Result<crate::id::types::ArInfo<crate::id::constants::ArCurve>,tonic::Status>>>>;
+
+    async fn get_block_info(
+        &mut self,
+        bi: BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::queries::BlockInfo>>;
+
+    async fn get_account_info(
+        &mut self,
+        acc: &AccountIdentifier,
+        bi: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<AccountInfo>>;
+}
+
+/// implementation for the real GRPC client
+impl GrpcClient for v2::Client {
+    async fn get_identity_providers(
+        &mut self,
+        bi: BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<impl Stream<Item = Result<crate::id::types::IpInfo<crate::id::constants::IpPairing>,tonic::Status>>>> {
+        self.get_identity_providers(bi).await
+    }
+
+    async fn get_anonymity_revokers(
+        &mut self,
+        bi: BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<impl Stream<Item = Result<crate::id::types::ArInfo<crate::id::constants::ArCurve>,tonic::Status>>>> {
+        self.get_anonymity_revokers(bi).await
+    }
+
+    async fn get_block_info(
+        &mut self,
+        bi: BlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<types::queries::BlockInfo>> {
+        self.get_block_info(bi).await
+    }
+
+    async fn get_account_info(
+            &mut self,
+            acc: &AccountIdentifier,
+            bi: impl IntoBlockIdentifier,
+        ) -> endpoints::QueryResult<QueryResponse<AccountInfo>> {
+        self.get_account_info(acc, bi).await
+    }
+}
+
 
 /// The public cryptographic data of a credential together with its current
 /// status.
@@ -66,6 +126,157 @@ pub struct CredentialWithMetadata {
 /// For web3id credentials the issuer contract is the source of truth, and this
 /// function does not perform additional validity checks apart from querying the
 /// contract.
+pub async fn verify_credential_metadata<C: GrpcClient>(
+    mut client: C,
+    network: web3id::did::Network,
+    metadata: &ProofMetadata,
+    bi: impl IntoBlockIdentifier,
+) -> Result<CredentialWithMetadata, CredentialLookupError> {
+    if metadata.network != network {
+        return Err(CredentialLookupError::IncorrectNetwork);
+    }
+    let bi = bi.into_block_identifier();
+    match metadata.cred_metadata {
+        CredentialMetadata::Account { issuer, cred_id } => {
+            let ai = client
+                .get_account_info(&cred_id.into(), BlockIdentifier::LastFinal)
+                .await?;
+            let Some(cred) = ai.response.account_credentials.values().find(|cred| {
+                cred.value
+                    .as_ref()
+                    .is_known_and(|c| c.cred_id() == cred_id.as_ref())
+            }) else {
+                return Err(CredentialLookupError::CredentialNotPresentOrUnknown {
+                    cred_id,
+                    account: ai.response.account_address,
+                });
+            };
+            let c = cred
+                .value
+                .as_ref()
+                .known_or(CredentialLookupError::UnknownCredential { cred_id })?;
+            if c.issuer() != issuer {
+                return Err(CredentialLookupError::InconsistentIssuer {
+                    stated: issuer,
+                    actual: c.issuer(),
+                });
+            }
+            match &c {
+                concordium_base::id::types::AccountCredentialWithoutProofs::Initial { .. } => {
+                    Err(CredentialLookupError::InitialCredential { cred_id })
+                }
+                concordium_base::id::types::AccountCredentialWithoutProofs::Normal {
+                    cdv,
+                    commitments,
+                } => {
+                    let now = client.get_block_info(bi).await?.response.block_slot_time;
+                    let valid_from = cdv.policy.created_at.lower().ok_or_else(|| {
+                        CredentialLookupError::InvalidResponse(
+                            "Credential creation date is not valid.".into(),
+                        )
+                    })?;
+                    let valid_until = cdv.policy.valid_to.upper().ok_or_else(|| {
+                        CredentialLookupError::InvalidResponse(
+                            "Credential creation date is not valid.".into(),
+                        )
+                    })?;
+
+                    let status = determine_credential_status_valid_from_valid_to(now, valid_from, valid_until);
+
+                    let inputs = CredentialsInputs::Account {
+                        commitments: commitments.cmm_attributes.clone(),
+                    };
+
+                    Ok(CredentialWithMetadata { status, inputs })
+                }
+            }
+        }
+
+        // TODO - modifications here wont work
+        CredentialMetadata::Web3Id { contract, holder } => {
+            let dummy_client  = Client::new(Endpoint::from_static("")).await.map_err(|_e| CredentialLookupError::InvalidResponse(
+                "placeholder error for now.".into(),
+            ))?;
+
+            // TODO - old code here, this would need to change if we reuse the new trait defined at the top...
+            //let mut contract_client = Cis4Contract::create(client, contract).await?;
+            let mut contract_client = Cis4Contract::create(dummy_client, contract).await?;
+            let issuer_pk = contract_client.issuer(bi).await?;
+
+            let inputs = CredentialsInputs::Web3 { issuer_pk };
+
+            let status = contract_client.credential_status(holder, bi).await?;
+
+            Ok(CredentialWithMetadata { status, inputs })
+        }
+
+        CredentialMetadata::Identity { issuer, validity } => {
+
+            // get all the identity providers at current block
+            let identity_providers = client.get_identity_providers(bi).await?
+                .response
+                .try_collect::<Vec<_>>()
+                .map_err(|_e| CredentialLookupError::InvalidResponse("Error getting identity providers".into()))
+                .await?;
+
+            // find the matching identity provider info
+            let matching_idp = identity_providers.iter()
+                .find(|idp| {
+                    idp.ip_identity.0 == issuer.0
+                })
+                .ok_or( CredentialLookupError::InvalidResponse("Error occurred while getting matching identity provider".into()))?;
+
+            // get anonymity revokers
+            let anonymity_revokers = client.get_anonymity_revokers(bi).await?.response
+                .try_collect::<Vec<_>>()
+                .map_err(|_e| 
+                    CredentialLookupError::InvalidResponse("Error while getting annonymity revokers.".into(),
+                ))
+                .await?;
+
+            // create a new BTreeMap to hold the Anonymity revoker identity -> the anonymity revoker info
+            let mut anonymity_revoker_infos = BTreeMap::new();
+            
+            for ar in anonymity_revokers {
+                anonymity_revoker_infos.insert(ar.ar_identity, ar);
+            }
+
+            // build inputs
+            let inputs = CredentialsInputs::Identity { ip_info: matching_idp.clone(), ars_infos: ArInfos { anonymity_revokers: anonymity_revoker_infos } };
+
+            // Credential Status handling
+            let now = client.get_block_info(bi).await?.response.block_slot_time;
+
+            let valid_to = validity.valid_to.upper()
+                .ok_or(CredentialLookupError::InvalidResponse("Error while getting annonymity revokers.".into()))?;
+
+            let credential_status = determine_credential_status_valid_to(now, valid_to);
+            
+            Ok(CredentialWithMetadata { inputs: inputs, status: credential_status})
+        }
+    }
+}
+
+
+/// Retrieve and validate credential metadata in a particular block.
+///
+/// This does not validate the cryptographic proofs, only the metadata. In
+/// particular it checks.
+///
+/// - credential exists
+/// - the credential's network is as supplied to this function
+/// - in case of account credentials, the credential issuer is as stated in the
+///   proof
+/// - credential commitments can be correctly parsed
+/// - credential is active and not expired at the timestamp of the supplied
+///   block
+/// - in case of an account credential, the credential is a normal credential,
+///   and not initial.
+///
+/// For web3id credentials the issuer contract is the source of truth, and this
+/// function does not perform additional validity checks apart from querying the
+/// contract.
+/* 
 pub async fn verify_credential_metadata(
     mut client: v2::Client,
     network: web3id::did::Network,
@@ -168,7 +379,7 @@ pub async fn verify_credential_metadata(
 
             // create a new BTreeMap to hold the Anonymity revoker identity -> the anonymity revoker info
             let mut anonymity_revoker_infos = BTreeMap::new();
-
+            
             for ar in anonymity_revokers {
                 anonymity_revoker_infos.insert(ar.ar_identity, ar);
             }
@@ -188,6 +399,7 @@ pub async fn verify_credential_metadata(
         }
     }
 }
+    */
 
 
 /// determine the credential status where both the valid from and valid to is provided
@@ -238,7 +450,66 @@ pub async fn get_public_data(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Days;
+    use chrono::{Datelike, Days};
+    use concordium_base::{hashes::HashBytes, id::types::{CredentialValidity, YearMonth}};
+
+    #[derive(Clone)]
+    struct DummyClient;
+
+    impl GrpcClient for DummyClient {
+        async fn get_identity_providers(
+            &mut self,
+            _bi: BlockIdentifier,
+        ) -> endpoints::QueryResult<QueryResponse<impl Stream<Item = Result<crate::id::types::IpInfo<IpPairing>, tonic::Status>>>> {
+            let empty_stream = stream::empty();
+            Ok(QueryResponse {
+                block_hash: HashBytes::new(1),
+                response: empty_stream,
+            })
+        }
+
+        async fn get_anonymity_revokers(
+            &mut self,
+            _bi: BlockIdentifier,
+        ) -> endpoints::QueryResult<QueryResponse<impl Stream<Item = Result<crate::id::types::ArInfo<ArCurve>, tonic::Status>>>> {
+            let empty_stream = stream::empty();
+            Ok(QueryResponse {
+                block_hash: HashBytes::new(1),
+                response: empty_stream,
+            })
+        }
+
+        async fn get_block_info(
+            &mut self,
+            _bi: BlockIdentifier,
+        ) -> endpoints::QueryResult<QueryResponse<BlockInfo>> {
+            // Fake current block time for testing
+            let fake_info = BlockInfo {
+                block_slot_time: Utc::now(),
+                ..Default::default()
+            };
+            Ok(QueryResponse {
+                block_hash: HashBytes::new(1),
+                response: fake_info,
+            })
+        }
+
+        async fn get_account_info(
+            &mut self,
+            _acc: &AccountIdentifier,
+            _bi: impl IntoBlockIdentifier,
+        ) -> endpoints::QueryResult<QueryResponse<AccountInfo>> {
+            // Return a fake account info object
+            let fake_info = AccountInfo {
+                account_address: AccountAddress([0u8; 32]),
+                ..Default::default()
+            };
+            Ok(QueryResponse {
+                block_hash: HashBytes::new(1),
+                response: fake_info,
+            })
+        }
+    }
 
     /// valid from is before now, valid to is in the future, therefore credential status should be `active`
     #[test]
@@ -291,5 +562,35 @@ mod tests {
 
         let status = determine_credential_status_valid_to(now, valid_to);
         assert_eq!(CredentialStatus::Expired, status);
+    }
+
+    #[test]
+    async fn test_determine_credential_status_active() {
+        let mut client = DummyClient::default();
+        let network = did::Network::Testnet;
+        let ip_identity = IpIdentity(42);
+        let valid_to = Utc::now().checked_add_days(Days::new(10)).unwrap();
+
+        let credential_validity = CredentialValidity {
+            created_at: None,
+            valid_to: YearMonth::new(valid_to.year(), valid_to.month())
+        };
+
+        let proof_meta_data = ProofMetadata {
+            network: did::Network::Testnet,
+            created: Utc::now(),
+            cred_metadata: CredentialMetadata::Identity { issuer: ip_identity.into(), validity: credential_validity }
+        };
+
+        let result = verify_credential_metadata(client, network, proof_meta_data, BlockIdentifier::LastFinal)
+            .await
+            .expect("Expected verification to succeed");
+
+        assert_eq!(result.status, CredentialStatus::Active);
+
+        match result.inputs {
+            CredentialsInputs::Identity { .. } => {} // success
+            _ => panic!("Expected Identity inputs, got something else"),
+        }
     }
 }
