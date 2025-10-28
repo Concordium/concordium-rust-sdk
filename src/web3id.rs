@@ -6,6 +6,7 @@ use crate::{
     cis4::{Cis4Contract, Cis4QueryError},
     v2::{self, BlockIdentifier, IntoBlockIdentifier},
 };
+use chrono::{Utc, DateTime};
 pub use concordium_base::web3id::*;
 use concordium_base::{
     base::CredentialRegistrationID, cis4_types::CredentialStatus, contracts_common::AccountAddress, id::{constants::{ArCurve, IpPairing}, types::{ArInfos, IpIdentity}}, web3id
@@ -119,13 +120,9 @@ pub async fn verify_credential_metadata(
                             "Credential creation date is not valid.".into(),
                         )
                     })?;
-                    let status = if valid_from > now {
-                        CredentialStatus::NotActivated
-                    } else if valid_until < now {
-                        CredentialStatus::Expired
-                    } else {
-                        CredentialStatus::Active
-                    };
+
+                    let status = determine_credential_status_valid_from_valid_to(now, valid_from, valid_until);
+
                     let inputs = CredentialsInputs::Account {
                         commitments: commitments.cmm_attributes.clone(),
                     };
@@ -145,7 +142,6 @@ pub async fn verify_credential_metadata(
             Ok(CredentialWithMetadata { status, inputs })
         }
 
-        // TODO - Identity handling for credential
         CredentialMetadata::Identity { issuer, validity } => {
 
             // get all the identity providers at current block
@@ -180,25 +176,37 @@ pub async fn verify_credential_metadata(
             // build inputs
             let inputs = CredentialsInputs::Identity { ip_info: matching_idp.clone(), ars_infos: ArInfos { anonymity_revokers: anonymity_revoker_infos } };
 
-            // TODO - change me, probably need to do something similar to how we handle the account - where we check the validity created at and valid to
-            // validity.created_at
-            // validity.valid_to
+            // Credential Status handling
             let now = client.get_block_info(bi).await?.response.block_slot_time;
 
-            // TODO temporary dummy status for now
-            let status = CredentialStatus::Active; 
-            /* 
-            let status = if &validity.valid_to.year < YearMonth::now() {
-                CredentialStatus::Expired
-            } else if &validity.valid_to >= YearMonth::now() {
-                CredentialStatus::Active
-            } else {
-                CredentialStatus::NotActivated
-            };
-            */
+            let valid_to = validity.valid_to.upper()
+                .ok_or(CredentialLookupError::InvalidResponse("Error while getting annonymity revokers.".into()))?;
+
+            let credential_status = determine_credential_status_valid_to(now, valid_to);
             
-            Ok(CredentialWithMetadata { inputs: inputs, status: status})
+            Ok(CredentialWithMetadata { inputs: inputs, status: credential_status})
         }
+    }
+}
+
+
+/// determine the credential status where both the valid from and valid to is provided
+fn determine_credential_status_valid_from_valid_to(time_to_compare_to: DateTime<Utc>, valid_from: DateTime<Utc>, valid_to: DateTime<Utc>) -> CredentialStatus {
+    if valid_from > time_to_compare_to {
+        CredentialStatus::NotActivated
+    } 
+    else {
+        determine_credential_status_valid_to(time_to_compare_to, valid_to)
+    }
+}
+
+/// determine the credential status where you only have a `valid to` field and no valid from (such as identity)
+fn determine_credential_status_valid_to(time_to_compare_to: DateTime<Utc>, valid_to: DateTime<Utc>) -> CredentialStatus {
+    if valid_to < time_to_compare_to {
+        CredentialStatus::Expired
+    }
+    else {
+        CredentialStatus::Active
     }
 }
 
@@ -225,4 +233,62 @@ pub async fn get_public_data(
         })
         .collect::<futures::stream::FuturesOrdered<_>>();
     stream.try_collect().await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// valid from is before now, valid to is in the future, therefore credential status should be `active`
+    #[test]
+    fn test_determine_credential_status_as_active_for_account() {
+        let now =  Utc::now();
+        let valid_from = now.checked_sub_days(20);
+        let valid_to = now.checked_add_days(30);
+
+        let status = determine_credential_status_valid_from_valid_to(now, valid_from, valid_to);
+        assert_eq!(CredentialStatus::Active, status);
+    }
+
+    /// valid from is after now, valid to is in the future, therefore credential status should be `not activated`
+    #[test]
+    fn test_determine_credential_status_as_not_activated_valid_from_after_today() {
+        let now =  Utc::now();
+        let valid_from = now.checked_add_days(2);
+        let valid_to = now.checked_add_days(30);
+
+        let status = determine_credential_status_valid_from_valid_to(now, valid_from, valid_to);
+        assert_eq!(CredentialStatus::NotActivated, status);
+    }
+
+    /// valid from is before now, valid to is in the past, therefore credential status should be `expired`
+    #[test]
+    fn test_determine_credential_status_as_not_activated_valid_from_after_today() {
+        let now =  Utc::now();
+        let valid_from = now.checked_sub_days(100);
+        let valid_to = now.checked_sub_days(30);
+
+        let status = determine_credential_status_valid_from_valid_to(now, valid_from, valid_to);
+        assert_eq!(CredentialStatus::Expired, status);
+    }
+
+    // identity credential status check, returns as active for valid to date in the future
+    #[test]
+    fn test_determine_credential_status_as_active_for_account() {
+        let now =  Utc::now();
+        let valid_to = now.checked_add_days(30);
+
+        let status = determine_credential_status_valid_to(now, valid_to);
+        assert_eq!(CredentialStatus::Active, status);
+    }
+
+    // identity credential status check, returns as expired for valid to date in the past
+    #[test]
+    fn test_determine_credential_status_as_expired_for_account() {
+        let now =  Utc::now();
+        let valid_to = now.checked_sub_days(1);
+
+        let status = determine_credential_status_valid_to(now, valid_to);
+        assert_eq!(CredentialStatus::Expired, status);
+    }
 }
