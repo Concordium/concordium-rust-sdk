@@ -67,7 +67,7 @@ For the quick proof of concept application the value can be unwrapped using [`un
 
 #### `ChainParameters`
 
-The `v2::ChainParameters` `enum` has been replaced by [`types::chain_parameters::ChainParameters`](types::chain_parameters::ChainParameters), which is a single `struct` with optional fields.
+The `v2::ChainParameters` `enum` has been replaced by [`types::chain_parameters::ChainParameters`], which is a single `struct` with optional fields.
 Applications should no longer case on the version of the chain parameters, but can directly access the relevant parameters.
 Since parameters are added and removed across different protocol versions, each parameter is optional, even if it is present in all current protocol versions, in case it may be removed in a future protocol version.
 The prior functions on `ChainParameters` have been removed, and should be migrated as set out below.
