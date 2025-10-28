@@ -99,19 +99,19 @@
     - `GASRewardsFamily` and `GASRewardsFor` (use `GASRewards` and `GASRewardsV1` directly where needed);
     - `AuthorizationsFamily` and `Authorizations` (use `AuthorizationsV0` and `AuthorizationsV1` directly where needed).
 
-- BREAKING: Remove `v2::ChainParametersV0`, `v2::ChainParametersV1`, `v2::ChainParametersV2` and `v2::ChainParametersV3`, replacing the enum `v2::ChainParameters` with a new struct with optional parameters.
+- BREAKING: Remove `v2::ChainParameters`, `v2::ChainParametersV0`, `v2::ChainParametersV1`, `v2::ChainParametersV2` and `v2::ChainParametersV3`. These are replaced by `types::chain_parameters::ChainParameters`.
 - A number of supporting types for `ChainParameters` are introduced. These have conversions that can be used to construct the payload types for updating the corresponding parameter sets.
-  - `v2::MintDistribution` (convertible to `types::MintDistributionV1`);
-  - `v2::TransactionFeeDistribution` (convertible to `types::TransactionFeeDistribution`);
-  - `v2::GasRewards` (convertible to `types::GASRewards` and `types::GASRewardsV1`);
-  - `v2::StakingParameters` (convertible to `types::PoolParameters`);
-  - `v2::Level2Keys` (provides `construct_update_signer`, convertible to `types::AuthorizationsV0` and `types::AuthorizationsV1`);
-  - `v2::UpdateKeys`;
-  - `v2::TimeoutParameters` (convertible to `types::TimeParameters`);
-  - `v2::CooldownParameters` (convertible to `types::CooldownParameters`);
-  - `v2::FinalizationCommitteeParameters` (convertible to `types::FinalizationCommitteeParameters`).
-- `v2::EnergyRate` with `ccd_cost` for computing Energy costs in CCD.
-- BREAKING: Changes to `v2::ChainParameters`:
+  - `types::chain_parameters::MintDistribution` (convertible to `types::MintDistributionV1`);
+  - `types::chain_parameters::TransactionFeeDistribution` (convertible to `types::TransactionFeeDistribution`);
+  - `types::chain_parameters::GasRewards` (convertible to `types::GASRewards` and `types::GASRewardsV1`);
+  - `types::chain_parameters::StakingParameters` (convertible to `types::PoolParameters`);
+  - `types::chain_parameters::Level2Keys` (provides `construct_update_signer`, convertible to `types::AuthorizationsV0` and `types::AuthorizationsV1`);
+  - `types::chain_parameters::UpdateKeys`;
+  - `types::chain_parameters::TimeoutParameters` (convertible to `types::TimeParameters`);
+  - `types::chain_parameters::CooldownParameters` (convertible to `types::CooldownParameters`);
+  - `types::chain_parameters::FinalizationCommitteeParameters` (convertible to `types::FinalizationCommitteeParameters`).
+- `types::chain_parameters::EnergyRate` with `ccd_cost` for computing Energy costs in CCD.
+- Compared to the former `v2::ChainParameters`, `types::chain_parameters::ChainParameters`:
   - no longer provides `micro_cd_per_energy`, which is replaced by `energy_rate`;
   - `ccd_cost` is removed, which should be replaced by calling `ccd_cost` on the energy rate instead;
   - the `foundation_account` getter function is removed, and should be replaced by direct access to the `foundation_account` field;

@@ -1,6 +1,7 @@
 //! Type definitions used throughout the rest of the SDK.
 
 pub mod block_certificates;
+pub mod chain_parameters;
 pub mod network;
 pub mod queries;
 pub mod smart_contracts;

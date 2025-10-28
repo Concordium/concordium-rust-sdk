@@ -6,10 +6,11 @@ use concordium_base::updates::ValidatorScoreParameters;
 use concordium_rust_sdk::{
     common::types::TransactionTime,
     types::{
+        chain_parameters::ChainParameters,
         transactions::{update, BlockItem, Payload},
         TransactionStatus, UpdateKeyPair, UpdatePayload,
     },
-    v2::{self, BlockIdentifier, ChainParameters},
+    v2::{self, BlockIdentifier},
 };
 use std::path::PathBuf;
 use structopt::StructOpt;
