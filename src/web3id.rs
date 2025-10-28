@@ -6,7 +6,7 @@ use crate::{
     cis4::{Cis4Contract, Cis4QueryError},
     v2::{self, BlockIdentifier, IntoBlockIdentifier},
 };
-use chrono::{Utc, DateTime};
+use chrono::{DateTime, Utc};
 pub use concordium_base::web3id::*;
 use concordium_base::{
     base::CredentialRegistrationID, cis4_types::CredentialStatus, contracts_common::AccountAddress, id::{constants::{ArCurve, IpPairing}, types::{ArInfos, IpIdentity}}, web3id
@@ -161,7 +161,7 @@ pub async fn verify_credential_metadata(
             // get anonymity revokers
             let anonymity_revokers = client.get_anonymity_revokers(bi).await?.response
                 .try_collect::<Vec<_>>()
-                .map_err(|e| 
+                .map_err(|_e| 
                     CredentialLookupError::InvalidResponse("Error while getting annonymity revokers.".into(),
                 ))
                 .await?;
@@ -238,13 +238,14 @@ pub async fn get_public_data(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Days;
 
     /// valid from is before now, valid to is in the future, therefore credential status should be `active`
     #[test]
     fn test_determine_credential_status_as_active_for_account() {
         let now =  Utc::now();
-        let valid_from = now.checked_sub_days(20);
-        let valid_to = now.checked_add_days(30);
+        let valid_from = now.checked_sub_days(Days::new(20)).expect("expected valid date time");
+        let valid_to = now.checked_add_days(Days::new(30)).expect("expected valid date time");
 
         let status = determine_credential_status_valid_from_valid_to(now, valid_from, valid_to);
         assert_eq!(CredentialStatus::Active, status);
@@ -254,8 +255,8 @@ mod tests {
     #[test]
     fn test_determine_credential_status_as_not_activated_valid_from_after_today() {
         let now =  Utc::now();
-        let valid_from = now.checked_add_days(2);
-        let valid_to = now.checked_add_days(30);
+        let valid_from = now.checked_add_days(Days::new(2)).expect("expected valid date time");
+        let valid_to = now.checked_add_days(Days::new(30)).expect("expected valid date time");
 
         let status = determine_credential_status_valid_from_valid_to(now, valid_from, valid_to);
         assert_eq!(CredentialStatus::NotActivated, status);
@@ -265,8 +266,8 @@ mod tests {
     #[test]
     fn test_determine_credential_status_as_not_activated_valid_from_after_today() {
         let now =  Utc::now();
-        let valid_from = now.checked_sub_days(100);
-        let valid_to = now.checked_sub_days(30);
+        let valid_from = now.checked_sub_days(Days::new(100)).expect("expected valid date time");
+        let valid_to = now.checked_sub_days(Days::new(30)).expect("expected valid date time");
 
         let status = determine_credential_status_valid_from_valid_to(now, valid_from, valid_to);
         assert_eq!(CredentialStatus::Expired, status);
@@ -276,7 +277,7 @@ mod tests {
     #[test]
     fn test_determine_credential_status_as_active_for_account() {
         let now =  Utc::now();
-        let valid_to = now.checked_add_days(30);
+        let valid_to = now.checked_add_days(Days::new(20)).expect("expected valid date time");
 
         let status = determine_credential_status_valid_to(now, valid_to);
         assert_eq!(CredentialStatus::Active, status);
@@ -286,7 +287,7 @@ mod tests {
     #[test]
     fn test_determine_credential_status_as_expired_for_account() {
         let now =  Utc::now();
-        let valid_to = now.checked_sub_days(1);
+        let valid_to = now.checked_sub_days(Days::new(2)).expect("expected valid date time");
 
         let status = determine_credential_status_valid_to(now, valid_to);
         assert_eq!(CredentialStatus::Expired, status);
