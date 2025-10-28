@@ -84,6 +84,40 @@
   - Type `Event`/`BakerPoolInfo` field `open_status` is now wrapped in `Upward`.
   - Bubble `Upward` from new variants of `VerifyKey` to `Upward<AccountCredentialWithoutProofs<...>>` in `AccountInfo::account_credentials`.
 
+- BREAKING: Remove types associated with discontinued V1 API:
+  - `types::BlockSummary`;
+  - `types::UpdateKeysCollectionSkeleton` and `types::UpdateKeysCollection`;
+  - `types::ChainParametersV0`, `types::ChainParametersV1`, `types::ChainParametersV2`, `types::ChainParametersV3`, `types::ChainParametersFamily` and `types::ChainParameters`.
+  - `types::RewardParametersSkeleton` and `types::RewardParameters`;
+  - `types::ScheduledUpdate`;
+  - `types::UpdateQueue`;
+  - `types::PendingUpdatesV0`, `types::PendingUpdatesV1`, `types::PendingUpdatesFamily`, and `types::PendingUpdates`;
+  - `types::UpdatesSkeleton` and `types::Updates`;
+  - removed from `concordium_base`:
+    - `ChainParametersVersion0`, `ChainParametersVersion1`, `ChainParametersVersion2`, `ChainParametersVersion3`;
+    - `MintDistributionFamily`, `MintDistribution` (use `MintDistributionV0` or `MintDistributionV1` directly instead where needed);
+    - `GASRewardsFamily` and `GASRewardsFor` (use `GASRewards` and `GASRewardsV1` directly where needed);
+    - `AuthorizationsFamily` and `Authorizations` (use `AuthorizationsV0` and `AuthorizationsV1` directly where needed).
+
+- BREAKING: Remove `v2::ChainParameters`, `v2::ChainParametersV0`, `v2::ChainParametersV1`, `v2::ChainParametersV2` and `v2::ChainParametersV3`. These are replaced by `types::chain_parameters::ChainParameters`.
+- A number of supporting types for `ChainParameters` are introduced. These have conversions that can be used to construct the payload types for updating the corresponding parameter sets.
+  - `types::chain_parameters::MintDistribution` (convertible to `types::MintDistributionV1`);
+  - `types::chain_parameters::TransactionFeeDistribution` (convertible to `types::TransactionFeeDistribution`);
+  - `types::chain_parameters::GasRewards` (convertible to `types::GASRewards` and `types::GASRewardsV1`);
+  - `types::chain_parameters::StakingParameters` (convertible to `types::PoolParameters`);
+  - `types::chain_parameters::Level2Keys` (provides `construct_update_signer`, convertible to `types::AuthorizationsV0` and `types::AuthorizationsV1`);
+  - `types::chain_parameters::UpdateKeys`;
+  - `types::chain_parameters::TimeoutParameters` (convertible to `types::TimeParameters`);
+  - `types::chain_parameters::CooldownParameters` (convertible to `types::CooldownParameters`);
+  - `types::chain_parameters::FinalizationCommitteeParameters` (convertible to `types::FinalizationCommitteeParameters`).
+- `types::chain_parameters::EnergyRate` with `ccd_cost` for computing Energy costs in CCD.
+- Compared to the former `v2::ChainParameters`, `types::chain_parameters::ChainParameters`:
+  - no longer provides `micro_cd_per_energy`, which is replaced by `energy_rate`;
+  - `ccd_cost` is removed, which should be replaced by calling `ccd_cost` on the energy rate instead;
+  - the `foundation_account` getter function is removed, and should be replaced by direct access to the `foundation_account` field;
+  - `common_update_keys` is removed, and instead `keys.level_2_keys` should be used, which can be used to construct an `UpdateSigner`, or converted to `types::AuthorizationsV0`.
+- BREAKING: The parameter of `PendingUpdateEffect::AddAnonymityRevoker` is now `Box`ed.
+
 ## 7.0.0
 
 Adds support for integrating with Concordium nodes running protocol version 9.

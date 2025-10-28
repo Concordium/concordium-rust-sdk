@@ -7,6 +7,7 @@ use crate::{
     protocol_level_tokens,
     types::{
         self, block_certificates,
+        chain_parameters::ChainParameters,
         hashes::{self, BlockHash, TransactionHash, TransactionSignHash},
         queries::ConsensusDetailedStatus,
         smart_contracts::{
@@ -21,31 +22,21 @@ use crate::{
 use anyhow::Context;
 pub use concordium_base::common::upward::{self, Upward};
 use concordium_base::{
-    base::{
-        AccountIndex, BlockHeight, ChainParameterVersion0, ChainParameterVersion1,
-        CredentialsPerBlockLimit, ElectionDifficulty, Epoch, ExchangeRate, GenesisIndex,
-        MintDistributionV0, MintDistributionV1,
-    },
+    base::{AccountIndex, BlockHeight, Epoch, GenesisIndex},
     common::{
         self,
         types::{TransactionSignature, TransactionTime},
     },
     contracts_common::{
-        AccountAddress, AccountAddressParseError, Amount, ContractAddress, Duration,
-        OwnedContractName, OwnedParameter, OwnedReceiveName, ReceiveName,
+        AccountAddress, AccountAddressParseError, Amount, ContractAddress, OwnedContractName,
+        OwnedParameter, OwnedReceiveName, ReceiveName,
     },
     hashes::HashFromStrError,
     transactions::{BlockItem, EncodedPayload, PayloadLike},
-    updates::{
-        AuthorizationsV0, CooldownParameters, FinalizationCommitteeParameters, GASRewards,
-        GASRewardsV1, PoolParameters, TimeParameters, TimeoutParameters,
-        TransactionFeeDistribution, ValidatorScoreParameters,
-    },
 };
 pub use endpoints::{QueryError, QueryResult, RPCError, RPCResult};
 use futures::{Stream, StreamExt, TryStreamExt};
 pub use http::uri::Scheme;
-use num::{BigUint, ToPrimitive};
 use std::{collections::HashMap, num::ParseIntError, str::FromStr};
 use tonic::IntoRequest;
 pub use tonic::{
@@ -364,234 +355,12 @@ impl From<EpochIdentifier> for generated::EpochRequest {
 }
 
 /// Information of a finalized block.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct FinalizedBlockInfo {
     /// The block hash for the finalized block.
     pub block_hash: BlockHash,
     /// The absolute block height for the finalized block.
     pub height: AbsoluteBlockHeight,
-}
-
-#[derive(Debug, Clone)]
-/// Values of chain parameters that can be updated via chain updates.
-/// This applies to protocol version 1-3.
-pub struct ChainParametersV0 {
-    /// Election difficulty for consensus lottery.
-    pub election_difficulty: ElectionDifficulty,
-    /// Euro per energy exchange rate.
-    pub euro_per_energy: ExchangeRate,
-    /// Micro ccd per euro exchange rate.
-    pub micro_ccd_per_euro: ExchangeRate,
-    /// Extra number of epochs before reduction in stake, or baker
-    /// deregistration is completed.
-    pub baker_cooldown_epochs: Epoch,
-    /// The limit for the number of account creations in a block.
-    pub account_creation_limit: CredentialsPerBlockLimit,
-    /// Parameters related to the distribution of newly minted CCD.
-    pub mint_distribution: MintDistributionV0,
-    /// Parameters related to the distribution of transaction fees.
-    pub transaction_fee_distribution: TransactionFeeDistribution,
-    /// Parameters related to the distribution of the GAS account.
-    pub gas_rewards: GASRewards,
-    /// Address of the foundation account.
-    pub foundation_account: AccountAddress,
-    /// Minimum threshold for becoming a baker.
-    pub minimum_threshold_for_baking: Amount,
-    /// Keys allowed to do updates.
-    pub keys: types::UpdateKeysCollection<ChainParameterVersion0>,
-}
-
-#[derive(Debug, Clone)]
-/// Values of chain parameters that can be updated via chain updates.
-/// This applies to protocol version 4 and 5.
-pub struct ChainParametersV1 {
-    /// Election difficulty for consensus lottery.
-    pub election_difficulty: ElectionDifficulty,
-    /// Euro per energy exchange rate.
-    pub euro_per_energy: ExchangeRate,
-    /// Micro ccd per euro exchange rate.
-    pub micro_ccd_per_euro: ExchangeRate,
-    pub cooldown_parameters: CooldownParameters,
-    pub time_parameters: TimeParameters,
-    /// The limit for the number of account creations in a block.
-    pub account_creation_limit: CredentialsPerBlockLimit,
-    /// Parameters related to the distribution of newly minted CCD.
-    pub mint_distribution: MintDistributionV1,
-    /// Parameters related to the distribution of transaction fees.
-    pub transaction_fee_distribution: TransactionFeeDistribution,
-    /// Parameters related to the distribution of the GAS account.
-    pub gas_rewards: GASRewards,
-    /// Address of the foundation account.
-    pub foundation_account: AccountAddress,
-    /// Parameters for baker pools.
-    pub pool_parameters: PoolParameters,
-    /// Keys allowed to do updates.
-    pub keys: types::UpdateKeysCollection<ChainParameterVersion1>,
-}
-
-#[derive(Debug, Clone)]
-/// Values of chain parameters that can be updated via chain updates.
-/// This applies to protocol version 6 and 7.
-pub struct ChainParametersV2 {
-    /// Consensus protocol version 2 timeout parameters.
-    pub timeout_parameters: TimeoutParameters,
-    /// Minimum time interval between blocks.
-    pub min_block_time: Duration,
-    /// Maximum energy allowed per block.
-    pub block_energy_limit: Energy,
-    /// Euro per energy exchange rate.
-    pub euro_per_energy: ExchangeRate,
-    /// Micro ccd per euro exchange rate.
-    pub micro_ccd_per_euro: ExchangeRate,
-    /// Parameters related to cooldowns when staking.
-    pub cooldown_parameters: CooldownParameters,
-    /// Parameters related mint rate and reward period.
-    pub time_parameters: TimeParameters,
-    /// The limit for the number of account creations in a block.
-    pub account_creation_limit: CredentialsPerBlockLimit,
-    /// Parameters related to the distribution of newly minted CCD.
-    pub mint_distribution: MintDistributionV1,
-    /// Parameters related to the distribution of transaction fees.
-    pub transaction_fee_distribution: TransactionFeeDistribution,
-    /// Parameters related to the distribution from the GAS account.
-    pub gas_rewards: GASRewardsV1,
-    /// Address of the foundation account.
-    pub foundation_account: AccountAddress,
-    /// Parameters for baker pools.
-    pub pool_parameters: PoolParameters,
-    /// The finalization committee parameters.
-    pub finalization_committee_parameters: FinalizationCommitteeParameters,
-    /// Keys allowed to do updates.
-    pub keys: types::UpdateKeysCollection<ChainParameterVersion1>,
-}
-
-#[derive(Debug, Clone)]
-/// Values of chain parameters that can be updated via chain updates.
-/// This applies to protocol version 8 and up.
-pub struct ChainParametersV3 {
-    /// Consensus protocol version 2 timeout parameters.
-    pub timeout_parameters: TimeoutParameters,
-    /// Minimum time interval between blocks.
-    pub min_block_time: Duration,
-    /// Maximum energy allowed per block.
-    pub block_energy_limit: Energy,
-    /// Euro per energy exchange rate.
-    pub euro_per_energy: ExchangeRate,
-    /// Micro ccd per euro exchange rate.
-    pub micro_ccd_per_euro: ExchangeRate,
-    /// Parameters related to cooldowns when staking.
-    pub cooldown_parameters: CooldownParameters,
-    /// Parameters related mint rate and reward period.
-    pub time_parameters: TimeParameters,
-    /// The limit for the number of account creations in a block.
-    pub account_creation_limit: CredentialsPerBlockLimit,
-    /// Parameters related to the distribution of newly minted CCD.
-    pub mint_distribution: MintDistributionV1,
-    /// Parameters related to the distribution of transaction fees.
-    pub transaction_fee_distribution: TransactionFeeDistribution,
-    /// Parameters related to the distribution from the GAS account.
-    pub gas_rewards: GASRewardsV1,
-    /// Address of the foundation account.
-    pub foundation_account: AccountAddress,
-    /// Parameters for baker pools.
-    pub pool_parameters: PoolParameters,
-    /// The finalization committee parameters.
-    pub finalization_committee_parameters: FinalizationCommitteeParameters,
-    /// Validator score parameters.
-    pub validator_score_parameters: ValidatorScoreParameters,
-    /// Keys allowed to do updates.
-    pub keys: types::UpdateKeysCollection<ChainParameterVersion1>,
-}
-
-/// Chain parameters. See [`ChainParametersV0`] and [`ChainParametersV1`] for
-/// details. `V0` parameters apply to protocol version `1..=3`, and `V1`
-/// parameters apply to protocol versions `4` and up.
-#[derive(Debug, Clone)]
-pub enum ChainParameters {
-    V0(ChainParametersV0),
-    V1(ChainParametersV1),
-    V2(ChainParametersV2),
-    V3(ChainParametersV3),
-}
-
-impl ChainParameters {
-    /// Get the keys for parameter updates that are common to all versions.
-    pub fn common_update_keys(&self) -> &AuthorizationsV0 {
-        match self {
-            Self::V0(data) => &data.keys.level_2_keys,
-            Self::V1(data) => &data.keys.level_2_keys.v0,
-            Self::V2(data) => &data.keys.level_2_keys.v0,
-            Self::V3(data) => &data.keys.level_2_keys.v0,
-        }
-    }
-}
-
-impl ChainParameters {
-    /// Compute the exchange rate between `microCCD` and `NRG`.
-    pub fn micro_ccd_per_energy(&self) -> num::rational::Ratio<u128> {
-        let (num, denom) = match self {
-            ChainParameters::V0(v0) => {
-                let x = v0.micro_ccd_per_euro;
-                let y = v0.euro_per_energy;
-                (
-                    u128::from(x.numerator()) * u128::from(y.numerator()),
-                    u128::from(x.denominator()) * u128::from(y.denominator()),
-                )
-            }
-            ChainParameters::V1(v1) => {
-                let x = v1.micro_ccd_per_euro;
-                let y = v1.euro_per_energy;
-                (
-                    u128::from(x.numerator()) * u128::from(y.numerator()),
-                    u128::from(x.denominator()) * u128::from(y.denominator()),
-                )
-            }
-            ChainParameters::V2(v2) => {
-                let x = v2.micro_ccd_per_euro;
-                let y = v2.euro_per_energy;
-                (
-                    u128::from(x.numerator()) * u128::from(y.numerator()),
-                    u128::from(x.denominator()) * u128::from(y.denominator()),
-                )
-            }
-            ChainParameters::V3(v3) => {
-                let x = v3.micro_ccd_per_euro;
-                let y = v3.euro_per_energy;
-                (
-                    u128::from(x.numerator()) * u128::from(y.numerator()),
-                    u128::from(x.denominator()) * u128::from(y.denominator()),
-                )
-            }
-        };
-        num::rational::Ratio::new(num, denom)
-    }
-
-    /// Get the CCD cost of the given amount of energy for the current chain
-    /// parameters.
-    pub fn ccd_cost(&self, nrg: Energy) -> Amount {
-        let ratio = self.micro_ccd_per_energy();
-        let numer = BigUint::from(*ratio.numer()) * nrg.energy;
-        let denomer = BigUint::from(*ratio.denom());
-        let cost = num::rational::Ratio::new(numer, denomer);
-        let i = cost.ceil().to_integer();
-        // The next line should be a no-op when the values are coming from the chain
-        // since the amount should always fit a u64. With a 3_000_000 maximum
-        // NRG limit the exchange rate would have to be more than 6148914691236
-        // microCCD per NRG (6148914 CCD per NRG) for this to occur. But even in that
-        // case this behaviour here matches the node behaviour.
-        let micro = i % u64::MAX;
-        Amount::from_micro_ccd(micro.to_u64().expect("Value is known to be under u64::MAX"))
-    }
-
-    /// The foundation account that gets the foundation tax.
-    pub fn foundation_account(&self) -> AccountAddress {
-        match self {
-            ChainParameters::V0(v0) => v0.foundation_account,
-            ChainParameters::V1(v1) => v1.foundation_account,
-            ChainParameters::V2(v2) => v2.foundation_account,
-            ChainParameters::V3(v3) => v3.foundation_account,
-        }
-    }
 }
 
 impl From<&BlockIdentifier> for generated::BlockHashInput {
