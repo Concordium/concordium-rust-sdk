@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+## 8.0.0
+
 - Added const conversion function to convert from `ProtocolVersion` enum to `ProtocolVersionInt`
 - Removed authorization from `TokenClient` validation.
 - Added `validate_mint`, `validate_burn`, `validate_allow_list_update`, `validate_deny_list_update` methods to `TokenClient`.
