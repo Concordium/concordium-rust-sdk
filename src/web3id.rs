@@ -14,7 +14,7 @@ use concordium_base::{
     contracts_common::AccountAddress,
     id::{
         constants::{ArCurve, IpPairing},
-        types::{ArInfos, IpIdentity},
+        types::{ArInfo, ArInfos, CredentialValidity, IpIdentity, IpInfo},
     },
     web3id,
 };
@@ -150,20 +150,12 @@ pub async fn verify_credential_metadata(
         }
 
         CredentialMetadata::Identity { issuer, validity } => {
-
             // get all the identity providers at current block
             let identity_providers = client.get_identity_providers(bi).await?
                 .response
                 .try_collect::<Vec<_>>()
                 .map_err(|_e| CredentialLookupError::InvalidResponse("Error getting identity providers".into()))
                 .await?;
-
-            // find the matching identity provider info
-            let matching_idp = identity_providers.iter()
-                .find(|idp| {
-                    idp.ip_identity.0 == issuer.0
-                })
-                .ok_or( CredentialLookupError::InvalidResponse("Error occurred while getting matching identity provider".into()))?;
 
             // get anonymity revokers
             let anonymity_revokers = client.get_anonymity_revokers(bi).await?.response
@@ -172,28 +164,47 @@ pub async fn verify_credential_metadata(
                     CredentialLookupError::InvalidResponse("Error while getting annonymity revokers.".into(),
                 ))
                 .await?;
-
-            // create a new BTreeMap to hold the Anonymity revoker identity -> the anonymity revoker info
-            let mut anonymity_revoker_infos = BTreeMap::new();
-
-            for ar in anonymity_revokers {
-                anonymity_revoker_infos.insert(ar.ar_identity, ar);
-            }
-
-            // build inputs
-            let inputs = CredentialsInputs::Identity { ip_info: matching_idp.clone(), ars_infos: ArInfos { anonymity_revokers: anonymity_revoker_infos } };
-
-            // Credential Status handling
+            
             let now = client.get_block_info(bi).await?.response.block_slot_time;
 
-            let valid_to = validity.valid_to.upper()
-                .ok_or(CredentialLookupError::InvalidResponse("Error while getting annonymity revokers.".into()))?;
-
-            let credential_status = determine_credential_status_valid_to(now, valid_to);
-
-            Ok(CredentialWithMetadata { inputs: inputs, status: credential_status})
+            // call verify now for the data gathered
+            verify_identity_credential_metadata(now, issuer, identity_providers, anonymity_revokers, validity)
         }
     }
+}
+
+/// verify metadata for an identity
+fn verify_identity_credential_metadata(
+    utc_time:DateTime<Utc>, 
+    issuer: IpIdentity, 
+    identity_providers: Vec<IpInfo<IpPairing>>, 
+    anonymity_revokers: Vec<ArInfo<ArCurve>>, 
+    validity: CredentialValidity
+) -> Result<CredentialWithMetadata, CredentialLookupError> {
+    // get the matching identity provider
+    let matching_idp = identity_providers.iter()
+        .find(|idp| {
+            idp.ip_identity.0 == issuer.0
+        })
+        .ok_or( CredentialLookupError::InvalidResponse("Error occurred while getting matching identity provider".into()))?;
+
+    // create a new BTreeMap to hold the Anonymity revoker identity -> the anonymity revoker info
+    let mut anonymity_revoker_infos = BTreeMap::new();
+
+    for ar in anonymity_revokers {
+        anonymity_revoker_infos.insert(ar.ar_identity, ar);
+    }
+
+    // build inputs
+    let inputs = CredentialsInputs::Identity { ip_info: matching_idp.clone(), ars_infos: ArInfos { anonymity_revokers: anonymity_revoker_infos } };
+
+    // Credential Status handling
+    let valid_to = validity.valid_to.upper()
+        .ok_or(CredentialLookupError::InvalidResponse("Error while getting annonymity revokers.".into()))?;
+
+    let credential_status = determine_credential_status_valid_to(utc_time, valid_to);
+
+    Ok(CredentialWithMetadata { inputs: inputs, status: credential_status})
 }
 
 /// determine the credential status where both the valid from and valid to is provided
