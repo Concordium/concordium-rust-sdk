@@ -342,14 +342,14 @@ mod tests {
 
         // Identity provider
         let ip_description = Description {description: "dummy description".to_string(), name: "dummy name".to_string(), url: "http://dummy.com".to_string()};
-        let ip_verify_key = None;
-        let ip_cdi_key = None;
+        let ip_verify_key = None; // TODO ROB - not sure how i build this
+        let ip_cdi_key = None; // TODO ROB - not sure how i build this
         let ip_info_stubbed = IpInfo { ip_identity: issuer, ip_description: ip_description, ip_verify_key: ip_verify_key, ip_cdi_verify_key: ip_cdi_key};
         let identity_providers = vec![ip_info_stubbed];
 
         // the anonymity revokers for testing
         let ar_identity = ArIdentity(1u32);
-        let ar_public_key = PublicKey { .. }; // some constructed public key here?
+        let ar_public_key = PublicKey { .. }; // TODO ROB - not sure how i build this
         let ar_description = Description {description: "ar description".to_string(), name: "ar dummy name".to_string(), url: "http://dummy.com".to_string()};
         let anonymity_revoker = ArInfo {ar_identity: ar_identity, ar_description: ar_description, ar_public_key:  ar_public_key };
         let anonymity_revokers = vec![anonymity_revoker];
