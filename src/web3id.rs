@@ -3,7 +3,9 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    cis4::{Cis4Contract, Cis4QueryError}, types::queries::BlockInfo, v2::{self, BlockIdentifier, IntoBlockIdentifier}
+    cis4::{Cis4Contract, Cis4QueryError},
+    types::queries::BlockInfo,
+    v2::{self, BlockIdentifier, IntoBlockIdentifier},
 };
 pub use concordium_base::web3id::*;
 use concordium_base::{
@@ -119,7 +121,7 @@ pub async fn verify_credential_metadata(
                     // create the credential validity reference
                     let validity = CredentialValidity {
                         created_at: cdv.policy.created_at,
-                        valid_to: cdv.policy.valid_to
+                        valid_to: cdv.policy.valid_to,
                     };
 
                     // determine credential validity status
@@ -146,42 +148,60 @@ pub async fn verify_credential_metadata(
 
         CredentialMetadata::Identity { issuer, validity } => {
             // get all the identity providers at current block
-            let identity_providers = client.get_identity_providers(bi).await?
+            let identity_providers = client
+                .get_identity_providers(bi)
+                .await?
                 .response
                 .try_collect::<Vec<_>>()
-                .map_err(|_e| CredentialLookupError::InvalidResponse("Error getting identity providers".into()))
+                .map_err(|_e| {
+                    CredentialLookupError::InvalidResponse(
+                        "Error getting identity providers".into(),
+                    )
+                })
                 .await?;
 
             // get anonymity revokers
-            let anonymity_revokers = client.get_anonymity_revokers(bi).await?.response
+            let anonymity_revokers = client
+                .get_anonymity_revokers(bi)
+                .await?
+                .response
                 .try_collect::<Vec<_>>()
-                .map_err(|_e|
-                    CredentialLookupError::InvalidResponse("Error while getting annonymity revokers.".into(),
-                ))
+                .map_err(|_e| {
+                    CredentialLookupError::InvalidResponse(
+                        "Error while getting annonymity revokers.".into(),
+                    )
+                })
                 .await?;
-            
+
             let block_info = client.get_block_info(bi).await?.response;
 
             // call verify now for the data gathered
-            verify_identity_credential_metadata(block_info, issuer, identity_providers, anonymity_revokers, validity)
+            verify_identity_credential_metadata(
+                block_info,
+                issuer,
+                identity_providers,
+                anonymity_revokers,
+                validity,
+            )
         }
     }
 }
 
 /// verify metadata for an identity
 fn verify_identity_credential_metadata(
-    block_info: BlockInfo, 
-    issuer: IpIdentity, 
-    identity_providers: Vec<IpInfo<IpPairing>>, 
-    anonymity_revokers: Vec<ArInfo<ArCurve>>, 
-    validity: CredentialValidity
+    block_info: BlockInfo,
+    issuer: IpIdentity,
+    identity_providers: Vec<IpInfo<IpPairing>>,
+    anonymity_revokers: Vec<ArInfo<ArCurve>>,
+    validity: CredentialValidity,
 ) -> Result<CredentialWithMetadata, CredentialLookupError> {
     // get the matching identity provider
-    let matching_idp = identity_providers.iter()
-        .find(|idp| {
-            idp.ip_identity.0 == issuer.0
-        })
-        .ok_or( CredentialLookupError::InvalidResponse("Error occurred while getting matching identity provider".into()))?;
+    let matching_idp = identity_providers
+        .iter()
+        .find(|idp| idp.ip_identity.0 == issuer.0)
+        .ok_or(CredentialLookupError::InvalidResponse(
+            "Error occurred while getting matching identity provider".into(),
+        ))?;
 
     // create a new BTreeMap to hold the Anonymity revoker identity -> the anonymity revoker info
     let mut anonymity_revoker_infos = BTreeMap::new();
@@ -191,7 +211,12 @@ fn verify_identity_credential_metadata(
     }
 
     // build inputs
-    let inputs = CredentialsInputs::Identity { ip_info: matching_idp.clone(), ars_infos: ArInfos { anonymity_revokers: anonymity_revoker_infos } };
+    let inputs = CredentialsInputs::Identity {
+        ip_info: matching_idp.clone(),
+        ars_infos: ArInfos {
+            anonymity_revokers: anonymity_revoker_infos,
+        },
+    };
 
     // determine the credential validity status
     let status = determine_credential_validity_status(validity, block_info)?;
@@ -199,24 +224,32 @@ fn verify_identity_credential_metadata(
     Ok(CredentialWithMetadata { inputs, status })
 }
 
-
 /// Checks the credentials validity for the block info provided and returns a Credential Status
-fn determine_credential_validity_status (validity: CredentialValidity, block_info: BlockInfo) -> Result<CredentialStatus, CredentialLookupError> { 
-    let valid_from = validity.created_at.lower()
-        .ok_or(CredentialLookupError::InvalidResponse("Credential valid from date is not valid.".into()))?;
+fn determine_credential_validity_status(
+    validity: CredentialValidity,
+    block_info: BlockInfo,
+) -> Result<CredentialStatus, CredentialLookupError> {
+    let valid_from = validity
+        .created_at
+        .lower()
+        .ok_or(CredentialLookupError::InvalidResponse(
+            "Credential valid from date is not valid.".into(),
+        ))?;
 
-    let valid_to = validity.valid_to.upper()
-        .ok_or(CredentialLookupError::InvalidResponse("Credential valid to date is not valid.".into()))?;
+    let valid_to = validity
+        .valid_to
+        .upper()
+        .ok_or(CredentialLookupError::InvalidResponse(
+            "Credential valid to date is not valid.".into(),
+        ))?;
 
     let now = block_info.block_slot_time;
 
     if valid_from > now {
         Ok(CredentialStatus::NotActivated)
-    }
-    else if valid_to >= now {
+    } else if valid_to >= now {
         Ok(CredentialStatus::Active)
-    }
-    else {
+    } else {
         Ok(CredentialStatus::Expired)
     }
 }
@@ -251,44 +284,113 @@ mod tests {
     use crate::types::queries::ProtocolVersionInt;
 
     use super::*;
-    use concordium_base::{base::{AbsoluteBlockHeight, BlockHeight, Energy, GenesisIndex, ProtocolVersion}, constants::SHA256, hashes::HashBytes, id::types::YearMonth};
-
+    use chrono::{DateTime, Utc};
+    use concordium_base::{
+        base::{AbsoluteBlockHeight, BlockHeight, Energy, GenesisIndex, ProtocolVersion},
+        constants::SHA256,
+        hashes::HashBytes,
+        id::types::YearMonth,
+    };
 
     #[test]
-    fn test_determine_credential_validity_status_as_active_for_account(){
+    fn test_determine_credential_validity_status_as_active() {
         let now = YearMonth::now();
         let now_time = now.lower().expect("expected now time");
         // create an 'active' credential validity, created last year, expires next year
-        let validity = CredentialValidity { 
-            created_at: YearMonth { month: now.month, year: now.year - 1 },
-            valid_to: YearMonth { month: now.month, year: now.year + 1 }, 
+        let validity = CredentialValidity {
+            created_at: YearMonth {
+                month: now.month,
+                year: now.year - 1,
+            },
+            valid_to: YearMonth {
+                month: now.month,
+                year: now.year + 1,
+            },
         };
 
         // stub the current block information
-        let block_info = BlockInfo { 
-            transactions_size: 0u64, 
-            block_parent: HashBytes::new([1u8; SHA256]), 
-            block_hash: HashBytes::new([1u8; SHA256]), 
-            finalized: true, 
-            block_state_hash: HashBytes::new([1u8; SHA256]),  
-            block_arrive_time: now_time, 
-            block_receive_time: now_time, 
-            transaction_count: 0, 
-            transaction_energy_cost: Energy::default(), 
-            block_slot: None, 
-            block_last_finalized: HashBytes::new([1u8; SHA256]), 
-            block_slot_time: now_time, 
-            block_height: AbsoluteBlockHeight { height: 1u64 }, 
-            era_block_height: BlockHeight {height: 1u64 }, 
-            genesis_index: GenesisIndex { height: 0u32 }, 
-            block_baker: None, 
-            protocol_version: ProtocolVersionInt::from_enum(ProtocolVersion::P9), 
-            round: None, 
-            epoch: None 
-        };
+        let block_info = get_dummy_block_info(now_time);
 
-        let credential_status_result = determine_credential_validity_status(validity, block_info).expect("expected credential status here");
+        let credential_status_result = determine_credential_validity_status(validity, block_info)
+            .expect("expected credential status here");
 
         assert_eq!(CredentialStatus::Active, credential_status_result);
+    }
+
+    #[test]
+    fn test_determine_credential_validity_status_as_expired() {
+        let now = YearMonth::now();
+        let now_time = now.lower().expect("expected now time");
+
+        // create an 'expired' credential validity, created last year, expires 2 month ago
+        let validity = CredentialValidity {
+            created_at: YearMonth {
+                month: now.month,
+                year: now.year - 1,
+            },
+            valid_to: YearMonth {
+                month: now.month - 2,
+                year: now.year,
+            },
+        };
+
+        // stub the current block information
+        let block_info = get_dummy_block_info(now_time);
+
+        let credential_status_result = determine_credential_validity_status(validity, block_info)
+            .expect("expected credential status here");
+
+        assert_eq!(CredentialStatus::Expired, credential_status_result);
+    }
+
+    #[test]
+    fn test_determine_credential_validity_status_as_not_active() {
+        let now = YearMonth::now();
+        let now_time = now.lower().expect("expected now time");
+
+        // create a 'not active' credential validity, created 1 month in future, expires 1 year in future
+        let validity = CredentialValidity {
+            created_at: YearMonth {
+                month: now.month + 1,
+                year: now.year,
+            },
+            valid_to: YearMonth {
+                month: now.month,
+                year: now.year + 1,
+            },
+        };
+
+        // stub the current block information
+        let block_info = get_dummy_block_info(now_time);
+
+        let credential_status_result = determine_credential_validity_status(validity, block_info)
+            .expect("expected credential status here");
+
+        assert_eq!(CredentialStatus::NotActivated, credential_status_result);
+    }
+
+    // helper util to just get a dummy block based on a block slot time provided for credential validity testing
+    fn get_dummy_block_info(block_slot_time: DateTime<Utc>) -> BlockInfo {
+        BlockInfo {
+            transactions_size: 0u64,
+            block_parent: HashBytes::new([1u8; SHA256]),
+            block_hash: HashBytes::new([1u8; SHA256]),
+            finalized: true,
+            block_state_hash: HashBytes::new([1u8; SHA256]),
+            block_arrive_time: block_slot_time,
+            block_receive_time: block_slot_time,
+            transaction_count: 0,
+            transaction_energy_cost: Energy::default(),
+            block_slot: None,
+            block_last_finalized: HashBytes::new([1u8; SHA256]),
+            block_slot_time: block_slot_time,
+            block_height: AbsoluteBlockHeight { height: 1u64 },
+            era_block_height: BlockHeight { height: 1u64 },
+            genesis_index: GenesisIndex { height: 0u32 },
+            block_baker: None,
+            protocol_version: ProtocolVersionInt::from_enum(ProtocolVersion::P9),
+            round: None,
+            epoch: None,
+        }
     }
 }
