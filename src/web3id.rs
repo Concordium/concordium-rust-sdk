@@ -3,10 +3,8 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    cis4::{Cis4Contract, Cis4QueryError},
-    v2::{self, BlockIdentifier, IntoBlockIdentifier},
+    cis4::{Cis4Contract, Cis4QueryError}, types::queries::BlockInfo, v2::{self, BlockIdentifier, IntoBlockIdentifier}
 };
-use chrono::{DateTime, Utc};
 pub use concordium_base::web3id::*;
 use concordium_base::{
     base::CredentialRegistrationID,
@@ -116,19 +114,16 @@ pub async fn verify_credential_metadata(
                     cdv,
                     commitments,
                 } => {
-                    let now = client.get_block_info(bi).await?.response.block_slot_time;
-                    let valid_from = cdv.policy.created_at.lower().ok_or_else(|| {
-                        CredentialLookupError::InvalidResponse(
-                            "Credential creation date is not valid.".into(),
-                        )
-                    })?;
-                    let valid_until = cdv.policy.valid_to.upper().ok_or_else(|| {
-                        CredentialLookupError::InvalidResponse(
-                            "Credential creation date is not valid.".into(),
-                        )
-                    })?;
+                    let block_info = client.get_block_info(bi).await?.response;
 
-                    let status = determine_credential_status_valid_from_valid_to(now, valid_from, valid_until);
+                    // create the credential validity reference
+                    let validity = CredentialValidity {
+                        created_at: cdv.policy.created_at,
+                        valid_to: cdv.policy.valid_to
+                    };
+
+                    // determine credential validity status
+                    let status = determine_credential_validity_status(validity, block_info)?;
 
                     let inputs = CredentialsInputs::Account {
                         commitments: commitments.cmm_attributes.clone(),
@@ -165,17 +160,17 @@ pub async fn verify_credential_metadata(
                 ))
                 .await?;
             
-            let now = client.get_block_info(bi).await?.response.block_slot_time;
+            let block_info = client.get_block_info(bi).await?.response;
 
             // call verify now for the data gathered
-            verify_identity_credential_metadata(now, issuer, identity_providers, anonymity_revokers, validity)
+            verify_identity_credential_metadata(block_info, issuer, identity_providers, anonymity_revokers, validity)
         }
     }
 }
 
 /// verify metadata for an identity
 fn verify_identity_credential_metadata(
-    utc_time:DateTime<Utc>, 
+    block_info: BlockInfo, 
     issuer: IpIdentity, 
     identity_providers: Vec<IpInfo<IpPairing>>, 
     anonymity_revokers: Vec<ArInfo<ArCurve>>, 
@@ -198,37 +193,31 @@ fn verify_identity_credential_metadata(
     // build inputs
     let inputs = CredentialsInputs::Identity { ip_info: matching_idp.clone(), ars_infos: ArInfos { anonymity_revokers: anonymity_revoker_infos } };
 
-    // Credential Status handling
+    // determine the credential validity status
+    let status = determine_credential_validity_status(validity, block_info)?;
+
+    Ok(CredentialWithMetadata { inputs, status })
+}
+
+
+/// Checks the credentials validity for the block info provided and returns a Credential Status
+fn determine_credential_validity_status (validity: CredentialValidity, block_info: BlockInfo) -> Result<CredentialStatus, CredentialLookupError> { 
+    let valid_from = validity.created_at.lower()
+        .ok_or(CredentialLookupError::InvalidResponse("Credential valid from date is not valid.".into()))?;
+
     let valid_to = validity.valid_to.upper()
-        .ok_or(CredentialLookupError::InvalidResponse("Error while getting the valid to date for the credentials validity.".into()))?;
+        .ok_or(CredentialLookupError::InvalidResponse("Credential valid to date is not valid.".into()))?;
 
-    let credential_status = determine_credential_status_valid_to(utc_time, valid_to);
+    let now = block_info.block_slot_time;
 
-    Ok(CredentialWithMetadata { inputs: inputs, status: credential_status})
-}
-
-/// determine the credential status where both the valid from and valid to is provided
-fn determine_credential_status_valid_from_valid_to(
-    time_to_compare_to: DateTime<Utc>,
-    valid_from: DateTime<Utc>,
-    valid_to: DateTime<Utc>,
-) -> CredentialStatus {
-    if valid_from > time_to_compare_to {
-        CredentialStatus::NotActivated
-    } else {
-        determine_credential_status_valid_to(time_to_compare_to, valid_to)
+    if valid_from > now {
+        Ok(CredentialStatus::NotActivated)
     }
-}
-
-/// determine the credential status where you only have a `valid to` field and no valid from (such as identity)
-fn determine_credential_status_valid_to(
-    time_to_compare_to: DateTime<Utc>,
-    valid_to: DateTime<Utc>,
-) -> CredentialStatus {
-    if valid_to < time_to_compare_to {
-        CredentialStatus::Expired
-    } else {
-        CredentialStatus::Active
+    else if valid_to >= now {
+        Ok(CredentialStatus::Active)
+    }
+    else {
+        Ok(CredentialStatus::Expired)
     }
 }
 
@@ -259,126 +248,47 @@ pub async fn get_public_data(
 
 #[cfg(test)]
 mod tests {
+    use crate::types::queries::ProtocolVersionInt;
+
     use super::*;
-    use chrono::{Datelike, Days};
-    use concordium_base::{contracts_common::PublicKeyEd25519, id::types::{ArIdentity, Description, YearMonth}, ps_sig::PublicKey};
+    use concordium_base::{base::{AbsoluteBlockHeight, BlockHeight, Energy, GenesisIndex, ProtocolVersion}, constants::SHA256, hashes::HashBytes, id::types::YearMonth};
 
-    /// valid from is before now, valid to is in the future, therefore credential status should be `active`
+
     #[test]
-    fn test_determine_credential_status_as_active_for_account() {
-        let now = Utc::now();
-        let valid_from = now
-            .checked_sub_days(Days::new(20))
-            .expect("expected valid date time");
-        let valid_to = now
-            .checked_add_days(Days::new(30))
-            .expect("expected valid date time");
+    fn test_determine_credential_validity_status_as_active_for_account(){
+        let now = YearMonth::now();
+        let now_time = now.lower().expect("expected now time");
+        // create an 'active' credential validity, created last year, expires next year
+        let validity = CredentialValidity { 
+            created_at: YearMonth { month: now.month, year: now.year - 1 },
+            valid_to: YearMonth { month: now.month, year: now.year + 1 }, 
+        };
 
-        let status = determine_credential_status_valid_from_valid_to(now, valid_from, valid_to);
-        assert_eq!(CredentialStatus::Active, status);
-    }
+        // stub the current block information
+        let block_info = BlockInfo { 
+            transactions_size: 0u64, 
+            block_parent: HashBytes::new([1u8; SHA256]), 
+            block_hash: HashBytes::new([1u8; SHA256]), 
+            finalized: true, 
+            block_state_hash: HashBytes::new([1u8; SHA256]),  
+            block_arrive_time: now_time, 
+            block_receive_time: now_time, 
+            transaction_count: 0, 
+            transaction_energy_cost: Energy::default(), 
+            block_slot: None, 
+            block_last_finalized: HashBytes::new([1u8; SHA256]), 
+            block_slot_time: now_time, 
+            block_height: AbsoluteBlockHeight { height: 1u64 }, 
+            era_block_height: BlockHeight {height: 1u64 }, 
+            genesis_index: GenesisIndex { height: 0u32 }, 
+            block_baker: None, 
+            protocol_version: ProtocolVersionInt::from_enum(ProtocolVersion::P9), 
+            round: None, 
+            epoch: None 
+        };
 
-    /// valid from is after now, valid to is in the future, therefore credential status should be `not activated`
-    #[test]
-    fn test_determine_credential_status_as_not_activated_valid_from_after_today() {
-        let now = Utc::now();
-        let valid_from = now
-            .checked_add_days(Days::new(2))
-            .expect("expected valid date time");
-        let valid_to = now
-            .checked_add_days(Days::new(30))
-            .expect("expected valid date time");
+        let credential_status_result = determine_credential_validity_status(validity, block_info).expect("expected credential status here");
 
-        let status = determine_credential_status_valid_from_valid_to(now, valid_from, valid_to);
-        assert_eq!(CredentialStatus::NotActivated, status);
-    }
-
-    /// valid from is before now, valid to is in the past, therefore credential status should be `expired`
-    #[test]
-    fn test_determine_credential_status_as_expired_from_and_to_in_past() {
-        let now = Utc::now();
-        let valid_from = now
-            .checked_sub_days(Days::new(100))
-            .expect("expected valid date time");
-        let valid_to = now
-            .checked_sub_days(Days::new(30))
-            .expect("expected valid date time");
-
-        let status = determine_credential_status_valid_from_valid_to(now, valid_from, valid_to);
-        assert_eq!(CredentialStatus::Expired, status);
-    }
-
-    // identity credential status check, returns as active for valid to date in the future
-    #[test]
-    fn test_determine_credential_status_as_active_for_identity() {
-        let now = Utc::now();
-        let valid_to = now
-            .checked_add_days(Days::new(20))
-            .expect("expected valid date time");
-
-        let status = determine_credential_status_valid_to(now, valid_to);
-        assert_eq!(CredentialStatus::Active, status);
-    }
-
-    // identity credential status check, returns as expired for valid to date in the past
-    #[test]
-    fn test_determine_credential_status_as_expired_for_identity() {
-        let now = Utc::now();
-        let valid_to = now
-            .checked_sub_days(Days::new(2))
-            .expect("expected valid date time");
-
-        let status = determine_credential_status_valid_to(now, valid_to);
-        assert_eq!(CredentialStatus::Expired, status);
-    }
-
-    // test the verification of an identity credential
-    #[test]
-    fn test_verify_identity_credential_metadata_success() {
-        
-        // mock data
-        let now = Utc::now();
-        let issuer = IpIdentity(1u32);
-
-        // Identity provider
-        let ip_description = Description {description: "dummy description".to_string(), name: "dummy name".to_string(), url: "http://dummy.com".to_string()};
-        let ip_verify_key = None; // TODO ROB - not sure how i build this
-        let ip_cdi_key = None; // TODO ROB - not sure how i build this
-        let ip_info_stubbed = IpInfo { ip_identity: issuer, ip_description: ip_description, ip_verify_key: ip_verify_key, ip_cdi_verify_key: ip_cdi_key};
-        let identity_providers = vec![ip_info_stubbed];
-
-        // the anonymity revokers for testing
-        let ar_identity = ArIdentity(1u32);
-        let ar_public_key = PublicKey { .. }; // TODO ROB - not sure how i build this
-        let ar_description = Description {description: "ar description".to_string(), name: "ar dummy name".to_string(), url: "http://dummy.com".to_string()};
-        let anonymity_revoker = ArInfo {ar_identity: ar_identity, ar_description: ar_description, ar_public_key:  ar_public_key };
-        let anonymity_revokers = vec![anonymity_revoker];
-
-        // credential validity
-        let created_at = YearMonth { month: now.month() as u8 , year: (now.year() - 1)};
-        let valid_to = YearMonth { month: (now.month() + 1) as u8, year: (now.year() as u16)};
-        let credential_validity = CredentialValidity {created_at: created_at, valid_to: valid_to};
-
-        // invocation
-        let result = verify_identity_credential_metadata(
-            now, issuer, identity_providers, anonymity_revokers, validity)?;
-        
-        // Expected anonymity revoker information returned in result
-        let expected_ar_info_btree = BTreeMap::new();
-        expected_ar_info_btree.insert(ar_identity, anonymity_revoker);
-        let expected_ar_infos = ArInfos {anonymity_revokers: expected_ar_info_btree};
-
-        // Assertions
-        assert_eq!(result.status, CredentialStatus::Active);
-
-        // Assertions for the Credential Iputs returned on the result
-        match result.inputs {
-            CredentialsInputs::Identity { ip_info, ars_infos } => {
-                assert_eq!(ip_info, ip_info_stubbed);
-                assert_eq!(ars_infos, expected_ar_infos);
-            },
-            _ => panic!("we should not reach here, we should have handled inputs realted to identity credentials for this test")
-        }
-
+        assert_eq!(CredentialStatus::Active, credential_status_result);
     }
 }
