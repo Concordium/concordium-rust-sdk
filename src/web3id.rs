@@ -260,7 +260,8 @@ pub async fn get_public_data(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Days;
+    use chrono::{Datelike, Days};
+    use concordium_base::{contracts_common::PublicKeyEd25519, id::types::{ArIdentity, Description, YearMonth}, ps_sig::PublicKey};
 
     /// valid from is before now, valid to is in the future, therefore credential status should be `active`
     #[test]
@@ -329,5 +330,55 @@ mod tests {
 
         let status = determine_credential_status_valid_to(now, valid_to);
         assert_eq!(CredentialStatus::Expired, status);
+    }
+
+    // test the verification of an identity credential
+    #[test]
+    fn test_verify_identity_credential_metadata_success() {
+        
+        // mock data
+        let now = Utc::now();
+        let issuer = IpIdentity(1u32);
+
+        // Identity provider
+        let ip_description = Description {description: "dummy description".to_string(), name: "dummy name".to_string(), url: "http://dummy.com".to_string()};
+        let ip_verify_key = None;
+        let ip_cdi_key = None;
+        let ip_info_stubbed = IpInfo { ip_identity: issuer, ip_description: ip_description, ip_verify_key: ip_verify_key, ip_cdi_verify_key: ip_cdi_key};
+        let identity_providers = vec![ip_info_stubbed];
+
+        // the anonymity revokers for testing
+        let ar_identity = ArIdentity(1u32);
+        let ar_public_key = PublicKey { .. }; // some constructed public key here?
+        let ar_description = Description {description: "ar description".to_string(), name: "ar dummy name".to_string(), url: "http://dummy.com".to_string()};
+        let anonymity_revoker = ArInfo {ar_identity: ar_identity, ar_description: ar_description, ar_public_key:  ar_public_key };
+        let anonymity_revokers = vec![anonymity_revoker];
+
+        // credential validity
+        let created_at = YearMonth { month: now.month() as u8 , year: (now.year() - 1)};
+        let valid_to = YearMonth { month: (now.month() + 1) as u8, year: (now.year() as u16)};
+        let credential_validity = CredentialValidity {created_at: created_at, valid_to: valid_to};
+
+        // invocation
+        let result = verify_identity_credential_metadata(
+            now, issuer, identity_providers, anonymity_revokers, validity)?;
+        
+        // Expected anonymity revoker information returned in result
+        let expected_ar_info_btree = BTreeMap::new();
+        expected_ar_info_btree.insert(ar_identity, anonymity_revoker);
+        let expected_ar_infos = ArInfos {anonymity_revokers: expected_ar_info_btree};
+
+        // Assertions
+        assert_eq!(result.status, CredentialStatus::Active);
+
+        // Assertions for the Credential Iputs returned on the result
+        match result.inputs {
+            CredentialsInputs::Identity { ip_info, ars_infos } => {
+                assert_eq!(ip_info, ip_info_stubbed);
+                assert_eq!(ars_infos, expected_ar_infos);
+            },
+            _ => panic!("we should not reach here, we should have handled inputs realted to identity credentials for this test")
+        }
+
     }
 }
