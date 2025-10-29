@@ -200,7 +200,7 @@ fn verify_identity_credential_metadata(
 
     // Credential Status handling
     let valid_to = validity.valid_to.upper()
-        .ok_or(CredentialLookupError::InvalidResponse("Error while getting annonymity revokers.".into()))?;
+        .ok_or(CredentialLookupError::InvalidResponse("Error while getting the valid to date for the credentials validity.".into()))?;
 
     let credential_status = determine_credential_status_valid_to(utc_time, valid_to);
 
