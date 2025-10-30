@@ -94,13 +94,22 @@ async fn main() -> anyhow::Result<()> {
                 created_at,
                 max_accounts: 100,
                 alist: vec![
-                    (AttributeTag(0), AttributeKind("A".into())),
-                    (AttributeTag(1), AttributeKind("B".into())),
-                    (AttributeTag(2), AttributeKind("C".into())),
-                    (AttributeTag(3), AttributeKind("D".into())),
-                    (AttributeTag(4), AttributeKind("EE".into())),
-                    (AttributeTag(5), AttributeKind("FFF".into())),
-                    (AttributeTag(6), AttributeKind("GGGG".into())),
+                    (AttributeTag(0), AttributeKind::try_new("A".into()).unwrap()),
+                    (AttributeTag(1), AttributeKind::try_new("B".into()).unwrap()),
+                    (AttributeTag(2), AttributeKind::try_new("C".into()).unwrap()),
+                    (AttributeTag(3), AttributeKind::try_new("D".into()).unwrap()),
+                    (
+                        AttributeTag(4),
+                        AttributeKind::try_new("EE".into()).unwrap(),
+                    ),
+                    (
+                        AttributeTag(5),
+                        AttributeKind::try_new("FFF".into()).unwrap(),
+                    ),
+                    (
+                        AttributeTag(6),
+                        AttributeKind::try_new("GGGG".into()).unwrap(),
+                    ),
                 ]
                 .into_iter()
                 .collect(),

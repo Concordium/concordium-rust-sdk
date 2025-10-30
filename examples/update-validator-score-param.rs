@@ -6,10 +6,11 @@ use concordium_base::updates::ValidatorScoreParameters;
 use concordium_rust_sdk::{
     common::types::TransactionTime,
     types::{
+        chain_parameters::ChainParameters,
         transactions::{update, BlockItem, Payload},
         TransactionStatus, UpdateKeyPair, UpdatePayload,
     },
-    v2::{self, BlockIdentifier, ChainParameters},
+    v2::{self, BlockIdentifier},
 };
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -54,10 +55,19 @@ async fn main() -> anyhow::Result<()> {
         .context("Could not obtain last finalized block's chain parameters")?
         .response;
 
+    let keys = summary
+        .keys
+        .level_2_keys
+        .context("No level 2 keys in chain parameters.")?;
+
     // find the key indices to sign with
-    let signer = summary
-        .common_update_keys()
-        .construct_update_signer(&summary.common_update_keys().micro_gtu_per_euro, kps)
+    let signer = keys
+        .construct_update_signer(
+            keys.micro_ccd_per_euro
+                .as_ref()
+                .context("Missing micro CCD per Euro update keys.")?,
+            kps,
+        )
         .context("Invalid keys supplied.")?;
 
     let seq_number = client
