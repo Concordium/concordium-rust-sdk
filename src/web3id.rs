@@ -2,17 +2,28 @@
 
 use crate::{
     cis4::{Cis4Contract, Cis4QueryError},
+    types::queries::BlockInfo,
     v2::{self, BlockIdentifier, IntoBlockIdentifier},
 };
+use anyhow::Ok;
 pub use concordium_base::web3id::*;
 use concordium_base::{
     base::CredentialRegistrationID,
     cis4_types::CredentialStatus,
     contracts_common::AccountAddress,
-    id::{constants::ArCurve, types::IpIdentity},
-    web3id,
+    id::{
+        constants::{ArCurve, IpPairing},
+        types::{ArInfos, CredentialValidity, IpIdentity, IpInfo},
+    },
+    web3id::{
+        self,
+        v1::{
+            CredentialMetadataTypeV1, CredentialMetadataV1, CredentialVerificationMaterial,
+            IdentityCredentialVerificationMaterial, RequestV1,
+        },
+    },
 };
-use futures::TryStreamExt;
+use futures::{TryFutureExt, TryStreamExt};
 
 #[derive(thiserror::Error, Debug)]
 pub enum CredentialLookupError {
@@ -47,6 +58,15 @@ pub struct CredentialWithMetadata {
     pub status: CredentialStatus,
     /// The extra public inputs needed for verification.
     pub inputs: CredentialsInputs<ArCurve>,
+}
+
+/// TODO - please review, I created this on the basis that we need something similar to the above
+/// where we have a credential status returned, and also the RequestV1 that was verified. Not sure if these are both needed
+pub struct VerifiablePresentationReqeuestWithMetadata {
+    /// The status of the credential at a point in time.
+    pub status: CredentialStatus,
+    /// the verified request
+    pub request: RequestV1<ArCurve, web3id::Web3IdAttribute>,
 }
 
 /// Retrieve and validate credential metadata in a particular block.
@@ -149,6 +169,106 @@ pub async fn verify_credential_metadata(
     }
 }
 
+/// Verify credential metadata for Presentation V1 which includes Identity based credential verification
+pub async fn verify_credential_metadata_v1(
+    mut client: v2::Client,
+    network: web3id::did::Network, // TODO - check if we really need it
+    metadata: CredentialMetadataV1,
+    bi: impl IntoBlockIdentifier,
+    presentation_v1: &web3id::v1::PresentationV1<IpPairing, ArCurve, web3id::Web3IdAttribute>,
+    request_v1: RequestV1<ArCurve, web3id::Web3IdAttribute>,
+    ip_info: IpInfo<IpPairing>,
+    ars_infos: ArInfos<ArCurve>,
+) -> Result<VerifiablePresentationReqeuestWithMetadata, CredentialLookupError> {
+    match metadata.cred_metadata {
+        // For verifying account credentials v1
+        CredentialMetadataTypeV1::Account(account_credential_metadata) => {
+            // call the other verify function
+            let proof = ProofMetadata {
+                created: metadata.created,
+                network,
+                cred_metadata: CredentialMetadata::Account {
+                    issuer: account_credential_metadata.issuer,
+                    cred_id: account_credential_metadata.cred_id,
+                },
+            };
+
+            let credential_with_metadata =
+                verify_credential_metadata(client, network, &proof, bi).await?;
+
+            // TODO:  Error for now - probably need to confirm return type for this one
+            Err(CredentialLookupError::InvalidResponse(
+                "not supported right now".to_string(),
+            ))
+        }
+        CredentialMetadataTypeV1::Identity(identity_credential_metadata) => {
+            let bi = bi.into_block_identifier();
+            let issuer = identity_credential_metadata.issuer;
+            let credential_validity = identity_credential_metadata.validity;
+
+            // Global context will be looked up on chain - through grpc client
+            let global_context = client
+                .get_cryptographic_parameters(bi)
+                .map_err(|_e| {
+                    CredentialLookupError::InvalidResponse("global context lookup fail".to_string())
+                })
+                .await?
+                .response;
+
+            // determine credential validity here
+            let block_info = client.get_block_info(bi).await?.response;
+            let status = determine_credential_validity_status(credential_validity, block_info)?;
+
+            /// TODO - anchor validation should be done somewhere here in a follow up ticket
+            /// anchor validation will be done, by looking up the transaction hash on chain
+            /// and verifying it matches in an expected block
+            let verification_material = vec![CredentialVerificationMaterial::Identity(
+                IdentityCredentialVerificationMaterial { ip_info, ars_infos },
+            )];
+
+            // cryptographic verification, which returns the verified request
+            let request = presentation_v1
+                .verify(&global_context, verification_material.into_iter())
+                .map_err(|_e| {
+                    CredentialLookupError::InvalidResponse("Some error for now".to_string())
+                })?;
+
+            Ok(VerifiablePresentationReqeuestWithMetadata { request, status })
+        }
+    }
+}
+
+/// determine the credential validity based on the valid from and valid to date information.
+/// The block info supplied has the slot time we will use as the current time, to check validity against
+fn determine_credential_validity_status(
+    validity: CredentialValidity,
+    block_info: BlockInfo,
+) -> Result<CredentialStatus, CredentialLookupError> {
+    let valid_from = validity
+        .created_at
+        .lower()
+        .ok_or(CredentialLookupError::InvalidResponse(
+            "Credential valid from date is not valid.".into(),
+        ))?;
+
+    let valid_to = validity
+        .valid_to
+        .upper()
+        .ok_or(CredentialLookupError::InvalidResponse(
+            "Credential valid to date is not valid.".into(),
+        ))?;
+
+    let now = block_info.block_slot_time;
+
+    if valid_from > now {
+        Ok(CredentialStatus::NotActivated)
+    } else if valid_to >= now {
+        Ok(CredentialStatus::Active)
+    } else {
+        Ok(CredentialStatus::Expired)
+    }
+}
+
 /// Retrieve the public data of credentials validating any metadata that is
 /// part of the credentials.
 ///
@@ -169,6 +289,39 @@ pub async fn get_public_data(
         .map(|meta| {
             let mainnet_client = client.clone();
             async move { verify_credential_metadata(mainnet_client, network, &meta, block).await }
+        })
+        .collect::<futures::stream::FuturesOrdered<_>>();
+    stream.try_collect().await
+}
+
+/// get public data for presentation v1, which supports Identity credentials verification
+pub async fn get_public_data_v1(
+    client: &mut v2::Client,
+    network: web3id::did::Network,
+    presentation: &web3id::v1::PresentationV1<IpPairing, ArCurve, web3id::Web3IdAttribute>,
+    bi: impl IntoBlockIdentifier,
+    request: RequestV1<ArCurve, web3id::Web3IdAttribute>,
+    ip_info: IpInfo<IpPairing>,
+    ars_infos: ArInfos<ArCurve>,
+) -> Result<Vec<VerifiablePresentationReqeuestWithMetadata>, CredentialLookupError> {
+    let block = bi.into_block_identifier();
+    let stream = presentation
+        .metadata()
+        .map(|meta| {
+            let client = client.clone();
+            async move {
+                verify_credential_metadata_v1(
+                    client,
+                    network,
+                    meta,
+                    block,
+                    presentation,
+                    request,
+                    ip_info,
+                    ars_infos,
+                )
+                .await
+            }
         })
         .collect::<futures::stream::FuturesOrdered<_>>();
     stream.try_collect().await
