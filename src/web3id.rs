@@ -9,7 +9,10 @@ use concordium_base::{
     base::CredentialRegistrationID,
     cis4_types::CredentialStatus,
     contracts_common::AccountAddress,
-    id::{constants::ArCurve, types::IpIdentity},
+    id::{
+        constants::{ArCurve, IpPairing},
+        types::IpIdentity,
+    },
     web3id,
 };
 use futures::TryStreamExt;
@@ -46,7 +49,7 @@ pub struct CredentialWithMetadata {
     /// The status of the credential at a point in time.
     pub status: CredentialStatus,
     /// The extra public inputs needed for verification.
-    pub inputs: CredentialsInputs<ArCurve>,
+    pub inputs: CredentialsInputs<IpPairing, ArCurve>,
 }
 
 /// Retrieve and validate credential metadata in a particular block.
@@ -78,7 +81,7 @@ pub async fn verify_credential_metadata(
     }
     let bi = bi.into_block_identifier();
     match metadata.cred_metadata {
-        CredentialMetadata::Account { issuer, cred_id } => {
+        CredentialMetadata::Account(AccountCredentialMetadata { issuer, cred_id }) => {
             let ai = client
                 .get_account_info(&cred_id.into(), BlockIdentifier::LastFinal)
                 .await?;
@@ -136,7 +139,7 @@ pub async fn verify_credential_metadata(
                 }
             }
         }
-        CredentialMetadata::Web3Id { contract, holder } => {
+        CredentialMetadata::Web3Id(Web3idCredentialMetadata { contract, holder }) => {
             let mut contract_client = Cis4Contract::create(client, contract).await?;
             let issuer_pk = contract_client.issuer(bi).await?;
 
