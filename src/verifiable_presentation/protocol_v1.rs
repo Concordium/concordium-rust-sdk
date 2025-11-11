@@ -1,6 +1,6 @@
 use crate::{
     v2,
-    web3id::web3id::sdk::protocol::{Context, CredentialStatementRequest},
+    verifiable_presentation::web3id::sdk::protocol::{Context, CredentialStatementRequest},
 };
 use concordium_base::transactions::TooLargeError;
 use concordium_base::{
@@ -27,11 +27,11 @@ pub enum CreateAnchorError {
 #[serde(rename_all = "camelCase")]
 // #[serde(tag = "type", rename = "ConcordiumContextInformationV1")] // TODO: check if we need to tag
 pub struct VerificationRequestV1 {
-    ///
+    /// TODO
     pub context: Context,
-    ///
+    /// TODO
     pub credential_statements: Vec<CredentialStatementRequest>,
-    ///
+    /// TODO
     pub transaction_ref: TransactionHash,
 }
 

@@ -20,7 +20,7 @@ use concordium_rust_sdk::{
     common::types::TransactionTime,
     types::WalletAccount,
     v2::{self},
-    web3id::verifiable_presentation_v1::VerificationRequestV1,
+    verifiable_presentation::protocol_v1::VerificationRequestV1,
 };
 use rand::Rng;
 use std::{collections::HashMap, marker::PhantomData, path::PathBuf};
