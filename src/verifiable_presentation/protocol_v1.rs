@@ -1,4 +1,5 @@
-use crate::v2;
+//! Types and functions used in Concordium verifiable presentation protocol version 1.
+use crate::v2::{self, RPCError};
 use concordium_base::{
     base::Nonce,
     common::{
@@ -17,8 +18,6 @@ use std::collections::HashMap;
 
 #[derive(thiserror::Error, Debug)]
 pub enum CreateAnchorError {
-    #[error("Node RPC error: {0}")]
-    RPC(#[from] v2::RPCError),
     #[error("Node query error: {0}")]
     Query(#[from] v2::QueryError),
     #[error("Data register transaction data is too large: {0}")]
@@ -27,6 +26,13 @@ pub enum CreateAnchorError {
     CborSerialization(#[from] CborSerializationError),
 }
 
+impl From<RPCError> for CreateAnchorError {
+    fn from(err: RPCError) -> Self {
+        CreateAnchorError::Query(err.into())
+    }
+}
+
+/// Function that creates and anchors the verification request on-chain.
 pub async fn create_and_anchor_verification_request(
     mut client: v2::Client,
     signer: &impl ExactSizeTransactionSigner,
@@ -49,7 +55,7 @@ pub async fn create_and_anchor_verification_request(
     );
     let item = BlockItem::AccountTransaction(tx);
 
-    // Submit the transaction to the chain
+    // Submit the transaction to the chain.
     let transaction_hash = client.send_block_item(&item).await?;
 
     Ok(VerificationRequest {
@@ -58,6 +64,10 @@ pub async fn create_and_anchor_verification_request(
     })
 }
 
+/// The verification audit data to be stored in the database by the merchant.
+/// The type links the private `VerificationAuditRecord` type which its publicly
+/// anchored on-chain version via the transaction hash.
+/// The type includes the result of the proof verification.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "type", rename = "ConcordiumVerificationAuditDataV1")]
@@ -67,10 +77,14 @@ pub struct VerificationAuditData {
     pub record: VerificationAuditRecord,
     /// Blockchain transaction hash that anchors the audit.
     pub transaction_ref: TransactionHash,
-    /// Boolean specifying if the verification of the verifiable presentation passed.
+    /// Boolean specifying if the cryptographic proof verification passed
+    /// and the metadata/context/validity of the credential was verified successfully.
     pub verification_result: bool,
 }
 
+/// Function that creates and anchors the audit record on-chain.
+/// TODO: The function will report additionally if the cryptographic proof and
+/// metadata/context/validity of the credential checks have passed successfully.
 #[allow(clippy::too_many_arguments)]
 pub async fn verify_and_anchor_audit_record(
     client: v2::Client,
@@ -104,6 +118,7 @@ pub async fn verify_and_anchor_audit_record(
     })
 }
 
+/// Function that creates and anchors the audit record on-chain.
 pub async fn create_and_anchor_audit_record(
     mut client: v2::Client,
     signer: &impl ExactSizeTransactionSigner,
@@ -126,16 +141,8 @@ pub async fn create_and_anchor_audit_record(
     );
     let item = BlockItem::AccountTransaction(tx);
 
-    // Submit the transaction to the chain
+    // Submit the transaction to the chain.
     let transaction_hash = client.send_block_item(&item).await?;
 
     Ok(transaction_hash)
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_serde_verification_audit_data() {
-        // TODO
-    }
 }

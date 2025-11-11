@@ -1,7 +1,7 @@
-//! Example that shows how to generate a verification request anchor.
+//! Example that shows how to generate a verification audit anchor.
 //!
 //! You can run this example as follows:
-//! cargo run --example create_validation_audit_anchor -- --account 3nhMYfA59MWaxBRjfHPKSYH9S4W5HdZZ721jozVdeToBGvXTU8.export
+//! cargo run --example create_validation_audit_anchor -- --node http://localhost:20100 --account 3nhMYfA59MWaxBRjfHPKSYH9S4W5HdZZ721jozVdeToBGvXTU8.export
 use anyhow::Context as AnyhowContext;
 use clap::AppSettings;
 use concordium_rust_sdk::{
@@ -118,7 +118,8 @@ async fn main() -> anyhow::Result<()> {
 
     println!("Verification request anchor finalized in block {}.", bh);
 
-    // TODO: replace with actual generated presentation
+    // Note: The verification request is sent to the wallet/idApp and the
+    // returned presentation would be used here instead.
     let presentation_json = r#"
 {
   "type": [
@@ -249,7 +250,7 @@ async fn main() -> anyhow::Result<()> {
         "#;
 
     let presentation: PresentationV1<IpPairing, ArCurve, Web3IdAttribute> =
-        serde_json::from_str(&presentation_json).unwrap();
+        serde_json::from_str(presentation_json).unwrap();
 
     let id = "UUID".to_string();
 

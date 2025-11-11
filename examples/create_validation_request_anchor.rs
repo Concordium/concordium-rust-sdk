@@ -1,7 +1,7 @@
-//! Example that shows how to generate a verification audit anchor.
+//! Example that shows how to generate a verification request anchor.
 //!
 //! You can run this example as follows:
-//! cargo run --example create_validation_request_anchor -- --account 3nhMYfA59MWaxBRjfHPKSYH9S4W5HdZZ721jozVdeToBGvXTU8.export
+//! cargo run --example create_validation_request_anchor -- --node http://localhost:20100 --account 3nhMYfA59MWaxBRjfHPKSYH9S4W5HdZZ721jozVdeToBGvXTU8.export
 use anyhow::Context as AnyhowContext;
 use clap::AppSettings;
 use concordium_base::{
