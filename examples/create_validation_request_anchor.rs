@@ -1,4 +1,4 @@
-//! Example that shows how to generate a verification request anchor.
+//! Example that shows how to generate a verification audit anchor.
 //!
 //! You can run this example as follows:
 //! cargo run --example create_validation_request_anchor -- --account 3nhMYfA59MWaxBRjfHPKSYH9S4W5HdZZ721jozVdeToBGvXTU8.export
@@ -20,7 +20,7 @@ use concordium_rust_sdk::{
     common::types::TransactionTime,
     types::WalletAccount,
     v2::{self},
-    verifiable_presentation::protocol_v1::VerificationRequestV1,
+    verifiable_presentation::protocol_v1::create_and_anchor_verification_request,
 };
 use rand::Rng;
 use std::{collections::HashMap, marker::PhantomData, path::PathBuf};
@@ -89,8 +89,8 @@ async fn main() -> anyhow::Result<()> {
     let mut public_info = HashMap::new();
     public_info.insert("key".to_string(), cbor::value::Value::Positive(4u64));
 
-    let verification_request = VerificationRequestV1::create_and_anchor(
-        client,
+    let verification_request = create_and_anchor_verification_request(
+        client.clone(),
         &keys,
         keys.address,
         account_sequence_number,
@@ -102,8 +102,15 @@ async fn main() -> anyhow::Result<()> {
 
     println!(
         "Verification request anchor transaction hash: {}",
-        verification_request.transaction_ref
+        verification_request.anchor_transaction_hash
     );
+
+    let (bh, bs) = client
+        .wait_until_finalized(&verification_request.anchor_transaction_hash)
+        .await?;
+
+    println!("Verification request anchor finalized in block {}.", bh);
+    println!("The outcome is {:#?}", bs);
 
     println!(
         "Generated Verification Request to be sent to the wallet/idApp: {:#?}",
