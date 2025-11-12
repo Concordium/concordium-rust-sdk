@@ -1,18 +1,24 @@
 //! Types and functions used in Concordium verifiable presentation protocol version 1.
-use crate::v2::{self, RPCError};
+use crate::{
+    types::{AccountTransactionEffects, BlockItemSummaryDetails},
+    v2::{self, RPCError},
+};
 use concordium_base::{
     base::Nonce,
     common::{
         cbor::{self, CborSerializationError},
         types::TransactionTime,
+        upward::UnknownDataError,
     },
     contracts_common::AccountAddress,
     hashes::TransactionHash,
     id::constants::{ArCurve, IpPairing},
     transactions::{send, BlockItem, ExactSizeTransactionSigner, TooLargeError},
     web3id::{
-        did::Network,
-        sdk::protocol::{VerificationAuditRecord, VerificationRequest, VerificationRequestData},
+        sdk::protocol::{
+            VerificationAuditRecord, VerificationRequest, VerificationRequestAnchor,
+            VerificationRequestData,
+        },
         v1::PresentationV1,
         Web3IdAttribute,
     },
@@ -27,6 +33,20 @@ pub enum CreateAnchorError {
     TooLarge(#[from] TooLargeError),
     #[error("Cbor serialization error: {0}")]
     CborSerialization(#[from] CborSerializationError),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum VerifyAnchorError {
+    #[error(
+        "On-chain anchor was invalid and could not be retrieved from anchor transaction hash."
+    )]
+    InvalidOnChainAnchor,
+    #[error("Unknown data error: {0}")]
+    UnknownDataError(#[from] UnknownDataError),
+    #[error("Cbor serialization error: {0}")]
+    CborSerialization(#[from] CborSerializationError),
+    #[error("Node query error: {0}")]
+    Query(#[from] v2::QueryError),
 }
 
 impl From<RPCError> for CreateAnchorError {
@@ -94,23 +114,92 @@ pub struct AnchoredVerificationAuditRecord {
     pub verification_result: bool,
 }
 
+/// Function that verifies if the on-chain hash matches the computed hash given the context/statements.
+pub async fn verify_verification_request_anchor_hash(
+    client: &mut v2::Client,
+    verification_request: VerificationRequest,
+) -> Result<(), VerifyAnchorError> {
+    let VerificationRequest { request, .. } = verification_request;
+
+    // Build verification data
+    let mut verification_data = VerificationRequestData::new(request.context);
+    for claim in request.subject_claims {
+        verification_data = verification_data.add_statement_request(claim);
+    }
+
+    let computed_hash = verification_data.hash();
+
+    // Fetch the finalized transaction
+    let (_, _, summary) = client
+        .get_finalized_block_item(verification_request.anchor_transaction_hash)
+        .await?;
+
+    // Extract account transaction
+    let BlockItemSummaryDetails::AccountTransaction(anchor_tx) = summary.details.known_or_err()?
+    else {
+        return Err(VerifyAnchorError::InvalidOnChainAnchor);
+    };
+
+    // Extract data registered payload
+    let AccountTransactionEffects::DataRegistered { data } = anchor_tx.effects.known_or_err()?
+    else {
+        return Err(VerifyAnchorError::InvalidOnChainAnchor);
+    };
+
+    // Decode anchor hash
+    let anchor: VerificationRequestAnchor = cbor::cbor_decode(data.as_ref())?;
+
+    if computed_hash != anchor.hash {
+        return Err(VerifyAnchorError::InvalidOnChainAnchor);
+    }
+
+    Ok(())
+}
+
+/// This function performs several validation steps:
+/// * 1. The verification request anchor on-chain corresponds to the given verification request.
+pub async fn verify(
+    client: &mut v2::Client,
+    verification_request: VerificationRequest,
+    _presentation: &PresentationV1<IpPairing, ArCurve, Web3IdAttribute>,
+) -> Result<bool, CreateAnchorError> {
+    let verified = verify_verification_request_anchor_hash(client, verification_request)
+        .await
+        .is_ok();
+
+    // TODO: call the `verify` function/functions from `RUN-51`.
+    // See also https://github.com/Concordium/concordium-node-sdk-js/pull/591
+
+    // 1. Check the context in verifiable presentation matches the context in the request.
+    // compareContexts(request, presentation);
+
+    // 2. Verify cryptographic integrity of presentation and metadata
+    // https://linear.app/concordium/issue/RUN-22/add-support-to-the-rust-sdk-for-cryptographic-verification-of-a#comment-1de4df29
+
+    // 3. Check that none of the credentials have expired
+    // determine_credential_validity_status() function in open PR for `RUN-51`.
+
+    // 4. Check the claims in verifiable presentation matches the statements in the request.
+    // verifyPresentationRequest(client, verification_request, _presentation.request);
+
+    Ok(verified)
+}
+
 /// Function that creates and anchors the audit record on-chain.
 /// TODO: The function will report additionally if the cryptographic proof and
 /// metadata/context/validity of the credential checks have passed successfully.
 pub async fn verify_and_anchor_audit_record<S: ExactSizeTransactionSigner>(
-    client: v2::Client,
-    _network: Network, // needed for the `verify` function.
+    client: &mut v2::Client,
     anchor_transaction_metadata: AnchorTransactionMetadata<'_, S>,
-    request: VerificationRequest,
+    verification_request: VerificationRequest,
     presentation: PresentationV1<IpPairing, ArCurve, Web3IdAttribute>,
     id: String,
     public_info: HashMap<String, cbor::value::Value>,
 ) -> Result<AnchoredVerificationAuditRecord, CreateAnchorError> {
-    // TODO: call the `verify` function from `RUN-51`.
-    // Even if above verification fails, we anchor the audit record on-chain.
-    let verification_result = false;
+    let verification_result = verify(client, verification_request.clone(), &presentation).await?;
 
-    let verification_audit_record = VerificationAuditRecord::new(request, id, presentation);
+    let verification_audit_record =
+        VerificationAuditRecord::new(verification_request, id, presentation);
     let transaction_hash = create_and_anchor_audit_record(
         client,
         anchor_transaction_metadata,
@@ -128,7 +217,7 @@ pub async fn verify_and_anchor_audit_record<S: ExactSizeTransactionSigner>(
 
 /// Function that creates and anchors the audit record on-chain.
 pub async fn create_and_anchor_audit_record<S: ExactSizeTransactionSigner>(
-    mut client: v2::Client,
+    client: &mut v2::Client,
     anchor_transaction_metadata: AnchorTransactionMetadata<'_, S>,
     verification_audit_record: &VerificationAuditRecord,
     public_info: HashMap<String, cbor::value::Value>,

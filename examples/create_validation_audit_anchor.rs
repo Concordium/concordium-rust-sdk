@@ -267,8 +267,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let anchored_verification_audit_record = verify_and_anchor_audit_record(
-        client.clone(),
-        network,
+        &mut client,
         anchor_transaction_metadata,
         verification_request,
         presentation,
