@@ -18,10 +18,14 @@ use concordium_contracts_common::{Cursor, Deserial, Get, ParseError, ParseResult
 use derive_more::*;
 use std::convert::TryFrom;
 
-#[derive(Clone, SerdeSerialize, SerdeDeserialize, Debug, PartialEq, Eq)]
-#[serde(
-    try_from = "instance_parser::InstanceInfoHelper",
-    into = "instance_parser::InstanceInfoHelper"
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde_deprecated",
+    serde(
+        try_from = "instance_parser::InstanceInfoHelper",
+        into = "instance_parser::InstanceInfoHelper"
+    )
 )]
 /// Information about an existing smart contract instance.
 pub enum InstanceInfo {
@@ -80,11 +84,15 @@ impl InstanceInfo {
 
 mod instance_parser {
     use super::*;
-    #[derive(SerdeSerialize, SerdeDeserialize, Debug)]
-    #[serde(rename_all = "camelCase", tag = "version")]
+    #[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+    #[derive(Debug)]
+    #[cfg_attr(
+        feature = "serde_deprecated",
+        serde(rename_all = "camelCase", tag = "version")
+    )]
     /// Helper struct to derive JSON instances for super::InstanceInfo.
     pub struct InstanceInfoHelper {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_deprecated", serde(default))]
         version: WasmVersion,
         model: Option<String>,
         owner: AccountAddress,
@@ -164,7 +172,8 @@ mod instance_parser {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Clone)]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Clone)]
 /// Data needed to invoke the contract.
 pub struct ContractContext {
     /// Invoker of the contract. If this is not supplied then the contract will
@@ -175,12 +184,12 @@ pub struct ContractContext {
     /// Contract to invoke.
     pub contract: ContractAddress,
     /// Amount to invoke the contract with.
-    #[serde(default = "return_zero_amount")]
+    #[cfg_attr(feature = "serde_deprecated", serde(default = "return_zero_amount"))]
     pub amount: Amount,
     /// Which entrypoint to invoke.
     pub method: OwnedReceiveName,
     /// And with what parameter.
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_deprecated", serde(default))]
     pub parameter: OwnedParameter,
     /// The energy to allow for execution. If not set the node decides on the
     /// maximum amount.
@@ -229,6 +238,7 @@ impl ContractContext {
     }
 }
 
+#[allow(dead_code)]
 fn return_zero_amount() -> Amount {
     Amount::from_micro_ccd(0)
 }
@@ -251,17 +261,27 @@ impl ReturnValue {
     }
 }
 
-#[derive(Debug, Clone, SerdeDeserialize)]
-#[serde(tag = "tag")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeDeserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(tag = "tag"))]
 pub enum InvokeContractResult {
-    #[serde(rename = "success", rename_all = "camelCase")]
+    #[cfg_attr(
+        feature = "serde_deprecated",
+        serde(rename = "success", rename_all = "camelCase")
+    )]
     Success {
         return_value: Option<ReturnValue>,
-        #[serde(deserialize_with = "contract_trace_via_events::deserialize")]
+        #[cfg_attr(
+            feature = "serde_deprecated",
+            serde(deserialize_with = "contract_trace_via_events::deserialize")
+        )]
         events: Vec<Upward<ContractTraceElement>>,
         used_energy: Energy,
     },
-    #[serde(rename = "failure", rename_all = "camelCase")]
+    #[cfg_attr(
+        feature = "serde_deprecated",
+        serde(rename = "failure", rename_all = "camelCase")
+    )]
     Failure {
         return_value: Option<ReturnValue>,
         reason: Upward<RejectReason>,
@@ -279,6 +299,7 @@ impl InvokeContractResult {
     }
 }
 
+#[cfg(feature = "serde_deprecated")]
 mod contract_trace_via_events {
     use super::*;
     use serde::de::Error;

@@ -123,10 +123,13 @@ async fn main() -> anyhow::Result<()> {
         .get_block_pending_updates(BlockIdentifier::LastFinal)
         .await?
         .response;
+
     while let Some(update) = pending_updates.next().await.transpose()? {
         // Display the update with the serde JSON serialization.
-        let update = serde_json::to_string_pretty(&update)?;
-        println!("Pending update: {}", update);
+        #[cfg(feature = "serde_deprecated")]
+        println!("Pending update: {}", serde_json::to_string_pretty(&update)?);
+        #[cfg(not(feature = "serde_deprecated"))]
+        println!("Pending update: {:?}", &update);
     }
 
     Ok(())

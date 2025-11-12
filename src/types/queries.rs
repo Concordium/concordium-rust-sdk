@@ -59,8 +59,9 @@ impl From<ProtocolVersion> for ProtocolVersionInt {
     }
 }
 
-#[derive(SerdeDeserialize, Debug, SerdeSerialize)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// Metadata about a given block.
 pub struct BlockInfo {
     /// Size of all the transactions in the block in bytes.
@@ -114,8 +115,9 @@ pub struct BlockInfo {
     pub epoch: Option<Epoch>,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// Summary of the current state of consensus.
 pub struct ConsensusInfo {
     /// Height of the last finalized block. Genesis block has height 0.
@@ -150,7 +152,10 @@ pub struct ConsensusInfo {
     pub last_finalized_time: Option<chrono::DateTime<chrono::Utc>>,
     /// The number of completed finalizations.
     pub finalization_count: u64,
-    #[serde(with = "crate::internal::duration_millis")]
+    #[cfg_attr(
+        feature = "serde_deprecated",
+        serde(with = "crate::internal::duration_millis")
+    )]
     /// Duration of an epoch.
     pub epoch_duration: chrono::Duration,
     /// Number of blocks that arrived, i.e., were added to the tree. Note that
@@ -209,17 +214,21 @@ pub struct ConsensusInfo {
     pub current_era_genesis_time: chrono::DateTime<chrono::Utc>,
     /// Parameters that apply from protocol 6 onward. This is present if and
     /// only if the `protocol_version` is [`ProtocolVersion::P6`] or later.
-    #[serde(rename = "concordiumBFTStatus")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "concordiumBFTStatus"))]
     pub concordium_bft_status: Option<ConcordiumBFTDetails>,
 }
 
 /// Parameters pertaining to the Concordium BFT consensus.
-#[derive(Debug, SerdeSerialize, SerdeDeserialize)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 #[non_exhaustive]
 pub struct ConcordiumBFTDetails {
     /// The current duration to wait before a round times out.
-    #[serde(with = "crate::internal::duration_millis")]
+    #[cfg_attr(
+        feature = "serde_deprecated",
+        serde(with = "crate::internal::duration_millis")
+    )]
     pub current_timeout_duration: chrono::Duration,
     /// The current round.
     pub current_round: Round,
@@ -230,8 +239,9 @@ pub struct ConcordiumBFTDetails {
     pub trigger_block_time: chrono::DateTime<chrono::Utc>,
 }
 
-#[derive(Debug, SerdeSerialize, SerdeDeserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// Branches of the tree. This is the part of the tree above the last finalized
 /// block.
 pub struct Branch {
@@ -241,8 +251,9 @@ pub struct Branch {
     pub children: Vec<Branch>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// Best guess about the current account nonce, with information about
 /// reliability.
 pub struct AccountNonceResponse {
@@ -312,8 +323,9 @@ pub enum BanMethod {
     Id(RemotePeerId),
 }
 
-#[derive(Debug, Clone, SerdeSerialize, SerdeDeserialize)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// A scheduled pending update.
 pub struct PendingUpdate {
     /// Time when it will become effective.
@@ -322,58 +334,71 @@ pub struct PendingUpdate {
     pub effect: Upward<PendingUpdateEffect>,
 }
 
-#[derive(Debug, Clone, SerdeSerialize, SerdeDeserialize)]
-#[serde(tag = "updateType", content = "update")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_deprecated",
+    serde(tag = "updateType", content = "update")
+)]
 pub enum PendingUpdateEffect {
-    #[serde(rename = "root")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "root"))]
     RootKeys(HigherLevelAccessStructure<RootKeysKind>),
-    #[serde(rename = "level1")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "level1"))]
     Level1Keys(HigherLevelAccessStructure<Level1KeysKind>),
-    #[serde(rename = "level2V0")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "level2V0"))]
     Level2KeysCPV0(AuthorizationsV0),
-    #[serde(rename = "level2V1")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "level2V1"))]
     Level2KeysCPV1(AuthorizationsV1),
-    #[serde(rename = "protocol")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "protocol"))]
     Protocol(ProtocolUpdate),
-    #[serde(rename = "electionDifficulty")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "electionDifficulty"))]
     ElectionDifficulty(ElectionDifficulty),
-    #[serde(rename = "euroPerEnergy")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "euroPerEnergy"))]
     EuroPerEnergy(ExchangeRate),
-    #[serde(rename = "microCCDPerEuro")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "microCCDPerEuro"))]
     MicroCcdPerEnergy(ExchangeRate),
-    #[serde(rename = "foundationAccount")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "foundationAccount"))]
     FoundationAccount(AccountAddress),
-    #[serde(rename = "mintDistributionV0")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "mintDistributionV0"))]
     MintDistributionV0(MintDistributionV0),
-    #[serde(rename = "mintDistributionV1")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "mintDistributionV1"))]
     MintDistributionV1(MintDistributionV1),
-    #[serde(rename = "transactionFeeDistribution")]
+    #[cfg_attr(
+        feature = "serde_deprecated",
+        serde(rename = "transactionFeeDistribution")
+    )]
     TransactionFeeDistribution(TransactionFeeDistribution),
-    #[serde(rename = "gasRewards")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "gasRewards"))]
     GasRewards(GASRewards),
-    #[serde(rename = "poolParametersV0")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "poolParametersV0"))]
     PoolParametersV0(BakerParameters),
-    #[serde(rename = "poolParametersV1")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "poolParametersV1"))]
     PoolParametersV1(PoolParameters),
-    #[serde(rename = "addAnonymityRevoker")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "addAnonymityRevoker"))]
     AddAnonymityRevoker(Box<id::types::ArInfo<id::constants::ArCurve>>),
-    #[serde(rename = "addIdentityProvider")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "addIdentityProvider"))]
     AddIdentityProvider(Box<id::types::IpInfo<id::constants::IpPairing>>),
-    #[serde(rename = "cooldownParametersV1")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "cooldownParametersV1"))]
     CooldownParameters(CooldownParameters),
-    #[serde(rename = "timeParametersV1")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "timeParametersV1"))]
     TimeParameters(TimeParameters),
-    #[serde(rename = "gasRewardsV1")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "gasRewardsV1"))]
     GasRewardsV1(GASRewardsV1),
-    #[serde(rename = "timeoutParameters")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "timeoutParameters"))]
     TimeoutParameters(TimeoutParameters),
-    #[serde(rename = "minBlockTime")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "minBlockTime"))]
     MinBlockTime(Duration),
-    #[serde(rename = "blockEnergyLimit")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "blockEnergyLimit"))]
     BlockEnergyLimit(Energy),
-    #[serde(rename = "finalizationCommitteeParameters")]
+    #[cfg_attr(
+        feature = "serde_deprecated",
+        serde(rename = "finalizationCommitteeParameters")
+    )]
     FinalizationCommitteeParameters(FinalizationCommitteeParameters),
-    #[serde(rename = "validatorScoreParameters")]
+    #[cfg_attr(
+        feature = "serde_deprecated",
+        serde(rename = "validatorScoreParameters")
+    )]
     ValidatorScoreParameters(ValidatorScoreParameters),
 }
 
