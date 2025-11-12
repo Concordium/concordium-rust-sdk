@@ -115,7 +115,7 @@ pub struct AnchoredVerificationAuditRecord {
 }
 
 /// Function that verifies if the on-chain hash matches the computed hash given the context/statements.
-pub async fn verify_verification_request_anchor_hash(
+async fn verify_verification_request_anchor_hash(
     client: &mut v2::Client,
     verification_request: VerificationRequest,
 ) -> Result<(), VerifyAnchorError> {
@@ -158,7 +158,7 @@ pub async fn verify_verification_request_anchor_hash(
 
 /// This function performs several validation steps:
 /// * 1. The verification request anchor on-chain corresponds to the given verification request.
-pub async fn verify(
+async fn verify(
     client: &mut v2::Client,
     verification_request: VerificationRequest,
     _presentation: &PresentationV1<IpPairing, ArCurve, Web3IdAttribute>,
