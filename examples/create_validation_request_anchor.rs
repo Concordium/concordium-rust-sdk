@@ -20,7 +20,9 @@ use concordium_rust_sdk::{
     common::types::TransactionTime,
     types::WalletAccount,
     v2::{self},
-    verifiable_presentation::protocol_v1::create_and_anchor_verification_request,
+    verifiable_presentation::protocol_v1::{
+        create_and_anchor_verification_request, AnchorTransactionMetadata,
+    },
 };
 use rand::Rng;
 use std::{collections::HashMap, marker::PhantomData, path::PathBuf};
@@ -89,12 +91,16 @@ async fn main() -> anyhow::Result<()> {
     let mut public_info = HashMap::new();
     public_info.insert("key".to_string(), cbor::value::Value::Positive(4u64));
 
+    let anchor_transaction_metadata = AnchorTransactionMetadata {
+        signer: &keys,
+        sender: keys.address,
+        account_sequence_number: account_sequence_number,
+        expiry: expiry,
+    };
+
     let verification_request = create_and_anchor_verification_request(
         client.clone(),
-        &keys,
-        keys.address,
-        account_sequence_number,
-        expiry,
+        anchor_transaction_metadata,
         verification_request_data,
         public_info,
     )

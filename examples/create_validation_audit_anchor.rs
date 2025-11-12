@@ -26,6 +26,7 @@ use concordium_rust_sdk::{
     v2::{self},
     verifiable_presentation::protocol_v1::{
         create_and_anchor_verification_request, verify_and_anchor_audit_record,
+        AnchorTransactionMetadata,
     },
 };
 use rand::Rng;
@@ -96,12 +97,16 @@ async fn main() -> anyhow::Result<()> {
     let mut public_info = HashMap::new();
     public_info.insert("key".to_string(), cbor::value::Value::Positive(4u64));
 
+    let anchor_transaction_metadata = AnchorTransactionMetadata {
+        signer: &keys,
+        sender: keys.address,
+        account_sequence_number: account_sequence_number,
+        expiry: expiry,
+    };
+
     let verification_request = create_and_anchor_verification_request(
         client.clone(),
-        &keys,
-        keys.address,
-        account_sequence_number,
-        expiry,
+        anchor_transaction_metadata,
         verification_request_data,
         public_info.clone(),
     )
@@ -257,14 +262,17 @@ async fn main() -> anyhow::Result<()> {
     let verification_audit_record =
         VerificationAuditRecord::new(verification_request, id, presentation);
 
+    let anchor_transaction_metadata = AnchorTransactionMetadata {
+        signer: &keys,
+        sender: keys.address,
+        account_sequence_number: account_sequence_number.next(), // We have to increase the nonce as this is the second anchor tx.
+        expiry: expiry,
+    };
+
     let verification_audit_data = verify_and_anchor_audit_record(
         client.clone(),
         network,
-        &keys,
-        keys.address,
-        // We have to increase the nonce as this is the second anchor tx.
-        account_sequence_number.next(),
-        expiry,
+        anchor_transaction_metadata,
         verification_audit_record,
         public_info,
     )

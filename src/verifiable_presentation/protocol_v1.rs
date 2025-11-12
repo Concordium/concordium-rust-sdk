@@ -32,13 +32,22 @@ impl From<RPCError> for CreateAnchorError {
     }
 }
 
+/// Metadata for transaction submission.
+pub struct AnchorTransactionMetadata<'a, S: ExactSizeTransactionSigner> {
+    /// The signer object used to sign the on-chain anchor transaction. This must correspond to the `sender` account below.
+    pub signer: &'a S,
+    /// The sender account of the anchor transaction.
+    pub sender: AccountAddress,
+    /// The sequence number for the sender account to use.
+    pub account_sequence_number: Nonce,
+    /// The transaction expiry time.
+    pub expiry: TransactionTime,
+}
+
 /// Function that creates and anchors the verification request on-chain.
-pub async fn create_and_anchor_verification_request(
+pub async fn create_and_anchor_verification_request<S: ExactSizeTransactionSigner>(
     mut client: v2::Client,
-    signer: &impl ExactSizeTransactionSigner,
-    sender: AccountAddress,
-    account_sequence_number: Nonce,
-    expiry: TransactionTime,
+    anchor_transaction_metadata: AnchorTransactionMetadata<'_, S>,
     verification_request_data: VerificationRequestData,
     public_info: HashMap<String, cbor::value::Value>,
 ) -> Result<VerificationRequest, CreateAnchorError> {
@@ -47,10 +56,10 @@ pub async fn create_and_anchor_verification_request(
     let register_data = cbor.try_into()?;
 
     let tx = send::register_data(
-        &signer,
-        sender,
-        account_sequence_number,
-        expiry,
+        &anchor_transaction_metadata.signer,
+        anchor_transaction_metadata.sender,
+        anchor_transaction_metadata.account_sequence_number,
+        anchor_transaction_metadata.expiry,
         register_data,
     );
     let item = BlockItem::AccountTransaction(tx);
@@ -64,7 +73,7 @@ pub async fn create_and_anchor_verification_request(
     })
 }
 
-/// The verification audit data to be stored in the database by the merchant.
+/// The verification audit data to be stored in an off-chain database for regulatory purposes.
 /// The type links the private `VerificationAuditRecord` type which its publicly
 /// anchored on-chain version via the transaction hash.
 /// The type includes the result of the proof verification.
@@ -85,14 +94,10 @@ pub struct VerificationAuditData {
 /// Function that creates and anchors the audit record on-chain.
 /// TODO: The function will report additionally if the cryptographic proof and
 /// metadata/context/validity of the credential checks have passed successfully.
-#[allow(clippy::too_many_arguments)]
-pub async fn verify_and_anchor_audit_record(
+pub async fn verify_and_anchor_audit_record<S: ExactSizeTransactionSigner>(
     client: v2::Client,
     _network: Network, // needed for the `verify` function.
-    signer: &impl ExactSizeTransactionSigner,
-    sender: AccountAddress,
-    account_sequence_number: Nonce,
-    expiry: TransactionTime,
+    anchor_transaction_metadata: AnchorTransactionMetadata<'_, S>,
     verification_audit_record: VerificationAuditRecord,
     public_info: HashMap<String, cbor::value::Value>,
 ) -> Result<VerificationAuditData, CreateAnchorError> {
@@ -102,10 +107,7 @@ pub async fn verify_and_anchor_audit_record(
 
     let transaction_hash = create_and_anchor_audit_record(
         client,
-        signer,
-        sender,
-        account_sequence_number,
-        expiry,
+        anchor_transaction_metadata,
         &verification_audit_record,
         public_info,
     )
@@ -119,12 +121,9 @@ pub async fn verify_and_anchor_audit_record(
 }
 
 /// Function that creates and anchors the audit record on-chain.
-pub async fn create_and_anchor_audit_record(
+pub async fn create_and_anchor_audit_record<S: ExactSizeTransactionSigner>(
     mut client: v2::Client,
-    signer: &impl ExactSizeTransactionSigner,
-    sender: AccountAddress,
-    account_sequence_number: Nonce,
-    expiry: TransactionTime,
+    anchor_transaction_metadata: AnchorTransactionMetadata<'_, S>,
     verification_audit_record: &VerificationAuditRecord,
     public_info: HashMap<String, cbor::value::Value>,
 ) -> Result<TransactionHash, CreateAnchorError> {
@@ -133,10 +132,10 @@ pub async fn create_and_anchor_audit_record(
     let register_data = cbor.try_into()?;
 
     let tx = send::register_data(
-        &signer,
-        sender,
-        account_sequence_number,
-        expiry,
+        &anchor_transaction_metadata.signer,
+        anchor_transaction_metadata.sender,
+        anchor_transaction_metadata.account_sequence_number,
+        anchor_transaction_metadata.expiry,
         register_data,
     );
     let item = BlockItem::AccountTransaction(tx);
