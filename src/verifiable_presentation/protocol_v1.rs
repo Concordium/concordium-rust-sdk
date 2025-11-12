@@ -8,10 +8,13 @@ use concordium_base::{
     },
     contracts_common::AccountAddress,
     hashes::TransactionHash,
+    id::constants::{ArCurve, IpPairing},
     transactions::{send, BlockItem, ExactSizeTransactionSigner, TooLargeError},
     web3id::{
         did::Network,
         sdk::protocol::{VerificationAuditRecord, VerificationRequest, VerificationRequestData},
+        v1::PresentationV1,
+        Web3IdAttribute,
     },
 };
 use std::collections::HashMap;
@@ -98,13 +101,16 @@ pub async fn verify_and_anchor_audit_record<S: ExactSizeTransactionSigner>(
     client: v2::Client,
     _network: Network, // needed for the `verify` function.
     anchor_transaction_metadata: AnchorTransactionMetadata<'_, S>,
-    verification_audit_record: VerificationAuditRecord,
+    request: VerificationRequest,
+    presentation: PresentationV1<IpPairing, ArCurve, Web3IdAttribute>,
+    id: String,
     public_info: HashMap<String, cbor::value::Value>,
 ) -> Result<AnchoredVerificationAuditRecord, CreateAnchorError> {
     // TODO: call the `verify` function from `RUN-51`.
     // Even if above verification fails, we anchor the audit record on-chain.
     let verification_result = false;
 
+    let verification_audit_record = VerificationAuditRecord::new(request, id, presentation);
     let transaction_hash = create_and_anchor_audit_record(
         client,
         anchor_transaction_metadata,

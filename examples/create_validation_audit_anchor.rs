@@ -15,7 +15,7 @@ use concordium_rust_sdk::{
             did::Network,
             sdk::protocol::{
                 Context, CredentialType, IdentityProviderMethod, IdentityStatementRequest,
-                VerificationAuditRecord, VerificationRequestData,
+                VerificationRequestData,
             },
             v1::PresentationV1,
             Web3IdAttribute,
@@ -259,9 +259,6 @@ async fn main() -> anyhow::Result<()> {
 
     let id = "UUID".to_string();
 
-    let verification_audit_record =
-        VerificationAuditRecord::new(verification_request, id, presentation);
-
     let anchor_transaction_metadata = AnchorTransactionMetadata {
         signer: &keys,
         sender: keys.address,
@@ -273,7 +270,9 @@ async fn main() -> anyhow::Result<()> {
         client.clone(),
         network,
         anchor_transaction_metadata,
-        verification_audit_record,
+        verification_request,
+        presentation,
+        id,
         public_info,
     )
     .await?;
