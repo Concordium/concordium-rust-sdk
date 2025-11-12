@@ -1,7 +1,6 @@
 ## Unreleased changes
 
 - Added `create_and_anchor_verification_request`, `create_and_anchor_audit_record`, and `verify_and_anchor_audit_record` functions for creating and submitting anchors on-chain in the `verifiable_presentation::protocol_v1` module.
-- Moved the `web3id` module to `verifiable_presentation::web3id`.
 
 ## 8.0.0
 

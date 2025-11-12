@@ -73,14 +73,14 @@ pub async fn create_and_anchor_verification_request<S: ExactSizeTransactionSigne
     })
 }
 
-/// The verification audit data to be stored in an off-chain database for regulatory purposes.
+/// The anchored verification audit record to be stored in an off-chain database for regulatory purposes.
 /// The type links the private `VerificationAuditRecord` type which its publicly
 /// anchored on-chain version via the transaction hash.
 /// The type includes the result of the proof verification.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[serde(tag = "type", rename = "ConcordiumVerificationAuditDataV1")]
-pub struct VerificationAuditData {
+#[serde(tag = "type", rename = "ConcordiumAnchoredVerificationAuditRecordV1")]
+pub struct AnchoredVerificationAuditRecord {
     /// The verification audit record that was anchored on chain.
     #[serde(flatten)]
     pub record: VerificationAuditRecord,
@@ -100,7 +100,7 @@ pub async fn verify_and_anchor_audit_record<S: ExactSizeTransactionSigner>(
     anchor_transaction_metadata: AnchorTransactionMetadata<'_, S>,
     verification_audit_record: VerificationAuditRecord,
     public_info: HashMap<String, cbor::value::Value>,
-) -> Result<VerificationAuditData, CreateAnchorError> {
+) -> Result<AnchoredVerificationAuditRecord, CreateAnchorError> {
     // TODO: call the `verify` function from `RUN-51`.
     // Even if above verification fails, we anchor the audit record on-chain.
     let verification_result = false;
@@ -113,7 +113,7 @@ pub async fn verify_and_anchor_audit_record<S: ExactSizeTransactionSigner>(
     )
     .await?;
 
-    Ok(VerificationAuditData {
+    Ok(AnchoredVerificationAuditRecord {
         record: verification_audit_record,
         transaction_ref: transaction_hash,
         verification_result,

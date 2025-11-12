@@ -94,8 +94,8 @@ async fn main() -> anyhow::Result<()> {
     let anchor_transaction_metadata = AnchorTransactionMetadata {
         signer: &keys,
         sender: keys.address,
-        account_sequence_number: account_sequence_number,
-        expiry: expiry,
+        account_sequence_number,
+        expiry,
     };
 
     let verification_request = create_and_anchor_verification_request(

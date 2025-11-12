@@ -100,8 +100,8 @@ async fn main() -> anyhow::Result<()> {
     let anchor_transaction_metadata = AnchorTransactionMetadata {
         signer: &keys,
         sender: keys.address,
-        account_sequence_number: account_sequence_number,
-        expiry: expiry,
+        account_sequence_number,
+        expiry,
     };
 
     let verification_request = create_and_anchor_verification_request(
@@ -266,10 +266,10 @@ async fn main() -> anyhow::Result<()> {
         signer: &keys,
         sender: keys.address,
         account_sequence_number: account_sequence_number.next(), // We have to increase the nonce as this is the second anchor tx.
-        expiry: expiry,
+        expiry,
     };
 
-    let verification_audit_data = verify_and_anchor_audit_record(
+    let anchored_verification_audit_record = verify_and_anchor_audit_record(
         client.clone(),
         network,
         anchor_transaction_metadata,
@@ -280,19 +280,19 @@ async fn main() -> anyhow::Result<()> {
 
     println!(
         "Verification audit anchor transaction hash: {}",
-        verification_audit_data.transaction_ref
+        anchored_verification_audit_record.transaction_ref
     );
 
     let (bh, bs) = client
-        .wait_until_finalized(&verification_audit_data.transaction_ref)
+        .wait_until_finalized(&anchored_verification_audit_record.transaction_ref)
         .await?;
 
     println!("Verification request anchor finalized in block {}.", bh);
     println!("The outcome is {:#?}", bs);
 
     println!(
-        "Generated verification audit data to be stored in database: {:#?}",
-        verification_audit_data
+        "Generated anchored verification audit record to be stored in database: {:#?}",
+        anchored_verification_audit_record
     );
 
     Ok(())
