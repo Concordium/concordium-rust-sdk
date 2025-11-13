@@ -352,3 +352,119 @@ fn get_ars_infos(anonymity_revokers: &Vec<ArInfo<ArCurve>>) -> ArInfos<ArCurve> 
         anonymity_revokers: ar_idenity_ar_info_btree,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::types::queries::ProtocolVersionInt;
+
+    use super::*;
+    use chrono::{DateTime, Utc};
+    use concordium_base::{
+        base::{AbsoluteBlockHeight, BlockHeight, Energy, GenesisIndex, ProtocolVersion},
+        constants::SHA256,
+        hashes::HashBytes,
+        id::types::YearMonth,
+    };
+
+    #[test]
+    fn test_determine_credential_validity_status_as_active() {
+        let now = YearMonth::now();
+        let now_time = now.lower().expect("expected now time");
+        // create an 'active' credential validity, created last year, expires next year
+        let validity = CredentialValidity {
+            created_at: YearMonth {
+                month: now.month,
+                year: now.year - 1,
+            },
+            valid_to: YearMonth {
+                month: now.month,
+                year: now.year + 1,
+            },
+        };
+
+        // stub the current block information
+        let block_info = get_dummy_block_info(now_time);
+
+        let credential_status_result = determine_credential_validity_status(&validity, &block_info)
+            .expect("expected credential status here");
+
+        assert_eq!(CredentialStatus::Active, credential_status_result);
+    }
+
+    #[test]
+    fn test_determine_credential_validity_status_as_expired() {
+        let now = YearMonth::now();
+        let now_time = now.lower().expect("expected now time");
+
+        // create an 'expired' credential validity, created last year, expires 2 month ago
+        let validity = CredentialValidity {
+            created_at: YearMonth {
+                month: now.month,
+                year: now.year - 1,
+            },
+            valid_to: YearMonth {
+                month: now.month - 2,
+                year: now.year,
+            },
+        };
+
+        // stub the current block information
+        let block_info = get_dummy_block_info(now_time);
+
+        let credential_status_result = determine_credential_validity_status(&validity, &block_info)
+            .expect("expected credential status here");
+
+        assert_eq!(CredentialStatus::Expired, credential_status_result);
+    }
+
+    #[test]
+    fn test_determine_credential_validity_status_as_not_active() {
+        let now = YearMonth::now();
+        let now_time = now.lower().expect("expected now time");
+
+        // create a 'not active' credential validity, created 1 month in future, expires 1 year in future
+        let validity = CredentialValidity {
+            created_at: YearMonth {
+                month: now.month + 1,
+                year: now.year,
+            },
+            valid_to: YearMonth {
+                month: now.month,
+                year: now.year + 1,
+            },
+        };
+
+        // stub the current block information
+        let block_info = get_dummy_block_info(now_time);
+
+        let credential_status_result = determine_credential_validity_status(&validity, &block_info)
+            .expect("expected credential status here");
+
+        assert_eq!(CredentialStatus::NotActivated, credential_status_result);
+    }
+
+    // helper util to just get a dummy block based on a block slot time provided for credential validity testing
+    fn get_dummy_block_info(block_slot_time: DateTime<Utc>) -> BlockInfo {
+        BlockInfo {
+            transactions_size: 0u64,
+            block_parent: HashBytes::new([1u8; SHA256]),
+            block_hash: HashBytes::new([1u8; SHA256]),
+            finalized: true,
+            block_state_hash: HashBytes::new([1u8; SHA256]),
+            block_arrive_time: block_slot_time,
+            block_receive_time: block_slot_time,
+            transaction_count: 0,
+            transaction_energy_cost: Energy::default(),
+            block_slot: None,
+            block_last_finalized: HashBytes::new([1u8; SHA256]),
+            block_slot_time: block_slot_time,
+            block_height: AbsoluteBlockHeight { height: 1u64 },
+            era_block_height: BlockHeight { height: 1u64 },
+            genesis_index: GenesisIndex { height: 0u32 },
+            block_baker: None,
+            protocol_version: ProtocolVersionInt::from_enum(ProtocolVersion::P9),
+            round: None,
+            epoch: None,
+        }
+    }
+}
