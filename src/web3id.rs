@@ -1,6 +1,6 @@
 //! Functionality for retrieving, verifying, and registering Web3Id credentials.
 
-/// Functionality for retrieving, verifying, and registering V1 Web3Id credentials.
+/// Functionality for requesting and verifying V1 Web3Id credentials.
 pub mod v1;
 
 use crate::{
