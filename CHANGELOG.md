@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+- Added `web3id::v1::anchor` module that contains functionality to create verification request anchor (VRA) and verification audit anchor (VAA) on chain.
+
 ## 8.0.0
 
 - Added const conversion function to convert from `ProtocolVersion` enum to `ProtocolVersionInt`

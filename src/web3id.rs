@@ -1,4 +1,7 @@
-//! Functionality for retrieving, verifying, and registering web3id credentials.
+//! Functionality for retrieving, verifying, and registering Web3Id credentials.
+
+/// Functionality for requesting and verifying V1 Web3Id credentials.
+pub mod v1;
 
 use crate::{
     cis4::{Cis4Contract, Cis4QueryError},
