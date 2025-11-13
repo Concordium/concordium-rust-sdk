@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use crate::{
     cis4::{Cis4Contract, Cis4QueryError},
     types::queries::BlockInfo,
-    v2::{self, BlockIdentifier, IntoBlockIdentifier, generated::ip_info},
+    v2::{self, BlockIdentifier, IntoBlockIdentifier},
 };
 use anyhow::Ok;
 pub use concordium_base::web3id::*;
@@ -20,7 +20,7 @@ use concordium_base::{
     web3id::{
         self,
         v1::{
-            AccountCredentialVerificationMaterial, CredentialMetadataTypeV1, CredentialMetadataV1, CredentialVerificationMaterial, IdentityCredentialVerificationMaterial, PresentationV1, RequestV1
+            CredentialMetadataTypeV1, CredentialMetadataV1, CredentialVerificationMaterial, IdentityCredentialVerificationMaterial, PresentationV1, RequestV1
         },
     },
 };
@@ -122,24 +122,11 @@ pub async fn verify_credential_metadata(
                     cdv,
                     commitments,
                 } => {
-                    let now = client.get_block_info(bi).await?.response.block_slot_time;
-                    let valid_from = cdv.policy.created_at.lower().ok_or_else(|| {
-                        CredentialLookupError::InvalidResponse(
-                            "Credential creation date is not valid.".into(),
-                        )
-                    })?;
-                    let valid_until = cdv.policy.valid_to.upper().ok_or_else(|| {
-                        CredentialLookupError::InvalidResponse(
-                            "Credential creation date is not valid.".into(),
-                        )
-                    })?;
-                    let status = if valid_from > now {
-                        CredentialStatus::NotActivated
-                    } else if valid_until < now {
-                        CredentialStatus::Expired
-                    } else {
-                        CredentialStatus::Active
-                    };
+                    let block_info = client.get_block_info(bi).await?.response;
+
+                    let credential_validity = CredentialValidity { created_at: cdv.policy.created_at, valid_to: cdv.policy.valid_to };
+                    let status = determine_credential_validity_status(credential_validity, block_info);
+
                     let inputs = CredentialsInputs::Account {
                         commitments: commitments.cmm_attributes.clone(),
                     };
@@ -228,6 +215,7 @@ fn determine_credential_validity_status(
 }
 
 
+/// TODO - placeholder until merged anchor changes
 struct AnchoredVerificationAuditRecord {
 
 }
@@ -241,9 +229,9 @@ pub async fn verify_presentation(
     request: RequestV1<ArCurve, web3id::Web3IdAttribute>,
     identity_providers: Vec<IpInfo<IpPairing>>,
     anonymity_revokers: Vec<ArInfo<ArCurve>>,
-) -> AnchoredVerificationAuditRecord {
+) -> Result<AnchoredVerificationAuditRecord, _> {
     // get the global context
-    let global_context = get_global_context(client, bi);
+    let global_context = get_global_context(client, bi).await?;
 
     let block_info = client.get_block_info(bi)
         .map_err(|e| CredentialLookupError::InvalidResponse("Issue occured gettting block info".to_string()))
@@ -251,10 +239,10 @@ pub async fn verify_presentation(
         .response;
 
     // build verification material by extracting the metadata for the credentials
-    let verification_material = get_public_data_v1(presentation, identity_providers, anonymity_revokers, block_info);
+    let verification_material = get_public_data_v1(presentation, identity_providers, anonymity_revokers, block_info).await?;
 
     // verification of the presentation
-    let request_v1 = presentation.verify(&global_context, verification_material);
+    let request_v1 = presentation.verify(&global_context, verification_material.iter());
 
     // TODO - audit anchor call goes here, and return AnchoredVerificationAuditRecord
     AnchoredVerificationAuditRecord {
@@ -282,7 +270,7 @@ pub async fn get_public_data_v1(
     identity_providers: Vec<IpInfo<IpPairing>>,
     anonymity_revokers: Vec<ArInfo<ArCurve>>,
     block_info: BlockInfo
-) -> Result<CredentialVerificationMaterial<IpPairing, ArCurve>, CredentialLookupError>{
+) -> Result<Vec<CredentialVerificationMaterial<IpPairing, ArCurve>>, CredentialLookupError>{
     let credential_verification_materials = presentation.metadata()
         .map(|metadata| {
             async move { verify_credential_metadata_v1(&metadata, &identity_providers, &anonymity_revokers, block_info).await }
