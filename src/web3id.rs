@@ -7,7 +7,6 @@ use crate::{
     types::queries::BlockInfo,
     v2::{self, BlockIdentifier, IntoBlockIdentifier},
 };
-use anyhow::Ok;
 pub use concordium_base::web3id::*;
 use concordium_base::{
     base::CredentialRegistrationID,
@@ -15,12 +14,13 @@ use concordium_base::{
     contracts_common::AccountAddress,
     id::{
         constants::{ArCurve, IpPairing},
-        types::{ArInfo, ArInfos, CredentialValidity, GlobalContext, IpIdentity, IpInfo},
+        types::{ArIdentity, ArInfo, ArInfos, CredentialValidity, IpIdentity, IpInfo},
     },
     web3id::{
         self,
         v1::{
-            CredentialMetadataTypeV1, CredentialMetadataV1, CredentialVerificationMaterial, IdentityCredentialVerificationMaterial, PresentationV1, RequestV1
+            CredentialMetadataTypeV1, CredentialMetadataV1, CredentialVerificationMaterial,
+            IdentityCredentialVerificationMaterial, PresentationV1, RequestV1,
         },
     },
 };
@@ -122,10 +122,22 @@ pub async fn verify_credential_metadata(
                     cdv,
                     commitments,
                 } => {
-                    let block_info = client.get_block_info(bi).await?.response;
+                    let block_info = client
+                        .get_block_info(bi)
+                        .map_err(|e| {
+                            CredentialLookupError::InvalidResponse(
+                                "could not get block info".to_string(),
+                            )
+                        })
+                        .await?
+                        .response;
 
-                    let credential_validity = CredentialValidity { created_at: cdv.policy.created_at, valid_to: cdv.policy.valid_to };
-                    let status = determine_credential_validity_status(credential_validity, block_info);
+                    let credential_validity = CredentialValidity {
+                        created_at: cdv.policy.created_at,
+                        valid_to: cdv.policy.valid_to,
+                    };
+                    let status =
+                        determine_credential_validity_status(&credential_validity, &block_info)?;
 
                     let inputs = CredentialsInputs::Account {
                         commitments: commitments.cmm_attributes.clone(),
@@ -173,35 +185,21 @@ pub async fn get_public_data(
     stream.try_collect().await
 }
 
-// check the list of identity providers to find the matching one for the issuer u32 provided
-fn determine_ip_info(issuer: u32, ip_info_list: Vec<IpInfo<IpPairing>>) -> Result<IpInfo<IpPairing>, CredentialLookupError>{
-    for ip_info in ip_info_list {
-        if ip_info.ip_identity.0 == issuer {
-            Ok(ip_info);
-        }
-    }
-    Err(CredentialLookupError::InvalidResponse("TODO - placeholder error for now".to_string()))
-}
-
 /// determine the credential validity based on the valid from and valid to date information.
 /// The block info supplied has the slot time we will use as the current time, to check validity against
 fn determine_credential_validity_status(
-    validity: CredentialValidity,
-    block_info: BlockInfo,
+    validity: &CredentialValidity,
+    block_info: &BlockInfo,
 ) -> Result<CredentialStatus, CredentialLookupError> {
-    let valid_from = validity
-        .created_at
-        .lower()
-        .ok_or(CredentialLookupError::InvalidResponse(
-            "Credential valid from date is not valid.".into(),
-        ))?;
+    let valid_from = validity.created_at.lower().ok_or_else(|| {
+        CredentialLookupError::InvalidResponse(
+            "Could not get valid-from date for credential validity".to_string(),
+        )
+    })?;
 
-    let valid_to = validity
-        .valid_to
-        .upper()
-        .ok_or(CredentialLookupError::InvalidResponse(
-            "Credential valid to date is not valid.".into(),
-        ))?;
+    let valid_to = validity.valid_to.upper().ok_or_else(|| {
+        CredentialLookupError::InvalidResponse("Credential valid-to date is not valid.".to_string())
+    })?;
 
     let now = block_info.block_slot_time;
 
@@ -214,53 +212,61 @@ fn determine_credential_validity_status(
     }
 }
 
-
-/// TODO - placeholder until merged anchor changes
-struct AnchoredVerificationAuditRecord {
-
+/// TODO - placeholder until merged anchor changes then this will be removed and we will use the Anchored verification audit record from base
+pub struct AnchoredVerificationAuditRecord {
+    dummy: u32,
 }
 
 /// verify a presentation for the v1 proofs protocol
 pub async fn verify_presentation(
-    client: v2::Client,
+    mut client: v2::Client,
     network: web3id::did::Network,
     presentation: web3id::v1::PresentationV1<IpPairing, ArCurve, web3id::Web3IdAttribute>,
     bi: impl IntoBlockIdentifier,
     request: RequestV1<ArCurve, web3id::Web3IdAttribute>,
     identity_providers: Vec<IpInfo<IpPairing>>,
     anonymity_revokers: Vec<ArInfo<ArCurve>>,
-) -> Result<AnchoredVerificationAuditRecord, _> {
+) -> Result<AnchoredVerificationAuditRecord, CredentialLookupError> {
     // get the global context
-    let global_context = get_global_context(client, bi).await?;
+    let block_identifier = bi.into_block_identifier();
+    let global_context = client
+        .get_cryptographic_parameters(block_identifier)
+        .map_err(|e| {
+            CredentialLookupError::InvalidResponse(
+                "could not get global context for block provided".to_string(),
+            )
+        })
+        .await?
+        .response;
 
-    let block_info = client.get_block_info(bi)
-        .map_err(|e| CredentialLookupError::InvalidResponse("Issue occured gettting block info".to_string()))
+    let block_info = client
+        .get_block_info(block_identifier)
+        .map_err(|e| {
+            CredentialLookupError::InvalidResponse("Issue occured gettting block info".to_string())
+        })
         .await?
         .response;
 
     // build verification material by extracting the metadata for the credentials
-    let verification_material = get_public_data_v1(presentation, identity_providers, anonymity_revokers, block_info).await?;
+    let verification_material = get_public_data_v1(
+        presentation.clone(),
+        identity_providers,
+        anonymity_revokers,
+        &block_info,
+    )
+    .await?;
 
     // verification of the presentation
-    let request_v1 = presentation.verify(&global_context, verification_material.iter());
+    let request_v1 = presentation
+        .verify(&global_context, verification_material.iter())
+        .map_err(|_e| {
+            CredentialLookupError::InvalidResponse("presentation verification failed".to_string())
+        })?;
 
     // TODO - audit anchor call goes here, and return AnchoredVerificationAuditRecord
-    AnchoredVerificationAuditRecord {
+    let dummy_anchor_audit_record_result = AnchoredVerificationAuditRecord { dummy: 1u32 };
 
-    }
-}
-
-/// get the global context using the client to query the node for the cryptographic parameters
-pub async fn get_global_context(
-    client: v2::Client,
-    bi: impl IntoBlockIdentifier,
-) -> Result<GlobalContext<ArCurve>, CredentialLookupError> {
-    let r = client.get_cryptographic_parameters(bi)
-        .map_err(|e| CredentialLookupError::InvalidResponse("could not get global context for block provided".to_string()))
-        .await?
-        .response;
-
-    Ok(r)
+    Ok(dummy_anchor_audit_record_result)
 }
 
 /// Retrieve the public data for the presentation.
@@ -269,11 +275,16 @@ pub async fn get_public_data_v1(
     presentation: PresentationV1<IpPairing, ArCurve, web3id::Web3IdAttribute>,
     identity_providers: Vec<IpInfo<IpPairing>>,
     anonymity_revokers: Vec<ArInfo<ArCurve>>,
-    block_info: BlockInfo
-) -> Result<Vec<CredentialVerificationMaterial<IpPairing, ArCurve>>, CredentialLookupError>{
-    let credential_verification_materials = presentation.metadata()
+    block_info: &BlockInfo,
+) -> Result<Vec<CredentialVerificationMaterial<IpPairing, ArCurve>>, CredentialLookupError> {
+    let credential_verification_materials = presentation
+        .metadata()
         .map(|metadata| {
-            async move { verify_credential_metadata_v1(&metadata, &identity_providers, &anonymity_revokers, block_info).await }
+            let idp_clone = identity_providers.clone();
+            let ars_clone = anonymity_revokers.clone();
+            async move {
+                verify_credential_metadata_v1(&metadata, &idp_clone, &ars_clone, block_info).await
+            }
         })
         .collect::<futures::stream::FuturesOrdered<_>>();
     credential_verification_materials.try_collect().await
@@ -284,45 +295,60 @@ pub async fn verify_credential_metadata_v1(
     metadata: &CredentialMetadataV1,
     identity_providers: &Vec<IpInfo<IpPairing>>,
     anonymity_revokers: &Vec<ArInfo<ArCurve>>,
-    block_info: BlockInfo
-) -> Result<CredentialVerificationMaterial<IpPairing, ArCurve>, CredentialLookupError>{
-    match metadata.cred_metadata {
+    block_info: &BlockInfo,
+) -> Result<CredentialVerificationMaterial<IpPairing, ArCurve>, CredentialLookupError> {
+    match &metadata.cred_metadata {
         CredentialMetadataTypeV1::Identity(identity_credential_metadata) => {
             let credential_ip_identity = identity_credential_metadata.issuer;
-            let matching_ip_info = find_matching_ip_info(credential_ip_identity, identity_providers)?;
+            let matching_ip_info =
+                find_matching_ip_info(credential_ip_identity, identity_providers)?;
 
             let ar_infos = get_ars_infos(anonymity_revokers);
 
             // credentials validity status
-            let status = determine_credential_validity_status(identity_credential_metadata.validity, block_info);
+            let status = determine_credential_validity_status(
+                &identity_credential_metadata.validity,
+                block_info,
+            );
 
             // build and return the verification material for the identity
             Ok(CredentialVerificationMaterial::Identity(
-                IdentityCredentialVerificationMaterial { ip_info: matching_ip_info, ars_infos: ar_infos }
-            ));
+                IdentityCredentialVerificationMaterial {
+                    ip_info: matching_ip_info,
+                    ars_infos: ar_infos,
+                },
+            ))
         }
-        _ => Err(CredentialLookupError::InvalidResponse("Not supported right now".to_string()))
+        _ => Err(CredentialLookupError::InvalidResponse(
+            "Not supported right now".to_string(),
+        )),
     }
 }
 
-fn find_matching_ip_info(ip_identity: IpIdentity, identity_providers: Vec<IpInfo<IpPairing>>) -> Result<IpInfo<IpPairing>, CredentialLookupError>{
+/// helper utility to make sure we find the matching identity provider for the issuer mentioned in the credential
+fn find_matching_ip_info(
+    ip_identity: IpIdentity,
+    identity_providers: &Vec<IpInfo<IpPairing>>,
+) -> Result<IpInfo<IpPairing>, CredentialLookupError> {
     for ip_info in identity_providers {
         if ip_info.ip_identity == ip_identity {
-            Ok(ip_info);
+            return Ok(ip_info.clone());
         }
     }
-    Err(CredentialLookupError::InvalidResponse("No identity provider found matching this identity".to_string()))
+    Err(CredentialLookupError::InvalidResponse(
+        "No identity provider found matching this identity".to_string(),
+    ))
 }
 
-fn get_ars_infos(
-    anonymity_revokers: Vec<ArInfo<ArCurve>>,
-) -> ArInfos<ArCurve> {
-    let mut ars_infos_btree = BTreeMap::new();
+/// Get anonynmity revokers helper utility which is used for building credential verification material
+fn get_ars_infos(anonymity_revokers: &Vec<ArInfo<ArCurve>>) -> ArInfos<ArCurve> {
+    let mut ar_idenity_ar_info_btree = BTreeMap::new();
+
     for ar in anonymity_revokers {
-        ars_infos_btree.insert(ar.ar_identity, ar);
+        ar_idenity_ar_info_btree.insert(ar.ar_identity, ar.clone());
     }
 
     ArInfos {
-        anonymity_revokers: ars_infos_btree
+        anonymity_revokers: ar_idenity_ar_info_btree,
     }
 }
