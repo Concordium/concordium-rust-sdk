@@ -13,7 +13,6 @@ pub mod cis3;
 pub mod cis4;
 pub mod protocol_level_tokens;
 
-pub mod verifiable_presentation;
 pub mod web3id;
 
 pub use concordium_base::{aggregate_sig, common, ecvrf, eddsa_ed25519, encrypted_transfers, id};
