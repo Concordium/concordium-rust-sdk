@@ -1,5 +1,53 @@
 ## Unreleased changes
 
+- The flag `serde_deprecated` now guards `serde::Serialize` and `serde::Deserialize` implemetations on the following types. The implementations will eventually be removed.
+  - `protocol_level_tokens::AccountToken`
+  - `protocol_level_tokens::TokenAccountState`
+  - `types::AccountEncryptedAmount`
+  - `types::AccountReleaseSchedule`
+  - `types::Release`
+  - `types::BakerInfo`
+  - `types::BakerPoolInfo`
+  - `types::AccountStakingInfo`
+  - `types::Cooldown`
+  - `types::AccountInfo`
+  - `types::BirkParameters`
+  - `types::BirkBaker`
+  - `types::StakePendingChange`
+  - `types::RewardsOverview`
+  - `types::CommonRewardData`
+  - `types::PoolPendingChange`
+  - `types::CurrentPaydayBakerPoolStatus`
+  - `types::lottery_power_parser`
+  - `types::BakerPoolStatus`
+  - `types::ActiveBakerPoolStatus`
+  - `types::PassiveDelegationStatus`
+  - `types::PoolStatus`
+  - `types::TransactionStatusInBlock`
+  - `types::TransactionStatus`
+  - `types::SpecialTransactionOutcome`
+  - `types::BlockSummaryData`
+  - `types::FinalizationSummary`
+  - `types::FinalizationSummaryParty`
+  - `types::BlockItemSummary`
+  - `types::NewEncryptedAmountEvent`
+  - `types::EncryptedAmountRemovedEvent`
+  - `types::BakerAddedEvent`
+  - `types::BakerKeysEvent`
+  - `types::EncryptedSelfAmountAddedEvent`
+  - `types::ContractInitializedEvent`
+  - `types::RejectReason`
+  - `types::queries::BlockInfo`
+  - `types::queries::ConsensusInfo`
+  - `types::queries::ConcordiumBFTDetails`
+  - `types::queries::Branch`
+  - `types::queries::AccountNonceResponse`
+  - `types::queries::PendingUpdate`
+  - `types::queries::PendingUpdateEffect`
+  - `types::smart_contracts::InstanceInfo`
+  - `types::smart_contracts::ContractContext`
+  - `types::smart_contracts::InvokeContractResult`
+
 ## 8.0.0
 
 - Added const conversion function to convert from `ProtocolVersion` enum to `ProtocolVersionInt`
