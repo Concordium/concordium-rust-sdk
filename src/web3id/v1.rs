@@ -2,8 +2,10 @@ use crate::types::{AccountTransactionEffects, BlockItemSummaryDetails};
 use crate::v2;
 
 use crate::endpoints::RPCError;
-use crate::v2::{BlockIdentifier, IntoBlockIdentifier, QueryError};
+use crate::smart_contracts::common::AccountAddress;
+use crate::v2::{AccountIdentifier, BlockIdentifier, IntoBlockIdentifier, QueryError};
 use crate::web3id::v1::anchor::{AnchorTransactionMetadata, CreateAnchorError};
+use concordium_base::base::CredentialRegistrationID;
 use concordium_base::common::cbor;
 use concordium_base::common::cbor::CborSerializationError;
 use concordium_base::common::upward::UnknownDataError;
@@ -17,7 +19,8 @@ use concordium_base::web3id::v1::anchor::{
     VerificationRequestData,
 };
 use concordium_base::web3id::v1::{
-    CredentialMetadataTypeV1, CredentialMetadataV1, IdentityCredentialVerificationMaterial,
+    AccountCredentialVerificationMaterial, CredentialMetadataTypeV1, CredentialMetadataV1,
+    IdentityCredentialVerificationMaterial,
 };
 use concordium_base::web3id::{v1, Web3IdAttribute};
 use futures::StreamExt;
@@ -65,6 +68,13 @@ pub enum VerifyError {
     Anchor(#[from] CreateAnchorError),
     #[error("unknown identity provider: {0}")]
     UnknownIdentityProvider(IpIdentity),
+    #[error("credential {cred_id} no longer present or of unknown type on account: {account}")]
+    CredentialNotPresent {
+        cred_id: CredentialRegistrationID,
+        account: AccountAddress,
+    },
+    #[error("initial credential {cred_id} cannot be used.")]
+    InitialCredential { cred_id: CredentialRegistrationID },
 }
 
 #[derive(Debug)]
@@ -187,63 +197,58 @@ async fn lookup_verification_material(
 ) -> Result<CredentialVerificationMaterial, VerifyError> {
     Ok(match credential_metadata {
         CredentialMetadataTypeV1::Account(metadata) => {
-            todo!()
+            let account_info = client
+                .get_account_info(
+                    &AccountIdentifier::CredId(metadata.cred_id),
+                    block_identifier,
+                )
+                .await?;
+            let Some(cred) = account_info
+                .response
+                .account_credentials
+                .values()
+                .find_map(|cred| {
+                    cred.value
+                        .as_ref()
+                        .known()
+                        .and_then(|c| (c.cred_id() == metadata.cred_id.as_ref()).then_some(c))
+                })
+            else {
+                return Err(VerifyError::CredentialNotPresent {
+                    cred_id: metadata.cred_id,
+                    account: account_info.response.account_address,
+                });
+            };
 
-            // let ai = client
-            //     .get_account_info(&cred_id.into(), BlockIdentifier::LastFinal)
-            //     .await?;
-            // let Some(cred) = ai.response.account_credentials.values().find(|cred| {
-            //     cred.value
-            //         .as_ref()
-            //         .is_known_and(|c| c.cred_id() == cred_id.as_ref())
-            // }) else {
-            //     return Err(CredentialLookupError::CredentialNotPresentOrUnknown {
-            //         cred_id,
-            //         account: ai.response.account_address,
-            //     });
-            // };
-            // let c = cred
-            //     .value
-            //     .as_ref()
-            //     .known_or(CredentialLookupError::UnknownCredential { cred_id })?;
             // if c.issuer() != issuer {
             //     return Err(CredentialLookupError::InconsistentIssuer {
             //         stated: issuer,
             //         actual: c.issuer(),
             //     });
             // }
-            // match &c {
-            //     concordium_base::id::types::AccountCredentialWithoutProofs::Initial { .. } => {
-            //         Err(CredentialLookupError::InitialCredential { cred_id })
-            //     }
-            //     concordium_base::id::types::AccountCredentialWithoutProofs::Normal {
-            //         cdv,
-            //         commitments,
-            //     } => {
-            //         let block_info = client
-            //             .get_block_info(bi)
-            //             .map_err(|e| {
-            //                 CredentialLookupError::InvalidResponse(
-            //                     "could not get block info".to_string(),
-            //                 )
-            //             })
-            //             .await?
-            //             .response;
-            //
-            //         let credential_validity = CredentialValidity {
-            //             created_at: cdv.policy.created_at,
-            //             valid_to: cdv.policy.valid_to,
-            //         };
-            //         let status =
-            //             determine_credential_validity_status(&credential_validity, &block_info)?;
-            //
-            //         let inputs = CredentialsInputs::Account {
-            //             commitments: commitments.cmm_attributes.clone(),
-            //         };
-            //
-            //         Ok(CredentialWithMetadata { status, inputs })
-            //     }
-            // }
+
+            // let credential_validity = CredentialValidity {
+            //     created_at: cdv.policy.created_at,
+            //     valid_to: cdv.policy.valid_to,
+            // };
+            // let status =
+            //     determine_credential_validity_status(&credential_validity, &block_info)?;
+
+            match cred {
+                concordium_base::id::types::AccountCredentialWithoutProofs::Initial { .. } => {
+                    return Err(VerifyError::InitialCredential {
+                        cred_id: metadata.cred_id,
+                    })
+                }
+                concordium_base::id::types::AccountCredentialWithoutProofs::Normal {
+                    cdv,
+                    commitments,
+                } => {
+                    CredentialVerificationMaterial::Account(AccountCredentialVerificationMaterial {
+                        attribute_commitments: commitments.cmm_attributes.clone(),
+                    })
+                }
+            }
         }
         CredentialMetadataTypeV1::Identity(metadata) => {
             let ip_info = client
