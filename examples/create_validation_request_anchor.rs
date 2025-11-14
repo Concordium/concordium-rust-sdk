@@ -98,7 +98,7 @@ async fn main() -> anyhow::Result<()> {
         expiry,
     };
 
-    let verification_request = anchor::submit_verification_request_anchor(
+    let verification_request = anchor::create_verification_request_and_submit_anchor(
         &mut client,
         anchor_transaction_metadata,
         verification_request_data,

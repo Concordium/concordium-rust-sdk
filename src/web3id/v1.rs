@@ -1,21 +1,32 @@
 use crate::types::{AccountTransactionEffects, BlockItemSummaryDetails};
 use crate::v2;
 
+use crate::endpoints::RPCError;
+use crate::v2::{BlockIdentifier, IntoBlockIdentifier, QueryError};
 use crate::web3id::v1::anchor::{AnchorTransactionMetadata, CreateAnchorError};
 use concordium_base::common::cbor;
 use concordium_base::common::cbor::CborSerializationError;
 use concordium_base::common::upward::UnknownDataError;
-use concordium_base::hashes;
 use concordium_base::hashes::{BlockHash, TransactionHash};
 use concordium_base::id::constants::{ArCurve, IpPairing};
+use concordium_base::id::types::{ArInfos, GlobalContext, IpIdentity};
 use concordium_base::transactions::ExactSizeTransactionSigner;
+use concordium_base::web3id;
 use concordium_base::web3id::v1::anchor::{
-    UnfilledContextInformation, VerificationAuditRecord, VerificationRequest,
-    VerificationRequestAnchor, VerificationRequestData,
+    VerificationAuditRecord, VerificationRequest, VerificationRequestAnchor,
+    VerificationRequestData,
 };
-use concordium_base::web3id::v1::{ContextInformation, ContextProperty, PresentationV1};
-use concordium_base::web3id::Web3IdAttribute;
-use std::collections::HashMap;
+use concordium_base::web3id::v1::{
+    CredentialMetadataTypeV1, CredentialMetadataV1, IdentityCredentialVerificationMaterial,
+};
+use concordium_base::web3id::{v1, Web3IdAttribute};
+use futures::StreamExt;
+use futures::{future, TryStreamExt};
+use std::collections::{BTreeMap, HashMap};
+
+pub type PresentationV1 = v1::PresentationV1<IpPairing, ArCurve, Web3IdAttribute>;
+pub type RequestV1 = v1::RequestV1<ArCurve, Web3IdAttribute>;
+pub type CredentialVerificationMaterial = v1::CredentialVerificationMaterial<IpPairing, ArCurve>;
 
 /// Functionality to create the verification request anchor (VRA) and verification audit anchor (VAA).
 pub mod anchor;
@@ -36,76 +47,98 @@ pub struct VerificationData {
     pub transaction_ref: TransactionHash,
     // todo ar
     pub verification_result: bool,
-
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum VerifyAnchorError {
-    #[error(
-        "On-chain anchor was invalid and could not be retrieved from anchor transaction hash."
-    )]
-    InvalidOnChainAnchor,
-    #[error("Unknown data error: {0}")]
-    UnknownDataError(#[from] UnknownDataError),
-    #[error("Cbor serialization error: {0}")]
-    CborSerialization(#[from] CborSerializationError),
-    #[error("Node query error: {0}")]
-    Query(#[from] v2::QueryError),
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum VerifyError {
-    #[error("error")]
+    #[error(
+        "on-chain request anchor was invalid and could not be retrieved from anchor transaction hash"
+    )]
+    InvalidRequestAnchor,
+    #[error("unknown data error: {0}")]
+    UnknownDataError(#[from] UnknownDataError),
+    #[error("CBOR serialization error: {0}")]
+    CborSerialization(#[from] CborSerializationError),
+    #[error("node query error: {0}")]
+    Query(#[from] v2::QueryError),
+    #[error("create anchor: {0}")]
+    Anchor(#[from] CreateAnchorError),
+    #[error("unknown identity provider: {0}")]
+    UnknownIdentityProvider(IpIdentity),
+}
+
+#[derive(Debug)]
+pub enum VerifyFailureReason {
     Verify,
 }
 
-/// Function that creates and anchors the audit record on-chain.
-/// TODO: The function will report additionally if the cryptographic proof and
-/// metadata/context/validity of the credential checks have passed successfully.
-pub async fn verify_and_anchor_audit_record<S: ExactSizeTransactionSigner>(
+/// Metadata for transaction submission.
+pub struct AuditRecordArgument<S: ExactSizeTransactionSigner> {
+    /// Id of the audit record to create. Is fully determined by the verifier/caller.
+    pub audit_record_id: String,
+    /// Public information to be included in the audit record anchor (VAA) on-chain.
+    pub public_info: HashMap<String, cbor::value::Value>,
+    /// Metadata for the anchor transaction that submits the audit record anchor (VAA) on-chain.
+    pub audit_record_anchor_transaction_metadata: AnchorTransactionMetadata<S>,
+}
+
+pub async fn verify_presentation_and_submit_audit_anchor(
     client: &mut v2::Client,
-    anchor_transaction_metadata: AnchorTransactionMetadata<'_, S>,
+    network: web3id::did::Network,
+    block_identifier: impl IntoBlockIdentifier,
     verification_request: VerificationRequest,
-    verifiable_presentation: PresentationV1<IpPairing, ArCurve, Web3IdAttribute>,
-    audit_record_id: String,
-    public_info: HashMap<String, cbor::value::Value>,
-) -> Result<VerificationData, VerifyAnchorError> {
+    verifiable_presentation: PresentationV1,
+    audit_record_arg: AuditRecordArgument<impl ExactSizeTransactionSigner>,
+) -> Result<VerificationData, VerifyError> {
+    let block_identifier = block_identifier.into_block_identifier();
+    let global_context = client
+        .get_cryptographic_parameters(block_identifier)
+        .await?
+        .response;
+
+    let block_info = client.get_block_info(block_identifier).await?.response;
+
     let (request_anchor_block_hash, request_anchor) =
         lookup_request_anchor(client, verification_request.anchor_transaction_hash).await?;
 
+    let verification_material =
+        lookup_verification_materials(client, block_identifier, &verifiable_presentation).await?;
+
     let verification_result = verify_request_and_presentation(
+        &global_context,
         &verification_request,
         &verifiable_presentation,
+        verification_material.iter(),
         request_anchor_block_hash,
-        request_anchor,
+        &request_anchor,
     )
     .is_ok();
 
     let verification_audit_record = VerificationAuditRecord::new(
         verification_request,
-        audit_record_id,
+        audit_record_arg.audit_record_id,
         verifiable_presentation,
-        verification_result,
     );
     let transaction_hash = anchor::submit_verification_audit_record_anchor(
         client,
-        anchor_transaction_metadata,
+        audit_record_arg.audit_record_anchor_transaction_metadata,
         &verification_audit_record,
-        public_info,
+        audit_record_arg.public_info,
     )
     .await?;
 
     Ok(VerificationData {
         record: verification_audit_record,
         transaction_ref: transaction_hash,
+        verification_result,
     })
 }
 
-/// Looks up request anchor on chain and returns it
+/// Looks up the request anchor on the chain and returns it
 async fn lookup_request_anchor(
     client: &mut v2::Client,
     anchor_transaction_hash: TransactionHash,
-) -> Result<(BlockHash, VerificationRequestAnchor), VerifyAnchorError> {
+) -> Result<(BlockHash, VerificationRequestAnchor), VerifyError> {
     // Fetch the finalized transaction
     let (_, block_hash, summary) = client
         .get_finalized_block_item(anchor_transaction_hash)
@@ -114,13 +147,13 @@ async fn lookup_request_anchor(
     // Extract account transaction
     let BlockItemSummaryDetails::AccountTransaction(anchor_tx) = summary.details.known_or_err()?
     else {
-        return Err(VerifyAnchorError::InvalidOnChainAnchor);
+        return Err(VerifyError::InvalidRequestAnchor);
     };
 
     // Extract data registered payload
     let AccountTransactionEffects::DataRegistered { data } = anchor_tx.effects.known_or_err()?
     else {
-        return Err(VerifyAnchorError::InvalidOnChainAnchor);
+        return Err(VerifyError::InvalidRequestAnchor);
     };
 
     // Decode anchor hash
@@ -129,54 +162,176 @@ async fn lookup_request_anchor(
     Ok((block_hash, anchor))
 }
 
+/// Lookup verification material for presentation
+async fn lookup_verification_materials(
+    client: &mut v2::Client,
+    block_identifier: BlockIdentifier,
+    presentation: &PresentationV1,
+) -> Result<Vec<CredentialVerificationMaterial>, VerifyError> {
+    let verification_material = future::try_join_all(presentation.metadata().map(|metadata| {
+        let mut client = client.clone();
+        async move {
+            lookup_verification_material(&mut client, block_identifier, &metadata.cred_metadata)
+                .await
+        }
+    }))
+    .await?;
+    Ok(verification_material)
+}
+
+/// Lookup verification material for presentation
+async fn lookup_verification_material(
+    client: &mut v2::Client,
+    block_identifier: BlockIdentifier,
+    credential_metadata: &CredentialMetadataTypeV1,
+) -> Result<CredentialVerificationMaterial, VerifyError> {
+    Ok(match credential_metadata {
+        CredentialMetadataTypeV1::Account(metadata) => {
+            todo!()
+
+            // let ai = client
+            //     .get_account_info(&cred_id.into(), BlockIdentifier::LastFinal)
+            //     .await?;
+            // let Some(cred) = ai.response.account_credentials.values().find(|cred| {
+            //     cred.value
+            //         .as_ref()
+            //         .is_known_and(|c| c.cred_id() == cred_id.as_ref())
+            // }) else {
+            //     return Err(CredentialLookupError::CredentialNotPresentOrUnknown {
+            //         cred_id,
+            //         account: ai.response.account_address,
+            //     });
+            // };
+            // let c = cred
+            //     .value
+            //     .as_ref()
+            //     .known_or(CredentialLookupError::UnknownCredential { cred_id })?;
+            // if c.issuer() != issuer {
+            //     return Err(CredentialLookupError::InconsistentIssuer {
+            //         stated: issuer,
+            //         actual: c.issuer(),
+            //     });
+            // }
+            // match &c {
+            //     concordium_base::id::types::AccountCredentialWithoutProofs::Initial { .. } => {
+            //         Err(CredentialLookupError::InitialCredential { cred_id })
+            //     }
+            //     concordium_base::id::types::AccountCredentialWithoutProofs::Normal {
+            //         cdv,
+            //         commitments,
+            //     } => {
+            //         let block_info = client
+            //             .get_block_info(bi)
+            //             .map_err(|e| {
+            //                 CredentialLookupError::InvalidResponse(
+            //                     "could not get block info".to_string(),
+            //                 )
+            //             })
+            //             .await?
+            //             .response;
+            //
+            //         let credential_validity = CredentialValidity {
+            //             created_at: cdv.policy.created_at,
+            //             valid_to: cdv.policy.valid_to,
+            //         };
+            //         let status =
+            //             determine_credential_validity_status(&credential_validity, &block_info)?;
+            //
+            //         let inputs = CredentialsInputs::Account {
+            //             commitments: commitments.cmm_attributes.clone(),
+            //         };
+            //
+            //         Ok(CredentialWithMetadata { status, inputs })
+            //     }
+            // }
+        }
+        CredentialMetadataTypeV1::Identity(metadata) => {
+            let ip_info = client
+                .get_identity_providers(block_identifier)
+                .await?
+                .response
+                .try_filter(|ip| future::ready(ip.ip_identity == metadata.issuer))
+                .next()
+                .await
+                .ok_or(VerifyError::UnknownIdentityProvider(metadata.issuer))?
+                .map_err(|status| QueryError::RPCError(RPCError::CallError(status)))?;
+
+            let ars_infos: BTreeMap<_, _> = client
+                .get_anonymity_revokers(block_identifier)
+                .await?
+                .response
+                .map_ok(|ar_info| (ar_info.ar_identity, ar_info))
+                .try_collect()
+                .await
+                .map_err(|status| QueryError::RPCError(RPCError::CallError(status)))?;
+
+            CredentialVerificationMaterial::Identity(IdentityCredentialVerificationMaterial {
+                ip_info,
+                ars_infos: ArInfos {
+                    anonymity_revokers: ars_infos,
+                },
+            })
+        }
+    })
+}
+
 /// This function performs several validation steps:
 /// * 1. The verification request anchor on-chain corresponds to the given verification request.
-fn verify_request_and_presentation(
+fn verify_request_and_presentation<'a>(
+    global_context: &'a GlobalContext<ArCurve>,
     request: &VerificationRequest,
-    presentation: &PresentationV1<IpPairing, ArCurve, Web3IdAttribute>,
+    presentation: &PresentationV1,
+    verification_material: impl ExactSizeIterator<Item = &'a CredentialVerificationMaterial>,
     request_anchor_block_hash: BlockHash,
     request_anchor: &VerificationRequestAnchor,
-) -> Result<(), VerifyError> {
+) -> Result<(), VerifyFailureReason> {
     // Verify the request matches the request anchor
     verify_request_anchor(request, request_anchor)?;
-
-    // Verify the request matches the presentation
-    verify_request(request, presentation)?;
 
     // Verify anchor block hash matches presentation context
     verify_anchor_block_hash(request_anchor_block_hash, presentation)?;
 
-    // 2. Verify cryptographic integrity of presentation and metadata
-    // https://linear.app/concordium/issue/RUN-22/add-support-to-the-rust-sdk-for-cryptographic-verification-of-a#comment-1de4df29
+    // Cryptographically verify the presentation
+    let request_from_presentation =
+        verify_presentation(global_context, presentation, verification_material)?;
 
-    // 3. Check that none of the credentials have expired
-    // determine_credential_validity_status() function in open PR for `RUN-51`.
+    // Verify the request matches the presentation
+    verify_request(&request_from_presentation, request)?;
 
     Ok(())
 }
 
+fn verify_presentation<'a>(
+    global_context: &'a GlobalContext<ArCurve>,
+    presentation: &PresentationV1,
+    verification_material: impl ExactSizeIterator<Item = &'a CredentialVerificationMaterial>,
+) -> Result<RequestV1, VerifyFailureReason> {
+    presentation
+        .verify(global_context, verification_material)
+        .map_err(|_| VerifyFailureReason::Verify)
+}
+
 fn verify_anchor_block_hash(
     request_anchor_block_hash: BlockHash,
-    presentation: &PresentationV1<IpPairing, ArCurve, Web3IdAttribute>,
-) -> Result<(), VerifyError> {
+    presentation: &PresentationV1,
+) -> Result<(), VerifyFailureReason> {
     // todo verify request anchor block hash matches presentation context
 
     Ok(())
 }
 
-
 /// Verify that request anchor matches the verification request.
 fn verify_request_anchor(
     verification_request: &VerificationRequest,
     request_anchor: &VerificationRequestAnchor,
-) -> Result<(), VerifyError> {
+) -> Result<(), VerifyFailureReason> {
     let verification_request_data = VerificationRequestData {
         context: verification_request.context.clone(),
         subject_claims: verification_request.subject_claims.clone(),
     };
 
     if verification_request_data.hash() != request_anchor.hash {
-        return Err(VerifyError::Verify);
+        return Err(VerifyFailureReason::Verify);
     }
 
     Ok(())
@@ -184,9 +339,9 @@ fn verify_request_anchor(
 
 /// Verify that verifiable presentation matches the verification request.
 fn verify_request(
+    request_from_presentation: &RequestV1,
     verification_request: &VerificationRequest,
-    verifiable_presentation: &PresentationV1<IpPairing, ArCurve, Web3IdAttribute>,
-) -> Result<(), VerifyError> {
+) -> Result<(), VerifyFailureReason> {
     // todo verify subject claims in presentation matches request
     //      this incudes both statements and the identity provider and the credential type
     // todo verify context in presentation matches request context
@@ -194,186 +349,33 @@ fn verify_request(
     Ok(())
 }
 
-// check the list of identity providers to find the matching one for the issuer u32 provided
-fn determine_ip_info(
-    issuer: u32,
-    ip_info_list: Vec<IpInfo<IpPairing>>,
-) -> Result<IpInfo<IpPairing>, CredentialLookupError> {
-    for ip_info in ip_info_list {
-        if ip_info.ip_identity.0 == issuer {
-            Ok(ip_info);
-        }
-    }
-    Err(CredentialLookupError::InvalidResponse(
-        "TODO - placeholder error for now".to_string(),
-    ))
-}
-
-/// determine the credential validity based on the valid from and valid to date information.
-/// The block info supplied has the slot time we will use as the current time, to check validity against
-fn determine_credential_validity_status(
-    validity: CredentialValidity,
-    block_info: BlockInfo,
-) -> Result<CredentialStatus, CredentialLookupError> {
-    let valid_from = validity
-        .created_at
-        .lower()
-        .ok_or(CredentialLookupError::InvalidResponse(
-            "Credential valid from date is not valid.".into(),
-        ))?;
-
-    let valid_to = validity
-        .valid_to
-        .upper()
-        .ok_or(CredentialLookupError::InvalidResponse(
-            "Credential valid to date is not valid.".into(),
-        ))?;
-
-    let now = block_info.block_slot_time;
-
-    if valid_from > now {
-        Ok(CredentialStatus::NotActivated)
-    } else if valid_to >= now {
-        Ok(CredentialStatus::Active)
-    } else {
-        Ok(CredentialStatus::Expired)
-    }
-}
-
-/// verify a presentation for the v1 proofs protocol
-pub async fn verify_presentation(
-    client: v2::Client,
-    network: web3id::did::Network,
-    presentation: web3id::v1::PresentationV1<IpPairing, ArCurve, web3id::Web3IdAttribute>,
-    bi: impl IntoBlockIdentifier,
-    request: RequestV1<ArCurve, web3id::Web3IdAttribute>,
-    identity_providers: Vec<IpInfo<IpPairing>>,
-    anonymity_revokers: Vec<ArInfo<ArCurve>>,
-) -> Result<AnchoredVerificationAuditRecord, _> {
-    // get the global context
-    let global_context = get_global_context(client, bi).await?;
-
-    let block_info = client
-        .get_block_info(bi)
-        .map_err(|e| {
-            CredentialLookupError::InvalidResponse("Issue occured gettting block info".to_string())
-        })
-        .await?
-        .response;
-
-    // build verification material by extracting the metadata for the credentials
-    let verification_material = get_public_data_v1(
-        presentation,
-        identity_providers,
-        anonymity_revokers,
-        block_info,
-    )
-    .await?;
-
-    // verification of the presentation
-    let request_v1 = presentation.verify(&global_context, verification_material.iter());
-
-    // TODO - audit anchor call goes here, and return AnchoredVerificationAuditRecord
-    AnchoredVerificationAuditRecord {}
-}
-
-/// get the global context using the client to query the node for the cryptographic parameters
-pub async fn get_global_context(
-    client: v2::Client,
-    bi: impl IntoBlockIdentifier,
-) -> Result<GlobalContext<ArCurve>, CredentialLookupError> {
-    let r = client
-        .get_cryptographic_parameters(bi)
-        .map_err(|e| {
-            CredentialLookupError::InvalidResponse(
-                "could not get global context for block provided".to_string(),
-            )
-        })
-        .await?
-        .response;
-
-    Ok(r)
-}
-
-/// Retrieve the public data for the presentation.
-/// Will call the cryptographic verification for each metadata of the presentation provided and also check the credential validity
-pub async fn get_public_data_v1(
-    presentation: PresentationV1<IpPairing, ArCurve, web3id::Web3IdAttribute>,
-    identity_providers: Vec<IpInfo<IpPairing>>,
-    anonymity_revokers: Vec<ArInfo<ArCurve>>,
-    block_info: BlockInfo,
-) -> Result<Vec<CredentialVerificationMaterial<IpPairing, ArCurve>>, CredentialLookupError> {
-    let credential_verification_materials = presentation
-        .metadata()
-        .map(|metadata| async move {
-            verify_credential_metadata_v1(
-                &metadata,
-                &identity_providers,
-                &anonymity_revokers,
-                block_info,
-            )
-            .await
-        })
-        .collect::<futures::stream::FuturesOrdered<_>>();
-    credential_verification_materials.try_collect().await
-}
-
-/// Verify metadata provided and return the CredentialVerificationMaterial
-pub async fn verify_credential_metadata_v1(
-    metadata: &CredentialMetadataV1,
-    identity_providers: &Vec<IpInfo<IpPairing>>,
-    anonymity_revokers: &Vec<ArInfo<ArCurve>>,
-    block_info: BlockInfo,
-) -> Result<CredentialVerificationMaterial<IpPairing, ArCurve>, CredentialLookupError> {
-    match metadata.cred_metadata {
-        CredentialMetadataTypeV1::Identity(identity_credential_metadata) => {
-            let credential_ip_identity = identity_credential_metadata.issuer;
-            let matching_ip_info =
-                find_matching_ip_info(credential_ip_identity, identity_providers)?;
-
-            let ar_infos = get_ars_infos(anonymity_revokers);
-
-            // credentials validity status
-            let status = determine_credential_validity_status(
-                identity_credential_metadata.validity,
-                block_info,
-            );
-
-            // build and return the verification material for the identity
-            Ok(CredentialVerificationMaterial::Identity(
-                IdentityCredentialVerificationMaterial {
-                    ip_info: matching_ip_info,
-                    ars_infos: ar_infos,
-                },
-            ));
-        }
-        _ => Err(CredentialLookupError::InvalidResponse(
-            "Not supported right now".to_string(),
-        )),
-    }
-}
-
-fn find_matching_ip_info(
-    ip_identity: IpIdentity,
-    identity_providers: Vec<IpInfo<IpPairing>>,
-) -> Result<IpInfo<IpPairing>, CredentialLookupError> {
-    for ip_info in identity_providers {
-        if ip_info.ip_identity == ip_identity {
-            Ok(ip_info);
-        }
-    }
-    Err(CredentialLookupError::InvalidResponse(
-        "No identity provider found matching this identity".to_string(),
-    ))
-}
-
-fn get_ars_infos(anonymity_revokers: Vec<ArInfo<ArCurve>>) -> ArInfos<ArCurve> {
-    let mut ars_infos_btree = BTreeMap::new();
-    for ar in anonymity_revokers {
-        ars_infos_btree.insert(ar.ar_identity, ar);
-    }
-
-    ArInfos {
-        anonymity_revokers: ars_infos_btree,
-    }
-}
+// /// determine the credential validity based on the valid from and valid to date information.
+// /// The block info supplied has the slot time we will use as the current time, to check validity against
+// fn determine_credential_validity_status(
+//     validity: CredentialValidity,
+//     block_info: BlockInfo,
+// ) -> Result<CredentialStatus, CredentialLookupError> {
+//     let valid_from = validity
+//         .created_at
+//         .lower()
+//         .ok_or(CredentialLookupError::InvalidResponse(
+//             "Credential valid from date is not valid.".into(),
+//         ))?;
+//
+//     let valid_to = validity
+//         .valid_to
+//         .upper()
+//         .ok_or(CredentialLookupError::InvalidResponse(
+//             "Credential valid to date is not valid.".into(),
+//         ))?;
+//
+//     let now = block_info.block_slot_time;
+//
+//     if valid_from > now {
+//         Ok(CredentialStatus::NotActivated)
+//     } else if valid_to >= now {
+//         Ok(CredentialStatus::Active)
+//     } else {
+//         Ok(CredentialStatus::Expired)
+//     }
+// }

@@ -32,9 +32,9 @@ impl From<RPCError> for CreateAnchorError {
 }
 
 /// Metadata for transaction submission.
-pub struct AnchorTransactionMetadata<'a, S: ExactSizeTransactionSigner> {
+pub struct AnchorTransactionMetadata<S: ExactSizeTransactionSigner> {
     /// The signer object used to sign the on-chain anchor transaction. This must correspond to the `sender` account below.
-    pub signer: &'a S,
+    pub signer: S,
     /// The sender account of the anchor transaction.
     pub sender: AccountAddress,
     /// The sequence number for the sender account to use.
@@ -50,9 +50,9 @@ pub struct AnchorTransactionMetadata<'a, S: ExactSizeTransactionSigner> {
 /// be tracked until finalization before the verification request is usable
 /// (waiting for finalization can be done in the app that receives the verification request
 /// to create a verifiable presentation).
-pub async fn submit_verification_request_anchor<S: ExactSizeTransactionSigner>(
+pub async fn create_verification_request_and_submit_anchor<S: ExactSizeTransactionSigner>(
     client: &mut v2::Client,
-    anchor_transaction_metadata: AnchorTransactionMetadata<'_, S>,
+    anchor_transaction_metadata: AnchorTransactionMetadata<S>,
     verification_request_data: VerificationRequestData,
     public_info: HashMap<String, cbor::value::Value>,
 ) -> Result<VerificationRequest, CreateAnchorError> {
@@ -85,7 +85,7 @@ pub async fn submit_verification_request_anchor<S: ExactSizeTransactionSigner>(
 /// be tracked until finalization for the audit record to be registered successfully.
 pub async fn submit_verification_audit_record_anchor<S: ExactSizeTransactionSigner>(
     client: &mut v2::Client,
-    anchor_transaction_metadata: AnchorTransactionMetadata<'_, S>,
+    anchor_transaction_metadata: AnchorTransactionMetadata<S>,
     verification_audit_record: &VerificationAuditRecord,
     public_info: HashMap<String, cbor::value::Value>,
 ) -> Result<TransactionHash, CreateAnchorError> {
