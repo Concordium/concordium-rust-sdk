@@ -25,7 +25,7 @@ use concordium_base::{
     base::{AccountIndex, BlockHeight, Epoch, GenesisIndex},
     common::{
         self,
-        types::{TransactionSignature, TransactionTime},
+        types::{TransactionSignature, TransactionSignaturesV1, TransactionTime},
     },
     contracts_common::{
         AccountAddress, AccountAddressParseError, Amount, ContractAddress, OwnedContractName,
@@ -755,6 +755,18 @@ impl From<&transactions::TransactionHeader> for generated::AccountTransactionHea
     }
 }
 
+impl From<&transactions::TransactionHeaderV1> for generated::AccountTransactionHeaderV1 {
+    fn from(v: &transactions::TransactionHeaderV1) -> Self {
+        Self {
+            sender: Some(generated::AccountAddress::from(v.sender)),
+            sponsor: v.sponsor.map(generated::AccountAddress::from),
+            sequence_number: Some(v.nonce.into()),
+            energy_amount: Some(v.energy_amount.into()),
+            expiry: Some(v.expiry.into()),
+        }
+    }
+}
+
 impl From<TransactionSignature> for generated::AccountTransactionSignature {
     fn from(v: TransactionSignature) -> Self {
         (&v).into()
@@ -785,6 +797,15 @@ impl From<&TransactionSignature> for generated::AccountTransactionSignature {
                 }
                 cred_map
             },
+        }
+    }
+}
+
+impl From<&TransactionSignaturesV1> for generated::AccountTransactionV1Signatures {
+    fn from(v: &TransactionSignaturesV1) -> Self {
+        Self {
+            sender_signatures: Some(v.sender.to_owned().into()),
+            sponsor_signatures: v.sponsor.to_owned().map(|x| x.into()),
         }
     }
 }
@@ -838,6 +859,24 @@ impl<P: PayloadLike> IntoRequest<generated::SendBlockItemRequest> for &transacti
                     generated::send_block_item_request::BlockItem::UpdateInstruction(v.into()),
                 ),
             },
+            transactions::BlockItem::AccountTransactionV1(v) => {
+                generated::SendBlockItemRequest {
+                    block_item: Some(
+                        generated::send_block_item_request::BlockItem::AccountTransactionV1(
+                            generated::AccountTransactionV1 {
+                                signatures: Some((&v.signatures).into()),
+                                header: Some((&v.header).into()),
+                                payload: {
+                                    let atp = generated::AccountTransactionPayload{
+                                    payload: Some(generated::account_transaction_payload::Payload::RawPayload(v.payload.encode().into())),
+                                };
+                                    Some(atp)
+                                },
+                            },
+                        ),
+                    ),
+                }
+            }
         };
         tonic::Request::new(request)
     }
