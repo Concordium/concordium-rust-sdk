@@ -5,22 +5,24 @@ use std::collections::BTreeMap;
 use crate::{
     cis4::{Cis4Contract, Cis4QueryError},
     types::queries::BlockInfo,
-    v2::{self, BlockIdentifier, IntoBlockIdentifier},
+    v2::{self, AccountIdentifier, BlockIdentifier, IntoBlockIdentifier},
 };
 pub use concordium_base::web3id::*;
 use concordium_base::{
     base::CredentialRegistrationID,
     cis4_types::CredentialStatus,
+    constants::SHA256,
     contracts_common::AccountAddress,
+    hashes::{HashBytes, TransactionHash},
     id::{
         constants::{ArCurve, IpPairing},
-        types::{ArIdentity, ArInfo, ArInfos, CredentialValidity, IpIdentity, IpInfo},
+        types::{ArInfo, ArInfos, CredentialValidity, IpIdentity, IpInfo},
     },
     web3id::{
         self,
         v1::{
-            CredentialMetadataTypeV1, CredentialMetadataV1, CredentialVerificationMaterial,
-            IdentityCredentialVerificationMaterial, PresentationV1, RequestV1,
+            AccountCredentialVerificationMaterial, CredentialMetadataTypeV1, CredentialMetadataV1,
+            CredentialVerificationMaterial, IdentityCredentialVerificationMaterial, PresentationV1,
         },
     },
 };
@@ -124,7 +126,7 @@ pub async fn verify_credential_metadata(
                 } => {
                     let block_info = client
                         .get_block_info(bi)
-                        .map_err(|e| {
+                        .map_err(|_e| {
                             CredentialLookupError::InvalidResponse(
                                 "could not get block info".to_string(),
                             )
@@ -187,6 +189,7 @@ pub async fn get_public_data(
 
 /// determine the credential validity based on the valid from and valid to date information.
 /// The block info supplied has the slot time we will use as the current time, to check validity against
+#[allow(clippy::result_large_err)]
 fn determine_credential_validity_status(
     validity: &CredentialValidity,
     block_info: &BlockInfo,
@@ -212,26 +215,28 @@ fn determine_credential_validity_status(
     }
 }
 
-/// TODO - placeholder until merged anchor changes then this will be removed and we will use the Anchored verification audit record from base
-pub struct AnchoredVerificationAuditRecord {
-    dummy: u32,
+/// TODO - this should contain the audit record data, and also the transaction hash for the anchored audit transaction on chain
+#[allow(dead_code)]
+pub struct AnchoredVerificationAuditResponse {
+    /// transaction hash of the audit anchor on chain
+    transaction_hash: TransactionHash,
+    /// TODO: this will become the Audit record, string for now for initial development work
+    audit_record_data: String,
 }
 
-/// verify a presentation for the v1 proofs protocol
+/// verify a presentation for the v1 proofs protocol.
 pub async fn verify_presentation(
     mut client: v2::Client,
-    network: web3id::did::Network,
     presentation: web3id::v1::PresentationV1<IpPairing, ArCurve, web3id::Web3IdAttribute>,
     bi: impl IntoBlockIdentifier,
-    request: RequestV1<ArCurve, web3id::Web3IdAttribute>,
     identity_providers: Vec<IpInfo<IpPairing>>,
     anonymity_revokers: Vec<ArInfo<ArCurve>>,
-) -> Result<AnchoredVerificationAuditRecord, CredentialLookupError> {
+) -> Result<AnchoredVerificationAuditResponse, CredentialLookupError> {
     // get the global context
     let block_identifier = bi.into_block_identifier();
     let global_context = client
         .get_cryptographic_parameters(block_identifier)
-        .map_err(|e| {
+        .map_err(|_e| {
             CredentialLookupError::InvalidResponse(
                 "could not get global context for block provided".to_string(),
             )
@@ -241,7 +246,7 @@ pub async fn verify_presentation(
 
     let block_info = client
         .get_block_info(block_identifier)
-        .map_err(|e| {
+        .map_err(|_e| {
             CredentialLookupError::InvalidResponse("Issue occured gettting block info".to_string())
         })
         .await?
@@ -249,22 +254,27 @@ pub async fn verify_presentation(
 
     // build verification material by extracting the metadata for the credentials
     let verification_material = get_public_data_v1(
+        client,
         presentation.clone(),
         identity_providers,
         anonymity_revokers,
         &block_info,
+        &block_identifier,
     )
     .await?;
 
     // verification of the presentation
-    let request_v1 = presentation
+    let _request_v1 = presentation
         .verify(&global_context, verification_material.iter())
         .map_err(|_e| {
             CredentialLookupError::InvalidResponse("presentation verification failed".to_string())
         })?;
 
     // TODO - audit anchor call goes here, and return AnchoredVerificationAuditRecord
-    let dummy_anchor_audit_record_result = AnchoredVerificationAuditRecord { dummy: 1u32 };
+    let dummy_anchor_audit_record_result = AnchoredVerificationAuditResponse {
+        transaction_hash: HashBytes::new([0u8; SHA256]),
+        audit_record_data: "dummy data".to_string(),
+    };
 
     Ok(dummy_anchor_audit_record_result)
 }
@@ -272,18 +282,29 @@ pub async fn verify_presentation(
 /// Retrieve the public data for the presentation.
 /// Will call the cryptographic verification for each metadata of the presentation provided and also check the credential validity
 pub async fn get_public_data_v1(
+    client: v2::Client,
     presentation: PresentationV1<IpPairing, ArCurve, web3id::Web3IdAttribute>,
     identity_providers: Vec<IpInfo<IpPairing>>,
     anonymity_revokers: Vec<ArInfo<ArCurve>>,
     block_info: &BlockInfo,
+    block_identifier: &BlockIdentifier,
 ) -> Result<Vec<CredentialVerificationMaterial<IpPairing, ArCurve>>, CredentialLookupError> {
     let credential_verification_materials = presentation
         .metadata()
         .map(|metadata| {
             let idp_clone = identity_providers.clone();
             let ars_clone = anonymity_revokers.clone();
+            let client = client.clone();
             async move {
-                verify_credential_metadata_v1(&metadata, &idp_clone, &ars_clone, block_info).await
+                verify_credential_metadata_v1(
+                    client,
+                    &metadata,
+                    &idp_clone,
+                    &ars_clone,
+                    block_info,
+                    block_identifier,
+                )
+                .await
             }
         })
         .collect::<futures::stream::FuturesOrdered<_>>();
@@ -292,10 +313,12 @@ pub async fn get_public_data_v1(
 
 /// Verify metadata provided and return the CredentialVerificationMaterial
 pub async fn verify_credential_metadata_v1(
+    mut client: v2::Client,
     metadata: &CredentialMetadataV1,
     identity_providers: &Vec<IpInfo<IpPairing>>,
     anonymity_revokers: &Vec<ArInfo<ArCurve>>,
     block_info: &BlockInfo,
+    block_identifier: &BlockIdentifier,
 ) -> Result<CredentialVerificationMaterial<IpPairing, ArCurve>, CredentialLookupError> {
     match &metadata.cred_metadata {
         CredentialMetadataTypeV1::Identity(identity_credential_metadata) => {
@@ -306,7 +329,7 @@ pub async fn verify_credential_metadata_v1(
             let ar_infos = get_ars_infos(anonymity_revokers);
 
             // credentials validity status
-            let status = determine_credential_validity_status(
+            let _status = determine_credential_validity_status(
                 &identity_credential_metadata.validity,
                 block_info,
             );
@@ -319,13 +342,28 @@ pub async fn verify_credential_metadata_v1(
                 },
             ))
         }
-        _ => Err(CredentialLookupError::InvalidResponse(
-            "Not supported right now".to_string(),
-        )),
+        CredentialMetadataTypeV1::Account(account_credentials_metadata) => {
+            let account_identifier = AccountIdentifier::from(account_credentials_metadata.cred_id);
+
+            let _account_info = client
+                .get_account_info(&account_identifier, block_identifier)
+                .await?
+                .response;
+
+            // TODO - here we will need to create and build attribute commitments for the account credentials
+            let attribute_commitments = BTreeMap::new();
+
+            Ok(CredentialVerificationMaterial::Account(
+                AccountCredentialVerificationMaterial {
+                    attribute_commitments,
+                },
+            ))
+        }
     }
 }
 
 /// helper utility to make sure we find the matching identity provider for the issuer mentioned in the credential
+#[allow(clippy::result_large_err)]
 fn find_matching_ip_info(
     ip_identity: IpIdentity,
     identity_providers: &Vec<IpInfo<IpPairing>>,
@@ -336,7 +374,7 @@ fn find_matching_ip_info(
         }
     }
     Err(CredentialLookupError::InvalidResponse(
-        "No identity provider found matching this identity".to_string(),
+        "No Idp Match".to_string(),
     ))
 }
 
@@ -457,7 +495,7 @@ mod tests {
             transaction_energy_cost: Energy::default(),
             block_slot: None,
             block_last_finalized: HashBytes::new([1u8; SHA256]),
-            block_slot_time: block_slot_time,
+            block_slot_time,
             block_height: AbsoluteBlockHeight { height: 1u64 },
             era_block_height: BlockHeight { height: 1u64 },
             genesis_index: GenesisIndex { height: 0u32 },
