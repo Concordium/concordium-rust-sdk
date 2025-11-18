@@ -54,7 +54,7 @@ pub async fn create_verification_request_and_submit_anchor<S: ExactSizeTransacti
     client: &mut v2::Client,
     anchor_transaction_metadata: AnchorTransactionMetadata<S>,
     verification_request_data: VerificationRequestData,
-    public_info: HashMap<String, cbor::value::Value>,
+    public_info: Option<HashMap<String, cbor::value::Value>>,
 ) -> Result<VerificationRequest, CreateAnchorError> {
     let verification_request_anchor = verification_request_data.to_anchor(public_info);
     let cbor = cbor::cbor_encode(&verification_request_anchor)?;
@@ -69,6 +69,7 @@ pub async fn create_verification_request_and_submit_anchor<S: ExactSizeTransacti
     );
     let block_item = BlockItem::AccountTransaction(tx);
 
+    // todo ar just return audit anchor?
     // Submit the transaction to the chain.
     let transaction_hash = client.send_block_item(&block_item).await?;
 
@@ -87,7 +88,7 @@ pub async fn submit_verification_audit_record_anchor<S: ExactSizeTransactionSign
     client: &mut v2::Client,
     anchor_transaction_metadata: AnchorTransactionMetadata<S>,
     verification_audit_record: &VerificationAuditRecord,
-    public_info: HashMap<String, cbor::value::Value>,
+    public_info: Option<HashMap<String, cbor::value::Value>>,
 ) -> Result<TransactionHash, CreateAnchorError> {
     let verification_audit_anchor = verification_audit_record.to_anchor(public_info);
     let cbor = cbor::cbor_encode(&verification_audit_anchor)?;

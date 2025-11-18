@@ -5,23 +5,19 @@ use crate::endpoints::RPCError;
 use crate::smart_contracts::common::AccountAddress;
 use crate::v2::{AccountIdentifier, BlockIdentifier, IntoBlockIdentifier, QueryError};
 use crate::web3id::v1::anchor::{AnchorTransactionMetadata, CreateAnchorError};
-use chrono::{DateTime, Utc};
 use concordium_base::base::CredentialRegistrationID;
 use concordium_base::common::cbor;
 use concordium_base::common::cbor::CborSerializationError;
 use concordium_base::common::upward::UnknownDataError;
-use concordium_base::hashes::{BlockHash, TransactionHash};
+use concordium_base::hashes::TransactionHash;
 use concordium_base::id::constants::{ArCurve, IpPairing};
 use concordium_base::id::types;
-use concordium_base::id::types::{
-    AccountCredentialWithoutProofs, ArInfos, GlobalContext, IpIdentity,
-};
+use concordium_base::id::types::{AccountCredentialWithoutProofs, ArInfos, IpIdentity};
 use concordium_base::transactions::ExactSizeTransactionSigner;
 use concordium_base::web3id;
-use concordium_base::web3id::did::Network;
 use concordium_base::web3id::v1::anchor::{
-    VerificationAuditRecord, VerificationRequest, VerificationRequestAnchor,
-    VerificationRequestData,
+    self as base_anchor, CredentialValidity, VerificationAuditRecord, VerificationContext,
+    VerificationRequest, VerificationRequestAnchor, VerificationRequestAndBlockHash,
 };
 use concordium_base::web3id::v1::{
     AccountCredentialVerificationMaterial, IdentityCredentialVerificationMaterial,
@@ -36,7 +32,7 @@ pub type CredentialV1 = v1::CredentialV1<IpPairing, ArCurve, Web3IdAttribute>;
 pub type RequestV1 = v1::RequestV1<ArCurve, Web3IdAttribute>;
 pub type CredentialVerificationMaterial = v1::CredentialVerificationMaterial<IpPairing, ArCurve>;
 
-/// Functionality to create the verification request anchor (VRA) and verification audit anchor (VAA).
+/// Functionality to create and verify the verification request anchor (VRA) and verification audit anchor (VAA).
 pub mod anchor;
 
 /// The verification audit record and the transaction hash
@@ -83,22 +79,17 @@ pub enum VerifyError {
     InitialCredential { cred_id: CredentialRegistrationID },
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub enum VerifyFailureReason {
-    Verify,
-    CredentialNotValidYet,
-    CredentialExpired,
-}
-
 /// Metadata for transaction submission.
 pub struct AuditRecordArgument<S: ExactSizeTransactionSigner> {
     /// Id of the audit record to create. Is fully determined by the verifier/caller.
     pub audit_record_id: String,
     /// Public information to be included in the audit record anchor (VAA) on-chain.
-    pub public_info: HashMap<String, cbor::value::Value>,
+    pub public_info: Option<HashMap<String, cbor::value::Value>>,
     /// Metadata for the anchor transaction that submits the audit record anchor (VAA) on-chain.
     pub audit_record_anchor_transaction_metadata: AnchorTransactionMetadata<S>,
 }
+
+// todo ar where to create audit record?
 
 pub async fn verify_presentation_and_create_audit_anchor(
     client: &mut v2::Client,
@@ -116,7 +107,7 @@ pub async fn verify_presentation_and_create_audit_anchor(
 
     let block_info = client.get_block_info(block_identifier).await?.response;
 
-    let (request_anchor_block_hash, request_anchor) =
+    let request_anchor =
         lookup_request_anchor(client, verification_request.anchor_transaction_hash).await?;
 
     let (verification_material, credential_validities): (Vec<_>, Vec<_>) =
@@ -129,16 +120,19 @@ pub async fn verify_presentation_and_create_audit_anchor(
         .into_iter()
         .unzip();
 
-    let verification_result = verify_request_and_presentation(
-        &global_context,
+    let context = VerificationContext {
         network,
-        block_info.block_slot_time,
+        now: block_info.block_slot_time,
+    };
+
+    let verification_result = base_anchor::verify_presentation_with_request_anchor(
+        &global_context,
+        &context,
         &verification_request,
         &verifiable_presentation,
+        &request_anchor,
         verification_material.iter(),
         credential_validities.iter(),
-        request_anchor_block_hash,
-        &request_anchor,
     )
     .is_ok();
 
@@ -166,7 +160,7 @@ pub async fn verify_presentation_and_create_audit_anchor(
 async fn lookup_request_anchor(
     client: &mut v2::Client,
     anchor_transaction_hash: TransactionHash,
-) -> Result<(BlockHash, VerificationRequestAnchor), VerifyError> {
+) -> Result<VerificationRequestAndBlockHash, VerifyError> {
     // Fetch the finalized transaction
     let (_, block_hash, summary) = client
         .get_finalized_block_item(anchor_transaction_hash)
@@ -185,9 +179,12 @@ async fn lookup_request_anchor(
     };
 
     // Decode anchor hash
-    let anchor: VerificationRequestAnchor = cbor::cbor_decode(data.as_ref())?;
+    let verification_request_anchor: VerificationRequestAnchor = cbor::cbor_decode(data.as_ref())?;
 
-    Ok((block_hash, anchor))
+    Ok(VerificationRequestAndBlockHash {
+        verification_request_anchor,
+        block_hash,
+    })
 }
 
 /// Lookup verification material for presentation
@@ -205,11 +202,6 @@ async fn lookup_verification_materials_and_validity(
         }))
         .await?;
     Ok(verification_material)
-}
-
-#[derive(Debug)]
-enum CredentialValidity {
-    ValidityPeriod(types::CredentialValidity),
 }
 
 /// Lookup verification material for presentation
@@ -304,198 +296,4 @@ async fn lookup_verification_material_and_validity(
             )
         }
     })
-}
-
-/// This function performs several validation steps:
-/// * 1. The verification request anchor on-chain corresponds to the given verification request.
-fn verify_request_and_presentation<'a>(
-    global_context: &'a GlobalContext<ArCurve>,
-    network: web3id::did::Network,
-    now: DateTime<Utc>,
-    request: &VerificationRequest,
-    presentation: &PresentationV1,
-    verification_material: impl ExactSizeIterator<Item = &'a CredentialVerificationMaterial>,
-    credential_validities: impl ExactSizeIterator<Item = &'a CredentialValidity>,
-    request_anchor_block_hash: BlockHash,
-    request_anchor: &VerificationRequestAnchor,
-) -> Result<(), VerifyFailureReason> {
-    // Verify network
-    verify_network(network, presentation)?;
-
-    // Verify validity period, is credential currently valid
-    verify_credential_validity(now, credential_validities)?;
-
-    // Verify the verification request matches the request anchor
-    verify_request_anchor(request, request_anchor)?;
-
-    // Verify anchor block hash matches presentation context
-    verify_anchor_block_hash(request_anchor_block_hash, presentation)?;
-
-    // Cryptographically verify the presentation
-    let request_from_presentation =
-        verify_presentation(global_context, presentation, verification_material)?;
-
-    // Verify the verification request matches the subject claims in the presentation
-    verify_request(&request_from_presentation, request)?;
-
-    Ok(())
-}
-
-fn verify_network(
-    network: Network,
-    presentation: &PresentationV1,
-) -> Result<(), VerifyFailureReason> {
-    for metadata in presentation.metadata() {
-        if metadata.network != network {
-            return Err(VerifyFailureReason::Verify);
-        }
-    }
-    Ok(())
-}
-
-fn verify_credential_validity<'a>(
-    now: DateTime<Utc>,
-    credential_validities: impl ExactSizeIterator<Item = &'a CredentialValidity>,
-) -> Result<(), VerifyFailureReason> {
-    for credential_validity in credential_validities {
-        match credential_validity {
-            CredentialValidity::ValidityPeriod(cred_validity) => {
-                verify_credential_validity_period(now, cred_validity)?;
-            }
-        }
-    }
-    Ok(())
-}
-
-/// determine the credential validity based on the valid from and valid to date information.
-/// The block info supplied has the slot time we will use as the current time, to check validity against
-fn verify_credential_validity_period(
-    now: DateTime<Utc>,
-    credential_validity: &types::CredentialValidity,
-) -> Result<(), VerifyFailureReason> {
-    let valid_from = credential_validity
-        .created_at
-        .lower()
-        .ok_or(VerifyFailureReason::Verify)?;
-
-    let valid_to = credential_validity
-        .valid_to
-        .upper()
-        .ok_or(VerifyFailureReason::Verify)?;
-
-    if now < valid_from {
-        Err(VerifyFailureReason::CredentialNotValidYet)
-    } else if now >= valid_to {
-        Err(VerifyFailureReason::CredentialExpired)
-    } else {
-        Ok(())
-    }
-}
-
-fn verify_presentation<'a>(
-    global_context: &'a GlobalContext<ArCurve>,
-    presentation: &PresentationV1,
-    verification_material: impl ExactSizeIterator<Item = &'a CredentialVerificationMaterial>,
-) -> Result<RequestV1, VerifyFailureReason> {
-    presentation
-        .verify(global_context, verification_material)
-        .map_err(|_| VerifyFailureReason::Verify)
-}
-
-fn verify_anchor_block_hash(
-    request_anchor_block_hash: BlockHash,
-    presentation: &PresentationV1,
-) -> Result<(), VerifyFailureReason> {
-    // todo verify request anchor block hash matches presentation context
-
-    Ok(())
-}
-
-/// Verify that request anchor matches the verification request.
-fn verify_request_anchor(
-    verification_request: &VerificationRequest,
-    request_anchor: &VerificationRequestAnchor,
-) -> Result<(), VerifyFailureReason> {
-    let verification_request_data = VerificationRequestData {
-        context: verification_request.context.clone(),
-        subject_claims: verification_request.subject_claims.clone(),
-    };
-
-    if verification_request_data.hash() != request_anchor.hash {
-        return Err(VerifyFailureReason::Verify);
-    }
-
-    Ok(())
-}
-
-/// Verify that verifiable presentation matches the verification request.
-fn verify_request(
-    request_from_presentation: &RequestV1,
-    verification_request: &VerificationRequest,
-) -> Result<(), VerifyFailureReason> {
-    // todo verify subject claims in presentation matches request
-    //      this incudes both statements and the identity provider and the credential type
-    // todo verify context in presentation matches request context
-
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use concordium_base::id::types::YearMonth;
-
-    #[test]
-    fn test_verify_credential_validity_period() {
-        let validity = types::CredentialValidity {
-            created_at: YearMonth::new(2018, 05).unwrap(),
-            valid_to: YearMonth::new(2020, 08).unwrap(),
-        };
-
-        assert_eq!(
-            verify_credential_validity_period(
-                chrono::DateTime::parse_from_rfc3339("2019-08-29T23:12:15Z")
-                    .unwrap()
-                    .to_utc(),
-                &validity,
-            ),
-            Ok(())
-        );
-        assert_eq!(
-            verify_credential_validity_period(
-                chrono::DateTime::parse_from_rfc3339("2018-05-01T00:00:00Z")
-                    .unwrap()
-                    .to_utc(),
-                &validity,
-            ),
-            Ok(())
-        );
-        assert_eq!(
-            verify_credential_validity_period(
-                chrono::DateTime::parse_from_rfc3339("2018-04-30T23:59:59Z")
-                    .unwrap()
-                    .to_utc(),
-                &validity,
-            ),
-            Err(VerifyFailureReason::CredentialNotValidYet)
-        );
-        assert_eq!(
-            verify_credential_validity_period(
-                chrono::DateTime::parse_from_rfc3339("2020-08-31T23:59:59Z")
-                    .unwrap()
-                    .to_utc(),
-                &validity,
-            ),
-            Ok(())
-        );
-        assert_eq!(
-            verify_credential_validity_period(
-                chrono::DateTime::parse_from_rfc3339("2020-09-01T00:00:00Z")
-                    .unwrap()
-                    .to_utc(),
-                &validity,
-            ),
-            Err(VerifyFailureReason::CredentialExpired)
-        );
-    }
 }

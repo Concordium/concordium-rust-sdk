@@ -1,3 +1,5 @@
+// todo are look through example
+
 //! Example that shows how to generate a verification request anchor.
 //!
 //! You can run this example as follows:
@@ -5,13 +7,13 @@
 use anyhow::Context as AnyhowContext;
 use clap::AppSettings;
 use concordium_base::web3id::v1::anchor::{
-    CredentialType, IdentityProviderMethod, RequestedIdentitySubjectClaims,
+    CredentialType, IdentityProviderMethod, RequestedIdentitySubjectClaims, RequestedStatement,
     UnfilledContextInformation, VerificationRequestData,
 };
 use concordium_base::web3id::Web3IdAttribute;
 use concordium_base::{
     common::cbor,
-    id::id_proof_types::{AtomicStatement, AttributeInRangeStatement},
+    id::id_proof_types::AttributeInRangeStatement,
     web3id::{
         did::Network,
         // Web3IdAttribute,
@@ -72,21 +74,21 @@ async fn main() -> anyhow::Result<()> {
     let context_string = "MyGreateApp".to_string();
     let context = UnfilledContextInformation::new_simple(nonce, connection_id, context_string);
 
-    let attribute_in_range_statement = AtomicStatement::AttributeInRange {
-        statement: AttributeInRangeStatement {
+    let attribute_in_range_statement =
+        RequestedStatement::AttributeInRange(AttributeInRangeStatement {
             attribute_tag: 17.into(),
             lower: Web3IdAttribute::Numeric(80),
             upper: Web3IdAttribute::Numeric(1237),
             _phantom: PhantomData,
-        },
-    };
+        });
 
-    let verification_request_data = VerificationRequestData::new(context).add_statement_request(
-        RequestedIdentitySubjectClaims::default()
-            .add_issuer(IdentityProviderMethod::new(0u32, Network::Testnet))
-            .add_source(CredentialType::IdentityCredential)
-            .add_statement(attribute_in_range_statement),
-    );
+    let verification_request_data = VerificationRequestData::new(context)
+        .add_subject_claim_request(
+            RequestedIdentitySubjectClaims::default()
+                .add_issuer(IdentityProviderMethod::new(0u32, Network::Testnet))
+                .add_source(CredentialType::IdentityCredential)
+                .add_statement(attribute_in_range_statement),
+        );
 
     let mut public_info = HashMap::new();
     public_info.insert("key".to_string(), cbor::value::Value::Positive(4u64));
@@ -102,7 +104,7 @@ async fn main() -> anyhow::Result<()> {
         &mut client,
         anchor_transaction_metadata,
         verification_request_data,
-        public_info,
+        Some(public_info),
     )
     .await?;
 

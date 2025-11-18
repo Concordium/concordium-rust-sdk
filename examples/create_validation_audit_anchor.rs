@@ -1,4 +1,4 @@
-// todo ar fix
+// todo ar example
 
 // //! Example that shows how to generate a verification audit anchor.
 // //!
