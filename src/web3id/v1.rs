@@ -5,22 +5,26 @@ use crate::endpoints::RPCError;
 use crate::smart_contracts::common::AccountAddress;
 use crate::v2::{AccountIdentifier, BlockIdentifier, IntoBlockIdentifier, QueryError};
 use crate::web3id::v1::anchor::{AnchorTransactionMetadata, CreateAnchorError};
+use chrono::{DateTime, Utc};
 use concordium_base::base::CredentialRegistrationID;
 use concordium_base::common::cbor;
 use concordium_base::common::cbor::CborSerializationError;
 use concordium_base::common::upward::UnknownDataError;
 use concordium_base::hashes::{BlockHash, TransactionHash};
 use concordium_base::id::constants::{ArCurve, IpPairing};
-use concordium_base::id::types::{ArInfos, GlobalContext, IpIdentity};
+use concordium_base::id::types;
+use concordium_base::id::types::{
+    AccountCredentialWithoutProofs, ArInfos, GlobalContext, IpIdentity,
+};
 use concordium_base::transactions::ExactSizeTransactionSigner;
 use concordium_base::web3id;
+use concordium_base::web3id::did::Network;
 use concordium_base::web3id::v1::anchor::{
     VerificationAuditRecord, VerificationRequest, VerificationRequestAnchor,
     VerificationRequestData,
 };
 use concordium_base::web3id::v1::{
-    AccountCredentialVerificationMaterial, CredentialMetadataTypeV1, CredentialMetadataV1,
-    IdentityCredentialVerificationMaterial,
+    AccountCredentialVerificationMaterial, IdentityCredentialVerificationMaterial,
 };
 use concordium_base::web3id::{v1, Web3IdAttribute};
 use futures::StreamExt;
@@ -28,6 +32,7 @@ use futures::{future, TryStreamExt};
 use std::collections::{BTreeMap, HashMap};
 
 pub type PresentationV1 = v1::PresentationV1<IpPairing, ArCurve, Web3IdAttribute>;
+pub type CredentialV1 = v1::CredentialV1<IpPairing, ArCurve, Web3IdAttribute>;
 pub type RequestV1 = v1::RequestV1<ArCurve, Web3IdAttribute>;
 pub type CredentialVerificationMaterial = v1::CredentialVerificationMaterial<IpPairing, ArCurve>;
 
@@ -48,7 +53,8 @@ pub struct VerificationData {
     /// the verification audit anchor (VAA) on-chain. Notice that
     /// this transaction may not have been finalized yet.
     pub transaction_ref: TransactionHash,
-    // todo ar
+    // Whether the verification was successful. If `false`, the verifiable presentation is not
+    // valid and the claims in it are not verified to be true.
     pub verification_result: bool,
 }
 
@@ -77,9 +83,11 @@ pub enum VerifyError {
     InitialCredential { cred_id: CredentialRegistrationID },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub enum VerifyFailureReason {
     Verify,
+    CredentialNotValidYet,
+    CredentialExpired,
 }
 
 /// Metadata for transaction submission.
@@ -92,7 +100,7 @@ pub struct AuditRecordArgument<S: ExactSizeTransactionSigner> {
     pub audit_record_anchor_transaction_metadata: AnchorTransactionMetadata<S>,
 }
 
-pub async fn verify_presentation_and_submit_audit_anchor(
+pub async fn verify_presentation_and_create_audit_anchor(
     client: &mut v2::Client,
     network: web3id::did::Network,
     block_identifier: impl IntoBlockIdentifier,
@@ -111,14 +119,24 @@ pub async fn verify_presentation_and_submit_audit_anchor(
     let (request_anchor_block_hash, request_anchor) =
         lookup_request_anchor(client, verification_request.anchor_transaction_hash).await?;
 
-    let verification_material =
-        lookup_verification_materials(client, block_identifier, &verifiable_presentation).await?;
+    let (verification_material, credential_validities): (Vec<_>, Vec<_>) =
+        lookup_verification_materials_and_validity(
+            client,
+            block_identifier,
+            &verifiable_presentation,
+        )
+        .await?
+        .into_iter()
+        .unzip();
 
     let verification_result = verify_request_and_presentation(
         &global_context,
+        network,
+        block_info.block_slot_time,
         &verification_request,
         &verifiable_presentation,
         verification_material.iter(),
+        credential_validities.iter(),
         request_anchor_block_hash,
         &request_anchor,
     )
@@ -173,46 +191,55 @@ async fn lookup_request_anchor(
 }
 
 /// Lookup verification material for presentation
-async fn lookup_verification_materials(
+async fn lookup_verification_materials_and_validity(
     client: &mut v2::Client,
     block_identifier: BlockIdentifier,
     presentation: &PresentationV1,
-) -> Result<Vec<CredentialVerificationMaterial>, VerifyError> {
-    let verification_material = future::try_join_all(presentation.metadata().map(|metadata| {
-        let mut client = client.clone();
-        async move {
-            lookup_verification_material(&mut client, block_identifier, &metadata.cred_metadata)
-                .await
-        }
-    }))
-    .await?;
+) -> Result<Vec<(CredentialVerificationMaterial, CredentialValidity)>, VerifyError> {
+    let verification_material =
+        future::try_join_all(presentation.verifiable_credentials.iter().map(|cred| {
+            let mut client = client.clone();
+            async move {
+                lookup_verification_material_and_validity(&mut client, block_identifier, cred).await
+            }
+        }))
+        .await?;
     Ok(verification_material)
 }
 
+#[derive(Debug)]
+enum CredentialValidity {
+    ValidityPeriod(types::CredentialValidity),
+}
+
 /// Lookup verification material for presentation
-async fn lookup_verification_material(
+async fn lookup_verification_material_and_validity(
     client: &mut v2::Client,
     block_identifier: BlockIdentifier,
-    credential_metadata: &CredentialMetadataTypeV1,
-) -> Result<CredentialVerificationMaterial, VerifyError> {
-    Ok(match credential_metadata {
-        CredentialMetadataTypeV1::Account(metadata) => {
+    credential: &CredentialV1,
+) -> Result<(CredentialVerificationMaterial, CredentialValidity), VerifyError> {
+    Ok(match credential {
+        CredentialV1::Account(cred) => {
+            let metadata = cred.metadata();
+
             let account_info = client
                 .get_account_info(
                     &AccountIdentifier::CredId(metadata.cred_id),
                     block_identifier,
                 )
                 .await?;
-            let Some(cred) = account_info
-                .response
-                .account_credentials
-                .values()
-                .find_map(|cred| {
-                    cred.value
-                        .as_ref()
-                        .known()
-                        .and_then(|c| (c.cred_id() == metadata.cred_id.as_ref()).then_some(c))
-                })
+
+            let Some(account_cred) =
+                account_info
+                    .response
+                    .account_credentials
+                    .values()
+                    .find_map(|cred| {
+                        cred.value
+                            .as_ref()
+                            .known()
+                            .and_then(|c| (c.cred_id() == metadata.cred_id.as_ref()).then_some(c))
+                    })
             else {
                 return Err(VerifyError::CredentialNotPresent {
                     cred_id: metadata.cred_id,
@@ -220,6 +247,7 @@ async fn lookup_verification_material(
                 });
             };
 
+            // todo ar
             // if c.issuer() != issuer {
             //     return Err(CredentialLookupError::InconsistentIssuer {
             //         stated: issuer,
@@ -227,30 +255,32 @@ async fn lookup_verification_material(
             //     });
             // }
 
-            // let credential_validity = CredentialValidity {
-            //     created_at: cdv.policy.created_at,
-            //     valid_to: cdv.policy.valid_to,
-            // };
-            // let status =
-            //     determine_credential_validity_status(&credential_validity, &block_info)?;
-
-            match cred {
-                concordium_base::id::types::AccountCredentialWithoutProofs::Initial { .. } => {
+            match account_cred {
+                AccountCredentialWithoutProofs::Initial { .. } => {
                     return Err(VerifyError::InitialCredential {
                         cred_id: metadata.cred_id,
                     })
                 }
-                concordium_base::id::types::AccountCredentialWithoutProofs::Normal {
-                    cdv,
-                    commitments,
-                } => {
-                    CredentialVerificationMaterial::Account(AccountCredentialVerificationMaterial {
-                        attribute_commitments: commitments.cmm_attributes.clone(),
-                    })
+                AccountCredentialWithoutProofs::Normal { cdv, commitments } => {
+                    let credential_validity = types::CredentialValidity {
+                        created_at: account_cred.policy().created_at,
+                        valid_to: cdv.policy.valid_to,
+                    };
+
+                    (
+                        CredentialVerificationMaterial::Account(
+                            AccountCredentialVerificationMaterial {
+                                attribute_commitments: commitments.cmm_attributes.clone(),
+                            },
+                        ),
+                        CredentialValidity::ValidityPeriod(credential_validity),
+                    )
                 }
             }
         }
-        CredentialMetadataTypeV1::Identity(metadata) => {
+        CredentialV1::Identity(cred) => {
+            let metadata = cred.metadata();
+
             let ip_info = client
                 .get_identity_providers(block_identifier)
                 .await?
@@ -270,12 +300,15 @@ async fn lookup_verification_material(
                 .await
                 .map_err(|status| QueryError::RPCError(RPCError::CallError(status)))?;
 
-            CredentialVerificationMaterial::Identity(IdentityCredentialVerificationMaterial {
-                ip_info,
-                ars_infos: ArInfos {
-                    anonymity_revokers: ars_infos,
-                },
-            })
+            (
+                CredentialVerificationMaterial::Identity(IdentityCredentialVerificationMaterial {
+                    ip_info,
+                    ars_infos: ArInfos {
+                        anonymity_revokers: ars_infos,
+                    },
+                }),
+                CredentialValidity::ValidityPeriod(cred.validity.clone()),
+            )
         }
     })
 }
@@ -284,13 +317,22 @@ async fn lookup_verification_material(
 /// * 1. The verification request anchor on-chain corresponds to the given verification request.
 fn verify_request_and_presentation<'a>(
     global_context: &'a GlobalContext<ArCurve>,
+    network: web3id::did::Network,
+    now: DateTime<Utc>,
     request: &VerificationRequest,
     presentation: &PresentationV1,
     verification_material: impl ExactSizeIterator<Item = &'a CredentialVerificationMaterial>,
+    credential_validities: impl ExactSizeIterator<Item = &'a CredentialValidity>,
     request_anchor_block_hash: BlockHash,
     request_anchor: &VerificationRequestAnchor,
 ) -> Result<(), VerifyFailureReason> {
-    // Verify the request matches the request anchor
+    // Verify network
+    verify_network(network, presentation)?;
+
+    // Verify validity period, is credential currently valid
+    verify_credential_validity(now, credential_validities)?;
+
+    // Verify the verification request matches the request anchor
     verify_request_anchor(request, request_anchor)?;
 
     // Verify anchor block hash matches presentation context
@@ -300,10 +342,61 @@ fn verify_request_and_presentation<'a>(
     let request_from_presentation =
         verify_presentation(global_context, presentation, verification_material)?;
 
-    // Verify the request matches the presentation
+    // Verify the verification request matches the subject claims in the presentation
     verify_request(&request_from_presentation, request)?;
 
     Ok(())
+}
+
+fn verify_network(
+    network: Network,
+    presentation: &PresentationV1,
+) -> Result<(), VerifyFailureReason> {
+    for metadata in presentation.metadata() {
+        if metadata.network != network {
+            return Err(VerifyFailureReason::Verify);
+        }
+    }
+    Ok(())
+}
+
+fn verify_credential_validity<'a>(
+    now: DateTime<Utc>,
+    credential_validities: impl ExactSizeIterator<Item = &'a CredentialValidity>,
+) -> Result<(), VerifyFailureReason> {
+    for credential_validity in credential_validities {
+        match credential_validity {
+            CredentialValidity::ValidityPeriod(cred_validity) => {
+                verify_credential_validity_period(now, cred_validity)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// determine the credential validity based on the valid from and valid to date information.
+/// The block info supplied has the slot time we will use as the current time, to check validity against
+fn verify_credential_validity_period(
+    now: DateTime<Utc>,
+    credential_validity: &types::CredentialValidity,
+) -> Result<(), VerifyFailureReason> {
+    let valid_from = credential_validity
+        .created_at
+        .lower()
+        .ok_or(VerifyFailureReason::Verify)?;
+
+    let valid_to = credential_validity
+        .valid_to
+        .upper()
+        .ok_or(VerifyFailureReason::Verify)?;
+
+    if now < valid_from {
+        Err(VerifyFailureReason::CredentialNotValidYet)
+    } else if now >= valid_to {
+        Err(VerifyFailureReason::CredentialExpired)
+    } else {
+        Ok(())
+    }
 }
 
 fn verify_presentation<'a>(
@@ -354,33 +447,62 @@ fn verify_request(
     Ok(())
 }
 
-// /// determine the credential validity based on the valid from and valid to date information.
-// /// The block info supplied has the slot time we will use as the current time, to check validity against
-// fn determine_credential_validity_status(
-//     validity: CredentialValidity,
-//     block_info: BlockInfo,
-// ) -> Result<CredentialStatus, CredentialLookupError> {
-//     let valid_from = validity
-//         .created_at
-//         .lower()
-//         .ok_or(CredentialLookupError::InvalidResponse(
-//             "Credential valid from date is not valid.".into(),
-//         ))?;
-//
-//     let valid_to = validity
-//         .valid_to
-//         .upper()
-//         .ok_or(CredentialLookupError::InvalidResponse(
-//             "Credential valid to date is not valid.".into(),
-//         ))?;
-//
-//     let now = block_info.block_slot_time;
-//
-//     if valid_from > now {
-//         Ok(CredentialStatus::NotActivated)
-//     } else if valid_to >= now {
-//         Ok(CredentialStatus::Active)
-//     } else {
-//         Ok(CredentialStatus::Expired)
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use concordium_base::id::types::YearMonth;
+
+    #[test]
+    fn test_verify_credential_validity_period() {
+        let validity =  types::CredentialValidity {
+            created_at: YearMonth::new(2018, 05).unwrap(),
+            valid_to: YearMonth::new(2020, 08).unwrap(),
+        };
+
+        assert_eq!(
+            verify_credential_validity_period(
+                chrono::DateTime::parse_from_rfc3339("2019-08-29T23:12:15Z")
+                    .unwrap()
+                    .to_utc(),
+                &validity,
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            verify_credential_validity_period(
+                chrono::DateTime::parse_from_rfc3339("2018-05-01T00:00:00Z")
+                    .unwrap()
+                    .to_utc(),
+                &validity,
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            verify_credential_validity_period(
+                chrono::DateTime::parse_from_rfc3339("2018-04-30T23:59:59Z")
+                    .unwrap()
+                    .to_utc(),
+                &validity,
+            ),
+            Err(VerifyFailureReason::CredentialNotValidYet)
+        );
+        assert_eq!(
+            verify_credential_validity_period(
+                chrono::DateTime::parse_from_rfc3339("2020-08-31T23:59:59Z")
+                    .unwrap()
+                    .to_utc(),
+                &validity,
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            verify_credential_validity_period(
+                chrono::DateTime::parse_from_rfc3339("2020-09-01T00:00:00Z")
+                    .unwrap()
+                    .to_utc(),
+                &validity,
+            ),
+            Err(VerifyFailureReason::CredentialExpired)
+        );
+    }
+}
