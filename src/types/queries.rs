@@ -41,6 +41,7 @@ impl ProtocolVersionInt {
             ProtocolVersion::P7 => Self(7),
             ProtocolVersion::P8 => Self(8),
             ProtocolVersion::P9 => Self(9),
+            ProtocolVersion::P10 => Self(10),
         }
     }
 }

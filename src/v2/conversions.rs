@@ -496,6 +496,7 @@ impl From<ProtocolVersion> for super::types::ProtocolVersion {
             ProtocolVersion::ProtocolVersion7 => super::types::ProtocolVersion::P7,
             ProtocolVersion::ProtocolVersion8 => super::types::ProtocolVersion::P8,
             ProtocolVersion::ProtocolVersion9 => super::types::ProtocolVersion::P9,
+            ProtocolVersion::ProtocolVersion10 => super::types::ProtocolVersion::P10,
         }
     }
 }
@@ -512,6 +513,7 @@ impl From<super::types::ProtocolVersion> for ProtocolVersion {
             super::types::ProtocolVersion::P7 => ProtocolVersion::ProtocolVersion7,
             super::types::ProtocolVersion::P8 => ProtocolVersion::ProtocolVersion8,
             super::types::ProtocolVersion::P9 => ProtocolVersion::ProtocolVersion9,
+            super::types::ProtocolVersion::P10 => ProtocolVersion::ProtocolVersion10,
         }
     }
 }
