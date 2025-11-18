@@ -247,14 +247,6 @@ async fn lookup_verification_material_and_validity(
                 });
             };
 
-            // todo ar
-            // if c.issuer() != issuer {
-            //     return Err(CredentialLookupError::InconsistentIssuer {
-            //         stated: issuer,
-            //         actual: c.issuer(),
-            //     });
-            // }
-
             match account_cred {
                 AccountCredentialWithoutProofs::Initial { .. } => {
                     return Err(VerifyError::InitialCredential {
@@ -270,6 +262,7 @@ async fn lookup_verification_material_and_validity(
                     (
                         CredentialVerificationMaterial::Account(
                             AccountCredentialVerificationMaterial {
+                                issuer: cdv.ip_identity,
                                 attribute_commitments: commitments.cmm_attributes.clone(),
                             },
                         ),
