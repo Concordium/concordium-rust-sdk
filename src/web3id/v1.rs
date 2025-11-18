@@ -454,7 +454,7 @@ mod tests {
 
     #[test]
     fn test_verify_credential_validity_period() {
-        let validity =  types::CredentialValidity {
+        let validity = types::CredentialValidity {
             created_at: YearMonth::new(2018, 05).unwrap(),
             valid_to: YearMonth::new(2020, 08).unwrap(),
         };
