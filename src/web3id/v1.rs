@@ -1,12 +1,25 @@
 //! Functionality for requesting and verifying V1 Web3Id credentials.
 //!
-//! A verification flow is started by constructing [`VerificationRequestData`]
-//! and submitting the corresponding [`VerificationRequestAnchor`] (VRA) on chain with
-//! [`create_verification_request_and_submit_anchor`]. The returned [`VerificationRequest`] is handed over
-//! to a credential holder to create a [`VerifiablePresentationV1`]. The presentation is then verified together with
+//! A verification flow consists of multiples stages:
+//!
+//! 1. Create a [`VerificationRequest`]: A verification flow is started by constructing [`VerificationRequestData`]
+//! and creating the [`VerificationRequest`] with [`create_verification_request_and_submit_anchor`] which also
+//! submits the corresponding [`VerificationRequestAnchor`] (VRA) on chain.
+//!
+//! 2. Prove [`VerifiablePresentationV1`]: The claims in the [`VerificationRequest`] are
+//! proved by a credential holder in the context specified in the request and
+//! embedded in a [`VerifiablePresentationV1`] together with the context and proofs.
+//! The prover is implemented in [`VerifiablePresentationRequestV1::prove`](anchor::VerifiablePresentationRequestV1::prove).
+//!
+//! 3. Verify a [`VerifiablePresentationV1`]: The presentation can be verified together with
 //! the verification request with [`verify_presentation_and_submit_audit_anchor`], which submits
 //! and [`VerificationAuditRecord`] (VAA) on chain and returns the [`VerificationAuditRecord`] to
 //! be stored locally by the verifier.
+//!
+//! 4. Verify an [`VerificationAuditRecord`]: The stored audit record can be re-verified with
+//! [`verify_audit_record`] if/when needed.
+//!
+//! The example `web3id_v1_verification_flow` demonstrates the verification flow.
 
 use crate::types::{AccountTransactionEffects, BlockItemSummaryDetails};
 use crate::v2;
@@ -24,40 +37,45 @@ use concordium_base::id::types::{AccountCredentialWithoutProofs, ArInfos, IpIden
 use concordium_base::transactions::{
     send, BlockItem, ExactSizeTransactionSigner, RegisteredData, TooLargeError,
 };
-use concordium_base::web3id;
 use concordium_base::web3id::v1::anchor::{
-    self as base_anchor, CredentialValidityType, VerifiablePresentationV1, VerificationAuditRecord,
-    VerificationContext, VerificationMaterial, VerificationMaterialWithValidity,
-    VerificationRequest, VerificationRequestAnchor, VerificationRequestAnchorAndBlockHash,
-    VerificationRequestData,
+    self as anchor, CredentialValidityType, PresentationVerificationResult,
+    VerifiablePresentationV1, VerificationAuditRecord, VerificationContext, VerificationMaterial,
+    VerificationMaterialWithValidity, VerificationRequest, VerificationRequestAnchor,
+    VerificationRequestAnchorAndBlockHash, VerificationRequestData,
 };
 use concordium_base::web3id::v1::{
     AccountCredentialVerificationMaterial, CredentialMetadataTypeV1, CredentialMetadataV1,
     IdentityCredentialVerificationMaterial,
 };
+use concordium_base::{hashes, web3id};
 
 use concordium_base::common::types::TransactionTime;
 use futures::StreamExt;
 use futures::{future, TryStreamExt};
 use std::collections::{BTreeMap, HashMap};
 
-/// The verification audit record and the transaction hash
-/// for the transaction registering the verification audit anchor (VAA) on-chain.
+/// Data returned from verifying a presentation against the corresponding verification request.
+/// Contains the verification result, the audit record and the transaction hash
+/// for the transaction registering the verification audit anchor (VAA) on-chain in case
+/// the verification was successful.
 /// The audit record should be stored in an off-chain database for regulatory purposes
 /// and should generally be kept private.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[serde(tag = "type", rename = "ConcordiumVerificationDataV1")]
-pub struct VerificationData {
-    /// The verification audit record that was anchored on chain.
-    pub record: VerificationAuditRecord,
+#[derive(Debug, Clone, PartialEq)]
+pub struct PresentationVerificationData {
+    // Whether the verification was successful. If `false`, the verifiable presentation is not
+    // valid and the credentials and claims in it are not verified to be true.
+    pub verification_result: PresentationVerificationResult,
+    /// The verification audit record. A corresponding [`VerificationRequestAnchor`] (VAA) is submitted
+    /// on chain, if the verification is successful. Notice that the existence of the audit record,
+    /// does not mean that verification was successful, that is specified
+    /// by [`Self::verification_result`]. The audit record should be stored in an off-chain database for regulatory purposes
+    // /// and should generally be kept private.
+    pub audit_record: VerificationAuditRecord,
     /// Blockchain transaction hash for the transaction that registers
     /// the verification audit anchor (VAA) on-chain. Notice that
-    /// this transaction may not have been finalized yet.
-    pub transaction_ref: TransactionHash,
-    // Whether the verification was successful. If `false`, the verifiable presentation is not
-    // valid and the claims in it are not verified to be true.
-    pub verification_result: bool,
+    /// this transaction may not have been finalized yet. The anchor is
+    /// only submitted if the verification is successful.
+    pub anchor_transaction_hash: Option<hashes::TransactionHash>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -68,12 +86,12 @@ pub enum VerifyError {
     InvalidRequestAnchor,
     #[error("unknown data error: {0}")]
     UnknownDataError(#[from] UnknownDataError),
-    #[error("CBOR serialization error: {0}")]
-    CborSerialization(#[from] CborSerializationError),
     #[error("node query error: {0}")]
     Query(#[from] v2::QueryError),
     #[error("create anchor: {0}")]
     Anchor(#[from] CreateAnchorError),
+    #[error("CBOR serialization error: {0}")]
+    CborSerialization(#[from] CborSerializationError),
     #[error("unknown identity provider: {0}")]
     UnknownIdentityProvider(IpIdentity),
     #[error("credential {cred_id} no longer present or of unknown type on account: {account}")]
@@ -95,6 +113,46 @@ pub struct AuditRecordArgument<S: ExactSizeTransactionSigner> {
     pub audit_record_anchor_transaction_metadata: AnchorTransactionMetadata<S>,
 }
 
+// todo ar doc
+pub async fn verify_audit_record(
+    client: &mut v2::Client,
+    network: web3id::did::Network,
+    block_identifier: impl IntoBlockIdentifier,
+    verification_audit_record: &VerificationAuditRecord,
+) -> Result<PresentationVerificationResult, VerifyError> {
+    let block_identifier = block_identifier.into_block_identifier();
+    let global_context = client
+        .get_cryptographic_parameters(block_identifier)
+        .await?
+        .response;
+
+    let block_info = client.get_block_info(block_identifier).await?.response;
+
+    let request_anchor = lookup_request_anchor(client, &verification_audit_record.request).await?;
+
+    let verification_material = lookup_verification_materials_and_validity(
+        client,
+        block_identifier,
+        &verification_audit_record.presentation,
+    )
+    .await?;
+
+    let context = VerificationContext {
+        network,
+        validity_time: block_info.block_slot_time,
+    };
+
+    Ok(anchor::verify_presentation_with_request_anchor(
+        &global_context,
+        &context,
+        &verification_audit_record.request,
+        &verification_audit_record.presentation,
+        &request_anchor,
+        &verification_material,
+    ))
+}
+
+// todo ar doc
 pub async fn verify_presentation_and_submit_audit_anchor(
     client: &mut v2::Client,
     network: web3id::did::Network,
@@ -102,7 +160,7 @@ pub async fn verify_presentation_and_submit_audit_anchor(
     verification_request: VerificationRequest,
     verifiable_presentation: VerifiablePresentationV1,
     audit_record_arg: AuditRecordArgument<impl ExactSizeTransactionSigner>,
-) -> Result<VerificationData, VerifyError> {
+) -> Result<PresentationVerificationData, VerifyError> {
     let block_identifier = block_identifier.into_block_identifier();
     let global_context = client
         .get_cryptographic_parameters(block_identifier)
@@ -125,33 +183,38 @@ pub async fn verify_presentation_and_submit_audit_anchor(
         validity_time: block_info.block_slot_time,
     };
 
-    let verification_result = base_anchor::verify_presentation_with_request_anchor(
+    let verification_result = anchor::verify_presentation_with_request_anchor(
         &global_context,
         &context,
         &verification_request,
         &verifiable_presentation,
         &request_anchor,
         &verification_material,
-    )
-    .is_ok();
+    );
 
-    let verification_audit_record = VerificationAuditRecord::new(
+    let audit_record = VerificationAuditRecord::new(
         audit_record_arg.audit_record_id,
         verification_request,
         verifiable_presentation,
     );
-    let transaction_hash = submit_verification_audit_record_anchor(
-        client,
-        audit_record_arg.audit_record_anchor_transaction_metadata,
-        &verification_audit_record,
-        audit_record_arg.public_info,
-    )
-    .await?;
 
-    Ok(VerificationData {
-        record: verification_audit_record,
-        transaction_ref: transaction_hash,
+    let anchor_transaction_hash = if verification_result.is_success() {
+        let txn_hash = submit_verification_audit_record_anchor(
+            client,
+            audit_record_arg.audit_record_anchor_transaction_metadata,
+            &audit_record,
+            audit_record_arg.public_info,
+        )
+        .await?;
+        Some(txn_hash)
+    } else {
+        None
+    };
+
+    Ok(PresentationVerificationData {
         verification_result,
+        audit_record,
+        anchor_transaction_hash,
     })
 }
 
