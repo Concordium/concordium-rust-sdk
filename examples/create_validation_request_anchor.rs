@@ -7,8 +7,8 @@
 use anyhow::Context as AnyhowContext;
 use clap::AppSettings;
 use concordium_base::web3id::v1::anchor::{
-    CredentialType, IdentityProviderMethod, RequestedIdentitySubjectClaims, RequestedStatement,
-    UnfilledContextInformation, VerificationRequestData,
+    IdentityCredentialType, IdentityProviderDid, RequestedIdentitySubjectClaims,
+    RequestedStatement, UnfilledContextInformation, VerificationRequestData,
 };
 use concordium_base::web3id::Web3IdAttribute;
 use concordium_base::{
@@ -85,8 +85,8 @@ async fn main() -> anyhow::Result<()> {
     let verification_request_data = VerificationRequestData::new(context)
         .add_subject_claim_request(
             RequestedIdentitySubjectClaims::default()
-                .add_issuer(IdentityProviderMethod::new(0u32, Network::Testnet))
-                .add_source(CredentialType::IdentityCredential)
+                .add_issuer(IdentityProviderDid::new(0u32, Network::Testnet))
+                .add_source(IdentityCredentialType::IdentityCredential)
                 .add_statement(attribute_in_range_statement),
         );
 

@@ -14,7 +14,6 @@ use concordium_base::{
 };
 use futures::TryStreamExt;
 
-/// Functionality for requesting and verifying V1 Web3Id credentials.
 pub mod v1;
 
 #[derive(thiserror::Error, Debug)]
