@@ -16,11 +16,13 @@ use concordium_base::id::types::{AccountCredentialWithoutProofs, ArInfos, IpIden
 use concordium_base::transactions::ExactSizeTransactionSigner;
 use concordium_base::web3id;
 use concordium_base::web3id::v1::anchor::{
-    self as base_anchor, CredentialValidity, VerificationAuditRecord, VerificationContext,
-    VerificationRequest, VerificationRequestAnchor, VerificationRequestAndBlockHash,
+    self as base_anchor, CredentialValidityType, VerificationAuditRecord, VerificationContext,
+    VerificationMaterialWithValidity, VerificationRequest, VerificationRequestAnchor,
+    VerificationRequestAnchorAndBlockHash,
 };
 use concordium_base::web3id::v1::{
-    AccountCredentialVerificationMaterial, IdentityCredentialVerificationMaterial,
+    AccountCredentialVerificationMaterial, CredentialMetadataTypeV1, CredentialMetadataV1,
+    IdentityCredentialVerificationMaterial,
 };
 use concordium_base::web3id::{v1, Web3IdAttribute};
 use futures::StreamExt;
@@ -110,15 +112,12 @@ pub async fn verify_presentation_and_create_audit_anchor(
     let request_anchor =
         lookup_request_anchor(client, verification_request.anchor_transaction_hash).await?;
 
-    let (verification_material, credential_validities): (Vec<_>, Vec<_>) =
-        lookup_verification_materials_and_validity(
-            client,
-            block_identifier,
-            &verifiable_presentation,
-        )
-        .await?
-        .into_iter()
-        .unzip();
+    let verification_material = lookup_verification_materials_and_validity(
+        client,
+        block_identifier,
+        &verifiable_presentation,
+    )
+    .await?;
 
     let context = VerificationContext {
         network,
@@ -131,8 +130,7 @@ pub async fn verify_presentation_and_create_audit_anchor(
         &verification_request,
         &verifiable_presentation,
         &request_anchor,
-        verification_material.iter(),
-        credential_validities.iter(),
+        &verification_material,
     )
     .is_ok();
 
@@ -160,7 +158,7 @@ pub async fn verify_presentation_and_create_audit_anchor(
 async fn lookup_request_anchor(
     client: &mut v2::Client,
     anchor_transaction_hash: TransactionHash,
-) -> Result<VerificationRequestAndBlockHash, VerifyError> {
+) -> Result<VerificationRequestAnchorAndBlockHash, VerifyError> {
     // Fetch the finalized transaction
     let (_, block_hash, summary) = client
         .get_finalized_block_item(anchor_transaction_hash)
@@ -181,7 +179,7 @@ async fn lookup_request_anchor(
     // Decode anchor hash
     let verification_request_anchor: VerificationRequestAnchor = cbor::cbor_decode(data.as_ref())?;
 
-    Ok(VerificationRequestAndBlockHash {
+    Ok(VerificationRequestAnchorAndBlockHash {
         verification_request_anchor,
         block_hash,
     })
@@ -192,12 +190,17 @@ async fn lookup_verification_materials_and_validity(
     client: &mut v2::Client,
     block_identifier: BlockIdentifier,
     presentation: &PresentationV1,
-) -> Result<Vec<(CredentialVerificationMaterial, CredentialValidity)>, VerifyError> {
+) -> Result<Vec<VerificationMaterialWithValidity>, VerifyError> {
     let verification_material =
-        future::try_join_all(presentation.verifiable_credentials.iter().map(|cred| {
+        future::try_join_all(presentation.metadata().map(|cred_metadata| {
             let mut client = client.clone();
             async move {
-                lookup_verification_material_and_validity(&mut client, block_identifier, cred).await
+                lookup_verification_material_and_validity(
+                    &mut client,
+                    block_identifier,
+                    &cred_metadata,
+                )
+                .await
             }
         }))
         .await?;
@@ -208,12 +211,10 @@ async fn lookup_verification_materials_and_validity(
 async fn lookup_verification_material_and_validity(
     client: &mut v2::Client,
     block_identifier: BlockIdentifier,
-    credential: &CredentialV1,
-) -> Result<(CredentialVerificationMaterial, CredentialValidity), VerifyError> {
-    Ok(match credential {
-        CredentialV1::Account(cred) => {
-            let metadata = cred.metadata();
-
+    cred_metadata: &CredentialMetadataV1,
+) -> Result<VerificationMaterialWithValidity, VerifyError> {
+    Ok(match &cred_metadata.cred_metadata {
+        CredentialMetadataTypeV1::Account(metadata) => {
             let account_info = client
                 .get_account_info(
                     &AccountIdentifier::CredId(metadata.cred_id),
@@ -251,21 +252,19 @@ async fn lookup_verification_material_and_validity(
                         valid_to: cdv.policy.valid_to,
                     };
 
-                    (
-                        CredentialVerificationMaterial::Account(
+                    VerificationMaterialWithValidity {
+                        verification_material: CredentialVerificationMaterial::Account(
                             AccountCredentialVerificationMaterial {
                                 issuer: cdv.ip_identity,
                                 attribute_commitments: commitments.cmm_attributes.clone(),
                             },
                         ),
-                        CredentialValidity::ValidityPeriod(credential_validity),
-                    )
+                        validity: CredentialValidityType::ValidityPeriod(credential_validity),
+                    }
                 }
             }
         }
-        CredentialV1::Identity(cred) => {
-            let metadata = cred.metadata();
-
+        CredentialMetadataTypeV1::Identity(metadata) => {
             let ip_info = client
                 .get_identity_providers(block_identifier)
                 .await?
@@ -285,15 +284,17 @@ async fn lookup_verification_material_and_validity(
                 .await
                 .map_err(|status| QueryError::RPCError(RPCError::CallError(status)))?;
 
-            (
-                CredentialVerificationMaterial::Identity(IdentityCredentialVerificationMaterial {
-                    ip_info,
-                    ars_infos: ArInfos {
-                        anonymity_revokers: ars_infos,
+            VerificationMaterialWithValidity {
+                verification_material: CredentialVerificationMaterial::Identity(
+                    IdentityCredentialVerificationMaterial {
+                        ip_info,
+                        ars_infos: ArInfos {
+                            anonymity_revokers: ars_infos,
+                        },
                     },
-                }),
-                CredentialValidity::ValidityPeriod(cred.validity.clone()),
-            )
+                ),
+                validity: CredentialValidityType::ValidityPeriod(metadata.validity.clone()),
+            }
         }
     })
 }
