@@ -1,12 +1,12 @@
 //! Functionality for requesting and verifying V1 Web3Id credentials.
 //!
-//! A verification flow consists of multiples stages:
+//! A verification flow consists of multiple stages:
 //!
 //! 1. Create a [`VerificationRequest`]: A verification flow is started by constructing [`VerificationRequestData`]
 //! and creating the [`VerificationRequest`] with [`create_verification_request_and_submit_anchor`] which also
 //! submits the corresponding [`VerificationRequestAnchor`] (VRA) on chain.
 //!
-//! 2. Prove [`VerifiablePresentationV1`]: The claims in the [`VerificationRequest`] are
+//! 2. Generate and prove [`VerifiablePresentationV1`]: The claims in the [`VerificationRequest`] are
 //! proved by a credential holder in the context specified in the request and
 //! embedded in a [`VerifiablePresentationV1`] together with the context and proofs.
 //! The prover is implemented in [`VerifiablePresentationRequestV1::prove`](anchor::VerifiablePresentationRequestV1::prove).
@@ -225,8 +225,9 @@ pub async fn lookup_request_anchor(
     verification_request: &VerificationRequest,
 ) -> Result<VerificationRequestAnchorAndBlockHash, VerifyError> {
     // Fetch the finalized transaction
+    // todo ar change to get_block_item_status
     let (_, block_hash, summary) = client
-        .get_finalized_block_item(verification_request.anchor_transaction_hash)
+        .finalized_block_item(verification_request.anchor_transaction_hash)
         .await?;
 
     // Extract account transaction
