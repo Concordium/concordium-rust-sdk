@@ -28,7 +28,9 @@ struct App {
     )]
     endpoint: v2::Endpoint,
     #[structopt(long = "sender", help = "Path to the sender account key file.")]
-    account: PathBuf,
+    sender_account: PathBuf,
+    #[structopt(long = "sponsor", help = "Path to the sponsor account key file.")]
+    sponsor_account: PathBuf,
     #[structopt(long = "receiver", help = "Receiver address.")]
     receiver: String,
     #[structopt(long = "token", help = "Token id of token.")]
@@ -67,13 +69,15 @@ async fn main() -> anyhow::Result<()> {
     // Receiver of the tokens
     let receiver_address = AccountAddress::from_str(&app.receiver)?;
 
-    // Load account keys and sender address from a file
-    let keys: WalletAccount = WalletAccount::from_json_file(app.account)
-        .context("Could not read the account keys file.")?;
+    // Load account keys and address for sender and sponsor from a file
+    let sender_keys: WalletAccount = WalletAccount::from_json_file(app.sender_account)
+        .context("Could not read the sender account keys file.")?;
+    let sponsor_keys: WalletAccount = WalletAccount::from_json_file(app.sponsor_account)
+        .context("Could not read the sponsor account keys file.")?;
 
     // Get the initial nonce at the last finalized block.
     let nonce = client
-        .get_next_account_sequence_number(&keys.address)
+        .get_next_account_sequence_number(&sender_keys.address)
         .await?
         .nonce;
 
@@ -86,15 +90,15 @@ async fn main() -> anyhow::Result<()> {
 
     // Compose operation to transaction
     let txn = send::token_update_operations(
-        &keys,
-        keys.address,
+        &sender_keys,
+        sender_keys.address,
         nonce,
         expiry,
         token_id,
         [operation].into_iter().collect(),
     )?;
 
-    let item = BlockItem::AccountTransaction(txn);
+    let item = BlockItem::AccountTransactionV1(txn);
 
     // Submit the transaction to the chain
     let transaction_hash = client.send_block_item(&item).await?;
