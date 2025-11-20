@@ -1340,7 +1340,7 @@ impl TryFrom<AccountTransactionV1>
                     Some(sponsor_sigs) => Some(sponsor_sigs.try_into()?),
                     None => None,
                 },
-            }, //value.signature.require()?.try_into()?
+            },
             header,
             payload,
         })
