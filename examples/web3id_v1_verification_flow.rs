@@ -5,6 +5,7 @@
 //! cargo run --example verify_presentation -- --node http://localhost:20100 --account 3nhMYfA59MWaxBRjfHPKSYH9S4W5HdZZ721jozVdeToBGvXTU8.export
 use anyhow::Context as AnyhowContext;
 use clap::AppSettings;
+use concordium_base::hashes;
 use concordium_base::web3id::v1::anchor::{
     IdentityCredentialType, IdentityProviderDid, RequestedIdentitySubjectClaims,
     RequestedStatement, UnfilledContextInformation, VerifiablePresentationV1,
@@ -67,7 +68,8 @@ async fn main() -> anyhow::Result<()> {
     //
     // Generating the `context` and `credential_statements` will normally happen server-side.
     let mut rng = rand::thread_rng();
-    let nonce: [u8; 32] = rng.gen(); // Note: This nonce has to be generated fresh/randomly for each request.
+    let nonce_bytes: [u8; 32] = rng.gen(); // todo ar use nonce bytes or hash, change back?
+    let nonce = hashes::Hash::from(nonce_bytes); // Note: This nonce has to be generated fresh/randomly for each request.
     let connection_id = "MyWalletConnectTopic".to_string(); // Note: Use the wallet connect topic in production.
     let context_string = "MyGreateApp".to_string();
     let context = UnfilledContextInformation::new_simple(nonce, connection_id, context_string);

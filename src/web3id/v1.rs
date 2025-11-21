@@ -80,10 +80,10 @@ pub struct PresentationVerificationData {
 
 #[derive(thiserror::Error, Debug)]
 pub enum VerifyError {
-    #[error(
-        "on-chain request anchor was invalid and could not be retrieved from anchor transaction hash"
-    )]
+    #[error("on-chain request anchor transaction is of invalid type")]
     InvalidRequestAnchor,
+    #[error("on-chain request anchor transaction not finalized yet")]
+    RequestAnchorNotFinalized,
     #[error("unknown data error: {0}")]
     UnknownDataError(#[from] UnknownDataError),
     #[error("node query error: {0}")]
@@ -224,20 +224,25 @@ pub async fn lookup_request_anchor(
     client: &mut v2::Client,
     verification_request: &VerificationRequest,
 ) -> Result<VerificationRequestAnchorAndBlockHash, VerifyError> {
-    // Fetch the finalized transaction
-    // todo ar change to get_block_item_status
-    let (_, block_hash, summary) = client
-        .finalized_block_item(verification_request.anchor_transaction_hash)
+    // Fetch the transaction
+    let item_status = client
+        .get_block_item_status(&verification_request.anchor_transaction_hash)
         .await?;
 
+    let (block_hash, summary) = item_status
+        .is_finalized()
+        .ok_or(VerifyError::RequestAnchorNotFinalized)?;
+
     // Extract account transaction
-    let BlockItemSummaryDetails::AccountTransaction(anchor_tx) = summary.details.known_or_err()?
+    let BlockItemSummaryDetails::AccountTransaction(anchor_tx) =
+        summary.details.as_ref().known_or_err()?
     else {
         return Err(VerifyError::InvalidRequestAnchor);
     };
 
     // Extract data registered payload
-    let AccountTransactionEffects::DataRegistered { data } = anchor_tx.effects.known_or_err()?
+    let AccountTransactionEffects::DataRegistered { data } =
+        anchor_tx.effects.as_ref().known_or_err()?
     else {
         return Err(VerifyError::InvalidRequestAnchor);
     };
@@ -247,7 +252,7 @@ pub async fn lookup_request_anchor(
 
     Ok(VerificationRequestAnchorAndBlockHash {
         verification_request_anchor,
-        block_hash,
+        block_hash: *block_hash,
     })
 }
 
