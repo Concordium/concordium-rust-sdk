@@ -122,15 +122,20 @@ async fn main() -> anyhow::Result<()> {
 
     println!("Verification request anchor finalized in block {}.", bh);
 
-    // The verification request is sent to the wallet/ID app and the
-    // returned presentation must be inserted here
-    async fn send_request_receive_presentation(
+    /// Send the verification request to the wallet/ID app and obtain the
+    /// verifiable presentation.
+    ///
+    /// The wallet/ID app fills in the requested context in [`VerificationRequest::context`]
+    /// and selects and identity in order to form a
+    /// [`VerifiablePresentationRequestV1`](concordium_base::web3id::v1::anchor::VerifiablePresentationRequestV1).
+    /// that is then used to generate and prove a [`VerifiablePresentationV1`].
+    async fn send_request_and_receive_presentation(
         _request: VerificationRequest,
     ) -> VerifiablePresentationV1 {
         todo!("send verification request to wallet/ID app and receive verifiable presentation")
     }
 
-    let presentation = send_request_receive_presentation(verification_request.clone()).await;
+    let presentation = send_request_and_receive_presentation(verification_request.clone()).await;
 
     let audit_record_id = "UUID".to_string();
 
