@@ -1,5 +1,6 @@
 //! Example that shows how to verify a verifiable presentation
-//! together with the verification request.
+//! together with the verification request. See
+//! [`crate::web3id::v1`].
 //!
 //! You can run this example as follows:
 //! cargo run --example verify_presentation -- --node http://localhost:20100 --account 3nhMYfA59MWaxBRjfHPKSYH9S4W5HdZZ721jozVdeToBGvXTU8.export
