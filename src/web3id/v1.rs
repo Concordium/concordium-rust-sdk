@@ -1,4 +1,4 @@
-//! Functionality for requesting and verifying V1 Web3Id credentials.
+//! Functionality for requesting and verifying V1 Concordium verifiable presentations.
 //!
 //! A verification flow consists of multiple stages:
 //!
