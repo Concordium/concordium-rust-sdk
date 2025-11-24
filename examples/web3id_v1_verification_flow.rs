@@ -3,7 +3,7 @@
 //! [`crate::web3id::v1`].
 //!
 //! You can run this example as follows:
-//! cargo run --example verify_presentation -- --node http://localhost:20100 --account 3nhMYfA59MWaxBRjfHPKSYH9S4W5HdZZ721jozVdeToBGvXTU8.export
+//! cargo run --example web3id_v1_verification_flow -- --node http://localhost:20100 --account 3nhMYfA59MWaxBRjfHPKSYH9S4W5HdZZ721jozVdeToBGvXTU8.export
 use anyhow::Context as AnyhowContext;
 use clap::AppSettings;
 use concordium_base::web3id::v1::anchor;
