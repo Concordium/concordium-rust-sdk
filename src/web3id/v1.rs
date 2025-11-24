@@ -3,21 +3,21 @@
 //! A verification flow consists of multiple stages:
 //!
 //! 1. Create a [`VerificationRequest`]: A verification flow is started by constructing [`VerificationRequestData`]
-//! and creating the [`VerificationRequest`] with [`create_verification_request_and_submit_anchor`] which also
-//! submits the corresponding [`VerificationRequestAnchor`] (VRA) on chain.
+//!    and creating the [`VerificationRequest`] with [`create_verification_request_and_submit_anchor`] which also
+//!    submits the corresponding [`VerificationRequestAnchor`] (VRA) on chain.
 //!
 //! 2. Generate and prove [`VerifiablePresentationV1`]: The claims in the [`VerificationRequest`] are
-//! proved by a credential holder in the context specified in the request and
-//! embedded in a [`VerifiablePresentationV1`] together with the context and proofs.
-//! The prover is implemented in [`VerifiablePresentationRequestV1::prove`](anchor::VerifiablePresentationRequestV1::prove).
+//!    proved by a credential holder in the context specified in the request and
+//!    embedded in a [`VerifiablePresentationV1`] together with the context and proofs.
+//!    The prover is implemented in [`VerifiablePresentationRequestV1::prove`](anchor::VerifiablePresentationRequestV1::prove).
 //!
 //! 3. Verify a [`VerifiablePresentationV1`]: The presentation can be verified together with
-//! the verification request with [`verify_presentation_and_submit_audit_anchor`], which submits
-//! and [`VerificationAuditRecord`] (VAA) on chain and returns the [`VerificationAuditRecord`] to
-//! be stored locally by the verifier.
+//!    the verification request with [`verify_presentation_and_submit_audit_anchor`], which submits
+//!    and [`VerificationAuditRecord`] (VAA) on chain and returns the [`VerificationAuditRecord`] to
+//!    be stored locally by the verifier.
 //!
 //! 4. Verify an [`VerificationAuditRecord`]: The stored audit record can be re-verified with
-//! [`verify_audit_record`] if/when needed.
+//!    [`verify_audit_record`] if/when needed.
 //!
 //! The example `web3id_v1_verification_flow` demonstrates the verification flow.
 
@@ -62,22 +62,24 @@ use std::collections::{BTreeMap, HashMap};
 /// and should generally be kept private.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PresentationVerificationData {
-    // Whether the verification was successful. If `false`, the verifiable presentation is not
-    // valid and the credentials and claims in it are not verified to be true.
+    // Whether the verification was successful. If not [`PresentationVerificationResult::Verified`],
+    // the verifiable presentation is not valid and the credentials and claims in it are not verified to be true.
     pub verification_result: PresentationVerificationResult,
-    /// The verification audit record. A corresponding [`VerificationRequestAnchor`] (VAA) is submitted
-    /// on chain, if the verification is successful. Notice that the existence of the audit record,
+    /// The verification audit record. Notice that the existence of the audit record
     /// does not mean that verification was successful, that is specified
     /// by [`Self::verification_result`]. The audit record should be stored in an off-chain database for regulatory purposes
-    // /// and should generally be kept private.
+    /// and should generally be kept private.
+    /// A corresponding [`VerificationRequestAnchor`] (VAA) is submitted
+    /// on chain, if the verification is successful.
     pub audit_record: VerificationAuditRecord,
     /// Blockchain transaction hash for the transaction that registers
-    /// the verification audit anchor (VAA) on-chain. Notice that
-    /// this transaction may not have been finalized yet. The anchor is
+    /// the [verification audit record](anchor::VerificationAuditAnchor) (VAA) on-chain.
+    /// Notice that this transaction may not have been finalized yet. Also, the anchor is
     /// only submitted if the verification is successful.
     pub anchor_transaction_hash: Option<hashes::TransactionHash>,
 }
 
+/// Error verifying presentation
 #[derive(thiserror::Error, Debug)]
 pub enum VerifyError {
     #[error("on-chain request anchor transaction is of invalid type")]
@@ -94,7 +96,7 @@ pub enum VerifyError {
     CborSerialization(#[from] CborSerializationError),
     #[error("unknown identity provider: {0}")]
     UnknownIdentityProvider(IpIdentity),
-    #[error("credential {cred_id} no longer present or of unknown type on account: {account}")]
+    #[error("credential {cred_id} no longer present on account: {account}")]
     CredentialNotPresent {
         cred_id: CredentialRegistrationID,
         account: AccountAddress,
@@ -113,46 +115,13 @@ pub struct AuditRecordArgument<S: ExactSizeTransactionSigner> {
     pub audit_record_anchor_transaction_metadata: AnchorTransactionMetadata<S>,
 }
 
-// todo ar doc
-pub async fn verify_audit_record(
-    client: &mut v2::Client,
-    network: web3id::did::Network,
-    block_identifier: impl IntoBlockIdentifier,
-    verification_audit_record: &VerificationAuditRecord,
-) -> Result<PresentationVerificationResult, VerifyError> {
-    let block_identifier = block_identifier.into_block_identifier();
-    let global_context = client
-        .get_cryptographic_parameters(block_identifier)
-        .await?
-        .response;
-
-    let block_info = client.get_block_info(block_identifier).await?.response;
-
-    let request_anchor = lookup_request_anchor(client, &verification_audit_record.request).await?;
-
-    let verification_material = lookup_verification_materials_and_validity(
-        client,
-        block_identifier,
-        &verification_audit_record.presentation,
-    )
-    .await?;
-
-    let context = VerificationContext {
-        network,
-        validity_time: block_info.block_slot_time,
-    };
-
-    Ok(anchor::verify_presentation_with_request_anchor(
-        &global_context,
-        &context,
-        &verification_audit_record.request,
-        &verification_audit_record.presentation,
-        &request_anchor,
-        &verification_material,
-    ))
-}
-
-// todo ar doc
+/// Verify the given verifiable presentation together with the given verification request.
+/// The aspects validated are documented on [`anchor::verify_presentation_with_request_anchor`].
+/// The verification returns an audit record containing the presentation and verification request.
+/// In case the verification is successful, a [verification audit record](anchor::VerificationAuditAnchor)
+/// (VRA) is submitted on chain.
+/// Notice that when this method returns, the anchor is only submitted. The returned anchor transaction
+/// hash must be tracked in order to determine if it is finalized.
 pub async fn verify_presentation_and_submit_audit_anchor(
     client: &mut v2::Client,
     network: web3id::did::Network,
@@ -216,6 +185,47 @@ pub async fn verify_presentation_and_submit_audit_anchor(
         audit_record,
         anchor_transaction_hash,
     })
+}
+
+/// Verify the verifiable presentation in the audit record together with the
+/// verification request in the audit record. The aspects validated are documented on
+/// [`anchor::verify_presentation_with_request_anchor`].
+pub async fn verify_audit_record(
+    client: &mut v2::Client,
+    network: web3id::did::Network,
+    block_identifier: impl IntoBlockIdentifier,
+    verification_audit_record: &VerificationAuditRecord,
+) -> Result<PresentationVerificationResult, VerifyError> {
+    let block_identifier = block_identifier.into_block_identifier();
+    let global_context = client
+        .get_cryptographic_parameters(block_identifier)
+        .await?
+        .response;
+
+    let block_info = client.get_block_info(block_identifier).await?.response;
+
+    let request_anchor = lookup_request_anchor(client, &verification_audit_record.request).await?;
+
+    let verification_material = lookup_verification_materials_and_validity(
+        client,
+        block_identifier,
+        &verification_audit_record.presentation,
+    )
+    .await?;
+
+    let context = VerificationContext {
+        network,
+        validity_time: block_info.block_slot_time,
+    };
+
+    Ok(anchor::verify_presentation_with_request_anchor(
+        &global_context,
+        &context,
+        &verification_audit_record.request,
+        &verification_audit_record.presentation,
+        &request_anchor,
+        &verification_material,
+    ))
 }
 
 /// Looks up the verifiable request anchor (VRA) from the verification

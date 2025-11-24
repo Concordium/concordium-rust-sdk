@@ -6,11 +6,11 @@
 //! cargo run --example verify_presentation -- --node http://localhost:20100 --account 3nhMYfA59MWaxBRjfHPKSYH9S4W5HdZZ721jozVdeToBGvXTU8.export
 use anyhow::Context as AnyhowContext;
 use clap::AppSettings;
-use concordium_base::hashes;
+use concordium_base::web3id::v1::anchor;
 use concordium_base::web3id::v1::anchor::{
-    IdentityCredentialType, IdentityProviderDid, RequestedIdentitySubjectClaims,
-    RequestedStatement, UnfilledContextInformation, VerifiablePresentationV1, VerificationRequest,
-    VerificationRequestData,
+    IdentityCredentialType, IdentityProviderDid, RequestedIdentitySubjectClaimsBuilder,
+    RequestedStatement, UnfilledContextInformationBuilder, VerifiablePresentationV1,
+    VerificationRequest, VerificationRequestDataBuilder,
 };
 use concordium_rust_sdk::v2::BlockIdentifier;
 use concordium_rust_sdk::web3id::v1::{AnchorTransactionMetadata, AuditRecordArgument};
@@ -70,10 +70,11 @@ async fn main() -> anyhow::Result<()> {
     // Generating the `context` and `credential_statements` will normally happen server-side.
     let mut rng = rand::thread_rng();
     let nonce_bytes: [u8; 32] = rng.gen(); // todo ar use nonce bytes or hash, change back?
-    let nonce = hashes::Hash::from(nonce_bytes); // Note: This nonce has to be generated fresh/randomly for each request.
+    let nonce = anchor::Nonce(nonce_bytes); // Note: This nonce has to be generated fresh/randomly for each request.
     let connection_id = "MyWalletConnectTopic".to_string(); // Note: Use the wallet connect topic in production.
     let context_string = "MyGreateApp".to_string();
-    let context = UnfilledContextInformation::new_simple(nonce, connection_id, context_string);
+    let context =
+        UnfilledContextInformationBuilder::new_simple(nonce, connection_id, context_string).build();
 
     let attribute_in_range_statement =
         RequestedStatement::AttributeInRange(AttributeInRangeStatement {
@@ -83,13 +84,15 @@ async fn main() -> anyhow::Result<()> {
             _phantom: PhantomData,
         });
 
-    let verification_request_data = VerificationRequestData::new(context)
-        .add_subject_claim_request(
-            RequestedIdentitySubjectClaims::default()
-                .add_issuer(IdentityProviderDid::new(0u32, network))
-                .add_source(IdentityCredentialType::IdentityCredential)
-                .add_statement(attribute_in_range_statement),
-        );
+    let verification_request_data = VerificationRequestDataBuilder::new(context)
+        .subject_claim(
+            RequestedIdentitySubjectClaimsBuilder::default()
+                .issuer(IdentityProviderDid::new(0u32, network))
+                .source(IdentityCredentialType::IdentityCredential)
+                .statement(attribute_in_range_statement)
+                .build(),
+        )
+        .build();
 
     let mut public_info = HashMap::new();
     public_info.insert("key".to_string(), cbor::value::Value::Positive(4u64));
