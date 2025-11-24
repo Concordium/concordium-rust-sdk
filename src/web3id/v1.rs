@@ -266,8 +266,8 @@ pub async fn lookup_request_anchor(
     })
 }
 
-/// Lookup verification material for presentation
-async fn lookup_verification_materials_and_validity(
+/// Lookup the verification material needed to verify the presentation.
+pub async fn lookup_verification_materials_and_validity(
     client: &mut v2::Client,
     block_identifier: BlockIdentifier,
     presentation: &VerifiablePresentationV1,
