@@ -181,9 +181,7 @@ async fn main() -> anyhow::Result<()> {
             anchor_transaction_hash
         );
 
-        let (bh, bs) = client
-            .wait_until_finalized(&anchor_transaction_hash)
-            .await?;
+        let (bh, bs) = client.wait_until_finalized(anchor_transaction_hash).await?;
 
         println!("Verification request anchor finalized in block {}.", bh);
         println!("The outcome is {:#?}", bs);
