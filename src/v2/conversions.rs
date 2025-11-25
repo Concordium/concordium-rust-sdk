@@ -1460,6 +1460,17 @@ impl TryFrom<block_item::BlockItem>
     }
 }
 
+impl TryFrom<SponsorDetails> for super::types::SponsorDetails {
+    type Error = tonic::Status;
+
+    fn try_from(v: SponsorDetails) -> Result<Self, Self::Error> {
+        Ok(Self {
+            cost: v.cost.require()?.into(),
+            sponsor: v.sponsor.require()?.try_into()?,
+        })
+    }
+}
+
 impl TryFrom<AccountTransactionDetails> for super::types::AccountTransactionDetails {
     type Error = tonic::Status;
 
@@ -1467,6 +1478,10 @@ impl TryFrom<AccountTransactionDetails> for super::types::AccountTransactionDeta
         Ok(Self {
             cost: v.cost.require()?.into(),
             sender: v.sender.require()?.try_into()?,
+            sponsor: match v.sponsor {
+                None => None,
+                Some(sponsor) => Some(sponsor.try_into()?),
+            },
             effects: Upward::from(v.effects.map(TryFrom::try_from).transpose()?),
         })
     }

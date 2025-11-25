@@ -805,7 +805,7 @@ impl From<&TransactionSignaturesV1> for generated::AccountTransactionV1Signature
     fn from(v: &TransactionSignaturesV1) -> Self {
         Self {
             sender_signatures: Some(v.sender.to_owned().into()),
-            sponsor_signatures: v.sponsor.to_owned().map(|x| x.into()),
+            sponsor_signatures: v.sponsor.to_owned().map(|s| s.into()),
         }
     }
 }
