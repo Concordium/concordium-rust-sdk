@@ -104,7 +104,7 @@ async fn main() -> anyhow::Result<()> {
         expiry,
     };
 
-    let verification_request = web3id::v1::create_verification_request_and_submit_anchor(
+    let verification_request = web3id::v1::create_verification_request_and_submit_request_anchor(
         &mut client,
         anchor_transaction_metadata,
         verification_request_data,

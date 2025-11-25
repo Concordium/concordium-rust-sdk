@@ -3,7 +3,7 @@
 //! A verification flow consists of multiple stages:
 //!
 //! 1. Create a [`VerificationRequest`]: A verification flow is started by constructing [`VerificationRequestData`]
-//!    and creating the [`VerificationRequest`] with [`create_verification_request_and_submit_anchor`] which also
+//!    and creating the [`VerificationRequest`] with [`create_verification_request_and_submit_request_anchor`] which also
 //!    submits the corresponding [`VerificationRequestAnchor`] (VRA) on chain.
 //!
 //! 2. Generate and prove [`VerifiablePresentationV1`]: The claims in the [`VerificationRequest`] are
@@ -417,7 +417,9 @@ pub struct AnchorTransactionMetadata<S: ExactSizeTransactionSigner> {
 /// be tracked until finalization before the verification request is usable
 /// (waiting for finalization can be done in the app that receives the verification request
 /// to create a verifiable presentation).
-pub async fn create_verification_request_and_submit_anchor<S: ExactSizeTransactionSigner>(
+pub async fn create_verification_request_and_submit_request_anchor<
+    S: ExactSizeTransactionSigner,
+>(
     client: &mut v2::Client,
     anchor_transaction_metadata: AnchorTransactionMetadata<S>,
     verification_request_data: VerificationRequestData,
