@@ -2007,6 +2007,15 @@ impl BlockItemSummaryDetails {
 }
 
 #[derive(Debug, Clone)]
+/// Details about the sponsor of a transaction.
+pub struct SponsorDetails {
+    /// The cost of the transaction. Paid by the sponsor.
+    pub sponsor: AccountAddress,
+    /// The sponsor of the transaction.
+    pub cost: Amount,
+}
+
+#[derive(Debug, Clone)]
 /// Details of an account transaction. This always has a sender and is paid for,
 /// and it might have some other effects on the state of the chain.
 pub struct AccountTransactionDetails {
@@ -2015,6 +2024,8 @@ pub struct AccountTransactionDetails {
     pub cost: Amount,
     /// Sender of the transaction.
     pub sender: AccountAddress,
+    /// Optional sponsor of the transaction
+    pub sponsor: Option<SponsorDetails>,
     /// Effects of the account transaction, if any.
     pub effects: Upward<AccountTransactionEffects>,
 }
