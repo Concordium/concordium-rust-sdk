@@ -48,6 +48,7 @@
   - `types::smart_contracts::InstanceInfo`
   - `types::smart_contracts::ContractContext`
   - `types::smart_contracts::InvokeContractResult`
+  - Support for sponsored transactions.
 
 ## 8.0.0
 
