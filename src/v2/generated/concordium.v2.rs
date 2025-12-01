@@ -2770,10 +2770,21 @@ pub mod update_payload {
         CreatePltUpdate(super::plt::CreatePlt),
     }
 }
+/// Details about the sponsor of a transaction.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SponsorDetails {
+    /// The cost of the transaction. Paid by the sponsor.
+    #[prost(message, optional, tag = "1")]
+    pub cost: ::core::option::Option<Amount>,
+    /// The sponsor of the transaction.
+    #[prost(message, optional, tag = "2")]
+    pub sponsor: ::core::option::Option<AccountAddress>,
+}
 /// Details about an account transaction.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountTransactionDetails {
-    /// The cost of the transaction. Paid by the sender.
+    /// The cost of the transaction. Paid by the sender. This will be zero if the
+    /// transaction is sponsored.
     #[prost(message, optional, tag = "1")]
     pub cost: ::core::option::Option<Amount>,
     /// The sender of the transaction.
@@ -2782,6 +2793,9 @@ pub struct AccountTransactionDetails {
     /// The effects of the transaction.
     #[prost(message, optional, tag = "3")]
     pub effects: ::core::option::Option<AccountTransactionEffects>,
+    /// The optional sponsor details of the transaction.
+    #[prost(message, optional, tag = "4")]
+    pub sponsor: ::core::option::Option<SponsorDetails>,
 }
 /// Details of an account creation. These transactions are free, and we only
 /// ever get a response for them if the account is created, hence no failure
@@ -4313,7 +4327,7 @@ pub mod node_info {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SendBlockItemRequest {
     /// This field might be extended in future versions of the API.
-    #[prost(oneof = "send_block_item_request::BlockItem", tags = "1, 2, 3")]
+    #[prost(oneof = "send_block_item_request::BlockItem", tags = "1, 2, 3, 4, 5")]
     pub block_item: ::core::option::Option<send_block_item_request::BlockItem>,
 }
 /// Nested message and enum types in `SendBlockItemRequest`.
@@ -4333,6 +4347,13 @@ pub mod send_block_item_request {
         /// to make future update instructions.
         #[prost(message, tag = "3")]
         UpdateInstruction(super::UpdateInstruction),
+        /// Account transactions v1 are messages which are signed and paid for by
+        /// either an account or a sponsor.
+        #[prost(message, tag = "4")]
+        AccountTransactionV1(super::AccountTransactionV1),
+        /// A block item which has already been serialized to the format expected by the node.
+        #[prost(bytes, tag = "5")]
+        RawBlockItem(::prost::alloc::vec::Vec<u8>),
     }
 }
 /// Credential deployments create new accounts. They are not paid for
@@ -4393,6 +4414,17 @@ pub struct AccountTransactionSignature {
     #[prost(map = "uint32, message", tag = "1")]
     pub signatures: ::std::collections::HashMap<u32, AccountSignatureMap>,
 }
+/// Account transaction signatures from the sender and optionally the sponsor of
+/// the transaction.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AccountTransactionV1Signatures {
+    /// Signatures from the sender of the transaction.
+    #[prost(message, optional, tag = "1")]
+    pub sender_signatures: ::core::option::Option<AccountTransactionSignature>,
+    /// The optional signature of the sponsor of the transaction.
+    #[prost(message, optional, tag = "2")]
+    pub sponsor_signatures: ::core::option::Option<AccountTransactionSignature>,
+}
 /// Header of an account transaction that contains basic data to check whether
 /// the sender and the transaction are valid. The header is shared by all transaction types.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -4409,6 +4441,26 @@ pub struct AccountTransactionHeader {
     /// Latest time the transaction can included in a block.
     #[prost(message, optional, tag = "5")]
     pub expiry: ::core::option::Option<TransactionTime>,
+}
+/// Header v1 of an account transaction with support for sponsored transactions.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AccountTransactionHeaderV1 {
+    /// Sender of the transaction.
+    #[prost(message, optional, tag = "1")]
+    pub sender: ::core::option::Option<AccountAddress>,
+    /// Sequence number of the transaction.
+    #[prost(message, optional, tag = "2")]
+    pub sequence_number: ::core::option::Option<SequenceNumber>,
+    /// Maximum amount of energy the transaction can take to execute.
+    #[prost(message, optional, tag = "3")]
+    pub energy_amount: ::core::option::Option<Energy>,
+    /// Latest time the transaction can included in a block.
+    #[prost(message, optional, tag = "5")]
+    pub expiry: ::core::option::Option<TransactionTime>,
+    /// The optional address of the account that sponsors the transaction, i.e.
+    /// pays the transaction fees associated with the execution.
+    #[prost(message, optional, tag = "6")]
+    pub sponsor: ::core::option::Option<AccountAddress>,
 }
 /// Data required to initialize a new contract instance.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -4513,6 +4565,15 @@ pub struct PreAccountTransaction {
     #[prost(message, optional, tag = "2")]
     pub payload: ::core::option::Option<AccountTransactionPayload>,
 }
+/// An unsigned account transaction v1. This is used with the
+/// `GetTransactionSignHash` endpoint to obtain the message to sign.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PreAccountTransactionV1 {
+    #[prost(message, optional, tag = "1")]
+    pub header: ::core::option::Option<AccountTransactionHeaderV1>,
+    #[prost(message, optional, tag = "2")]
+    pub payload: ::core::option::Option<AccountTransactionPayload>,
+}
 /// Account transactions are messages which are signed and paid for by the sender
 /// account.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -4521,6 +4582,21 @@ pub struct AccountTransaction {
     pub signature: ::core::option::Option<AccountTransactionSignature>,
     #[prost(message, optional, tag = "2")]
     pub header: ::core::option::Option<AccountTransactionHeader>,
+    #[prost(message, optional, tag = "3")]
+    pub payload: ::core::option::Option<AccountTransactionPayload>,
+}
+/// Account transactions v1 are messages which are signed and paid for by the sender
+/// account or by the sponsor.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AccountTransactionV1 {
+    /// The signatures on the transaction by the source account and other
+    /// relevant parties such as sponsors.
+    #[prost(message, optional, tag = "1")]
+    pub signatures: ::core::option::Option<AccountTransactionV1Signatures>,
+    /// The transaction header data.
+    #[prost(message, optional, tag = "2")]
+    pub header: ::core::option::Option<AccountTransactionHeaderV1>,
+    /// The account transaction payload.
     #[prost(message, optional, tag = "3")]
     pub payload: ::core::option::Option<AccountTransactionPayload>,
 }
@@ -4869,7 +4945,7 @@ pub struct BlockItem {
     #[prost(message, optional, tag = "1")]
     pub hash: ::core::option::Option<TransactionHash>,
     /// This field might be extended in future versions of the API.
-    #[prost(oneof = "block_item::BlockItem", tags = "2, 3, 4")]
+    #[prost(oneof = "block_item::BlockItem", tags = "2, 3, 4, 5, 6")]
     pub block_item: ::core::option::Option<block_item::BlockItem>,
 }
 /// Nested message and enum types in `BlockItem`.
@@ -4889,6 +4965,13 @@ pub mod block_item {
         /// to make future update instructions.
         #[prost(message, tag = "4")]
         UpdateInstruction(super::UpdateInstruction),
+        /// Account transactions v1 are messages which are signed and paid for by
+        /// either an account or a sponsor.
+        #[prost(message, tag = "5")]
+        AccountTransactionV1(super::AccountTransactionV1),
+        /// A block item which has already been serialized to the format expected by the node.
+        #[prost(bytes, tag = "6")]
+        RawBlockItem(::prost::alloc::vec::Vec<u8>),
     }
 }
 /// Information about a particular validator with respect to
@@ -7726,6 +7809,43 @@ pub mod queries_client {
                     GrpcMethod::new(
                         "concordium.v2.Queries",
                         "GetAccountTransactionSignHash",
+                    ),
+                );
+            self.inner.unary(req, path, codec).await
+        }
+        /// Get the hash to be signed for an account transaction v1. The
+        /// hash returned should be signed and the signatures included as an
+        /// AccountTransactionV1Signatures when calling `SendBlockItem`. This is
+        /// provided as a convenience to support cases where the right SDK is not
+        /// available for interacting with the node. If an SDK is available then it is
+        /// strongly recommended to compute this hash off-line using it. That reduces
+        /// the trust in the node, removes networking failure modes, and will perform
+        /// better.
+        pub async fn get_account_transaction_v1_sign_hash(
+            &mut self,
+            request: impl tonic::IntoRequest<super::PreAccountTransactionV1>,
+        ) -> std::result::Result<
+            tonic::Response<super::AccountTransactionSignHash>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetAccountTransactionV1SignHash",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "concordium.v2.Queries",
+                        "GetAccountTransactionV1SignHash",
                     ),
                 );
             self.inner.unary(req, path, codec).await
