@@ -1038,7 +1038,7 @@ fn convert_account_transaction(
         Ok(super::AccountTransactionDetails {
             cost,
             sender,
-            sponsor: sponsor.map(|sponsor| SponsorDetails { sponsor, cost }),
+            sponsor: sponsor.map(|s| SponsorDetails { sponsor: s, cost }),
             effects: Upward::Known(effects),
         })
     };
