@@ -1,6 +1,13 @@
 ## Unreleased changes
 
-- Added `web3id::v1::anchor` module that contains functionality to create verification request anchor (VRA) and verification audit anchor (VAA) on chain.
+- Implemented `web3id::v1` module that contains functionality to support the verification flow of Concordium verifiable presentations V1.
+  This includes
+  - creating verification request anchor (VRA)
+  - verifying presentations
+  - creating verification audit anchor (VAA)
+   
+  The main entrypoints in the module are `v1::create_verification_request_and_submit_request_anchor` 
+  and `v1::verify_presentation_and_submit_audit_anchor`.
 
 ## 8.0.0
 
