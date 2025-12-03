@@ -102,9 +102,9 @@ async fn main() -> anyhow::Result<()> {
     .sign(&sender_keys)
     // Sponsor signs the now sponsored transaction.
     .sponsor(&sponsor_keys)
-    .map_err(|e| anyhow::anyhow!(e))?
+    .expect("Can sponsor the transaction")
     .finalize()
-    .map_err(|e| anyhow::anyhow!(e))?;
+    .expect("Transaction is well-formed");
 
     let item = BlockItem::AccountTransactionV1(txn);
 
