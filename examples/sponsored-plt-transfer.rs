@@ -1,4 +1,4 @@
-//! Example that shows how to transfer (PLT) tokens.
+//! Example that shows how to create a sponsored PLT token transfer.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_base::{
