@@ -97,7 +97,7 @@ async fn main() -> anyhow::Result<()> {
     // Extend the transaction and add a sponsor.
     .extend()
     .add_sponsor(sponsor_keys.address, 1)
-    .map_err(|e| anyhow::anyhow!(e))?
+    .expect("Can add sponsor account")
     // Sender signs the transaction.
     .sign(&sender_keys)
     // Sponsor signs the now sponsored transaction.
