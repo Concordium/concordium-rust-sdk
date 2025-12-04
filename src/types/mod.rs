@@ -1994,9 +1994,9 @@ impl BlockItemSummaryDetails {
                     }
                 };
                 // Add the optional sponsor account to the affected accounts.
-                at.sponsor
-                    .iter()
-                    .for_each(|s| affected_accounts.push(s.sponsor));
+                if let Some(sponsor) = at.sponsor {
+                    affected_accounts.push(sponsor);
+                }
                 affected_accounts
             }
             BlockItemSummaryDetails::AccountCreation(_) => Vec::new(),
