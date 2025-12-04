@@ -1914,7 +1914,7 @@ impl BlockItemSummaryDetails {
                 let Upward::Known(effects) = &at.effects else {
                     return Upward::Unknown(());
                 };
-                match effects {
+                let mut affected_accounts = match effects {
                     AccountTransactionEffects::None { .. } => vec![at.sender],
                     AccountTransactionEffects::ModuleDeployed { .. } => vec![at.sender],
                     AccountTransactionEffects::ContractInitialized { .. } => vec![at.sender],
@@ -1992,7 +1992,12 @@ impl BlockItemSummaryDetails {
                         add_token_event_addresses(&mut addresses, events);
                         addresses.into_iter().collect()
                     }
+                };
+                // Add the optional sponsor account to the affected accounts.
+                if let Some(sponsor) = at.sponsor.as_ref() {
+                    affected_accounts.push(sponsor.sponsor);
                 }
+                affected_accounts
             }
             BlockItemSummaryDetails::AccountCreation(_) => Vec::new(),
             BlockItemSummaryDetails::Update(_) => Vec::new(),
