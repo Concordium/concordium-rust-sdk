@@ -1994,8 +1994,8 @@ impl BlockItemSummaryDetails {
                     }
                 };
                 // Add the optional sponsor account to the affected accounts.
-                if let Some(sponsor) = at.sponsor {
-                    affected_accounts.push(sponsor);
+                if let Some(sponsor) = at.sponsor.as_ref() {
+                    affected_accounts.push(sponsor.sponsor);
                 }
                 affected_accounts
             }
