@@ -740,8 +740,9 @@ impl TryFrom<ArThreshold> for crate::id::secret_sharing::Threshold {
 
     fn try_from(value: ArThreshold) -> Result<Self, Self::Error> {
         if let Ok(v) = u8::try_from(value.value) {
-            Self::try_from(v).map_err(|e| match e {
-                () => tonic::Status::internal("Unexpected zero AR threshold."),
+            Self::try_from(v).map_err(|e| {
+                let () = e;
+                tonic::Status::internal("Unexpected zero AR threshold.")
             })
         } else {
             Err(tonic::Status::internal("Unexpected AR threshold."))
