@@ -1,5 +1,7 @@
 ## Unreleased changes
 
+## 9.0.0-alpha.0
+
 - Support for `ProtocolVersion::P10`.
 - The flag `serde_deprecated` now guards `serde::Serialize` and `serde::Deserialize` implemetations on the following types. The implementations will eventually be removed.
   - `protocol_level_tokens::AccountToken`
@@ -48,6 +50,7 @@
   - `types::smart_contracts::InstanceInfo`
   - `types::smart_contracts::ContractContext`
   - `types::smart_contracts::InvokeContractResult`
+  - Support for sponsored transactions.
 
 ## 8.0.0
 

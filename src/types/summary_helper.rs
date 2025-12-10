@@ -16,7 +16,7 @@ use super::{
 };
 
 use crate::{
-    types::Address,
+    types::{Address, SponsorDetails},
     v2::upward::{UnknownDataError, Upward},
 };
 use concordium_base::{
@@ -42,6 +42,8 @@ pub(crate) struct BlockItemSummary {
     /// Sender, if available. The sender is always available for account
     /// transactions.
     sender: Option<AccountAddress>,
+    /// Optional sponsor of the transaction.
+    sponsor: Option<AccountAddress>,
     /// Hash of the transaction.
     hash: hashes::TransactionHash,
     /// The amount of CCD the transaction was charged to the sender.
@@ -510,6 +512,7 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                 super::AccountTransactionDetails {
                     cost,
                     sender,
+                    sponsor,
                     effects,
                 },
             ) => {
@@ -905,6 +908,7 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                 };
                 BlockItemSummary {
                     sender: Some(sender),
+                    sponsor: sponsor.map(|s| s.sponsor),
                     hash: bi.hash,
                     cost,
                     energy_cost: bi.energy_cost,
@@ -919,6 +923,7 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                 reg_id,
             }) => BlockItemSummary {
                 sender: None,
+                sponsor: None,
                 hash: bi.hash,
                 cost: Amount::zero(),
                 energy_cost: bi.energy_cost,
@@ -941,6 +946,7 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                 let payload = payload.known_or_err()?;
                 BlockItemSummary {
                     sender: None,
+                    sponsor: None,
                     hash: bi.hash,
                     cost: Amount::zero(),
                     energy_cost: bi.energy_cost,
@@ -967,6 +973,7 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
 
                 BlockItemSummary {
                     sender: None,
+                    sponsor: None,
                     hash: bi.hash,
                     cost: Amount::zero(),
                     energy_cost: bi.energy_cost,
@@ -1012,12 +1019,14 @@ fn convert_account_transaction(
     ty: Option<TransactionType>,
     cost: Amount,
     sender: AccountAddress,
+    sponsor: Option<AccountAddress>,
     value: BlockItemResult,
 ) -> Result<super::AccountTransactionDetails, ConversionError> {
     let mk_none = |reject_reason| {
         Ok(super::AccountTransactionDetails {
             cost,
             sender,
+            sponsor: sponsor.map(|s| SponsorDetails { sponsor: s, cost }),
             effects: Upward::Known(super::AccountTransactionEffects::None {
                 transaction_type: ty,
                 reject_reason: Upward::Known(reject_reason),
@@ -1029,6 +1038,7 @@ fn convert_account_transaction(
         Ok(super::AccountTransactionDetails {
             cost,
             sender,
+            sponsor: sponsor.map(|s| SponsorDetails { sponsor: s, cost }),
             effects: Upward::Known(effects),
         })
     };
@@ -1509,12 +1519,14 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
                 let index = value.index;
                 let energy_cost = value.energy_cost;
                 let hash = value.hash;
+                let sponsor = value.sponsor;
                 let sender = value
                     .sender
                     .ok_or(ConversionError::InvalidTransactionResult(
                         "Expect `BlockItemType::Account` to have a sender".to_string(),
                     ))?;
-                let details = convert_account_transaction(ty, value.cost, sender, value.result)?;
+                let details =
+                    convert_account_transaction(ty, value.cost, sender, sponsor, value.result)?;
                 Ok(super::BlockItemSummary {
                     index,
                     energy_cost,
