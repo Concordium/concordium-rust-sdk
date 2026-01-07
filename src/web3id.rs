@@ -14,6 +14,8 @@ use concordium_base::{
 };
 use futures::TryStreamExt;
 
+pub mod v1;
+
 #[derive(thiserror::Error, Debug)]
 pub enum CredentialLookupError {
     #[error("Credential network not supported.")]
