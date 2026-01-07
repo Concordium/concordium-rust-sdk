@@ -5,6 +5,7 @@ pub mod chain_parameters;
 pub mod network;
 pub mod queries;
 pub mod smart_contracts;
+#[cfg(feature = "serde_deprecated")]
 mod summary_helper;
 pub mod transactions;
 
@@ -52,8 +53,9 @@ use std::{
 /// zero-knowledge proofs.
 pub type CryptographicParameters = crate::id::types::GlobalContext<crate::id::constants::ArCurve>;
 
-#[derive(SerdeSerialize, PartialEq, Eq, SerdeDeserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(PartialEq, Eq, Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// The state of the encrypted balance of an account.
 pub struct AccountEncryptedAmount {
     /// Encrypted amount that is a result of this accounts' actions.
@@ -70,7 +72,7 @@ pub struct AccountEncryptedAmount {
     /// list of incoming encrypted amounts starts at the index `start_index
     /// + 1`.
     pub start_index: u64,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_deprecated", serde(default))]
     /// If ['Some'], the amount that has resulted from aggregating other amounts
     /// and the number of aggregated amounts (must be at least 2 if
     /// present).
@@ -218,8 +220,9 @@ impl AccountEncryptedAmount {
         }
     }
 }
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Eq, PartialEq, Clone)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Eq, PartialEq, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// State of the account's release schedule. This is the balance of the account
 /// that is owned by the account, but cannot be used until the release point.
 pub struct AccountReleaseSchedule {
@@ -229,11 +232,15 @@ pub struct AccountReleaseSchedule {
     pub schedule: Vec<Release>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Eq, PartialEq, Clone)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Eq, PartialEq, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// An individual release of a locked balance.
 pub struct Release {
-    #[serde(with = "crate::internal::timestamp_millis")]
+    #[cfg_attr(
+        feature = "serde_deprecated",
+        serde(with = "crate::internal::timestamp_millis")
+    )]
     /// Effective time of release.
     pub timestamp: chrono::DateTime<chrono::Utc>,
     /// Amount to be released.
@@ -242,8 +249,9 @@ pub struct Release {
     pub transactions: Vec<hashes::TransactionHash>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// Information about a baker.
 pub struct BakerInfo {
     /// Identity of the baker. This is actually the account index of
@@ -263,8 +271,9 @@ pub struct BakerInfo {
 /// Additional information about a baking pool.
 /// This information is added with the introduction of delegation in protocol
 /// version 4.
-#[derive(SerdeSerialize, SerdeDeserialize, PartialEq, Eq, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(PartialEq, Eq, Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 pub struct BakerPoolInfo {
     /// Whether the pool allows delegators.
     pub open_status: Upward<OpenStatus>,
@@ -274,15 +283,16 @@ pub struct BakerPoolInfo {
     pub commission_rates: CommissionRates,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, PartialEq)]
-#[serde(untagged)]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde_deprecated", serde(untagged))]
 pub enum AccountStakingInfo {
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// The account is a baker.
     Baker {
         staked_amount: Amount,
         restake_earnings: bool,
-        #[serde(flatten)]
+        #[cfg_attr(feature = "serde_deprecated", serde(flatten))]
         baker_info: Box<BakerInfo>,
         pending_change: Option<StakePendingChange>,
         pool_info: Option<BakerPoolInfo>,
@@ -293,7 +303,7 @@ pub enum AccountStakingInfo {
         is_suspended: bool,
     },
     /// The account is delegating stake to a baker.
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     Delegated {
         staked_amount: Amount,
         restake_earnings: bool,
@@ -337,8 +347,9 @@ pub enum CooldownStatus {
     PrePreCooldown,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq, Clone)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, PartialEq, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 pub struct Cooldown {
     /// The time in milliseconds since the Unix epoch when the cooldown period
     /// ends.
@@ -356,8 +367,9 @@ pub struct Cooldown {
     pub status: Upward<CooldownStatus>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq, Clone)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, PartialEq, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// Account information exposed via the node's API. This is always the state of
 /// an account in a specific block.
 pub struct AccountInfo {
@@ -389,7 +401,7 @@ pub struct AccountInfo {
     /// however the account index serves the role of the baker id, if the
     /// account is a baker. Hence it is exposed here as well.
     pub account_index: AccountIndex,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_deprecated", serde(default))]
     /// `Some` if and only if the account is a baker or delegator. In that case
     /// it is the information about the baker or delegator.
     ///
@@ -398,7 +410,10 @@ pub struct AccountInfo {
     /// [`Upward`] potentially representing some future unknown data.
     // this is a bit of a hacky way of JSON parsing, and **relies** on
     // the account staking info serde instance being "untagged"
-    #[serde(rename = "accountBaker", alias = "accountDelegation")]
+    #[cfg_attr(
+        feature = "serde_deprecated",
+        serde(rename = "accountBaker", alias = "accountDelegation")
+    )]
     pub account_stake: Option<Upward<AccountStakingInfo>>,
     /// Canonical address of the account.
     pub account_address: AccountAddress,
@@ -455,8 +470,9 @@ impl From<&AccountInfo> for Upward<AccountAccessStructure> {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// The state of consensus parameters, and allowed participants (i.e., bakers).
 pub struct BirkParameters {
     /// Current election difficulty. This is only present for protocol versions
@@ -468,8 +484,9 @@ pub struct BirkParameters {
     pub bakers: Vec<BirkBaker>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// State of an individual baker.
 pub struct BirkBaker {
     /// ID of the baker. Matches their account index.
@@ -481,20 +498,21 @@ pub struct BirkBaker {
     pub baker_account: AccountAddress,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, PartialEq, Eq, Debug, Clone, Copy)]
-#[serde(tag = "change")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde_deprecated", serde(tag = "change"))]
 /// Pending change in the baker's stake.
 pub enum StakePendingChange {
-    #[serde(rename = "ReduceStake")]
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "ReduceStake"))]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// The stake is being reduced. The new stake will take affect in the given
     /// epoch.
     ReduceStake {
         new_stake: Amount,
         effective_time: chrono::DateTime<chrono::Utc>,
     },
-    #[serde(rename = "RemoveStake")]
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "RemoveStake"))]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// The baker will be removed at the end of the given epoch.
     RemoveStake {
         effective_time: chrono::DateTime<chrono::Utc>,
@@ -531,22 +549,26 @@ pub struct DelegatorRewardPeriodInfo {
     pub stake: Amount,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
-#[serde(
-    rename_all = "camelCase",
-    untagged,
-    try_from = "rewards_overview::RewardsDataRaw"
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(
+    feature = "serde_deprecated",
+    serde(
+        rename_all = "camelCase",
+        untagged,
+        try_from = "rewards_overview::RewardsDataRaw"
+    )
 )]
 /// Information about the state of the CCD distribution at a particular time.
 pub enum RewardsOverview {
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     V0 {
-        #[serde(flatten)]
+        #[cfg_attr(feature = "serde_deprecated", serde(flatten))]
         data: CommonRewardData,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     V1 {
-        #[serde(flatten)]
+        #[cfg_attr(feature = "serde_deprecated", serde(flatten))]
         common: CommonRewardData,
         /// The transaction reward fraction accruing to the foundation (to be
         /// paid at next payday).
@@ -571,8 +593,9 @@ impl RewardsOverview {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// Reward data common to both V0 and V1 rewards.
 pub struct CommonRewardData {
     /// Protocol version that applies to these rewards. V0 variant
@@ -592,10 +615,10 @@ pub struct CommonRewardData {
 
 mod rewards_overview {
     use super::*;
-    #[derive(SerdeDeserialize)]
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", derive(SerdeDeserialize))]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     pub struct RewardsDataRaw {
-        #[serde(flatten)]
+        #[cfg_attr(feature = "serde_deprecated", serde(flatten))]
         common: CommonRewardData,
         /// The transaction reward fraction accruing to the foundation (to be
         /// paid at next payday).
@@ -641,26 +664,28 @@ mod rewards_overview {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy, PartialEq, Eq)]
-#[serde(tag = "pendingChangeType")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_deprecated", serde(tag = "pendingChangeType"))]
 pub enum PoolPendingChange {
     NoChange,
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     ReduceBakerCapital {
         /// New baker equity capital.
         baker_equity_capital: Amount,
         /// Effective time of the change.
         effective_time: chrono::DateTime<chrono::Utc>,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     RemovePool {
         /// Effective time of the change.
         effective_time: chrono::DateTime<chrono::Utc>,
     },
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 pub struct CurrentPaydayBakerPoolStatus {
     /// The number of blocks baked in the current reward period.
     pub blocks_baked: u64,
@@ -672,7 +697,10 @@ pub struct CurrentPaydayBakerPoolStatus {
     /// The effective stake of the baker in the current reward period.
     pub effective_stake: Amount,
     /// The lottery power of the baker in the current reward period.
-    #[serde(deserialize_with = "lottery_power_parser::deserialize")]
+    #[cfg_attr(
+        feature = "serde_deprecated",
+        serde(deserialize_with = "lottery_power_parser::deserialize")
+    )]
     pub lottery_power: f64,
     /// The effective equity capital of the baker for the current reward period.
     pub baker_equity_capital: Amount,
@@ -686,6 +714,7 @@ pub struct CurrentPaydayBakerPoolStatus {
 
 // hack due to a bug in Serde that is caused by the combination of
 // the tag attribute, and the arbitrary_precision feature.
+#[cfg(feature = "serde_deprecated")]
 mod lottery_power_parser {
     use super::SerdeDeserialize;
     /// Deserialize (via Serde) chrono::Duration in milliseconds as an i64.
@@ -699,8 +728,9 @@ mod lottery_power_parser {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// The state of the baker currently registered on the account.
 /// Current here means "present". This is the information that is being updated
 /// by transactions (and rewards). This is in contrast to "epoch baker" which is
@@ -724,8 +754,9 @@ pub struct BakerPoolStatus {
 // Information about a baker pool's active stake and status. This does not
 // reflect the stake used for the current reward period, but rather the stake
 // that is currently active.
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 pub struct ActiveBakerPoolStatus {
     /// The equity capital provided by the pool owner.
     pub baker_equity_capital: Amount,
@@ -741,8 +772,9 @@ pub struct ActiveBakerPoolStatus {
     pub baker_stake_pending_change: PoolPendingChange,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// State of the passive delegation pool at present. Changes to delegation,
 /// e.g., an account deciding to delegate are reflected in this structure at
 /// first.
@@ -761,23 +793,28 @@ pub struct PassiveDelegationStatus {
     pub all_pool_total_capital: Amount,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(tag = "poolType")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(tag = "poolType"))]
 pub enum PoolStatus {
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     BakerPool {
-        #[serde(flatten)]
+        #[cfg_attr(feature = "serde_deprecated", serde(flatten))]
         status: BakerPoolStatus,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     PassiveDelegation {
-        #[serde(flatten)]
+        #[cfg_attr(feature = "serde_deprecated", serde(flatten))]
         status: PassiveDelegationStatus,
     },
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
-#[serde(tag = "status", content = "result", rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug)]
+#[cfg_attr(
+    feature = "serde_deprecated",
+    serde(tag = "status", content = "result", rename_all = "camelCase")
+)]
 /// Status of a transaction in a given block.
 /// NB: If the transaction is committed or finalized, but not in the given
 /// block, then the API response will be `QueryError::NotFound`, hence those
@@ -792,8 +829,12 @@ pub enum TransactionStatusInBlock {
     Committed(BlockItemSummary),
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug)]
-#[serde(tag = "status", content = "outcomes", rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug)]
+#[cfg_attr(
+    feature = "serde_deprecated",
+    serde(tag = "status", content = "outcomes", rename_all = "camelCase")
+)]
 /// Status of a transaction known to the node.
 pub enum TransactionStatus {
     /// Transaction is received, but not yet in any blocks.
@@ -829,17 +870,21 @@ impl TransactionStatus {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(tag = "tag")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(tag = "tag"))]
 /// In addition to the user initiated transactions the protocol generates some
 /// events which are deemed "Special outcomes". These are rewards for running
 /// the consensus and finalization protocols.
 pub enum SpecialTransactionOutcome {
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// Reward issued to all the bakers at the end of an epoch for baking blocks
     /// in the epoch.
     BakingRewards {
-        #[serde(with = "crate::internal::account_amounts")]
+        #[cfg_attr(
+            feature = "serde_deprecated",
+            serde(with = "crate::internal::account_amounts")
+        )]
         baker_rewards: BTreeMap<AccountAddress, Amount>,
         /// Remaining balance of the baking account. This will be transferred to
         /// the next epoch's reward account. It exists since it is not possible
@@ -847,7 +892,7 @@ pub enum SpecialTransactionOutcome {
         /// not possible is that amounts are integers.
         remainder: Amount,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// Distribution of newly minted CCD.
     Mint {
         /// The portion of the newly minted CCD that goes to the baking reward
@@ -861,10 +906,13 @@ pub enum SpecialTransactionOutcome {
         /// to.
         foundation_account: AccountAddress,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// Distribution of finalization rewards.
     FinalizationRewards {
-        #[serde(with = "crate::internal::account_amounts")]
+        #[cfg_attr(
+            feature = "serde_deprecated",
+            serde(with = "crate::internal::account_amounts")
+        )]
         finalization_rewards: BTreeMap<AccountAddress, Amount>,
         /// Remaining balance of the finalization reward account. It exists
         /// since it is not possible to perfectly distribute the
@@ -872,15 +920,15 @@ pub enum SpecialTransactionOutcome {
         /// amounts are integers.
         remainder: Amount,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// Reward for including transactions in a block.
     BlockReward {
         /// Total amount of transaction fees in the block.
         transaction_fees: Amount,
-        #[serde(rename = "oldGASAccount")]
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "oldGASAccount"))]
         /// Previous balance of the GAS account.
         old_gas_account: Amount,
-        #[serde(rename = "newGASAccount")]
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "newGASAccount"))]
         /// New balance of the GAS account.
         new_gas_account: Amount,
         /// The amount of CCD that goes to the baker.
@@ -892,7 +940,7 @@ pub enum SpecialTransactionOutcome {
         /// The account address where the foundation receives the tax.
         foundation_account: AccountAddress,
     },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// Payment for the foundation.
     PaydayFoundationReward {
         /// Address of the foundation account.
@@ -903,7 +951,7 @@ pub enum SpecialTransactionOutcome {
     /// Payment for a particular account.
     /// When listed in a block summary, the delegated pool of the account is
     /// given by the last PaydayPoolReward outcome included before this outcome.
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     PaydayAccountReward {
         /// The account that got rewarded.
         account: AccountAddress,
@@ -915,15 +963,15 @@ pub enum SpecialTransactionOutcome {
         finalization_reward: Amount,
     },
     /// Amounts accrued to accounts for each baked block.
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     BlockAccrueReward {
         /// The total fees paid for transactions in the block.
         transaction_fees: Amount,
         /// The old balance of the GAS account.
-        #[serde(rename = "oldGASAccount")]
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "oldGASAccount"))]
         old_gas_account: Amount,
         /// The new balance of the GAS account.
-        #[serde(rename = "newGASAccount")]
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "newGASAccount"))]
         new_gas_account: Amount,
         /// The amount awarded to the baker.
         baker_reward: Amount,
@@ -935,7 +983,7 @@ pub enum SpecialTransactionOutcome {
         baker_id: BakerId,
     },
     /// Payment distributed to a pool or passive delegators.
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     PaydayPoolReward {
         /// The pool owner (passive delegators when 'None').
         pool_owner: Option<BakerId>,
@@ -947,7 +995,7 @@ pub enum SpecialTransactionOutcome {
         finalization_reward: Amount,
     },
     /// A validator was suspended due to too many missed rounds.
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     ValidatorSuspended {
         /// The validator that was suspended.
         baker_id: BakerId,
@@ -956,7 +1004,7 @@ pub enum SpecialTransactionOutcome {
     },
     /// A validator was primed to be suspended at the next snapshot epoch due to
     /// too many missed rounds.
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     ValidatorPrimedForSuspension {
         /// The validator that was primed for suspension.
         baker_id: BakerId,
@@ -1011,8 +1059,9 @@ impl SpecialTransactionOutcome {
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 pub struct BlockSummaryData<Upd> {
     /// Outcomes of transactions in this block, ordered as in the block.
     pub transaction_summaries: Vec<BlockItemSummary>,
@@ -1056,21 +1105,26 @@ fn add_token_event_addresses(
     }
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone)]
 /// Summary of the finalization record in a block, if any.
 pub struct FinalizationSummary {
-    #[serde(rename = "finalizationBlockPointer")]
+    #[cfg_attr(
+        feature = "serde_deprecated",
+        serde(rename = "finalizationBlockPointer")
+    )]
     pub block_pointer: hashes::BlockHash,
-    #[serde(rename = "finalizationIndex")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "finalizationIndex"))]
     pub index: FinalizationIndex,
-    #[serde(rename = "finalizationDelay")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "finalizationDelay"))]
     pub delay: BlockHeight,
-    #[serde(rename = "finalizers")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "finalizers"))]
     pub finalizers: Vec<FinalizationSummaryParty>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone, Copy)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// Details of a party in a finalization.
 pub struct FinalizationSummaryParty {
     /// The identity of the baker.
@@ -1081,8 +1135,12 @@ pub struct FinalizationSummaryParty {
     pub signed: bool,
 }
 
-#[derive(SerdeDeserialize, Debug, Clone)]
-#[serde(try_from = "summary_helper::BlockItemSummary")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeDeserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_deprecated",
+    serde(try_from = "summary_helper::BlockItemSummary")
+)]
 /// Summary of the outcome of a block item in structured form.
 /// The summary determines which transaction type it was.
 ///
@@ -1187,6 +1245,7 @@ impl BlockItemSummary {
     }
 }
 
+#[cfg(feature = "serde_deprecated")]
 impl SerdeSerialize for BlockItemSummary {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -2433,12 +2492,13 @@ pub struct TokenCreationDetails {
     pub events: Vec<TokenEvent>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// Event generated when an account receives a new encrypted amount.
 pub struct NewEncryptedAmountEvent {
     /// The account onto which the amount was added.
-    #[serde(rename = "account")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "account"))]
     pub receiver: AccountAddress,
     /// The index the amount was assigned.
     pub new_index: crate::encrypted_transfers::types::EncryptedAmountIndex,
@@ -2446,8 +2506,9 @@ pub struct NewEncryptedAmountEvent {
     pub encrypted_amount: crate::encrypted_transfers::types::EncryptedAmount<EncryptedAmountsCurve>,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// Event generated when one or more encrypted amounts are consumed from the
 /// account.
 pub struct EncryptedAmountRemovedEvent {
@@ -2461,10 +2522,11 @@ pub struct EncryptedAmountRemovedEvent {
     pub up_to_index: crate::encrypted_transfers::types::EncryptedAmountAggIndex,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 pub struct BakerAddedEvent {
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde_deprecated", serde(flatten))]
     /// The keys with which the baker registered.
     pub keys_event: BakerKeysEvent,
     /// The amount the account staked to become a baker. This amount is
@@ -2475,8 +2537,9 @@ pub struct BakerAddedEvent {
     pub restake_earnings: bool,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 /// Result of a successful change of baker keys.
 pub struct BakerKeysEvent {
     /// ID of the baker whose keys were changed.
@@ -2492,8 +2555,9 @@ pub struct BakerKeysEvent {
     pub aggregation_key: BakerAggregationVerifyKey,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 pub struct EncryptedSelfAmountAddedEvent {
     /// The affected account.
     pub account: AccountAddress,
@@ -2503,12 +2567,16 @@ pub struct EncryptedSelfAmountAddedEvent {
     pub amount: Amount,
 }
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
 pub struct ContractInitializedEvent {
-    #[serde(default = "smart_contracts::WasmVersionInt::zero_version")]
+    #[cfg_attr(
+        feature = "serde_deprecated",
+        serde(default = "smart_contracts::WasmVersionInt::zero_version")
+    )]
     pub contract_version: smart_contracts::WasmVersionInt,
-    #[serde(rename = "ref")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "ref"))]
     /// Module with the source code of the contract.
     pub origin_ref: smart_contracts::ModuleReference,
     /// The newly assigned address of the contract.
@@ -2531,8 +2599,9 @@ pub use concordium_base::{
     updates::*,
 };
 
-#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
-#[serde(tag = "tag")]
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(tag = "tag"))]
 /// A reason for why a transaction was rejected. Rejected means included in a
 /// block, but the desired action was not achieved. The only effect of a
 /// rejected transaction is payment.
@@ -2580,9 +2649,9 @@ pub enum RejectReason {
     /// We ran of out energy to process this transaction.
     OutOfEnergy,
     /// Rejected due to contract logic in init function of a contract.
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     RejectedInit { reject_reason: i32 },
-    #[serde(rename_all = "camelCase")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     RejectedReceive {
         reject_reason: i32,
         contract_address: ContractAddress,
@@ -2683,12 +2752,12 @@ pub enum RejectReason {
     DelegatorInCooldown,
     /// Account is not a delegation account.
     NotADelegator {
-        #[serde(rename = "contents")]
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
         address: AccountAddress,
     },
     /// Delegation target is not a baker
     DelegationTargetNotABaker {
-        #[serde(rename = "contents")]
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
         target: BakerId,
     },
     /// The amount would result in pool capital higher than the maximum
@@ -2702,13 +2771,13 @@ pub enum RejectReason {
     /// The provided identifier does not match a token currently on chain.
     /// Introduced in protocol version 9.
     NonExistentTokenId {
-        #[serde(rename = "contents")]
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
         token_id: protocol_level_tokens::TokenId,
     },
     /// The token-holder transaction failed.
     /// Introduced in protocol version 9.
     TokenUpdateTransactionFailed {
-        #[serde(rename = "contents")]
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
         reject_reason: protocol_level_tokens::TokenModuleRejectReason,
     },
 }
