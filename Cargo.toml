@@ -1,6 +1,6 @@
 [package]
 name = "concordium-rust-sdk"
-version = "8.0.0"
+version = "8.1.0"
 authors = ["Concordium <developers@concordium.com>"]
 edition = "2021"
 rust-version = "1.85"
@@ -52,3 +52,8 @@ tokio-test = { version = "0.4" }
 tonic = {version = "0.12.0", features = ["tls", "tls-roots"]} # Use system trust roots.
 tracing-subscriber = "0.3"
 sqlite = "0.33"
+
+[features]
+default = ["serde_deprecated"]
+# enables `serde` for composite data structures; see `README.md` for more information
+serde_deprecated = []
