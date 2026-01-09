@@ -1,14 +1,6 @@
-## 8.1.0
+## 9.0.0
 
-- Implemented `web3id::v1` module that contains functionality to support the verification flow of Concordium verifiable presentations V1.
-  This includes
-  - creating verification request anchor (VRA)
-  - verifying presentations
-  - creating verification audit anchor (VAA)
-   
-  The main entrypoints in the module are `v1::create_verification_request_and_submit_request_anchor` 
-  and `v1::verify_presentation_and_submit_audit_anchor`.
-
+- Support for `ProtocolVersion::P10`.
 - The flag `serde_deprecated` now guards `serde::Serialize` and `serde::Deserialize` implemetations on the following types. The implementations will eventually be removed.
   - `protocol_level_tokens::AccountToken`
   - `protocol_level_tokens::TokenAccountState`
@@ -56,6 +48,18 @@
   - `types::smart_contracts::InstanceInfo`
   - `types::smart_contracts::ContractContext`
   - `types::smart_contracts::InvokeContractResult`
+  - Support for sponsored transactions.
+
+## 8.1.0
+
+- Implemented `web3id::v1` module that contains functionality to support the verification flow of Concordium verifiable presentations V1.
+  This includes
+  - creating verification request anchor (VRA)
+  - verifying presentations
+  - creating verification audit anchor (VAA)
+   
+  The main entrypoints in the module are `v1::create_verification_request_and_submit_request_anchor` 
+  and `v1::verify_presentation_and_submit_audit_anchor`.
 
 ## 8.0.0
 

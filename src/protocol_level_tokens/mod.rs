@@ -57,8 +57,8 @@ impl TryFrom<generated::plt::TokenModuleRef> for TokenModuleRef {
     }
 }
 
-impl From<generated::plt::CBor> for RawCbor {
-    fn from(wrapper: generated::plt::CBor) -> Self {
+impl From<generated::plt::Cbor> for RawCbor {
+    fn from(wrapper: generated::plt::Cbor) -> Self {
         wrapper.value.into()
     }
 }
