@@ -1,6 +1,6 @@
 # the purpose of this workflow is to run cargo-deny on a schedule to catch
 # any new license/advisories/sources/bans issues that may arise as dependencies are updated.
-name: Check Concordium Rust SDK subfolder with Cargo Deny
+name: Check Concordium Rust SDK src with Cargo Deny
 
 on:
   schedule:
