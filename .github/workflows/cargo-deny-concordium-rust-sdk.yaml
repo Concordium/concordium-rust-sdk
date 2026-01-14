@@ -23,18 +23,11 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-          override: true
-
-      - name: Install cargo-deny
-        working-directory: /home/runner
-        run: cargo install --locked cargo-deny
-
       - name: Run cargo-deny
-        run: cargo deny check advisories
+        uses: embark-studios/cargo-deny-action@v2
+        with:
+          command: advisories
+          manifest-path: Cargo.toml
 
       - name: Report Status to Slack    # This step only runs if a previous step failed
         if: failure()
