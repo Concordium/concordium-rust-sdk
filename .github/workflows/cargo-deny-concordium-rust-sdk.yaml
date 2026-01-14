@@ -30,6 +30,7 @@ jobs:
           override: true
 
       - name: Install cargo-deny
+        working-directory: /home/runner
         run: cargo install --locked cargo-deny
 
       - name: Run cargo-deny
