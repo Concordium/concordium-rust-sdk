@@ -30,7 +30,7 @@ jobs:
           override: true
 
       - name: Install cargo-deny
-        run: cargo install --locked cargo-deny --version 0.19.0
+        run: cargo install --locked cargo-deny
 
       - name: Run cargo-deny
         run: cargo deny check advisories
