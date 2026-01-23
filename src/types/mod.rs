@@ -8,6 +8,7 @@ pub mod smart_contracts;
 #[cfg(feature = "serde_deprecated")]
 mod summary_helper;
 pub mod transactions;
+pub mod upward;
 
 use anyhow::Context;
 pub use concordium_base::hashes;

@@ -21,7 +21,7 @@
 //!
 //! The example `web3id_v1_verification_flow` demonstrates the verification flow.
 
-use crate::types::{AccountTransactionEffects, BlockItemSummaryDetails};
+use crate::types::{upward::UnknownDataError, AccountTransactionEffects, BlockItemSummaryDetails};
 use crate::v2;
 
 use crate::endpoints::RPCError;
@@ -30,7 +30,6 @@ use crate::v2::{AccountIdentifier, BlockIdentifier, IntoBlockIdentifier, QueryEr
 use concordium_base::base::{CredentialRegistrationID, Nonce};
 use concordium_base::common::cbor;
 use concordium_base::common::cbor::CborSerializationError;
-use concordium_base::common::upward::UnknownDataError;
 use concordium_base::hashes::TransactionHash;
 use concordium_base::id::types;
 use concordium_base::id::types::{AccountCredentialWithoutProofs, ArInfos, IpIdentity};
@@ -426,7 +425,7 @@ pub async fn create_verification_request_and_submit_request_anchor<
     public_info: Option<HashMap<String, cbor::value::Value>>,
 ) -> Result<VerificationRequest, CreateAnchorError> {
     let verification_request_anchor = verification_request_data.to_anchor(public_info);
-    let cbor = cbor::cbor_encode(&verification_request_anchor)?;
+    let cbor = cbor::cbor_encode(&verification_request_anchor);
     let register_data = RegisteredData::try_from(cbor)?;
 
     let tx = send::register_data(
@@ -460,7 +459,7 @@ pub async fn submit_verification_audit_record_anchor<S: ExactSizeTransactionSign
     public_info: Option<HashMap<String, cbor::value::Value>>,
 ) -> Result<TransactionHash, CreateAnchorError> {
     let verification_audit_anchor = verification_audit_record.to_anchor(public_info);
-    let cbor = cbor::cbor_encode(&verification_audit_anchor)?;
+    let cbor = cbor::cbor_encode(&verification_audit_anchor);
     let register_data = RegisteredData::try_from(cbor)?;
 
     let tx = send::register_data(

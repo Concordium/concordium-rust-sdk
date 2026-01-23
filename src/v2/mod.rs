@@ -1,6 +1,7 @@
 //! This module exposes [Client] which is a wrapper around the
 //! generated gRPC rust client, providing a more ergonomic interface than the
 //! generated client. See [Client] for documentation of how to use.
+pub use crate::types::upward::{self, Upward};
 use crate::{
     endpoints,
     id::{self, types::AccountCredentialMessage},
@@ -20,7 +21,6 @@ use crate::{
     },
 };
 use anyhow::Context;
-pub use concordium_base::common::upward::{self, Upward};
 use concordium_base::{
     base::{AccountIndex, BlockHeight, Epoch, GenesisIndex},
     common::{
