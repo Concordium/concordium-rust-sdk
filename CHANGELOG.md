@@ -1,3 +1,9 @@
+## Unreleased
+
+- Added `Upward`, `TokenEvent`, `TokenEventDetails`.
+- Changed `TokenModuleEvent` into `TokenModuleEventEnum`.
+- Changed `TokenRejectReason` into `TokenRejectReasonEnum`.
+
 ## 9.0.0
 
 - Support for `ProtocolVersion::P10`.
