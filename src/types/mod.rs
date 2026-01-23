@@ -13,7 +13,11 @@ pub mod upward;
 use anyhow::Context;
 pub use concordium_base::hashes;
 // re-export to maintain backwards compatibility.
-use crate::{constants::*, protocol_level_tokens, v2::upward::Upward};
+use crate::{
+    constants::*,
+    protocol_level_tokens::{self, TokenEvent, TokenEventDetails},
+    v2::upward::Upward,
+};
 pub use concordium_base::{
     base::*,
     id::types::CredentialType,
@@ -39,7 +43,7 @@ use concordium_base::{
             AccountAddress, AccountCredentialWithoutProofs, AccountKeys, CredentialPublicKeys,
         },
     },
-    protocol_level_tokens::{TokenAmount, TokenEvent, TokenEventDetails, TokenHolder, TokenId},
+    protocol_level_tokens::{TokenAmount, TokenHolder, TokenId},
     smart_contracts::{
         ContractEvent, ModuleReference, OwnedParameter, OwnedReceiveName, WasmVersion,
     },
@@ -2795,7 +2799,7 @@ pub enum RejectReason {
     /// Introduced in protocol version 9.
     TokenUpdateTransactionFailed {
         #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
-        reject_reason: protocol_level_tokens::TokenModuleRejectReason,
+        reject_reason: protocol_level_tokens::TokenModuleRejectReasonEnum,
     },
 }
 

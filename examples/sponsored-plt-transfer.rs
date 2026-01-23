@@ -93,7 +93,7 @@ async fn main() -> anyhow::Result<()> {
         expiry,
         token_id,
         [operation].into_iter().collect(),
-    )?
+    )
     // Extend the transaction and add a sponsor.
     .extend()
     .add_sponsor(sponsor_keys.address, 1)

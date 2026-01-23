@@ -5,10 +5,12 @@ use concordium_base::protocol_level_tokens;
 
 mod token_account_info;
 pub mod token_client;
+mod token_event;
 mod token_info;
 
 pub use protocol_level_tokens::*;
 pub use token_account_info::*;
+pub use token_event::*;
 pub use token_info::*;
 
 // gRPC type conversions for the types which are define as part of
@@ -97,17 +99,23 @@ impl TryFrom<generated::plt::token_event::Event> for TokenEventDetails {
     }
 }
 
-impl TryFrom<generated::plt::TokenModuleEvent> for TokenModuleEvent {
+impl TryFrom<generated::plt::TokenModuleEvent> for TokenModuleEventEnum {
     type Error = tonic::Status;
 
     fn try_from(event: generated::plt::TokenModuleEvent) -> Result<Self, Self::Error> {
-        Ok(Self {
-            event_type: protocol_level_tokens::TokenModuleCborTypeDiscriminator::try_from(
-                event.r#type,
-            )
-            .map_err(|err| tonic::Status::internal(err.to_string()))?,
-            details: event.details.require()?.into(),
-        })
+        let event_type = TokenModuleEventType::try_from_type_discriminator(
+            &event
+                .r#type
+                .try_into()
+                .map_err(|err: TypeFromStringError| tonic::Status::internal(err.to_string()))?,
+        )
+        .map_err(|err| tonic::Status::internal(err.to_string()))?;
+
+        Self::decode_event(
+            event_type,
+            &event.details.expect("Event details must exist").into(),
+        )
+        .map_err(|err| tonic::Status::internal(err.to_string()))
     }
 }
 
@@ -151,17 +159,25 @@ impl TryFrom<generated::plt::TokenHolder> for TokenHolder {
     }
 }
 
-impl TryFrom<generated::plt::TokenModuleRejectReason> for TokenModuleRejectReason {
+impl TryFrom<generated::plt::TokenModuleRejectReason> for TokenModuleRejectReasonEnum {
     type Error = tonic::Status;
 
     fn try_from(value: generated::plt::TokenModuleRejectReason) -> Result<Self, Self::Error> {
-        Ok(Self {
-            token_id: value.token_id.require()?.try_into()?,
-            reason_type: protocol_level_tokens::TokenModuleCborTypeDiscriminator::try_from(
-                value.r#type,
-            )
-            .map_err(|err| tonic::Status::internal(err.to_string()))?,
-            details: value.details.map(|d| d.into()),
-        })
+        let reject_reason_type = TokenModuleRejectReasonType::try_from_type_discriminator(
+            &value
+                .r#type
+                .try_into()
+                .map_err(|err: TypeFromStringError| tonic::Status::internal(err.to_string()))?,
+        )
+        .map_err(|err| tonic::Status::internal(err.to_string()))?;
+
+        Self::decode_reject_reason(
+            reject_reason_type,
+            &value
+                .details
+                .expect("Reject reason details must be knwon")
+                .into(),
+        )
+        .map_err(|err| tonic::Status::internal(err.to_string()))
     }
 }
