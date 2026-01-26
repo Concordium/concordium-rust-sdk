@@ -173,21 +173,5 @@ impl TryFrom<generated::plt::TokenModuleRejectReason> for EncodedTokenModuleReje
                 .map_err(|e: TypeFromStringError| tonic::Status::invalid_argument(e.to_string()))?,
             details: value.details.map(|c| c.into()),
         })
-        // let reject_reason_type = TokenModuleRejectReasonType::try_from_type_discriminator(
-        //     &value
-        //         .r#type
-        //         .try_into()
-        //         .map_err(|err: TypeFromStringError| tonic::Status::internal(err.to_string()))?,
-        // )
-        // .map_err(|err| tonic::Status::internal(err.to_string()))?;
-
-        // Self::decode_reject_reason(
-        //     reject_reason_type,
-        //     &value
-        //         .details
-        //         .expect("Reject reason details must be knwon")
-        //         .into(),
-        // )
-        // .map_err(|err| tonic::Status::internal(err.to_string()))
     }
 }
