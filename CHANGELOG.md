@@ -1,8 +1,8 @@
 ## Unreleased
 
-- Moved the `Upward`,`TokenEvent`, `TokenEventDetails` from the `concordium-base` into this crate.
-- Changed `TokenModuleEvent` into `EncodedTokenModuleEvent`.
-- Changed `TokenRejectReason` into `EncodedTokenRejectReason`.
+- Moved the `Upward`,`TokenEvent`, `TokenEventDetails` from the `concordium-base`.
+- Moved the `TokenModuleEvent` from the `concordium-base` as `EncodedTokenModuleEvent`.
+- Moved the `TokenModuleRejectReason` from the `concordium-base` as `EncodedTokenModuleRejectReason`.
 
 ## 9.0.0
 
