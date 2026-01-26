@@ -43,7 +43,7 @@ pub(crate) struct BlockItemSummary {
     /// transactions.
     sender: Option<AccountAddress>,
     /// Optional sponsor details of the transaction.
-    sponsor: Option<SponsorDetails>,
+    sponsor_details: Option<SponsorDetails>,
     /// Hash of the transaction.
     hash: hashes::TransactionHash,
     /// The amount of CCD the transaction was charged to the sender.
@@ -934,7 +934,7 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                 };
                 BlockItemSummary {
                     sender: Some(sender),
-                    sponsor: sponsor.map(SponsorDetails::from),
+                    sponsor_details: sponsor.map(SponsorDetails::from),
                     hash: bi.hash,
                     cost,
                     energy_cost: bi.energy_cost,
@@ -949,7 +949,7 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                 reg_id,
             }) => BlockItemSummary {
                 sender: None,
-                sponsor: None,
+                sponsor_details: None,
                 hash: bi.hash,
                 cost: Amount::zero(),
                 energy_cost: bi.energy_cost,
@@ -972,7 +972,7 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                 let payload = payload.known_or_err()?;
                 BlockItemSummary {
                     sender: None,
-                    sponsor: None,
+                    sponsor_details: None,
                     hash: bi.hash,
                     cost: Amount::zero(),
                     energy_cost: bi.energy_cost,
@@ -999,7 +999,7 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
 
                 BlockItemSummary {
                     sender: None,
-                    sponsor: None,
+                    sponsor_details: None,
                     hash: bi.hash,
                     cost: Amount::zero(),
                     energy_cost: bi.energy_cost,
@@ -1545,7 +1545,7 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
                 let index = value.index;
                 let energy_cost = value.energy_cost;
                 let hash = value.hash;
-                let sponsor = value.sponsor;
+                let sponsor = value.sponsor_details;
                 let sender = value
                     .sender
                     .ok_or(ConversionError::InvalidTransactionResult(
@@ -1681,7 +1681,7 @@ mod tests {
         let bis_converted = BlockItemSummary::try_from(bis).expect("can convert");
         assert_eq!(bis_converted.cost, atd.cost);
         assert_eq!(
-            bis_converted.clone().sponsor.unwrap().cost,
+            bis_converted.clone().sponsor_details.unwrap().cost,
             atd.sponsor.clone().unwrap().cost
         );
 
