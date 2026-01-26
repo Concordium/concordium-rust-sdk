@@ -1,5 +1,4 @@
 use crate::types;
-pub use crate::types::upward::{self, Upward};
 
 use concordium_base::{
     base::{

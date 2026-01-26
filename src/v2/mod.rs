@@ -1,7 +1,6 @@
 //! This module exposes [Client] which is a wrapper around the
 //! generated gRPC rust client, providing a more ergonomic interface than the
 //! generated client. See [Client] for documentation of how to use.
-pub use crate::types::upward::{self, Upward};
 use crate::{
     endpoints,
     id::{self, types::AccountCredentialMessage},
@@ -48,6 +47,10 @@ use self::dry_run::WithRemainingQuota;
 
 mod conversions;
 pub mod dry_run;
+pub mod upward;
+pub use upward::Upward;
+
+
 #[path = "generated/mod.rs"]
 #[allow(
     clippy::large_enum_variant,

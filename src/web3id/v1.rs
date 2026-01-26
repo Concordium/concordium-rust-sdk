@@ -21,8 +21,8 @@
 //!
 //! The example `web3id_v1_verification_flow` demonstrates the verification flow.
 
-use crate::types::{upward::UnknownDataError, AccountTransactionEffects, BlockItemSummaryDetails};
-use crate::v2;
+use crate::types::{AccountTransactionEffects, BlockItemSummaryDetails};
+use crate::v2::{self, upward::UnknownDataError};
 
 use crate::endpoints::RPCError;
 use crate::smart_contracts::common::AccountAddress;
