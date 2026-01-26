@@ -16,7 +16,7 @@ use super::{
 };
 
 use crate::{
-    protocol_level_tokens::{TokenEvent, TokenEventDetails, TokenModuleEventEnum},
+    protocol_level_tokens::{EncodedTokenModuleEvent, TokenEvent, TokenEventDetails},
     types::{Address, SponsorDetails},
     v2::upward::{UnknownDataError, Upward},
 };
@@ -389,7 +389,7 @@ pub(crate) enum Event {
         /// The event includes the `type` and cbor encoded `details` of the
         /// event.
         #[serde(flatten)]
-        event: TokenModuleEventEnum,
+        event: EncodedTokenModuleEvent,
     },
     /// An event emitted when a transfer of plt (protocol level token) is
     /// performed.

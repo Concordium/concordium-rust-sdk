@@ -1,8 +1,8 @@
 ## Unreleased
 
-- Added `Upward`, `TokenEvent`, `TokenEventDetails`.
-- Changed `TokenModuleEvent` into `TokenModuleEventEnum`.
-- Changed `TokenRejectReason` into `TokenRejectReasonEnum`.
+- Moved the `Upward`,`TokenEvent`, `TokenEventDetails` from the `concordium-base` into this crate.
+- Changed `TokenModuleEvent` into `EncodedTokenModuleEvent`.
+- Changed `TokenRejectReason` into `EncodedTokenRejectReason`.
 
 ## 9.0.0
 

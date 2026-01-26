@@ -2798,7 +2798,7 @@ pub enum RejectReason {
     /// Introduced in protocol version 9.
     TokenUpdateTransactionFailed {
         #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
-        reject_reason: protocol_level_tokens::TokenModuleRejectReasonEnum,
+        reject_reason: protocol_level_tokens::EncodedTokenModuleRejectReason,
     },
 }
 
