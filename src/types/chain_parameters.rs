@@ -1,5 +1,5 @@
 use crate::types;
-pub use concordium_base::common::upward::{self, Upward};
+
 use concordium_base::{
     base::{
         AmountFraction, CapitalBound, CommissionRanges, CredentialsPerBlockLimit, DurationSeconds,
