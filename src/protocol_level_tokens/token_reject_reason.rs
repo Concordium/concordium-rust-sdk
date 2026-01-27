@@ -7,10 +7,15 @@ use crate::v2::upward::{CborUpward, Upward};
 
 use anyhow::Context;
 
-/// Details provided by the token module in the event of rejecting a
+/// CBOR-encoded details provided by the token module in the event of rejecting a
 /// transaction.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
+/// Use [EncodedTokenModuleRejectReason::decode_reject_reason] to decoded the details.
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_deprecated",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "camelCase")
+)]
 pub struct EncodedTokenModuleRejectReason {
     /// The unique symbol of the token, which produced this event.
     pub token_id: TokenId,

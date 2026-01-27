@@ -8,8 +8,12 @@ use crate::protocol_level_tokens::{
 use crate::v2::upward::{CborUpward, Upward};
 
 /// An event produced from the effect of a token transaction.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_deprecated",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "camelCase")
+)]
 pub struct TokenEvent {
     /// The unique symbol of the token, which produced this event.
     pub token_id: TokenId,
@@ -18,8 +22,12 @@ pub struct TokenEvent {
 }
 
 /// The type of the token event.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_deprecated",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "camelCase")
+)]
 pub enum TokenEventDetails {
     /// An event emitted by the token module.
     Module(EncodedTokenModuleEvent),
@@ -33,8 +41,13 @@ pub enum TokenEventDetails {
     Burn(TokenSupplyUpdateEvent),
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
+/// Token module event produced from the effect of a token transaction.
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_deprecated",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "camelCase")
+)]
 pub struct EncodedTokenModuleEvent {
     /// The type of event produced.
     #[serde(rename = "type")]
