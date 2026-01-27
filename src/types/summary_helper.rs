@@ -16,6 +16,7 @@ use super::{
 };
 
 use crate::{
+    protocol_level_tokens::{EncodedTokenModuleEvent, TokenEvent, TokenEventDetails},
     types::Address,
     v2::upward::{UnknownDataError, Upward},
 };
@@ -25,10 +26,7 @@ use concordium_base::{
         SerdeDeserialize, SerdeSerialize,
     },
     id::types::AccountAddress,
-    protocol_level_tokens::{
-        TokenEvent, TokenEventDetails, TokenId, TokenModuleEvent, TokenSupplyUpdateEvent,
-        TokenTransferEvent,
-    },
+    protocol_level_tokens::{TokenId, TokenSupplyUpdateEvent, TokenTransferEvent},
     updates::{CreatePlt, UpdateType},
 };
 use std::convert::{TryFrom, TryInto};
@@ -417,7 +415,7 @@ pub(crate) enum Event {
         /// The event includes the `type` and cbor encoded `details` of the
         /// event.
         #[serde(flatten)]
-        event: TokenModuleEvent,
+        event: EncodedTokenModuleEvent,
     },
     /// An event emitted when a transfer of plt (protocol level token) is
     /// performed.
