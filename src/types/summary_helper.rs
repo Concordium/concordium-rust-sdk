@@ -17,7 +17,7 @@ use super::{
 
 use crate::{
     protocol_level_tokens::{EncodedTokenModuleEvent, TokenEvent, TokenEventDetails},
-    types::{Address, SponsorDetails},
+    types::Address,
     v2::upward::{UnknownDataError, Upward},
 };
 use concordium_base::{
@@ -40,8 +40,8 @@ pub(crate) struct BlockItemSummary {
     /// Sender, if available. The sender is always available for account
     /// transactions.
     sender: Option<AccountAddress>,
-    /// Optional sponsor of the transaction.
-    sponsor: Option<AccountAddress>,
+    /// Optional sponsor details of the transaction.
+    sponsor_details: Option<SponsorDetails>,
     /// Hash of the transaction.
     hash: hashes::TransactionHash,
     /// The amount of CCD the transaction was charged to the sender.
@@ -55,6 +55,32 @@ pub(crate) struct BlockItemSummary {
     result: BlockItemResult,
     /// Index of the transaction in the block where it is included.
     index: TransactionIndex,
+}
+
+#[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
+/// Details about the sponsor of a transaction.
+pub(crate) struct SponsorDetails {
+    /// The cost of the transaction. Paid by the sponsor.
+    pub sponsor: AccountAddress,
+    /// The sponsor of the transaction.
+    pub cost: Amount,
+}
+
+impl From<SponsorDetails> for super::SponsorDetails {
+    fn from(value: SponsorDetails) -> Self {
+        Self {
+            sponsor: value.sponsor,
+            cost: value.cost,
+        }
+    }
+}
+impl From<super::SponsorDetails> for SponsorDetails {
+    fn from(value: super::SponsorDetails) -> Self {
+        Self {
+            sponsor: value.sponsor,
+            cost: value.cost,
+        }
+    }
 }
 
 #[derive(SerdeSerialize, SerdeDeserialize, Debug, Clone)]
@@ -906,7 +932,7 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                 };
                 BlockItemSummary {
                     sender: Some(sender),
-                    sponsor: sponsor.map(|s| s.sponsor),
+                    sponsor_details: sponsor.map(SponsorDetails::from),
                     hash: bi.hash,
                     cost,
                     energy_cost: bi.energy_cost,
@@ -921,7 +947,7 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                 reg_id,
             }) => BlockItemSummary {
                 sender: None,
-                sponsor: None,
+                sponsor_details: None,
                 hash: bi.hash,
                 cost: Amount::zero(),
                 energy_cost: bi.energy_cost,
@@ -944,7 +970,7 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                 let payload = payload.known_or_err()?;
                 BlockItemSummary {
                     sender: None,
-                    sponsor: None,
+                    sponsor_details: None,
                     hash: bi.hash,
                     cost: Amount::zero(),
                     energy_cost: bi.energy_cost,
@@ -971,7 +997,7 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
 
                 BlockItemSummary {
                     sender: None,
-                    sponsor: None,
+                    sponsor_details: None,
                     hash: bi.hash,
                     cost: Amount::zero(),
                     energy_cost: bi.energy_cost,
@@ -1017,14 +1043,14 @@ fn convert_account_transaction(
     ty: Option<TransactionType>,
     cost: Amount,
     sender: AccountAddress,
-    sponsor: Option<AccountAddress>,
+    sponsor: Option<SponsorDetails>,
     value: BlockItemResult,
 ) -> Result<super::AccountTransactionDetails, ConversionError> {
     let mk_none = |reject_reason| {
         Ok(super::AccountTransactionDetails {
             cost,
             sender,
-            sponsor: sponsor.map(|s| SponsorDetails { sponsor: s, cost }),
+            sponsor: sponsor.clone().map(super::SponsorDetails::from),
             effects: Upward::Known(super::AccountTransactionEffects::None {
                 transaction_type: ty,
                 reject_reason: Upward::Known(reject_reason),
@@ -1036,7 +1062,7 @@ fn convert_account_transaction(
         Ok(super::AccountTransactionDetails {
             cost,
             sender,
-            sponsor: sponsor.map(|s| SponsorDetails { sponsor: s, cost }),
+            sponsor: sponsor.clone().map(super::SponsorDetails::from),
             effects: Upward::Known(effects),
         })
     };
@@ -1517,7 +1543,7 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
                 let index = value.index;
                 let energy_cost = value.energy_cost;
                 let hash = value.hash;
-                let sponsor = value.sponsor;
+                let sponsor = value.sponsor_details;
                 let sender = value
                     .sender
                     .ok_or(ConversionError::InvalidTransactionResult(
@@ -1610,5 +1636,66 @@ impl TryFrom<BlockItemSummary> for super::BlockItemSummary {
                 })
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use assert_matches::assert_matches;
+
+    use crate::types::AccountTransactionEffects;
+
+    use super::*;
+
+    #[test]
+    fn test_block_item_summary_conversion() {
+        let sender = AccountAddress([1; 32]);
+        let receiver = AccountAddress([2; 32]);
+        let sponsor = AccountAddress([3; 32]);
+
+        let effects = AccountTransactionEffects::AccountTransfer {
+            amount: Amount::from_ccd(59),
+            to: receiver,
+        };
+        let atd = crate::types::AccountTransactionDetails {
+            cost: Amount::zero(),
+            sender,
+            sponsor: crate::types::SponsorDetails {
+                cost: Amount::from_ccd(123),
+                sponsor,
+            }
+            .into(),
+            effects: Upward::Known(effects),
+        };
+        let bis = crate::types::BlockItemSummary {
+            hash: [0; 32].into(),
+            index: TransactionIndex { index: 12 },
+            energy_cost: 832.into(),
+            details: Upward::Known(crate::types::BlockItemSummaryDetails::AccountTransaction(
+                atd.clone(),
+            )),
+        };
+
+        let bis_converted = BlockItemSummary::try_from(bis).expect("can convert");
+        assert_eq!(bis_converted.cost, atd.cost);
+        assert_eq!(
+            bis_converted.clone().sponsor_details.unwrap().cost,
+            atd.sponsor.clone().unwrap().cost
+        );
+
+        let roundtrip =
+            crate::types::BlockItemSummary::try_from(bis_converted).expect("can convert");
+        assert_matches!(
+            roundtrip,
+            crate::types::BlockItemSummary {
+                details: Upward::Known(crate::types::BlockItemSummaryDetails::AccountTransaction(
+                    mapped_atd
+                )),
+                ..
+            } => {
+                    assert_eq!(mapped_atd.cost, atd.cost);
+                    assert_eq!(mapped_atd.sponsor.unwrap().cost, atd.sponsor.unwrap().cost);
+                }
+        );
     }
 }
