@@ -5,10 +5,6 @@ name: Check Concordium Rust SDK src with Cargo Deny
 on:
   schedule:
     - cron: '0 12 * * *' # run every day at 12
-
-  push:
-    branches:
-      - main
   workflow_dispatch: # allows manual trigger
 
 jobs:
