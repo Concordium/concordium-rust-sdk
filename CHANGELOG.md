@@ -1,5 +1,7 @@
 ## Unreleased
 
+- Support for `ProtocolVersion::P11`.
+
 ## 9.0.1
 
 - Fixes a bug where using `serde` to convert `BlockItemSummary` would result in data loss with regards to transaction sponsor details.
