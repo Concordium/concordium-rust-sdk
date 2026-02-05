@@ -354,6 +354,15 @@ impl From<EpochIdentifier> for generated::EpochRequest {
     }
 }
 
+/// Information of an arrived block
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct ArrivedBlockInfo {
+    /// The block hash for the arrived block.
+    pub block_hash: BlockHash,
+    /// The absolute block height for the arrived block.
+    pub height: AbsoluteBlockHeight,
+}
+
 /// Information of a finalized block.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct FinalizedBlockInfo {
@@ -1377,6 +1386,24 @@ impl Client {
             block_hash,
             response: stream,
         })
+    }
+
+    /// Return a stream of blocks that arrive from the time the query is made onward.
+    /// This can be used to listen for incoming blocks.
+    pub async fn get_blocks(
+        &mut self,
+    ) -> endpoints::QueryResult<impl Stream<Item = Result<ArrivedBlockInfo, tonic::Status>>> {
+        let response = self.client.get_blocks(generated::Empty::default()).await?;
+
+        let stream = response.into_inner().map(|x| match x {
+            Ok(v) => {
+                let block_hash = v.hash.require().and_then(TryFrom::try_from)?;
+                let height = v.height.require()?.into();
+                Ok(ArrivedBlockInfo { block_hash, height })
+            }
+            Err(x) => Err(x),
+        });
+        Ok(stream)
     }
 
     /// Return a stream of blocks that are finalized from the time the query is
