@@ -1,6 +1,6 @@
 ## Unreleased
 
-- Exposed `get_blocks` function on the v2 client which returns a stream of blocks `ArrivedBlockInfo` can be used to listen for new blocks arriving on chain.
+- Exposed `get_blocks` function on the v2 client which returns a stream of blocks `ArrivedBlockInfo`. This endpoint can be used to listen for new blocks arriving on chain.
 
 ## 9.0.1
 
