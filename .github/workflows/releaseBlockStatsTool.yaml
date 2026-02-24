@@ -1,0 +1,54 @@
+name: Release BlockStatsTool
+
+on:
+
+  workflow_dispatch: # allows manual trigger
+
+  push:
+    tags:
+      # Use the SDK version to tag e.g. `block-stats-tool/9.0.1`
+      - block-stats-tool/*
+
+env:
+  TAG: ${{ github.ref_name }}
+
+jobs:
+
+  ## BlockStatsTool Release
+  block-stats-tool-release:
+    name: block-stats-tool:release
+    runs-on: ubuntu-latest
+    # environment: release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Validate that the tag version matches the version in Cargo.toml
+      - name: validate tag version has correct matching tag
+        run: |
+          echo "Validating tag version $TAG matches expected version from Cargo.toml"
+          EXPECTED_VERSION_FROM_CARGO=$(yq .package.version ./Cargo.toml)
+          TAG_VERSION_NUMBER=${TAG##block-stats-tool/}
+          
+          # Check if the tag version number matches the expected version from Cargo.toml
+          if [ "$TAG_VERSION_NUMBER" != "$EXPECTED_VERSION_FROM_CARGO" ]; then
+            echo "version tagged: $TAG_VERSION_NUMBER  does not match cargo version: $EXPECTED_VERSION_FROM_CARGO. Exiting."
+            exit 1
+          else
+            echo "Tag version number matches expected version from Cargo.toml. Proceeding with release."
+          fi
+
+      - name: Build
+        run: |
+          echo "Building BlockStatsTool: $TAG_VERSION_NUMBER"
+          cargo build --release --example block-stats
+
+      - name: Store build artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: artifacts
+          path: |
+            target/release/examples/block-stats
