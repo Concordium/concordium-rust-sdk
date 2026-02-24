@@ -16,6 +16,7 @@ jobs:
   block-stats-tool-release:
     name: block-stats-tool:release
     runs-on: ubuntu-latest
+    environment: release
 
     steps:
       - name: Checkout
