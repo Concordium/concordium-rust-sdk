@@ -13,10 +13,12 @@ env:
   TAG: ${{ github.ref_name }}
 
 jobs:
-  block-stats-tool-release:
-    name: block-stats-tool:release
+  block-stats-tool-build:
+    name: build
     runs-on: ubuntu-latest
     environment: release
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
 
     steps:
       - name: Checkout
@@ -26,6 +28,7 @@ jobs:
 
       # Validate that the tag version matches the version in Cargo.toml
       - name: validate tag version has correct matching tag
+        id: meta
         run: |
           echo "Validating tag version $TAG matches expected version from Cargo.toml"
           EXPECTED_VERSION_FROM_CARGO=$(yq .package.version ./Cargo.toml)
@@ -39,9 +42,12 @@ jobs:
             echo "Tag version number matches expected version from Cargo.toml. Proceeding with release."
           fi
 
+          # Store the version into a version variable for the following step.
+          echo "version=${TAG_VERSION_NUMBER}" > "$GITHUB_OUTPUT"
+
       - name: Build
         run: |
-          echo "Building BlockStatsTool: $TAG_VERSION_NUMBER"
+          echo "Building BlockStatsTool"
           cargo build --release --example block-stats
 
       - name: Store build artifacts
@@ -50,3 +56,25 @@ jobs:
           name: artifacts
           path: |
             target/release/examples/block-stats
+
+  # Attach binaries to the release identified by the tag.
+  release:
+    permissions:
+      contents: write
+    needs: [build] 
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+  
+      - uses: actions/download-artifact@v4
+      - run: |
+          mkdir uploads
+          mv artifacts/block-stats uploads/block-stats-tool
+  
+      - name: Create release and attach binaries to release.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ github.ref_name }} --title "BlockStatsTool ${{ needs.validate-version.outputs.version }}" uploads/*
