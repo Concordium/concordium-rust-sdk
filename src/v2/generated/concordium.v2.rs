@@ -6228,6 +6228,7 @@ pub enum ProtocolVersion {
     ProtocolVersion8 = 7,
     ProtocolVersion9 = 8,
     ProtocolVersion10 = 9,
+    ProtocolVersion11 = 10,
 }
 impl ProtocolVersion {
     /// String value of the enum field names used in the ProtoBuf definition.
@@ -6246,6 +6247,7 @@ impl ProtocolVersion {
             Self::ProtocolVersion8 => "PROTOCOL_VERSION_8",
             Self::ProtocolVersion9 => "PROTOCOL_VERSION_9",
             Self::ProtocolVersion10 => "PROTOCOL_VERSION_10",
+            Self::ProtocolVersion11 => "PROTOCOL_VERSION_11",
         }
     }
     /// Creates an enum from field names used in the ProtoBuf definition.
@@ -6261,6 +6263,7 @@ impl ProtocolVersion {
             "PROTOCOL_VERSION_8" => Some(Self::ProtocolVersion8),
             "PROTOCOL_VERSION_9" => Some(Self::ProtocolVersion9),
             "PROTOCOL_VERSION_10" => Some(Self::ProtocolVersion10),
+            "PROTOCOL_VERSION_11" => Some(Self::ProtocolVersion11),
             _ => None,
         }
     }

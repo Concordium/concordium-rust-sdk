@@ -949,7 +949,6 @@ mod tests {
                 mintable: None,
                 burnable: None,
                 paused,
-                additional: HashMap::new(),
             }
         }
 
@@ -960,10 +959,9 @@ mod tests {
             deny_list: Option<bool>,
         ) -> MockInfo {
             let module_state = (allow_list.is_some() || deny_list.is_some())
-                .then(|| TokenModuleAccountState {
+                .then_some(TokenModuleAccountState {
                     allow_list,
                     deny_list,
-                    additional: HashMap::new(),
                 })
                 .map(|s| cbor::cbor_encode(&s).into());
 
