@@ -1,12 +1,9 @@
 ## Unreleased
 
-<<<<<<< HEAD
 - Moved the `Upward`,`TokenEvent`, `TokenEventDetails` from the `concordium-base`.
 - Moved the `TokenModuleEvent` from the `concordium-base` as `EncodedTokenModuleEvent`.
 - Moved the `TokenModuleRejectReason` from the `concordium-base` as `EncodedTokenModuleRejectReason`.
-=======
 - Support for `ProtocolVersion::P11`.
->>>>>>> 1c55151c64fd9190f714c4619d3314a6f4f23949
 
 ## 9.0.1
 
