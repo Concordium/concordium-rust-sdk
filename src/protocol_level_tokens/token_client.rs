@@ -351,7 +351,7 @@ impl TokenClient {
     }
 
     /// Removes an accounts from the allow list of a token.
-    ///     
+    ///
     /// # Arguments
     ///
     /// * `signer` - A [`WalletAccount`] who's address is used as a sender and
@@ -789,7 +789,7 @@ impl TokenClient {
             expiry,
             token_id,
             operations,
-        )?;
+        );
         let block_item = BlockItem::AccountTransaction(transaction);
         Ok(self.client.send_block_item(&block_item).await?)
     }
@@ -949,7 +949,6 @@ mod tests {
                 mintable: None,
                 burnable: None,
                 paused,
-                additional: HashMap::new(),
             }
         }
 
@@ -960,16 +959,11 @@ mod tests {
             deny_list: Option<bool>,
         ) -> MockInfo {
             let module_state = (allow_list.is_some() || deny_list.is_some())
-                .then(|| TokenModuleAccountState {
+                .then_some(TokenModuleAccountState {
                     allow_list,
                     deny_list,
-                    additional: HashMap::new(),
                 })
-                .map(|s| {
-                    cbor::cbor_encode(&s)
-                        .expect("TokenModuleAccountState must be serializbale")
-                        .into()
-                });
+                .map(|s| cbor::cbor_encode(&s).into());
 
             MockInfo {
                 info: vec![AccountToken {

@@ -98,7 +98,7 @@ async fn main() -> anyhow::Result<()> {
         expiry,
         token_id,
         [operation].into_iter().collect(),
-    )?;
+    );
 
     let item = BlockItem::AccountTransaction(txn);
 

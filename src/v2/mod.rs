@@ -20,7 +20,6 @@ use crate::{
     },
 };
 use anyhow::Context;
-pub use concordium_base::common::upward::{self, Upward};
 use concordium_base::{
     base::{AccountIndex, BlockHeight, Epoch, GenesisIndex},
     common::{
@@ -48,6 +47,10 @@ use self::dry_run::WithRemainingQuota;
 
 mod conversions;
 pub mod dry_run;
+pub mod upward;
+pub use upward::Upward;
+
+
 #[path = "generated/mod.rs"]
 #[allow(
     clippy::large_enum_variant,

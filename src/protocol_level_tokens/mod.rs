@@ -5,11 +5,15 @@ use concordium_base::protocol_level_tokens;
 
 mod token_account_info;
 pub mod token_client;
+mod token_event;
 mod token_info;
+mod token_reject_reason;
 
 pub use protocol_level_tokens::*;
 pub use token_account_info::*;
+pub use token_event::*;
 pub use token_info::*;
+pub use token_reject_reason::*;
 
 // gRPC type conversions for the types which are define as part of
 // the `concordium-base` crate.
@@ -97,16 +101,19 @@ impl TryFrom<generated::plt::token_event::Event> for TokenEventDetails {
     }
 }
 
-impl TryFrom<generated::plt::TokenModuleEvent> for TokenModuleEvent {
+impl TryFrom<generated::plt::TokenModuleEvent> for EncodedTokenModuleEvent {
     type Error = tonic::Status;
 
     fn try_from(event: generated::plt::TokenModuleEvent) -> Result<Self, Self::Error> {
         Ok(Self {
-            event_type: protocol_level_tokens::TokenModuleCborTypeDiscriminator::try_from(
-                event.r#type,
-            )
-            .map_err(|err| tonic::Status::internal(err.to_string()))?,
-            details: event.details.require()?.into(),
+            event_type: event
+                .r#type
+                .try_into()
+                .map_err(|e: TypeFromStringError| tonic::Status::invalid_argument(e.to_string()))?,
+            details: event
+                .details
+                .ok_or(tonic::Status::invalid_argument("Event details must exist"))?
+                .into(),
         })
     }
 }
@@ -151,17 +158,20 @@ impl TryFrom<generated::plt::TokenHolder> for TokenHolder {
     }
 }
 
-impl TryFrom<generated::plt::TokenModuleRejectReason> for TokenModuleRejectReason {
+impl TryFrom<generated::plt::TokenModuleRejectReason> for EncodedTokenModuleRejectReason {
     type Error = tonic::Status;
 
     fn try_from(value: generated::plt::TokenModuleRejectReason) -> Result<Self, Self::Error> {
         Ok(Self {
-            token_id: value.token_id.require()?.try_into()?,
-            reason_type: protocol_level_tokens::TokenModuleCborTypeDiscriminator::try_from(
-                value.r#type,
-            )
-            .map_err(|err| tonic::Status::internal(err.to_string()))?,
-            details: value.details.map(|d| d.into()),
+            token_id: value
+                .token_id
+                .ok_or(tonic::Status::invalid_argument("missing token id"))?
+                .try_into()?,
+            reason_type: value
+                .r#type
+                .try_into()
+                .map_err(|e: TypeFromStringError| tonic::Status::invalid_argument(e.to_string()))?,
+            details: value.details.map(|c| c.into()),
         })
     }
 }
