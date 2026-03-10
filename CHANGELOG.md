@@ -1,5 +1,6 @@
 ## Unreleased
 
+- Implemented `get_token_authorizations` and `assign_admin_roles` and `revoke_admin_roles` from `concordium-base`.
 - Moved the `Upward`,`TokenEvent`, `TokenEventDetails` from the `concordium-base`.
 - Moved the `TokenModuleEvent` from the `concordium-base` as `EncodedTokenModuleEvent`.
 - Moved the `TokenModuleRejectReason` from the `concordium-base` as `EncodedTokenModuleRejectReason`.
