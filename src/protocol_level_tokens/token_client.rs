@@ -10,8 +10,11 @@ use concordium_base::{
     common::{cbor::CborSerializationError, types::TransactionTime},
     contracts_common::AccountAddress,
     hashes::TransactionHash,
-    protocol_level_tokens::{MetadataUrl, TokenAdminRole, TokenAmount, TokenId, TokenModuleState, TokenOperations, operations},
-    transactions::{BlockItem, send},
+    protocol_level_tokens::{
+        operations, MetadataUrl, TokenAdminRole, TokenAmount, TokenId, TokenModuleState,
+        TokenOperations,
+    },
+    transactions::{send, BlockItem},
 };
 use thiserror::Error;
 
@@ -192,11 +195,13 @@ impl TokenClient {
         signer: &WalletAccount,
         meta: Option<TransactionMetadata>,
         account: AccountAddress,
-        roles: Vec<TokenAdminRole>
+        roles: Vec<TokenAdminRole>,
     ) -> TokenResult<TransactionHash> {
         let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
 
-        let operations = [operations::assign_admin_roles(account, roles)].into_iter().collect();
+        let operations = [operations::assign_admin_roles(account, roles)]
+            .into_iter()
+            .collect();
 
         self.sign_and_send(signer, operations, expiry, nonce).await
     }
@@ -216,11 +221,13 @@ impl TokenClient {
         signer: &WalletAccount,
         meta: Option<TransactionMetadata>,
         account: AccountAddress,
-        roles: Vec<TokenAdminRole>
+        roles: Vec<TokenAdminRole>,
     ) -> TokenResult<TransactionHash> {
         let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
 
-        let operations = [operations::revoke_admin_roles(account, roles)].into_iter().collect();
+        let operations = [operations::revoke_admin_roles(account, roles)]
+            .into_iter()
+            .collect();
 
         self.sign_and_send(signer, operations, expiry, nonce).await
     }
@@ -242,7 +249,9 @@ impl TokenClient {
     ) -> TokenResult<TransactionHash> {
         let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
 
-        let operations = [operations::update_metadata(metadata_url)].into_iter().collect();
+        let operations = [operations::update_metadata(metadata_url)]
+            .into_iter()
+            .collect();
 
         self.sign_and_send(signer, operations, expiry, nonce).await
     }
