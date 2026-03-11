@@ -1,9 +1,8 @@
-//! Example that shows how to assign/revoke roles from an account for a token.
+//! Example that shows how to update token metadata for a token.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_base::{
-    contracts_common::AccountAddress,
-    protocol_level_tokens::{operations, TokenAdminRole, TokenId},
+    protocol_level_tokens::{MetadataUrl, TokenId, operations},
 };
 use concordium_rust_sdk::{
     common::types::TransactionTime,
@@ -13,7 +12,7 @@ use concordium_rust_sdk::{
     },
     v2::{self},
 };
-use std::{path::PathBuf, str::FromStr};
+use std::{collections::HashMap, path::PathBuf};
 use structopt::*;
 
 #[derive(StructOpt)]
@@ -29,21 +28,16 @@ struct App {
         help = "Path to the account keys file of the governance account."
     )]
     account: PathBuf,
-    #[structopt(long = "token", help = "Token to assign/revoke admin roles.")]
+    #[structopt(long = "token", help = "Token to update metadata.")]
     token_id: String,
-    #[structopt(subcommand)]
-    cmd: AssignOrRevoke,
-    #[structopt(long = "target", help = "Target address.")]
-    target: String,
+    #[structopt(
+        long = "metadata url string to update",
+        help = "Meta data url string to update for the token."
+    )]
+    metadata_url: String,
 }
 
-#[derive(StructOpt)]
-enum AssignOrRevoke {
-    AssignAdminRoles,
-    RevokeAdminRoles,
-}
-
-/// TODO - this is a placeholder for when it is possible to assign and revoke roles with the node.
+/// TODO - this is a placeholder for when it is possible to update token metadata with the node.
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
     let app = {
@@ -52,9 +46,6 @@ async fn main() -> anyhow::Result<()> {
         App::from_clap(&matches)
     };
     let mut client = v2::Client::new(app.endpoint).await?;
-
-    // Target address
-    let account = AccountAddress::from_str(&app.target)?;
 
     // Token id of the fungible PLT token
     let token_id = TokenId::try_from(app.token_id.clone())?;
@@ -73,21 +64,14 @@ async fn main() -> anyhow::Result<()> {
     let expiry: TransactionTime =
         TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
 
-    // Create assign and revoke operations
-    let operation = match app.cmd {
-        AssignOrRevoke::AssignAdminRoles => operations::assign_admin_roles(
-            account,
-            vec![TokenAdminRole::Mint, TokenAdminRole::Burn],
-        ),
-        AssignOrRevoke::RevokeAdminRoles => operations::revoke_admin_roles(
-            account,
-            vec![
-                TokenAdminRole::UpdateAdminRoles,
-                TokenAdminRole::UpdateAllowList,
-                TokenAdminRole::UpdateDenyList,
-            ],
-        ),
+    // Create operation to update metadata url
+    let metadata = MetadataUrl {
+        additional: HashMap::new(),
+        checksum_sha_256: None,
+        url: app.metadata_url
     };
+
+    let operation = operations::update_metadata(metadata);
 
     // Compose operation to transaction
     let txn = send::token_update_operations(
