@@ -203,3 +203,14 @@ pub struct TokenCreationDetails {
     #[prost(message, repeated, tag = "2")]
     pub events: ::prost::alloc::vec::Vec<TokenEvent>,
 }
+/// The authorizations for a token. The actual authorizations are found in the CBOR encoded
+/// `details`.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TokenAuthorizations {
+    /// The canonical token identifier.
+    #[prost(message, optional, tag = "1")]
+    pub token_id: ::core::option::Option<TokenId>,
+    /// The CBOR encoded authorizations for the token represented by the `token_id`.
+    #[prost(message, optional, tag = "2")]
+    pub details: ::core::option::Option<Cbor>,
+}

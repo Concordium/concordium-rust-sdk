@@ -5914,6 +5914,16 @@ pub struct AccountPending {
     #[prost(message, optional, tag = "2")]
     pub first_timestamp: ::core::option::Option<Timestamp>,
 }
+/// The input for a token authorizations request.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TokenAuthorizationsRequest {
+    /// Block in which to query the token information.
+    #[prost(message, optional, tag = "1")]
+    pub block_hash: ::core::option::Option<BlockHashInput>,
+    /// Specification of the token identifier.
+    #[prost(message, optional, tag = "2")]
+    pub token_id: ::core::option::Option<plt::TokenId>,
+}
 /// Information about how open the pool is to new delegators.
 ///
 /// This type might be extended in future versions of the API.
@@ -6456,6 +6466,33 @@ pub mod queries_client {
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetTokenInfo"));
+            self.inner.unary(req, path, codec).await
+        }
+        /// Retrieve the authorizations of a given token in the given block.
+        pub async fn get_token_authorizations(
+            &mut self,
+            request: impl tonic::IntoRequest<super::TokenAuthorizationsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::plt::TokenAuthorizations>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetTokenAuthorizations",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("concordium.v2.Queries", "GetTokenAuthorizations"),
+                );
             self.inner.unary(req, path, codec).await
         }
         /// Retrieve the list of accounts that exist at the end of the given block.

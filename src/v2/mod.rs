@@ -18,6 +18,7 @@ use crate::{
         CredentialRegistrationID, Energy, Memo, Nonce, RegisteredData, SpecialTransactionOutcome,
         TransactionStatus, UpdateSequenceNumber,
     },
+    v2::generated::plt::TokenAuthorizations,
 };
 use anyhow::Context;
 use concordium_base::{
@@ -2024,6 +2025,24 @@ impl Client {
             Err(err) => Err(err),
         });
         Ok(stream)
+    }
+
+    /// Get the token authorizations for a given token.
+    /// The underlying details in `TokenAuthorizations` is cbor encoded and contains
+    /// the authorizations structure for the given token.
+    pub async fn get_token_authorizations(
+        &mut self,
+        bi: impl IntoBlockIdentifier,
+        token_id: protocol_level_tokens::TokenId,
+    ) -> endpoints::QueryResult<TokenAuthorizations> {
+        let request = generated::TokenAuthorizationsRequest {
+            block_hash: Some((&bi.into_block_identifier()).into()),
+            token_id: Some(token_id.into()),
+        };
+
+        let response = self.client.get_token_authorizations(request).await?;
+
+        Ok(response.into_inner())
     }
 
     /// Get the block items included in a given block.

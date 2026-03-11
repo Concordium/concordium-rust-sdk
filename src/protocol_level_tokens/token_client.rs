@@ -10,7 +10,10 @@ use concordium_base::{
     common::{cbor::CborSerializationError, types::TransactionTime},
     contracts_common::AccountAddress,
     hashes::TransactionHash,
-    protocol_level_tokens::{operations, TokenAmount, TokenId, TokenModuleState, TokenOperations},
+    protocol_level_tokens::{
+        operations, MetadataUrl, TokenAdminRole, TokenAmount, TokenId, TokenModuleState,
+        TokenOperations,
+    },
     transactions::{send, BlockItem},
 };
 use thiserror::Error;
@@ -175,6 +178,82 @@ impl TokenClient {
             info,
             default_expiry,
         })
+    }
+
+    /// Assign admin roles for the token
+    ///
+    /// # Arguments
+    ///
+    /// * `signer` - A [`WalletAccount`] who's address is used as a sender and
+    ///   keys as a signer.
+    /// * `meta` - The optional transaction metadata. Includes optional
+    ///   expiration, nonce, and validation.
+    /// * `account` - The account address to assign the admin roles to.
+    /// * `roles` - List of admin roles to assign.
+    pub async fn assign_admin_roles(
+        &mut self,
+        signer: &WalletAccount,
+        meta: Option<TransactionMetadata>,
+        account: AccountAddress,
+        roles: Vec<TokenAdminRole>,
+    ) -> TokenResult<TransactionHash> {
+        let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
+
+        let operations = [operations::assign_admin_roles(account, roles)]
+            .into_iter()
+            .collect();
+
+        self.sign_and_send(signer, operations, expiry, nonce).await
+    }
+
+    /// Revoke admin roles for the token
+    ///
+    /// # Arguments
+    ///
+    /// * `signer` - A [`WalletAccount`] who's address is used as a sender and
+    ///   keys as a signer.
+    /// * `meta` - The optional transaction metadata. Includes optional
+    ///   expiration, nonce, and validation.
+    /// * `account` - The account address to revoke the admin roles from.
+    /// * `roles` - List of admin roles to revoke.
+    pub async fn revoke_admin_roles(
+        &mut self,
+        signer: &WalletAccount,
+        meta: Option<TransactionMetadata>,
+        account: AccountAddress,
+        roles: Vec<TokenAdminRole>,
+    ) -> TokenResult<TransactionHash> {
+        let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
+
+        let operations = [operations::revoke_admin_roles(account, roles)]
+            .into_iter()
+            .collect();
+
+        self.sign_and_send(signer, operations, expiry, nonce).await
+    }
+
+    /// Update metadata for a token.
+    ///
+    /// # Arguments
+    ///
+    /// * `signer` - A [`WalletAccount`] who's address is used as a sender and
+    ///   keys as a signer.
+    /// * `meta` - The optional transaction metadata. Includes optional
+    ///   expiration, nonce, and validation.
+    /// * `metadata_url` - The metadata to update the token with.
+    pub async fn update_metadata(
+        &mut self,
+        signer: &WalletAccount,
+        meta: Option<TransactionMetadata>,
+        metadata_url: MetadataUrl,
+    ) -> TokenResult<TransactionHash> {
+        let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
+
+        let operations = [operations::update_metadata(metadata_url)]
+            .into_iter()
+            .collect();
+
+        self.sign_and_send(signer, operations, expiry, nonce).await
     }
 
     /// Suspends execution of any operation involving balance changes for the
@@ -949,6 +1028,7 @@ mod tests {
                 mintable: None,
                 burnable: None,
                 paused,
+                additional: HashMap::new(),
             }
         }
 
@@ -962,6 +1042,7 @@ mod tests {
                 .then_some(TokenModuleAccountState {
                     allow_list,
                     deny_list,
+                    additional: HashMap::new(),
                 })
                 .map(|s| cbor::cbor_encode(&s).into());
 
