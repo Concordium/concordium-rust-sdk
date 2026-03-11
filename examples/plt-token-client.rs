@@ -2,7 +2,9 @@
 use anyhow::{anyhow, Context};
 use clap::AppSettings;
 use concordium_base::{
-    contracts_common::AccountAddress, hashes::HashBytes, protocol_level_tokens::{ConversionRule, MetadataUrl, TokenAdminRole, TokenAmount, TokenId}
+    contracts_common::AccountAddress,
+    hashes::HashBytes,
+    protocol_level_tokens::{ConversionRule, MetadataUrl, TokenAdminRole, TokenAmount, TokenId},
 };
 use concordium_rust_sdk::{
     common::types::TransactionTime,
@@ -81,7 +83,7 @@ enum Action {
         #[structopt(long = "metadata_url", help = "Metadata url to update for a token.")]
         metadata_url: String,
         #[structopt(long = "checksum_sha_256", help = "Hash checksum to update.")]
-        checksum_sha_256: String
+        checksum_sha_256: String,
     },
 }
 
@@ -251,7 +253,10 @@ async fn main() -> anyhow::Result<()> {
                 .revoke_admin_roles(&keys, meta, target_address, token_admin_roles)
                 .await
         }
-        Action::UpdateMetadata { metadata_url, checksum_sha_256 } => {
+        Action::UpdateMetadata {
+            metadata_url,
+            checksum_sha_256,
+        } => {
             let metadata = MetadataUrl {
                 additional: HashMap::new(),
                 checksum_sha_256: Some(HashBytes::from_str(&checksum_sha_256)?),
