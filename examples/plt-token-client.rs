@@ -83,7 +83,7 @@ enum Action {
         #[structopt(long = "metadata_url", help = "Metadata url to update for a token.")]
         metadata_url: String,
         #[structopt(long = "checksum_sha_256", help = "Hash checksum to update.")]
-        checksum_sha_256: String,
+        checksum_sha_256: Option<String>,
     },
 }
 
@@ -257,9 +257,13 @@ async fn main() -> anyhow::Result<()> {
             metadata_url,
             checksum_sha_256,
         } => {
+            let checksum = checksum_sha_256
+                .map(|s| HashBytes::from_str(&s))
+                .transpose()?;
+
             let metadata = MetadataUrl {
                 additional: HashMap::new(),
-                checksum_sha_256: Some(HashBytes::from_str(&checksum_sha_256)?),
+                checksum_sha_256: checksum,
                 url: metadata_url,
             };
 
