@@ -1,9 +1,8 @@
 //! Example that shows how to use the TokenClient
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use clap::AppSettings;
 use concordium_base::{
-    contracts_common::AccountAddress,
-    protocol_level_tokens::{ConversionRule, MetadataUrl, TokenAdminRole, TokenAmount, TokenId},
+    contracts_common::AccountAddress, hashes::HashBytes, protocol_level_tokens::{ConversionRule, MetadataUrl, TokenAdminRole, TokenAmount, TokenId}
 };
 use concordium_rust_sdk::{
     common::types::TransactionTime,
@@ -81,20 +80,22 @@ enum Action {
     UpdateMetadata {
         #[structopt(long = "metadata_url", help = "Metadata url to update for a token.")]
         metadata_url: String,
+        #[structopt(long = "checksum_sha_256", help = "Hash checksum to update.")]
+        checksum_sha_256: String
     },
 }
 
 // Helper function to parse the role from a string
-fn parse_role(s: &str) -> Option<TokenAdminRole> {
+fn parse_role(s: &str) -> Result<TokenAdminRole, anyhow::Error> {
     match s {
-        "updateAdminRoles" => Some(TokenAdminRole::UpdateAdminRoles),
-        "mint" => Some(TokenAdminRole::Mint),
-        "burn" => Some(TokenAdminRole::Burn),
-        "updateAllowList" => Some(TokenAdminRole::UpdateAllowList),
-        "updateDenyList" => Some(TokenAdminRole::UpdateDenyList),
-        "pause" => Some(TokenAdminRole::Pause),
-        "updateMetadata" => Some(TokenAdminRole::UpdateMetadata),
-        _ => None,
+        "updateAdminRoles" => Ok(TokenAdminRole::UpdateAdminRoles),
+        "mint" => Ok(TokenAdminRole::Mint),
+        "burn" => Ok(TokenAdminRole::Burn),
+        "updateAllowList" => Ok(TokenAdminRole::UpdateAllowList),
+        "updateDenyList" => Ok(TokenAdminRole::UpdateDenyList),
+        "pause" => Ok(TokenAdminRole::Pause),
+        "updateMetadata" => Ok(TokenAdminRole::UpdateMetadata),
+        _ => Err(anyhow!("role provided does not match: {}", s)),
     }
 }
 
@@ -229,8 +230,10 @@ async fn main() -> anyhow::Result<()> {
         Action::AssignAdminRoles { target, roles } => {
             let target_address = AccountAddress::from_str(&target)?;
 
-            let token_admin_roles: Vec<TokenAdminRole> =
-                roles.iter().filter_map(|s| parse_role(s)).collect();
+            let token_admin_roles: Vec<TokenAdminRole> = roles
+                .iter()
+                .map(|s| parse_role(s))
+                .collect::<Result<Vec<_>, _>>()?;
 
             token_client
                 .assign_admin_roles(&keys, meta, target_address, token_admin_roles)
@@ -239,17 +242,19 @@ async fn main() -> anyhow::Result<()> {
         Action::RevokeAdminRoles { target, roles } => {
             let target_address = AccountAddress::from_str(&target)?;
 
-            let token_admin_roles: Vec<TokenAdminRole> =
-                roles.iter().filter_map(|s| parse_role(s)).collect();
+            let token_admin_roles: Vec<TokenAdminRole> = roles
+                .iter()
+                .map(|s| parse_role(s))
+                .collect::<Result<Vec<_>, _>>()?;
 
             token_client
                 .revoke_admin_roles(&keys, meta, target_address, token_admin_roles)
                 .await
         }
-        Action::UpdateMetadata { metadata_url } => {
+        Action::UpdateMetadata { metadata_url, checksum_sha_256 } => {
             let metadata = MetadataUrl {
                 additional: HashMap::new(),
-                checksum_sha_256: None,
+                checksum_sha_256: Some(HashBytes::from_str(&checksum_sha_256)?),
                 url: metadata_url,
             };
 

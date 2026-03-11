@@ -82,6 +82,9 @@ impl EncodedTokenModuleEvent {
             "revokeAdminRoles" => {
                 Upward::Known(RevokeAdminRoles(cbor::cbor_decode(self.details.as_ref())?))
             }
+            "updateMetadata" => {
+                Upward::Known(UpdateMetadata(cbor::cbor_decode(self.details.as_ref())?))
+            }
             _ => Upward::Unknown(cbor::cbor_decode(self.details.as_ref())?),
         })
     }
