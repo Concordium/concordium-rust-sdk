@@ -97,7 +97,7 @@ fn parse_role(s: &str) -> Result<TokenAdminRole, anyhow::Error> {
         "updateDenyList" => Ok(TokenAdminRole::UpdateDenyList),
         "pause" => Ok(TokenAdminRole::Pause),
         "updateMetadata" => Ok(TokenAdminRole::UpdateMetadata),
-        _ => Err(anyhow!("role provided does not match: {}", s)),
+        _ => Err(anyhow!("unknown token admin role: {}", s)),
     }
 }
 
@@ -234,7 +234,8 @@ async fn main() -> anyhow::Result<()> {
 
             let token_admin_roles: Vec<TokenAdminRole> = roles
                 .iter()
-                .map(|s| parse_role(s))
+                .map(String::as_str)
+                .map(parse_role)
                 .collect::<Result<Vec<_>, _>>()?;
 
             token_client

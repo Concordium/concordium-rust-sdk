@@ -1,6 +1,16 @@
 ## Unreleased
 
-- Implemented `get_token_authorizations`, `assign_admin_roles`, `revoke_admin_roles` and `UpdateMetadata` for protocol level tokens from `concordium-base`.
+- Implemented new role based access operations from `concordium-base`.
+  - `token_client` now supports new operations for RBAC in `concordium-base`
+    - `TokenOperations`: support for role based access: `AssignAdminRoles`, `RevokeAdminRoles`
+    - `TokenOperations`: support for updating token metadata: `UpdateMetadata`
+    - New GRPC query `GetTokenAuthorizations` is now also exposed in `token_client` which
+      queries for the Authorizations structure for a given protocol level token.
+    - `examples` folder now contains:
+      - [Get Token Authorizatiojns](examples/v2_get_token_authorizations.rs)
+      - [Assign and Revoke roles](examples/plt-assign_and_revoke_admin_roles.rs)
+      - [Update Token Metadata](examples/plt-update-metadata.rs)
+      - [Token Client Examples](examples/plt-token-client.rs)
 - Moved the `Upward`,`TokenEvent`, `TokenEventDetails` from the `concordium-base`.
 - Moved the `TokenModuleEvent` from the `concordium-base` as `EncodedTokenModuleEvent`.
 - Moved the `TokenModuleRejectReason` from the `concordium-base` as `EncodedTokenModuleRejectReason`.
