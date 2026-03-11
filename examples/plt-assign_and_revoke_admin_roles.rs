@@ -43,7 +43,6 @@ enum AssignOrRevoke {
     RevokeAdminRoles,
 }
 
-/// TODO - this is a placeholder for when it is possible to assign and revoke roles with the node.
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
     let app = {

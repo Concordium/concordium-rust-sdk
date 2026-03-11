@@ -1,9 +1,7 @@
 //! Example that shows how to update token metadata for a token.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_base::{
-    protocol_level_tokens::{MetadataUrl, TokenId, operations},
-};
+use concordium_base::protocol_level_tokens::{operations, MetadataUrl, TokenId};
 use concordium_rust_sdk::{
     common::types::TransactionTime,
     types::{
@@ -37,7 +35,6 @@ struct App {
     metadata_url: String,
 }
 
-/// TODO - this is a placeholder for when it is possible to update token metadata with the node.
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
     let app = {
@@ -68,7 +65,7 @@ async fn main() -> anyhow::Result<()> {
     let metadata = MetadataUrl {
         additional: HashMap::new(),
         checksum_sha_256: None,
-        url: app.metadata_url
+        url: app.metadata_url,
     };
 
     let operation = operations::update_metadata(metadata);

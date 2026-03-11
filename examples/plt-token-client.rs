@@ -3,7 +3,7 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_base::{
     contracts_common::AccountAddress,
-    protocol_level_tokens::{ConversionRule, TokenAmount, TokenId},
+    protocol_level_tokens::{ConversionRule, MetadataUrl, TokenAdminRole, TokenAmount, TokenId},
 };
 use concordium_rust_sdk::{
     common::types::TransactionTime,
@@ -12,7 +12,7 @@ use concordium_rust_sdk::{
     v2::{self, BlockIdentifier},
 };
 use rust_decimal::Decimal;
-use std::{path::PathBuf, str::FromStr};
+use std::{collections::HashMap, path::PathBuf, str::FromStr};
 use structopt::*;
 
 #[derive(StructOpt)]
@@ -66,6 +66,36 @@ enum Action {
     },
     Pause,
     Unpause,
+    AssignAdminRoles {
+        #[structopt(long = "target", help = "Account address to assign admin roles to.")]
+        target: String,
+        #[structopt(long = "roles", help = "Roles to assign.")]
+        roles: Vec<String>,
+    },
+    RevokeAdminRoles {
+        #[structopt(long = "target", help = "Account address to revoke admin roles from.")]
+        target: String,
+        #[structopt(long = "roles", help = "Roles to revoke.")]
+        roles: Vec<String>,
+    },
+    UpdateMetadata {
+        #[structopt(long = "metadata_url", help = "Metadata url to update for a token.")]
+        metadata_url: String,
+    },
+}
+
+// Helper function to parse the role from a string
+fn parse_role(s: &str) -> Option<TokenAdminRole> {
+    match s {
+        "updateAdminRoles" => Some(TokenAdminRole::UpdateAdminRoles),
+        "mint" => Some(TokenAdminRole::Mint),
+        "burn" => Some(TokenAdminRole::Burn),
+        "updateAllowList" => Some(TokenAdminRole::UpdateAllowList),
+        "updateDenyList" => Some(TokenAdminRole::UpdateDenyList),
+        "pause" => Some(TokenAdminRole::Pause),
+        "updateMetadata" => Some(TokenAdminRole::UpdateMetadata),
+        _ => None,
+    }
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -196,6 +226,35 @@ async fn main() -> anyhow::Result<()> {
         }
         Action::Pause => token_client.pause(&keys, meta).await,
         Action::Unpause => token_client.unpause(&keys, meta).await,
+        Action::AssignAdminRoles { target, roles } => {
+            let target_address = AccountAddress::from_str(&target)?;
+
+            let token_admin_roles: Vec<TokenAdminRole> =
+                roles.iter().filter_map(|s| parse_role(s)).collect();
+
+            token_client
+                .assign_admin_roles(&keys, meta, target_address, token_admin_roles)
+                .await
+        }
+        Action::RevokeAdminRoles { target, roles } => {
+            let target_address = AccountAddress::from_str(&target)?;
+
+            let token_admin_roles: Vec<TokenAdminRole> =
+                roles.iter().filter_map(|s| parse_role(s)).collect();
+
+            token_client
+                .revoke_admin_roles(&keys, meta, target_address, token_admin_roles)
+                .await
+        }
+        Action::UpdateMetadata { metadata_url } => {
+            let metadata = MetadataUrl {
+                additional: HashMap::new(),
+                checksum_sha_256: None,
+                url: metadata_url,
+            };
+
+            token_client.update_metadata(&keys, meta, metadata).await
+        }
     }?;
 
     println!("Transaction {} submitted.", transaction_hash,);
