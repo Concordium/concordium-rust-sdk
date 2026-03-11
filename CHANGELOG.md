@@ -7,7 +7,7 @@
     - New GRPC query `GetTokenAuthorizations` is now also exposed in `token_client` which
       queries for the Authorizations structure for a given protocol level token.
     - `examples` folder now contains:
-      - [Get Token Authorizatiojns](examples/v2_get_token_authorizations.rs)
+      - [Get Token Authorizations](examples/v2_get_token_authorizations.rs)
       - [Assign and Revoke roles](examples/plt-assign_and_revoke_admin_roles.rs)
       - [Update Token Metadata](examples/plt-update-metadata.rs)
       - [Token Client Examples](examples/plt-token-client.rs)
