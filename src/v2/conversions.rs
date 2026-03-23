@@ -31,6 +31,7 @@ use std::{
     io::Cursor,
 };
 
+#[allow(clippy::result_large_err)]
 fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
     let mut cursor = std::io::Cursor::new(bytes);
     let res = A::deserial(&mut cursor);

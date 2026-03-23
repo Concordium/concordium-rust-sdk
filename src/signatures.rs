@@ -142,6 +142,7 @@ impl AccountSignaturesVerificationData {
     /// Zip an [`AccountSignatures`] and an [`AccountKeys`] into
     /// an [`AccountSignaturesVerificationData`] type. The function returns an
     /// error if the indices in the maps do not match.
+    #[allow(clippy::result_large_err)]
     pub fn zip_signatures_and_keys(
         account_signatures: AccountSignatures,
         account_keys: AccountKeys,
@@ -221,6 +222,7 @@ pub fn calculate_message_hash(message: impl AsRef<[u8]>, signer: AccountAddress)
 
 /// Check that all key indices in the signatures map exist on chain but not vice
 /// versa.
+#[allow(clippy::result_large_err)]
 fn check_signature_map_key_indices_on_chain<C: Curve, AttributeType: Attribute<C::Scalar>>(
     signatures: &AccountSignatures,
     on_chain_credentials: &BTreeMap<
@@ -372,6 +374,7 @@ pub async fn verify_single_account_signature(
 /// - if the thresholds on chain are followed.
 /// - if the public keys in the `signature_data` map match the public keys on
 ///   chain.
+#[allow(clippy::result_large_err)]
 pub fn verify_account_signature_unchecked(
     signer: AccountAddress,
     signature_data: AccountSignaturesVerificationData,
@@ -396,6 +399,7 @@ pub fn verify_account_signature_unchecked(
 
 /// Wrapper around the [`verify_account_signature_unchecked`] function to
 /// simplify the verification for single-signer accounts.
+#[allow(clippy::result_large_err)]
 pub fn verify_single_account_signature_unchecked(
     signer: AccountAddress,
     signature: Signature,
@@ -569,6 +573,7 @@ pub fn sign_as_account_unchecked(
 
 /// Wrapper around the [`sign_as_account_unchecked`] function to simplify the
 /// signature generation for single-signer accounts.
+#[allow(clippy::result_large_err)]
 pub fn sign_as_single_signer_account_unchecked(
     signer: AccountAddress,
     signing_key: SigningKey,

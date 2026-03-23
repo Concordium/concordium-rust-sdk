@@ -196,6 +196,7 @@ impl Cis4Contract {
     }
 
     /// Construct a transaction to revoke a credential as an issuer.
+    #[allow(clippy::result_large_err)]
     pub fn make_revoke_credential_as_issuer(
         &self,
         signer: &impl transactions::ExactSizeTransactionSigner,
