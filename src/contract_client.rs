@@ -749,7 +749,7 @@ impl std::fmt::Display for ErrorSchema {
         match &self.0 {
             Value::Object(map) => {
                 if let Some(key) = map.keys().next() {
-                    write!(f, "{}", key)?;
+                    write!(f, "{key}")?;
                     if let Some(value) = map.values().next() {
                         if value.is_array() {
                             write!(f, "{}", ErrorSchema(value.clone()))?;
@@ -798,10 +798,10 @@ impl std::fmt::Display for DecodedReason {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DecodedReason::Std { parsed, .. } => {
-                write!(f, "{}", parsed)
+                write!(f, "{parsed}")
             }
             DecodedReason::Custom { parsed, .. } => {
-                write!(f, "{}", parsed)
+                write!(f, "{parsed}")
             }
         }
     }
@@ -845,6 +845,7 @@ pub struct RejectedTransaction {
 
 impl InvokeContractOutcome {
     /// This converts `InvokeContractOutcome` into a result type.
+    #[allow(clippy::result_large_err)]
     pub fn success(self) -> Result<SimulatedTransaction, RejectedTransaction> {
         match self {
             InvokeContractOutcome::Success(simulated_transaction) => Ok(simulated_transaction),

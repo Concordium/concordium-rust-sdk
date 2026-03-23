@@ -310,6 +310,6 @@ mod contract_trace_via_events {
         xs.into_iter()
             .map(|event| ContractTraceElement::try_from(event).map(Upward::Known))
             .collect::<Result<_, _>>()
-            .map_err(|e| D::Error::custom(format!("Conversion failure: {}", e)))
+            .map_err(|e| D::Error::custom(format!("Conversion failure: {e}")))
     }
 }

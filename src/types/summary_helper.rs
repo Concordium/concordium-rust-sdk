@@ -520,8 +520,7 @@ impl TryFrom<Event> for super::ContractTraceElement {
             Event::Resumed { address, success } => Ok(Self::Resumed { address, success }),
             Event::Upgraded { address, from, to } => Ok(Self::Upgraded { address, from, to }),
             other_event => Err(ConversionError::InvalidTransactionResult(format!(
-                "Didn't expect event `{:?}` in contract trace element",
-                other_event
+                "Didn't expect event `{other_event:?}` in contract trace element"
             ))),
         }
     }
@@ -1131,8 +1130,7 @@ fn convert_account_transaction(
                     })
                 }
                 other_event => Err(ConversionError::InvalidTransactionResult(format!(
-                    "Didn't expect event `{:?}` in transaction type `TransferWithMemo`",
-                    other_event
+                    "Didn't expect event `{other_event:?}` in transaction type `TransferWithMemo`"
                 ))),
             }
         }
@@ -1243,8 +1241,7 @@ fn convert_account_transaction(
                     )
                 }
                 other_events => Err(ConversionError::InvalidTransactionResult(format!(
-                    "Didn't expect events `{:?}` in transaction type `EncryptedAmountTransfer`",
-                    other_events
+                    "Didn't expect events `{other_events:?}` in transaction type `EncryptedAmountTransfer`"
                 ))),
             }
         }
@@ -1267,9 +1264,8 @@ fn convert_account_transaction(
                     )
                 }
                 other_events => Err(ConversionError::InvalidTransactionResult(format!(
-                    "Didn't expect events `{:?}` in transaction type \
-                     `EncryptedAmountTransferWithMemo`",
-                    other_events
+                    "Didn't expect events `{other_events:?}` in transaction type \
+                     `EncryptedAmountTransferWithMemo`"
                 ))),
             }
         }
@@ -1297,8 +1293,7 @@ fn convert_account_transaction(
                     })
                 }
                 other_events => Err(ConversionError::InvalidTransactionResult(format!(
-                    "Didn't expect events `{:?}` in transaction type `TransferToPublic`",
-                    other_events
+                    "Didn't expect events `{other_events:?}` in transaction type `TransferToPublic`"
                 ))),
             }
         }
@@ -1328,8 +1323,7 @@ fn convert_account_transaction(
                     )
                 }
                 other_events => Err(ConversionError::InvalidTransactionResult(format!(
-                    "Didn't expect events `{:?}` in transaction type `TransferWithScheduleAndMemo`",
-                    other_events
+                    "Didn't expect events `{other_events:?}` in transaction type `TransferWithScheduleAndMemo`"
                 ))),
             }
         }
@@ -1438,8 +1432,7 @@ fn convert_account_transaction(
                         account: _,
                     } => Ok(super::BakerEvent::DelegationRemoved { delegator_id }),
                     other_event => Err(ConversionError::InvalidTransactionResult(format!(
-                        "Didn't expect event `{:?}` in transaction type `ConfigureBaker`",
-                        other_event
+                        "Didn't expect event `{other_event:?}` in transaction type `ConfigureBaker`"
                     ))),
                 })
                 .map(|result| result.map(Upward::Known))
@@ -1495,8 +1488,7 @@ fn convert_account_transaction(
                         account: _,
                     } => Ok(super::DelegationEvent::BakerRemoved { baker_id }),
                     other_event => Err(ConversionError::InvalidTransactionResult(format!(
-                        "Didn't expect event `{:?}` in transaction type `ConfigureDelegation`",
-                        other_event
+                        "Didn't expect event `{other_event:?}` in transaction type `ConfigureDelegation`"
                     ))),
                 })
                 .map(|result| result.map(Upward::Known))
@@ -1524,8 +1516,7 @@ fn convert_account_transaction(
                         event: TokenEventDetails::Burn(event),
                     }),
                     other_event => Err(ConversionError::InvalidTransactionResult(format!(
-                        "Didn't expect event `{:?}` in transaction type `TokenUpdate`",
-                        other_event
+                        "Didn't expect event `{other_event:?}` in transaction type `TokenUpdate`"
                     ))),
                 })
                 .collect::<Result<_, ConversionError>>()?;
