@@ -37,8 +37,7 @@ fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
     match res {
         Ok(v) if cursor.position() == bytes.len() as u64 => Ok(v),
         Err(e) => Err(tonic::Status::internal(format!(
-            "Could not deserialize response: {}",
-            e
+            "Could not deserialize response: {e}"
         ))),
         Ok(_) => Err(tonic::Status::internal(
             "Could not deserialize response: trailing bytes",
@@ -48,6 +47,7 @@ fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
 
 /// Convert from the 0-based protobuf representation to the 1-based internal
 /// representation of a [ProtocolVersionInt].
+#[allow(clippy::result_large_err)]
 fn protocol_version_int_from_enum(tag_number: i32) -> Result<ProtocolVersionInt, tonic::Status> {
     if tag_number < 0 {
         Err(tonic::Status::internal(format!(
@@ -2273,7 +2273,7 @@ impl TryFrom<baker_event::Event> for super::types::BakerEvent {
             baker_event::Event::BakerSetMetadataUrl(v) => Self::BakerSetMetadataURL {
                 baker_id: v.baker_id.require()?.into(),
                 metadata_url: v.url.try_into().map_err(|e| {
-                    tonic::Status::invalid_argument(format!("Invalid argument: {}", e))
+                    tonic::Status::invalid_argument(format!("Invalid argument: {e}"))
                 })?,
             },
             baker_event::Event::BakerSetTransactionFeeCommission(v) => {
@@ -2317,7 +2317,7 @@ impl TryFrom<RegisteredData> for super::types::RegisteredData {
         value
             .value
             .try_into()
-            .map_err(|e| tonic::Status::invalid_argument(format!("{}", e)))
+            .map_err(|e| tonic::Status::invalid_argument(format!("{e}")))
     }
 }
 
@@ -3443,6 +3443,7 @@ impl TryFrom<block_special_event::AccountAmounts>
 {
     type Error = tonic::Status;
 
+    #[allow(clippy::result_large_err)]
     fn try_from(message: block_special_event::AccountAmounts) -> Result<Self, Self::Error> {
         fn mapper(
             entry: block_special_event::account_amounts::Entry,

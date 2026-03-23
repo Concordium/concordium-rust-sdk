@@ -157,6 +157,7 @@ impl Cis4Contract {
 
     /// Construct a transaction for registering a new credential.
     /// Note that this **does not** send the transaction.c
+    #[allow(clippy::result_large_err)]
     pub fn make_register_credential(
         &self,
         signer: &impl transactions::ExactSizeTransactionSigner,
@@ -244,6 +245,7 @@ impl Cis4Contract {
     /// The extra nonce that must be provided is the holder's nonce inside the
     /// contract. The signature on this revocation message is set to expire at
     /// the same time as the transaction.
+    #[allow(clippy::result_large_err)]
     pub fn make_revoke_credential_as_holder(
         &self,
         signer: &impl transactions::ExactSizeTransactionSigner,
@@ -310,6 +312,7 @@ impl Cis4Contract {
     /// key that signs the revocation message.
     /// The signature on this revocation message is set to expire at
     /// the same time as the transaction.
+    #[allow(clippy::result_large_err)]
     pub fn make_revoke_credential_other(
         &self,
         signer: &impl transactions::ExactSizeTransactionSigner,

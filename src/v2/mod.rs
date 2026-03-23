@@ -3010,6 +3010,7 @@ impl FinalizedBlocksStream {
     }
 }
 
+#[allow(clippy::result_large_err)]
 fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<BlockHash> {
     match response.metadata().get("blockhash") {
         Some(bytes) => {

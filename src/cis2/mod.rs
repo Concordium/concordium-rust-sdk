@@ -215,6 +215,7 @@ impl Cis2Contract {
     ///   update transaction.
     /// * `transaction_metadata` - Metadata for constructing the transaction.
     /// * `transfers` - A list of CIS2 token transfers to execute.
+    #[allow(clippy::result_large_err)]
     pub fn make_transfer(
         &self,
         signer: &impl transactions::ExactSizeTransactionSigner,
@@ -241,6 +242,7 @@ impl Cis2Contract {
 
     /// Like [`make_transfer`](Self::make_transfer), except it is more ergonomic
     /// when transferring a single token.
+    #[allow(clippy::result_large_err)]
     pub fn make_transfer_single(
         &self,
         signer: &impl transactions::ExactSizeTransactionSigner,
@@ -307,6 +309,7 @@ impl Cis2Contract {
     ///   update transaction.
     /// * `transaction_metadata` - Metadata for constructing the transaction.
     /// * `updates` - A list of CIS2 UpdateOperators to update.
+    #[allow(clippy::result_large_err)]
     pub fn make_update_operator(
         &self,
         signer: &impl transactions::ExactSizeTransactionSigner,
@@ -360,6 +363,7 @@ impl Cis2Contract {
 
     /// Like [`make_update_operator`](Self::make_update_operator), but more
     /// ergonomic when updating a single operator.
+    #[allow(clippy::result_large_err)]
     pub fn make_update_operator_single(
         &self,
         signer: &impl transactions::ExactSizeTransactionSigner,
@@ -489,6 +493,7 @@ impl Cis2Contract {
 
 /// Extract an element from the given vector if the vector has exactly one
 /// element. Otherwise raise a parse error.
+#[allow(clippy::result_large_err)]
 fn only_one<A, V: AsRef<Vec<A>>>(res: V) -> Result<A, Cis2QueryError>
 where
     Vec<A>: From<V>,

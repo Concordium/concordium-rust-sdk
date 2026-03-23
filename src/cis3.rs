@@ -189,6 +189,7 @@ impl Cis3Contract {
     /// * `params` - The parameters for the permit invocation. Includes the
     ///   signature of the sponsoree, the address of the sponsoree, and the
     ///   signed message.
+    #[allow(clippy::result_large_err)]
     pub fn make_permit(
         &mut self,
         signer: &impl transactions::ExactSizeTransactionSigner,
@@ -237,6 +238,7 @@ impl Cis3Contract {
 
 /// Extract an element from the given vector if the vector has exactly one
 /// element. Otherwise raise a parse error.
+#[allow(clippy::result_large_err)]
 fn only_one<A, V: AsRef<Vec<A>>>(res: V) -> Result<A, Cis3SupportsPermitError>
 where
     Vec<A>: From<V>,

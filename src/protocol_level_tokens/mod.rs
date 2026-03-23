@@ -23,7 +23,7 @@ impl TryFrom<generated::plt::TokenId> for TokenId {
 
     fn try_from(token_id: generated::plt::TokenId) -> Result<Self, Self::Error> {
         Self::try_from(token_id.value)
-            .map_err(|err| tonic::Status::internal(format!("Unexpected token identifier: {}", err)))
+            .map_err(|err| tonic::Status::internal(format!("Unexpected token identifier: {err}")))
     }
 }
 
