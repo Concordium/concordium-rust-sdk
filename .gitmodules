@@ -1,3 +1,4 @@
 [submodule "concordium-base"]
 	path = concordium-base
 	url = ../concordium-base.git
+	branch = feature/p11-rbac
