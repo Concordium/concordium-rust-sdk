@@ -18,13 +18,13 @@ use crate::{
         CredentialRegistrationID, Energy, Memo, Nonce, RegisteredData, SpecialTransactionOutcome,
         TransactionStatus, UpdateSequenceNumber,
     },
-    v2::generated::plt::TokenAuthorizations,
 };
 use anyhow::Context;
 use concordium_base::{
     base::{AccountIndex, BlockHeight, Epoch, GenesisIndex},
     common::{
         self,
+        cbor::cbor_decode,
         types::{TransactionSignature, TransactionSignaturesV1, TransactionTime},
     },
     contracts_common::{
@@ -32,6 +32,7 @@ use concordium_base::{
         OwnedParameter, OwnedReceiveName, ReceiveName,
     },
     hashes::HashFromStrError,
+    protocol_level_tokens::TokenAuthorizations,
     transactions::{BlockItem, EncodedPayload, PayloadLike},
 };
 pub use endpoints::{QueryError, QueryResult, RPCError, RPCResult};
@@ -2042,7 +2043,16 @@ impl Client {
 
         let response = self.client.get_token_authorizations(request).await?;
 
-        Ok(response.into_inner())
+        let cbor_enc_token_authorizations = response.into_inner();
+
+        let details = cbor_enc_token_authorizations
+            .details
+            .ok_or_else(|| tonic::Status::internal("missing CBOR details"))?;
+
+        let decoded_token_authorizations = cbor_decode::<TokenAuthorizations>(&details.value)
+            .map_err(|e| RPCError::ParseError(e.into()))?;
+
+        Ok(decoded_token_authorizations)
     }
 
     /// Get the block items included in a given block.
