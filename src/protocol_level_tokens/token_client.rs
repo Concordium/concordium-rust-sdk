@@ -1028,7 +1028,6 @@ mod tests {
                 mintable: None,
                 burnable: None,
                 paused,
-                additional: HashMap::new(),
             }
         }
 
@@ -1042,7 +1041,6 @@ mod tests {
                 .then_some(TokenModuleAccountState {
                     allow_list,
                     deny_list,
-                    additional: HashMap::new(),
                 })
                 .map(|s| cbor::cbor_encode(&s).into());
 
