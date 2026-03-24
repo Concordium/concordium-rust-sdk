@@ -21,12 +21,19 @@ use crate::{
 };
 use anyhow::Context;
 use concordium_base::{
-    base::{AccountIndex, BlockHeight, Epoch, GenesisIndex}, common::{
-        self, cbor::cbor_decode, types::{TransactionSignature, TransactionSignaturesV1, TransactionTime}
-    }, contracts_common::{
+    base::{AccountIndex, BlockHeight, Epoch, GenesisIndex},
+    common::{
+        self,
+        cbor::cbor_decode,
+        types::{TransactionSignature, TransactionSignaturesV1, TransactionTime},
+    },
+    contracts_common::{
         AccountAddress, AccountAddressParseError, Amount, ContractAddress, OwnedContractName,
         OwnedParameter, OwnedReceiveName, ReceiveName,
-    }, hashes::HashFromStrError, protocol_level_tokens::TokenAuthorizations, transactions::{BlockItem, EncodedPayload, PayloadLike}
+    },
+    hashes::HashFromStrError,
+    protocol_level_tokens::TokenAuthorizations,
+    transactions::{BlockItem, EncodedPayload, PayloadLike},
 };
 pub use endpoints::{QueryError, QueryResult, RPCError, RPCResult};
 use futures::{Stream, StreamExt, TryStreamExt};
