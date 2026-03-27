@@ -929,6 +929,11 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                         let events: Vec<Event> = events.into_iter().map(|x| x.into()).collect();
                         (Some(ty), BlockItemResult::Success { events })
                     }
+                    super::AccountTransactionEffects::MetaUpdate { events } => {
+                        let ty = TransactionType::MetaUpdate;
+                        let events: Vec<Event> = events.into_iter().map(|x| x.into()).collect();
+                        (Some(ty), BlockItemResult::Success { events })
+                    }
                 };
                 BlockItemSummary {
                     sender: Some(sender),
@@ -1530,6 +1535,34 @@ fn convert_account_transaction(
                 })
                 .collect::<Result<_, ConversionError>>()?;
             mk_success(super::AccountTransactionEffects::TokenUpdate { events })
+        }
+        TransactionType::MetaUpdate => {
+            let events = events
+                .into_iter()
+                .map(|ev| match ev {
+                    Event::TokenModuleEvent { token_id, event } => Ok(TokenEvent {
+                        token_id,
+                        event: TokenEventDetails::Module(event),
+                    }),
+                    Event::TokenTransfer { token_id, event } => Ok(TokenEvent {
+                        token_id,
+                        event: TokenEventDetails::Transfer(event),
+                    }),
+                    Event::TokenMint { token_id, event } => Ok(TokenEvent {
+                        token_id,
+                        event: TokenEventDetails::Mint(event),
+                    }),
+                    Event::TokenBurn { token_id, event } => Ok(TokenEvent {
+                        token_id,
+                        event: TokenEventDetails::Burn(event),
+                    }),
+                    other_event => Err(ConversionError::InvalidTransactionResult(format!(
+                        "Didn't expect event `{:?}` in transaction type `MetaUpdate`",
+                        other_event
+                    ))),
+                })
+                .collect::<Result<_, ConversionError>>()?;
+            mk_success(super::AccountTransactionEffects::MetaUpdate { events })
         }
     }
 }

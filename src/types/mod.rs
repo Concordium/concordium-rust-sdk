@@ -1996,6 +1996,12 @@ impl BlockItemSummaryDetails {
                         add_token_event_addresses(&mut addresses, events);
                         addresses.into_iter().collect()
                     }
+                    AccountTransactionEffects::MetaUpdate { events } => {
+                        let mut addresses = BTreeSet::new();
+                        addresses.insert(at.sender);
+                        add_token_event_addresses(&mut addresses, events);
+                        addresses.into_iter().collect()
+                    }
                 };
                 // Add the optional sponsor account to the affected accounts.
                 if let Some(sponsor) = at.sponsor.as_ref() {
@@ -2112,6 +2118,7 @@ impl AccountTransactionEffects {
             AccountTransactionEffects::BakerConfigured { .. } => Some(ConfigureBaker),
             AccountTransactionEffects::DelegationConfigured { .. } => Some(ConfigureDelegation),
             AccountTransactionEffects::TokenUpdate { .. } => Some(TokenUpdate),
+            AccountTransactionEffects::MetaUpdate { .. } => Some(MetaUpdate),
         }
     }
 
@@ -2343,6 +2350,12 @@ pub enum AccountTransactionEffects {
     DelegationConfigured { data: Vec<Upward<DelegationEvent>> },
     /// Effect of a successful token update.
     TokenUpdate {
+        /// Events produced by the update.
+        events: Vec<protocol_level_tokens::TokenEvent>,
+    },
+    /// Effect of a successful meta update.
+    /// TODO: Support for non-token events.
+    MetaUpdate {
         /// Events produced by the update.
         events: Vec<protocol_level_tokens::TokenEvent>,
     },

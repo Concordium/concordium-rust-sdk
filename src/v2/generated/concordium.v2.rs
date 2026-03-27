@@ -892,6 +892,20 @@ pub struct TokenInfoRequest {
     #[prost(message, optional, tag = "2")]
     pub token_id: ::core::option::Option<plt::TokenId>,
 }
+/// Request for information about a PLT lock.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct LockInfoRequest {
+    #[prost(message, optional, tag = "1")]
+    pub block_hash: ::core::option::Option<BlockHashInput>,
+    #[prost(message, optional, tag = "2")]
+    pub lock_id: ::core::option::Option<plt::LockId>,
+}
+/// Information about a PLT lock.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct LockInfo {
+    #[prost(message, optional, tag = "1")]
+    pub lock_info: ::core::option::Option<plt::Cbor>,
+}
 /// Information about a finalized block that is part of the streaming response.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FinalizedBlockInfo {
@@ -1938,7 +1952,7 @@ pub struct AccountTransactionEffects {
     /// This field might be extended in future versions of the API.
     #[prost(
         oneof = "account_transaction_effects::Effect",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20"
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21"
     )]
     pub effect: ::core::option::Option<account_transaction_effects::Effect>,
 }
@@ -2147,6 +2161,9 @@ pub mod account_transaction_effects {
         /// Token update transaction effect.
         #[prost(message, tag = "20")]
         TokenUpdateEffect(super::plt::TokenEffect),
+        /// Meta-update transaction effect.
+        #[prost(message, tag = "21")]
+        MetaUpdateEffect(super::plt::MetaEffect),
     }
 }
 /// Election difficulty parameter.
@@ -6147,6 +6164,8 @@ pub enum TransactionType {
     ConfigureDelegation = 20,
     /// Introduced in protocol version 9.
     TokenUpdate = 21,
+    /// Introduced in protocol version 11.
+    MetaUpdate = 22,
 }
 impl TransactionType {
     /// String value of the enum field names used in the ProtoBuf definition.
@@ -6179,6 +6198,7 @@ impl TransactionType {
             Self::ConfigureBaker => "CONFIGURE_BAKER",
             Self::ConfigureDelegation => "CONFIGURE_DELEGATION",
             Self::TokenUpdate => "TOKEN_UPDATE",
+            Self::MetaUpdate => "META_UPDATE",
         }
     }
     /// Creates an enum from field names used in the ProtoBuf definition.
@@ -6208,6 +6228,7 @@ impl TransactionType {
             "CONFIGURE_BAKER" => Some(Self::ConfigureBaker),
             "CONFIGURE_DELEGATION" => Some(Self::ConfigureDelegation),
             "TOKEN_UPDATE" => Some(Self::TokenUpdate),
+            "META_UPDATE" => Some(Self::MetaUpdate),
             _ => None,
         }
     }
@@ -6457,6 +6478,53 @@ pub mod queries_client {
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetTokenInfo"));
             self.inner.unary(req, path, codec).await
+        }
+        /// Retrieve the information about the given lock in the given block.
+        pub async fn get_lock_info(
+            &mut self,
+            request: impl tonic::IntoRequest<super::LockInfoRequest>,
+        ) -> std::result::Result<tonic::Response<super::LockInfo>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetLockInfo",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("concordium.v2.Queries", "GetLockInfo"));
+            self.inner.unary(req, path, codec).await
+        }
+        /// Retrieve the list of locks that exist in a given block.
+        pub async fn get_lock_list(
+            &mut self,
+            request: impl tonic::IntoRequest<super::BlockHashInput>,
+        ) -> std::result::Result<
+            tonic::Response<tonic::codec::Streaming<super::plt::LockId>>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetLockList",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("concordium.v2.Queries", "GetLockList"));
+            self.inner.server_streaming(req, path, codec).await
         }
         /// Retrieve the list of accounts that exist at the end of the given block.
         pub async fn get_account_list(

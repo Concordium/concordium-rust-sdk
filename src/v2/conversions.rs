@@ -2136,6 +2136,15 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                         .collect::<Result<_, tonic::Status>>()?,
                 })
             }
+            account_transaction_effects::Effect::MetaUpdateEffect(meta_effect) => {
+                Ok(Self::MetaUpdate {
+                    events: meta_effect
+                        .events
+                        .into_iter()
+                        .map(TryInto::try_into)
+                        .collect::<Result<_, tonic::Status>>()?,
+                })
+            }
         }
     }
 }

@@ -15,6 +15,20 @@ pub struct TokenId {
     #[prost(string, tag = "1")]
     pub value: ::prost::alloc::string::String,
 }
+/// Lock ID: a trio of numbers that together uniquely identify a lock.
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct LockId {
+    /// The account index of the account that created the lock.
+    #[prost(uint64, tag = "1")]
+    pub account_index: u64,
+    /// The sequence number of the transaction that created the lock.
+    #[prost(uint64, tag = "2")]
+    pub sequence_number: u64,
+    /// The 0-based creation order of the lock within the transaction that
+    /// created it.
+    #[prost(uint64, tag = "3")]
+    pub creation_order: u64,
+}
 /// A token module reference. This is always 32 bytes long.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TokenModuleRef {
@@ -69,6 +83,11 @@ pub struct TokenModuleEvent {
     /// The CBOR encoded event details.
     #[prost(message, optional, tag = "2")]
     pub details: ::core::option::Option<Cbor>,
+    /// The Token ID of the token generating the event. In the context of
+    /// a `TokenEvent`, this should be absent (as it is already specified).
+    /// In the context of a `MetaEvent`, this must be present.
+    #[prost(message, optional, tag = "3")]
+    pub token_id: ::core::option::Option<TokenId>,
 }
 /// A token holder is an entity that can hold tokens. Currently, this is limited
 /// to accounts, but in the future it may be extended to other entities.
@@ -108,6 +127,21 @@ pub struct TokenTransferEvent {
     /// transfer.
     #[prost(message, optional, tag = "4")]
     pub memo: ::core::option::Option<super::Memo>,
+    /// When the funds originate on the locked balance of an account, the
+    /// identity of the lock controlling the funds. Absent when the funds
+    /// are not on the locked balance of the originating account.
+    #[prost(message, optional, tag = "5")]
+    pub from_lock: ::core::option::Option<LockId>,
+    /// When the funds are transferred into the control of a lock, the
+    /// identity of the lock assuming control of the funds. Absent when the
+    /// funds are sent to the available balance of the receiving account.
+    #[prost(message, optional, tag = "6")]
+    pub to_lock: ::core::option::Option<LockId>,
+    /// The token being transferred. In the context of a `TokenEvent`,
+    /// which already specifies the token, this is absent. In the context
+    /// of a `MetaEvent`, it must be present.
+    #[prost(message, optional, tag = "7")]
+    pub token_id: ::core::option::Option<TokenId>,
 }
 /// An event emitted when the token supply is updated, i.e. by minting/burning
 /// tokens to/from the balance of the `target`.
@@ -119,6 +153,11 @@ pub struct TokenSupplyUpdateEvent {
     /// The balance difference to be applied to the target.
     #[prost(message, optional, tag = "2")]
     pub amount: ::core::option::Option<TokenAmount>,
+    /// The Token ID of the token generating the event. In the context of
+    /// a `TokenEvent`, this should be absent (as it is already specified).
+    /// In the context of a `MetaEvent`, this must be present.
+    #[prost(message, optional, tag = "3")]
+    pub token_id: ::core::option::Option<TokenId>,
 }
 /// Token event originating from token transactions.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -161,6 +200,69 @@ pub struct TokenEffect {
     /// Events emitted by the token.
     #[prost(message, repeated, tag = "1")]
     pub events: ::prost::alloc::vec::Vec<TokenEvent>,
+}
+/// A new lock was created.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct LockCreateEvent {
+    /// The Lock ID of the newly-created lock.
+    #[prost(message, optional, tag = "1")]
+    pub lock_id: ::core::option::Option<LockId>,
+    /// The CBOR-encoded configuration of the lock.
+    #[prost(message, optional, tag = "2")]
+    pub lock_config: ::core::option::Option<Cbor>,
+}
+/// A lock was destroyed.
+/// Before this event can occur, the balance controlled by the lock
+/// must be zero.
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct LockDestroyEvent {
+    /// The Lock ID of the destroyed lock.
+    #[prost(message, optional, tag = "1")]
+    pub lock_id: ::core::option::Option<LockId>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct MetaEvent {
+    /// The type of the event.
+    ///
+    /// This field might be extended in future versions of the API.
+    #[prost(oneof = "meta_event::Event", tags = "2, 3, 4, 5, 6, 7")]
+    pub event: ::core::option::Option<meta_event::Event>,
+}
+/// Nested message and enum types in `MetaEvent`.
+pub mod meta_event {
+    /// The type of the event.
+    ///
+    /// This field might be extended in future versions of the API.
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Event {
+        /// An event emitted by the token module.
+        #[prost(message, tag = "2")]
+        ModuleEvent(super::TokenModuleEvent),
+        /// An event emitted when a transfer of tokens is performed.
+        #[prost(message, tag = "3")]
+        TransferEvent(super::TokenTransferEvent),
+        /// An event emitted when the token supply is updated by minting tokens to a
+        /// token holder.
+        #[prost(message, tag = "4")]
+        MintEvent(super::TokenSupplyUpdateEvent),
+        /// An event emitted when the token supply is updated by burning tokens from
+        /// the balance of a token holder.
+        #[prost(message, tag = "5")]
+        BurnEvent(super::TokenSupplyUpdateEvent),
+        /// A lock creation event.
+        #[prost(message, tag = "6")]
+        LockCreateEvent(super::LockCreateEvent),
+        /// A lock destruction event.
+        #[prost(message, tag = "7")]
+        LockDestroyEvent(super::LockDestroyEvent),
+    }
+}
+/// Events originating from a meta-update transaction.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct MetaEffect {
+    /// The events.
+    #[prost(message, repeated, tag = "1")]
+    pub events: ::prost::alloc::vec::Vec<MetaEvent>,
 }
 /// Details provided by the token module in the event of rejecting a transaction.
 #[derive(Clone, PartialEq, ::prost::Message)]
