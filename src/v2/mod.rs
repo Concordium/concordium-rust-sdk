@@ -24,6 +24,7 @@ use concordium_base::{
     base::{AccountIndex, BlockHeight, Epoch, GenesisIndex},
     common::{
         self,
+        cbor::cbor_decode,
         types::{TransactionSignature, TransactionSignaturesV1, TransactionTime},
     },
     contracts_common::{
@@ -31,6 +32,7 @@ use concordium_base::{
         OwnedParameter, OwnedReceiveName, ReceiveName,
     },
     hashes::HashFromStrError,
+    protocol_level_tokens::TokenAuthorizations,
     transactions::{BlockItem, EncodedPayload, PayloadLike},
 };
 pub use endpoints::{QueryError, QueryResult, RPCError, RPCResult};
@@ -2024,6 +2026,33 @@ impl Client {
             Err(err) => Err(err),
         });
         Ok(stream)
+    }
+
+    /// Get the token authorizations for a given token.
+    /// The underlying details in `TokenAuthorizations` is cbor encoded and contains
+    /// the authorizations structure for the given token.
+    pub async fn get_token_authorizations(
+        &mut self,
+        bi: impl IntoBlockIdentifier,
+        token_id: protocol_level_tokens::TokenId,
+    ) -> endpoints::QueryResult<TokenAuthorizations> {
+        let request = generated::TokenAuthorizationsRequest {
+            block_hash: Some((&bi.into_block_identifier()).into()),
+            token_id: Some(token_id.into()),
+        };
+
+        let response = self.client.get_token_authorizations(request).await?;
+
+        let cbor_enc_token_authorizations = response.into_inner();
+
+        let details = cbor_enc_token_authorizations
+            .details
+            .ok_or_else(|| tonic::Status::internal("missing CBOR details"))?;
+
+        let decoded_token_authorizations = cbor_decode::<TokenAuthorizations>(&details.value)
+            .map_err(|e| RPCError::ParseError(e.into()))?;
+
+        Ok(decoded_token_authorizations)
     }
 
     /// Get the block items included in a given block.
