@@ -3,12 +3,14 @@
 use crate::v2::{generated, Require};
 use concordium_base::protocol_level_tokens;
 
+mod meta_event;
 mod token_account_info;
 pub mod token_client;
 mod token_event;
 mod token_info;
 mod token_reject_reason;
 
+pub use meta_event::*;
 pub use protocol_level_tokens::*;
 pub use token_account_info::*;
 pub use token_event::*;
@@ -144,6 +146,79 @@ impl TryFrom<generated::plt::TokenSupplyUpdateEvent> for TokenSupplyUpdateEvent 
         })
     }
 }
+impl TryFrom<generated::plt::MetaEvent> for MetaEvent {
+    type Error = tonic::Status;
+
+    fn try_from(meta_event: generated::plt::MetaEvent) -> Result<Self, Self::Error> {
+        meta_event.event.require()?.try_into()
+    }
+}
+
+impl TryFrom<generated::plt::meta_event::Event> for MetaEvent {
+    type Error = tonic::Status;
+
+    fn try_from(event: generated::plt::meta_event::Event) -> Result<Self, Self::Error> {
+        use generated::plt::meta_event::Event as GenEvent;
+        let out = match event {
+            GenEvent::ModuleEvent(token_module_event) => MetaEvent::Token(TokenEvent {
+                token_id: token_module_event.token_id.clone().require()?.try_into()?,
+                event: TokenEventDetails::Module(token_module_event.try_into()?),
+            }),
+            GenEvent::TransferEvent(token_transfer_event) => MetaEvent::Token(TokenEvent {
+                token_id: token_transfer_event
+                    .token_id
+                    .clone()
+                    .require()?
+                    .try_into()?,
+                event: TokenEventDetails::Transfer(token_transfer_event.try_into()?),
+            }),
+            GenEvent::MintEvent(token_supply_update_event) => MetaEvent::Token(TokenEvent {
+                token_id: token_supply_update_event
+                    .token_id
+                    .clone()
+                    .require()?
+                    .try_into()?,
+                event: TokenEventDetails::Mint(token_supply_update_event.try_into()?),
+            }),
+            GenEvent::BurnEvent(token_supply_update_event) => MetaEvent::Token(TokenEvent {
+                token_id: token_supply_update_event
+                    .token_id
+                    .clone()
+                    .require()?
+                    .try_into()?,
+                event: TokenEventDetails::Burn(token_supply_update_event.try_into()?),
+            }),
+            GenEvent::LockCreateEvent(lock_create_event) => {
+                MetaEvent::LockCreate(lock_create_event.try_into()?)
+            }
+            GenEvent::LockDestroyEvent(lock_destroy_event) => {
+                MetaEvent::LockDestroy(lock_destroy_event.try_into()?)
+            }
+        };
+        Ok(out)
+    }
+}
+
+impl TryFrom<generated::plt::LockCreateEvent> for LockCreateEvent {
+    type Error = tonic::Status;
+
+    fn try_from(value: generated::plt::LockCreateEvent) -> Result<Self, Self::Error> {
+        Ok(LockCreateEvent {
+            lock_id: value.lock_id.require()?.into(),
+            lock_config: value.lock_config.require()?.into(),
+        })
+    }
+}
+
+impl TryFrom<generated::plt::LockDestroyEvent> for LockDestroyEvent {
+    type Error = tonic::Status;
+
+    fn try_from(value: generated::plt::LockDestroyEvent) -> Result<Self, Self::Error> {
+        Ok(LockDestroyEvent {
+            lock_id: value.lock_id.require()?.into(),
+        })
+    }
+}
 
 impl TryFrom<generated::plt::TokenHolder> for TokenHolder {
     type Error = tonic::Status;
@@ -173,5 +248,15 @@ impl TryFrom<generated::plt::TokenModuleRejectReason> for EncodedTokenModuleReje
                 .map_err(|e: TypeFromStringError| tonic::Status::invalid_argument(e.to_string()))?,
             details: value.details.map(|c| c.into()),
         })
+    }
+}
+
+impl From<generated::plt::LockId> for LockId {
+    fn from(value: generated::plt::LockId) -> Self {
+        LockId {
+            account_index: value.account_index,
+            sequence_number: value.sequence_number,
+            creation_order: value.creation_order,
+        }
     }
 }
