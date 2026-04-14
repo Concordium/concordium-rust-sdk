@@ -1,4 +1,4 @@
-use concordium_base::protocol_level_tokens::{LockId, RawCbor};
+use concordium_base::{protocol_level_locks::LockId, protocol_level_tokens::RawCbor};
 
 #[derive(Debug, Clone)]
 #[cfg_attr(

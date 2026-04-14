@@ -1,6 +1,7 @@
 //! Types and functions for working with Protocol Level Tokens (PLT).
 
 use crate::v2::{generated, Require};
+use concordium_base::protocol_level_locks;
 use concordium_base::protocol_level_tokens;
 
 mod meta_event;
@@ -11,6 +12,7 @@ mod token_info;
 mod token_reject_reason;
 
 pub use meta_event::*;
+pub use protocol_level_locks::*;
 pub use protocol_level_tokens::*;
 pub use token_account_info::*;
 pub use token_event::*;
