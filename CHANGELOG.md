@@ -15,6 +15,7 @@
 - Moved the `TokenModuleEvent` from the `concordium-base` as `EncodedTokenModuleEvent`.
 - Moved the `TokenModuleRejectReason` from the `concordium-base` as `EncodedTokenModuleRejectReason`.
 - Support for `ProtocolVersion::P11`.
+- Support for `MetaUpdate` transaction type (added in P11).
 
 ## 9.0.1
 
