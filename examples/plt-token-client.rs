@@ -1,9 +1,10 @@
 //! Example that shows how to use the TokenClient
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use clap::AppSettings;
 use concordium_base::{
     contracts_common::AccountAddress,
-    protocol_level_tokens::{ConversionRule, TokenAmount, TokenId},
+    hashes::HashBytes,
+    protocol_level_tokens::{ConversionRule, MetadataUrl, TokenAdminRole, TokenAmount, TokenId},
 };
 use concordium_rust_sdk::{
     common::types::TransactionTime,
@@ -12,7 +13,7 @@ use concordium_rust_sdk::{
     v2::{self, BlockIdentifier},
 };
 use rust_decimal::Decimal;
-use std::{path::PathBuf, str::FromStr};
+use std::{collections::HashMap, path::PathBuf, str::FromStr};
 use structopt::*;
 
 #[derive(StructOpt)]
@@ -66,6 +67,38 @@ enum Action {
     },
     Pause,
     Unpause,
+    AssignAdminRoles {
+        #[structopt(long = "target", help = "Account address to assign admin roles to.")]
+        target: String,
+        #[structopt(long = "roles", help = "Roles to assign.")]
+        roles: Vec<String>,
+    },
+    RevokeAdminRoles {
+        #[structopt(long = "target", help = "Account address to revoke admin roles from.")]
+        target: String,
+        #[structopt(long = "roles", help = "Roles to revoke.")]
+        roles: Vec<String>,
+    },
+    UpdateMetadata {
+        #[structopt(long = "metadata_url", help = "Metadata url to update for a token.")]
+        metadata_url: String,
+        #[structopt(long = "checksum_sha_256", help = "Hash checksum to update.")]
+        checksum_sha_256: Option<String>,
+    },
+}
+
+// Helper function to parse the role from a string
+fn parse_role(s: &str) -> Result<TokenAdminRole, anyhow::Error> {
+    match s {
+        "updateAdminRoles" => Ok(TokenAdminRole::UpdateAdminRoles),
+        "mint" => Ok(TokenAdminRole::Mint),
+        "burn" => Ok(TokenAdminRole::Burn),
+        "updateAllowList" => Ok(TokenAdminRole::UpdateAllowList),
+        "updateDenyList" => Ok(TokenAdminRole::UpdateDenyList),
+        "pause" => Ok(TokenAdminRole::Pause),
+        "updateMetadata" => Ok(TokenAdminRole::UpdateMetadata),
+        _ => Err(anyhow!("unknown token admin role: {}", s)),
+    }
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -196,6 +229,47 @@ async fn main() -> anyhow::Result<()> {
         }
         Action::Pause => token_client.pause(&keys, meta).await,
         Action::Unpause => token_client.unpause(&keys, meta).await,
+        Action::AssignAdminRoles { target, roles } => {
+            let target_address = AccountAddress::from_str(&target)?;
+
+            let token_admin_roles: Vec<TokenAdminRole> = roles
+                .iter()
+                .map(String::as_str)
+                .map(parse_role)
+                .collect::<Result<Vec<_>, _>>()?;
+
+            token_client
+                .assign_admin_roles(&keys, meta, target_address, token_admin_roles)
+                .await
+        }
+        Action::RevokeAdminRoles { target, roles } => {
+            let target_address = AccountAddress::from_str(&target)?;
+
+            let token_admin_roles: Vec<TokenAdminRole> = roles
+                .iter()
+                .map(|s| parse_role(s))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            token_client
+                .revoke_admin_roles(&keys, meta, target_address, token_admin_roles)
+                .await
+        }
+        Action::UpdateMetadata {
+            metadata_url,
+            checksum_sha_256,
+        } => {
+            let checksum = checksum_sha_256
+                .map(|s| HashBytes::from_str(&s))
+                .transpose()?;
+
+            let metadata = MetadataUrl {
+                additional: HashMap::new(),
+                checksum_sha_256: checksum,
+                url: metadata_url,
+            };
+
+            token_client.update_metadata(&keys, meta, metadata).await
+        }
     }?;
 
     println!("Transaction {} submitted.", transaction_hash,);

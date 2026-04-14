@@ -76,6 +76,15 @@ impl EncodedTokenModuleEvent {
             }
             "pause" => Upward::Known(Pause(cbor::cbor_decode(self.details.as_ref())?)),
             "unpause" => Upward::Known(Unpause(cbor::cbor_decode(self.details.as_ref())?)),
+            "assignAdminRoles" => {
+                Upward::Known(AssignAdminRoles(cbor::cbor_decode(self.details.as_ref())?))
+            }
+            "revokeAdminRoles" => {
+                Upward::Known(RevokeAdminRoles(cbor::cbor_decode(self.details.as_ref())?))
+            }
+            "updateMetadata" => {
+                Upward::Known(UpdateMetadata(cbor::cbor_decode(self.details.as_ref())?))
+            }
             _ => Upward::Unknown(cbor::cbor_decode(self.details.as_ref())?),
         })
     }
