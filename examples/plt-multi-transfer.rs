@@ -4,9 +4,7 @@ use clap::AppSettings;
 use concordium_base::{
     base::Energy,
     contracts_common::AccountAddress,
-    protocol_level_tokens::{
-        meta_operations::meta_operations, ConversionRule, TokenAmount, TokenId,
-    },
+    protocol_level_tokens::{meta_operations, ConversionRule, TokenAmount, TokenId},
     transactions::{construct, cost},
 };
 use concordium_rust_sdk::{
