@@ -1531,6 +1531,7 @@ fn convert_account_transaction(
                 .collect::<Result<_, ConversionError>>()?;
             mk_success(super::AccountTransactionEffects::TokenUpdate { events })
         }
+        TransactionType::MetaUpdate => todo!(),
     }
 }
 
