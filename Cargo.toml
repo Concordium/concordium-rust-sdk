@@ -37,7 +37,7 @@ num-traits = "0.2"
 http = "1.2.0"
 tokio-stream = "0.1"
 
-concordium_base = { version = "10.0.0", path = "./concordium-base/rust-src/concordium_base/", features = ["encryption"] }
+concordium_base = { version = "10.0.0", path = "./concordium-base/rust-src/concordium_base/", features = ["encryption"], default-features = false}
 concordium-smart-contract-engine = { version = "6.0", path = "./concordium-base/smart-contracts/wasm-chain-integration/", default-features = false, features = ["async"]}
 aes-gcm = { version = "0.10", features = ["std"] }
 tracing = "0.1"
@@ -57,4 +57,4 @@ sqlite = "0.33"
 [features]
 default = ["serde_deprecated"]
 # enables `serde` for composite data structures; see `README.md` for more information
-serde_deprecated = []
+serde_deprecated = ["concordium_base/serde_deprecated"]

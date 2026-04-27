@@ -1,5 +1,6 @@
 use concordium_base::{protocol_level_locks::LockId, protocol_level_tokens::RawCbor};
 
+/// Events that may be emitted by meta-update transactions.
 #[derive(Debug, Clone)]
 #[cfg_attr(
     feature = "serde_deprecated",
@@ -15,6 +16,7 @@ pub enum MetaEvent {
     LockDestroy(LockDestroyEvent),
 }
 
+/// Event that is emitted when a protocol-level lock is created.
 #[derive(Debug, Clone)]
 #[cfg_attr(
     feature = "serde_deprecated",
@@ -28,6 +30,7 @@ pub struct LockCreateEvent {
     pub lock_config: RawCbor,
 }
 
+/// Event that is emitted when a protocol-level lock is destroyed.
 #[derive(Debug, Clone)]
 #[cfg_attr(
     feature = "serde_deprecated",
