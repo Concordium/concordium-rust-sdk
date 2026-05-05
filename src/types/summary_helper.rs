@@ -16,7 +16,10 @@ use super::{
 };
 
 use crate::{
-    protocol_level_tokens::{EncodedTokenModuleEvent, TokenEvent, TokenEventDetails},
+    protocol_level_tokens::{
+        EncodedTokenModuleEvent, LockCreateEvent, LockDestroyEvent, MetaEvent, TokenEvent,
+        TokenEventDetails,
+    },
     types::Address,
     v2::upward::{UnknownDataError, Upward},
 };
@@ -458,6 +461,17 @@ pub(crate) enum Event {
         /// `governance_account`, `decimal` and `initialization_parameters`.
         payload: CreatePlt,
     },
+    /// An event emitted when a lock is created.
+    LockCreated {
+        #[serde(flatten)]
+        event: LockCreateEvent,
+    },
+    /// An event emitted when a lock is destroyed.
+    /// This can only occur when the lock has no funds associated with it.
+    LockDestroyed {
+        #[serde(flatten)]
+        event: LockDestroyEvent,
+    },
 }
 
 impl From<TokenEvent> for Event {
@@ -478,6 +492,20 @@ impl From<TokenEvent> for Event {
             TokenEventDetails::Burn(token_supply_update_event) => Event::TokenBurn {
                 token_id: e.token_id,
                 event: token_supply_update_event,
+            },
+        }
+    }
+}
+
+impl From<MetaEvent> for Event {
+    fn from(e: MetaEvent) -> Self {
+        match e {
+            MetaEvent::Token(token_event) => token_event.into(),
+            MetaEvent::LockCreate(lock_create_event) => Event::LockCreated {
+                event: lock_create_event,
+            },
+            MetaEvent::LockDestroy(lock_destroy_event) => Event::LockDestroyed {
+                event: lock_destroy_event,
             },
         }
     }
@@ -926,6 +954,11 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                     }
                     super::AccountTransactionEffects::TokenUpdate { events } => {
                         let ty = TransactionType::TokenUpdate;
+                        let events: Vec<Event> = events.into_iter().map(|x| x.into()).collect();
+                        (Some(ty), BlockItemResult::Success { events })
+                    }
+                    super::AccountTransactionEffects::MetaUpdate { events } => {
+                        let ty = TransactionType::MetaUpdate;
                         let events: Vec<Event> = events.into_iter().map(|x| x.into()).collect();
                         (Some(ty), BlockItemResult::Success { events })
                     }
@@ -1531,7 +1564,38 @@ fn convert_account_transaction(
                 .collect::<Result<_, ConversionError>>()?;
             mk_success(super::AccountTransactionEffects::TokenUpdate { events })
         }
-        TransactionType::MetaUpdate => todo!(),
+        TransactionType::MetaUpdate => {
+            let events = events
+                .into_iter()
+                .map(|ev| match ev {
+                    Event::TokenModuleEvent { token_id, event } => {
+                        Ok(MetaEvent::Token(TokenEvent {
+                            token_id,
+                            event: TokenEventDetails::Module(event),
+                        }))
+                    }
+                    Event::TokenTransfer { token_id, event } => Ok(MetaEvent::Token(TokenEvent {
+                        token_id,
+                        event: TokenEventDetails::Transfer(event),
+                    })),
+                    Event::TokenMint { token_id, event } => Ok(MetaEvent::Token(TokenEvent {
+                        token_id,
+                        event: TokenEventDetails::Mint(event),
+                    })),
+                    Event::TokenBurn { token_id, event } => Ok(MetaEvent::Token(TokenEvent {
+                        token_id,
+                        event: TokenEventDetails::Burn(event),
+                    })),
+                    Event::LockCreated { event } => Ok(MetaEvent::LockCreate(event)),
+                    Event::LockDestroyed { event } => Ok(MetaEvent::LockDestroy(event)),
+                    other_event => Err(ConversionError::InvalidTransactionResult(format!(
+                        "Didn't expect event `{:?}` in transaction type `MetaUpdate`",
+                        other_event
+                    ))),
+                })
+                .collect::<Result<_, ConversionError>>()?;
+            mk_success(super::AccountTransactionEffects::MetaUpdate { events })
+        }
     }
 }
 

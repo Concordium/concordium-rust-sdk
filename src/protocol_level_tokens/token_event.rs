@@ -50,7 +50,7 @@ pub enum TokenEventDetails {
 )]
 pub struct EncodedTokenModuleEvent {
     /// The type of event produced.
-    #[serde(rename = "type")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "type"))]
     pub event_type: TokenModuleCborTypeDiscriminator,
     /// The details of the event produced, in the raw byte encoded form.
     pub details: RawCbor,

@@ -20,7 +20,7 @@ pub struct EncodedTokenModuleRejectReason {
     /// The unique symbol of the token, which produced this event.
     pub token_id: TokenId,
     /// The type of the reject reason.
-    #[serde(rename = "type")]
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "type"))]
     pub reason_type: TokenModuleCborTypeDiscriminator,
     /// (Optional) CBOR-encoded details.
     pub details: Option<RawCbor>,

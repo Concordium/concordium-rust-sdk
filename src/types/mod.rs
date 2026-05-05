@@ -14,7 +14,7 @@ pub use concordium_base::hashes;
 // re-export to maintain backwards compatibility.
 use crate::{
     constants::*,
-    protocol_level_tokens::{self, TokenEvent, TokenEventDetails},
+    protocol_level_tokens::{self, MetaEvent, TokenEvent, TokenEventDetails},
     v2::upward::Upward,
 };
 pub use concordium_base::{
@@ -1084,27 +1084,52 @@ pub struct BlockSummaryData<Upd> {
 /// balance changed as part of the token events) to the affected addresses set.
 fn add_token_event_addresses(
     affected_addresses: &mut BTreeSet<AccountAddress>,
+    token_event: &TokenEvent,
+) {
+    match &token_event.event {
+        TokenEventDetails::Module(_) => {
+            // An `address` added/removed from an
+            // allow/deny list is NOT considered affected.
+        }
+
+        TokenEventDetails::Transfer(event) => {
+            let TokenHolder::Account { address: from } = &event.from;
+            affected_addresses.insert(*from);
+
+            let TokenHolder::Account { address: to } = &event.to;
+            affected_addresses.insert(*to);
+        }
+
+        TokenEventDetails::Mint(event) | TokenEventDetails::Burn(event) => {
+            let TokenHolder::Account { address } = &event.target;
+            affected_addresses.insert(*address);
+        }
+    }
+}
+
+/// Add token event addresses (meaning addresses that have their plt token
+/// balance changed as part of the token events) to the affected addresses set.
+fn add_token_events_addresses(
+    affected_addresses: &mut BTreeSet<AccountAddress>,
     events: &[TokenEvent],
 ) {
     for token_event in events {
-        match &token_event.event {
-            TokenEventDetails::Module(_) => {
-                // An `address` added/removed from an
-                // allow/deny list is NOT considered affected.
-            }
+        add_token_event_addresses(affected_addresses, token_event);
+    }
+}
 
-            TokenEventDetails::Transfer(event) => {
-                let TokenHolder::Account { address: from } = &event.from;
-                affected_addresses.insert(*from);
-
-                let TokenHolder::Account { address: to } = &event.to;
-                affected_addresses.insert(*to);
+/// Add addresses that have had PLT balance changes to the affected addresses
+/// set.
+fn add_meta_events_addresses(
+    affected_addresses: &mut BTreeSet<AccountAddress>,
+    events: &[MetaEvent],
+) {
+    for meta_event in events {
+        match &meta_event {
+            MetaEvent::Token(token_event) => {
+                add_token_event_addresses(affected_addresses, token_event)
             }
-
-            TokenEventDetails::Mint(event) | TokenEventDetails::Burn(event) => {
-                let TokenHolder::Account { address } = &event.target;
-                affected_addresses.insert(*address);
-            }
+            MetaEvent::LockCreate(_) | MetaEvent::LockDestroy(_) => {}
         }
     }
 }
@@ -1993,7 +2018,13 @@ impl BlockItemSummaryDetails {
                     AccountTransactionEffects::TokenUpdate { events } => {
                         let mut addresses = BTreeSet::new();
                         addresses.insert(at.sender);
-                        add_token_event_addresses(&mut addresses, events);
+                        add_token_events_addresses(&mut addresses, events);
+                        addresses.into_iter().collect()
+                    }
+                    AccountTransactionEffects::MetaUpdate { events } => {
+                        let mut addresses = BTreeSet::new();
+                        addresses.insert(at.sender);
+                        add_meta_events_addresses(&mut addresses, events);
                         addresses.into_iter().collect()
                     }
                 };
@@ -2007,7 +2038,7 @@ impl BlockItemSummaryDetails {
             BlockItemSummaryDetails::Update(_) => Vec::new(),
             BlockItemSummaryDetails::TokenCreationDetails(token_creation_details) => {
                 let mut addresses = BTreeSet::new();
-                add_token_event_addresses(&mut addresses, &token_creation_details.events);
+                add_token_events_addresses(&mut addresses, &token_creation_details.events);
                 addresses.into_iter().collect()
             }
         };
@@ -2112,6 +2143,7 @@ impl AccountTransactionEffects {
             AccountTransactionEffects::BakerConfigured { .. } => Some(ConfigureBaker),
             AccountTransactionEffects::DelegationConfigured { .. } => Some(ConfigureDelegation),
             AccountTransactionEffects::TokenUpdate { .. } => Some(TokenUpdate),
+            AccountTransactionEffects::MetaUpdate { .. } => Some(MetaUpdate),
         }
     }
 
@@ -2345,6 +2377,11 @@ pub enum AccountTransactionEffects {
     TokenUpdate {
         /// Events produced by the update.
         events: Vec<protocol_level_tokens::TokenEvent>,
+    },
+    /// Effect of a successful meta update.
+    MetaUpdate {
+        /// Events produced by the update.
+        events: Vec<protocol_level_tokens::MetaEvent>,
     },
 }
 
