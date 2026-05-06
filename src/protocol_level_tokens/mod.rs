@@ -4,6 +4,8 @@ use crate::v2::{generated, Require};
 use concordium_base::protocol_level_locks;
 use concordium_base::protocol_level_tokens;
 
+pub mod lock_client;
+mod lock_info;
 mod meta_event;
 mod token_account_info;
 pub mod token_client;
@@ -11,6 +13,7 @@ mod token_event;
 mod token_info;
 mod token_reject_reason;
 
+pub use lock_info::*;
 pub use meta_event::*;
 pub use protocol_level_locks::*;
 pub use protocol_level_tokens::*;
@@ -256,6 +259,16 @@ impl TryFrom<generated::plt::TokenModuleRejectReason> for EncodedTokenModuleReje
 impl From<generated::plt::LockId> for LockId {
     fn from(value: generated::plt::LockId) -> Self {
         LockId {
+            account_index: value.account_index,
+            sequence_number: value.sequence_number,
+            creation_order: value.creation_order,
+        }
+    }
+}
+
+impl From<LockId> for generated::plt::LockId {
+    fn from(value: LockId) -> Self {
+        Self {
             account_index: value.account_index,
             sequence_number: value.sequence_number,
             creation_order: value.creation_order,
