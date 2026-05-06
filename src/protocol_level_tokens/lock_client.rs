@@ -219,12 +219,7 @@ pub struct LockCreateProposal {
 }
 
 impl LockCreateProposal {
-    /// Construct a new lock-creation proposal.
-    ///
-    /// The resulting
-    /// proposal can be extended with chained operations and later submitted as
-    /// a single meta-update transaction.
-    pub fn new(sender: AccountAddress, config: LockConfig) -> Self {
+    fn new(sender: AccountAddress, config: LockConfig) -> Self {
         Self {
             sender,
             config,
@@ -292,9 +287,7 @@ impl LockCreateProposal {
         let lock_id = LockId::new(account_index, nonce, 0);
 
         let operations = resolve_pending_operations(self.config, self.operations, lock_id);
-        let hash =
-            sign_and_send_with_client(client, signer, &operations, meta, DEFAULT_EXPIRY_SECS)
-                .await?;
+        let hash = sign_and_send_with_client(client, signer, &operations, meta).await?;
         Ok(PendingLockCreation {
             client: client.clone(),
             hash,
@@ -308,9 +301,6 @@ pub struct LockClient {
     client: Client,
     /// Cached lock information.
     info: LockInfo,
-    /// Default transaction submission expiry in seconds. This is distinct from
-    /// the lock's on-chain expiry in [`LockInfo::expiry`].
-    default_expiry: u32,
 }
 
 impl LockClient {
@@ -319,28 +309,7 @@ impl LockClient {
     ///
     /// The default transaction submission expiry is five minutes.
     pub fn new(client: Client, info: LockInfo) -> Self {
-        Self {
-            client,
-            info,
-            default_expiry: DEFAULT_EXPIRY_SECS,
-        }
-    }
-
-    /// Submit a lock-creation transaction and return a pending creation handle.
-    ///
-    /// This submits only the `lockCreate` operation. Use [`LockCreateProposal`]
-    /// to compose creation with additional operations in the same transaction.
-    pub async fn create(
-        mut client: Client,
-        signer: &WalletAccount,
-        config: LockConfig,
-        meta: Option<TransactionMetadata>,
-    ) -> LockResult<PendingLockCreation> {
-        let operations = MetaUpdateOperations::new(vec![meta_operations::lock_create(config)]);
-        let hash =
-            sign_and_send_with_client(&mut client, signer, &operations, meta, DEFAULT_EXPIRY_SECS)
-                .await?;
-        Ok(PendingLockCreation { client, hash })
+        Self { client, info }
     }
 
     /// Construct a [`LockClient`] by looking up lock information from the
@@ -352,6 +321,31 @@ impl LockClient {
     pub async fn from_lock_id(mut client: Client, lock_id: LockId) -> LockResult<Self> {
         let info = from_lock_id_impl(&mut client, lock_id).await?;
         Ok(Self::new(client, info))
+    }
+
+    /// Submit a lock-creation transaction and return a pending creation handle.
+    ///
+    /// This submits only the `lockCreate` operation. Use
+    /// [`LockClient::create_compose`] to compose creation with additional
+    /// operations in the same transaction.
+    pub async fn create(
+        mut client: Client,
+        signer: &WalletAccount,
+        config: LockConfig,
+        meta: Option<TransactionMetadata>,
+    ) -> LockResult<PendingLockCreation> {
+        let operations = MetaUpdateOperations::new(vec![meta_operations::lock_create(config)]);
+        let hash = sign_and_send_with_client(&mut client, signer, &operations, meta).await?;
+        Ok(PendingLockCreation { client, hash })
+    }
+
+    /// Construct a proposal for composing lock creation with additional
+    /// operations in a single meta-update transaction.
+    ///
+    /// The returned [`LockCreateProposal`] can be extended with chained
+    /// operations and later submitted as one transaction.
+    pub fn create_compose(sender: AccountAddress, config: LockConfig) -> LockCreateProposal {
+        LockCreateProposal::new(sender, config)
     }
 
     /// Get the cached lock information.
@@ -573,14 +567,7 @@ impl LockClient {
         operations: &MetaUpdateOperations,
         meta: Option<TransactionMetadata>,
     ) -> LockResult<TransactionHash> {
-        sign_and_send_with_client(
-            &mut self.client,
-            signer,
-            operations,
-            meta,
-            self.default_expiry,
-        )
-        .await
+        sign_and_send_with_client(&mut self.client, signer, operations, meta).await
     }
 
     fn ensure_not_expired(&self) -> LockResult<()> {
@@ -699,17 +686,11 @@ fn ensure_locked_amount(
     }
 }
 
-async fn from_lock_id_impl<LQ: LockQuery>(
-    lq: &mut LQ,
-    lock_id: LockId,
-) -> LockResult<LockInfo> {
+async fn from_lock_id_impl<LQ: LockQuery>(lq: &mut LQ, lock_id: LockId) -> LockResult<LockInfo> {
     query_lock_info_impl(lq, lock_id).await
 }
 
-async fn query_lock_info_impl<LQ: LockQuery>(
-    lq: &mut LQ,
-    lock_id: LockId,
-) -> LockResult<LockInfo> {
+async fn query_lock_info_impl<LQ: LockQuery>(lq: &mut LQ, lock_id: LockId) -> LockResult<LockInfo> {
     Ok(lq
         .get_lock_info(lock_id, BlockIdentifier::LastFinal)
         .await?
@@ -807,10 +788,9 @@ async fn sign_and_send_with_client(
     signer: &WalletAccount,
     operations: &MetaUpdateOperations,
     meta: Option<TransactionMetadata>,
-    default_expiry: u32,
 ) -> LockResult<TransactionHash> {
     let TransactionMetadata { expiry, nonce } = meta.unwrap_or_default();
-    let expiry = expiry.unwrap_or(TransactionTime::seconds_after(default_expiry));
+    let expiry = expiry.unwrap_or(TransactionTime::seconds_after(DEFAULT_EXPIRY_SECS));
     let nonce = match nonce {
         Some(nonce) => nonce,
         None => {
