@@ -60,21 +60,16 @@ async fn main() -> anyhow::Result<()> {
 
     // Construct the lock client
     let mut lock = LockClient::from_lock_id(client, app.lock_id).await?;
-
     // Construct payload.
+    let payload = ReturnTokens {
+        token_id,
+        source: app.source,
+        amount: token_amount,
+        memo: None,
+    };
+    // Submit transaction.
     let hash = lock
-        .return_funds(
-            &keys,
-            ReturnTokens {
-                token_id,
-                source: app.source,
-                amount: token_amount,
-                memo: None,
-            },
-            None,
-            Validation::Validate,
-        )
-        // Submit transaction.
+        .return_funds(&keys, payload, None, Validation::Validate)
         .await?;
     println!("submitted transaction: {}", hash);
 

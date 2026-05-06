@@ -10,7 +10,7 @@ use concordium_base::{
     protocol_level_tokens::{CborHolderAccount, TokenId},
 };
 use concordium_rust_sdk::{
-    protocol_level_tokens::lock_client::LockClient, types::WalletAccount, v2,
+    protocol_level_tokens::lock_client::create_lock, types::WalletAccount, v2,
 };
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -56,7 +56,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Submit transaction.
-    let pending = LockClient::create(client, &keys, config, None).await?;
+    let pending = create_lock(client, &keys, config, None).await?;
     println!("submitted transaction: {}", pending.transaction_hash());
 
     // Await the lock creation.

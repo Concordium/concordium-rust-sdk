@@ -275,16 +275,7 @@ impl LockCreateProposal {
         signer: &WalletAccount,
         meta: Option<TransactionMetadata>,
     ) -> LockResult<PendingLockCreation> {
-        let account_index = client
-            .get_account_info(&self.sender.into(), BlockIdentifier::LastFinal)
-            .await?
-            .response
-            .account_index;
-        let nonce = client
-            .get_next_account_sequence_number(&self.sender)
-            .await?
-            .nonce;
-        let lock_id = LockId::new(account_index, nonce, 0);
+        let lock_id = get_next_lock_id(client, self.sender, 0).await?;
 
         let operations = resolve_pending_operations(self.config, self.operations, lock_id);
         let hash = sign_and_send_with_client(client, signer, &operations, meta).await?;
@@ -293,6 +284,50 @@ impl LockCreateProposal {
             hash,
         })
     }
+}
+
+/// Get the next deterministic lock id for the given account and creation order.
+///
+/// This queries the account's index and next sequence number from the node and
+/// returns the lock id that would be assigned to a `lockCreate` operation with
+/// the given `creation_order` in the next transaction from that account.
+pub async fn get_next_lock_id(
+    client: &mut Client,
+    account: AccountAddress,
+    creation_order: u64,
+) -> LockResult<LockId> {
+    let account_index = client
+        .get_account_info(&account.into(), BlockIdentifier::LastFinal)
+        .await?
+        .response
+        .account_index;
+    let nonce = client
+        .get_next_account_sequence_number(&account)
+        .await?
+        .nonce;
+    Ok(LockId::new(account_index, nonce, creation_order))
+}
+
+/// Construct a proposal for composing lock creation with additional operations
+/// in a single meta-update transaction.
+pub fn create_lock_proposal(sender: AccountAddress, config: LockConfig) -> LockCreateProposal {
+    LockCreateProposal::new(sender, config)
+}
+
+/// Submit a lock-creation transaction and return a pending creation handle.
+///
+/// This submits only the `lockCreate` operation. Use
+/// [`create_lock_proposal`] to compose creation with additional operations in
+/// the same transaction.
+pub async fn create_lock(
+    mut client: Client,
+    signer: &WalletAccount,
+    config: LockConfig,
+    meta: Option<TransactionMetadata>,
+) -> LockResult<PendingLockCreation> {
+    let operations = MetaUpdateOperations::new(vec![meta_operations::lock_create(config)]);
+    let hash = sign_and_send_with_client(&mut client, signer, &operations, meta).await?;
+    Ok(PendingLockCreation { client, hash })
 }
 
 /// A wrapper around the gRPC client representing a protocol-level lock.
@@ -316,36 +351,10 @@ impl LockClient {
     /// chain.
     ///
     /// The lock info is fetched from the latest finalized block and decoded
-    /// from the query response. The default transaction submission expiry is
-    /// five minutes.
+    /// from the query response.
     pub async fn from_lock_id(mut client: Client, lock_id: LockId) -> LockResult<Self> {
         let info = from_lock_id_impl(&mut client, lock_id).await?;
         Ok(Self::new(client, info))
-    }
-
-    /// Submit a lock-creation transaction and return a pending creation handle.
-    ///
-    /// This submits only the `lockCreate` operation. Use
-    /// [`LockClient::create_compose`] to compose creation with additional
-    /// operations in the same transaction.
-    pub async fn create(
-        mut client: Client,
-        signer: &WalletAccount,
-        config: LockConfig,
-        meta: Option<TransactionMetadata>,
-    ) -> LockResult<PendingLockCreation> {
-        let operations = MetaUpdateOperations::new(vec![meta_operations::lock_create(config)]);
-        let hash = sign_and_send_with_client(&mut client, signer, &operations, meta).await?;
-        Ok(PendingLockCreation { client, hash })
-    }
-
-    /// Construct a proposal for composing lock creation with additional
-    /// operations in a single meta-update transaction.
-    ///
-    /// The returned [`LockCreateProposal`] can be extended with chained
-    /// operations and later submitted as one transaction.
-    pub fn create_compose(sender: AccountAddress, config: LockConfig) -> LockCreateProposal {
-        LockCreateProposal::new(sender, config)
     }
 
     /// Get the cached lock information.

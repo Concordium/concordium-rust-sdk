@@ -10,7 +10,7 @@ use concordium_base::{
     protocol_level_tokens::{CborHolderAccount, ConversionRule, TokenAmount, TokenId},
 };
 use concordium_rust_sdk::{
-    protocol_level_tokens::lock_client::{FundTokens, LockClient},
+    protocol_level_tokens::lock_client::{create_lock_proposal, FundTokens},
     types::WalletAccount,
     v2::{self, BlockIdentifier},
 };
@@ -75,7 +75,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Construct composed payload.
-    let pending = LockClient::create_compose(keys.address, config)
+    let pending = create_lock_proposal(keys.address, config)
         .fund(FundTokens {
             token_id,
             amount: token_amount,

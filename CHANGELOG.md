@@ -16,7 +16,12 @@
 - Moved the `TokenModuleRejectReason` from the `concordium-base` as `EncodedTokenModuleRejectReason`.
 - Support for `ProtocolVersion::P11`.
 - Support for `MetaUpdate` transaction type (added in P11).
-- Adds high level `LockClient` for interacting with locks on-chain.
+- Adds high level lock support for interacting with locks on-chain.
+  - `protocol_level_tokens::LockInfoResponse` for lazily decoding `GetLockInfo` responses.
+  - `v2::Client::{get_lock_info, get_lock_list}` query wrappers.
+  - `protocol_level_tokens::lock_client::LockClient` for interacting with existing locks.
+  - `protocol_level_tokens::lock_client::{create_lock, create_lock_proposal, get_next_lock_id}` public helper functions.
+  - `TokenClient` transfer/burn validation now uses the unencumbered `available` balance when present.
 
 ## 9.0.1
 
