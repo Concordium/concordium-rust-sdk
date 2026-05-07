@@ -29,7 +29,7 @@ struct App {
     source: AccountAddress,
     #[structopt(
         long = "lock-id",
-        help = "Lock id in the form <account_index,sequence_number,creation_order>"
+        help = "Lock id in the form P{account_index}L{sequence_number}T{creation_order}L"
     )]
     lock_id: LockId,
 }
