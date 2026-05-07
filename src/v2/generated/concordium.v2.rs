@@ -1165,7 +1165,7 @@ pub struct RejectReason {
     /// This field might be extended in future versions of the API.
     #[prost(
         oneof = "reject_reason::Reason",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56"
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64"
     )]
     pub reason: ::core::option::Option<reject_reason::Reason>,
 }
@@ -1217,6 +1217,20 @@ pub mod reject_reason {
     pub struct NonExistentCredIds {
         #[prost(message, repeated, tag = "1")]
         pub ids: ::prost::alloc::vec::Vec<super::CredentialRegistrationId>,
+    }
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct LockOperationNotAuthorized {
+        #[prost(message, optional, tag = "1")]
+        pub lock_id: ::core::option::Option<super::plt::LockId>,
+        #[prost(message, optional, tag = "2")]
+        pub account: ::core::option::Option<super::AccountAddress>,
+    }
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct LockTokenImpermissible {
+        #[prost(message, optional, tag = "1")]
+        pub lock_id: ::core::option::Option<super::plt::LockId>,
+        #[prost(message, optional, tag = "2")]
+        pub token_id: ::core::option::Option<super::plt::TokenId>,
     }
     /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
@@ -1410,6 +1424,31 @@ pub mod reject_reason {
         /// Introduced in protocol version 9.
         #[prost(message, tag = "56")]
         TokenUpdateTransactionFailed(super::plt::TokenModuleRejectReason),
+        /// The provided Lock ID does not match a lock that currently exists.
+        /// Introduced in protocol version 11.
+        #[prost(message, tag = "57")]
+        NonExistentLockId(super::plt::LockId),
+        /// The operation could not be compleded because the lock is expired.
+        #[prost(message, tag = "58")]
+        LockExpired(super::plt::LockId),
+        /// The account is not authorized to fund the lock.
+        #[prost(message, tag = "59")]
+        LockFundNotAuthorized(LockOperationNotAuthorized),
+        /// The account is not authorized to send funds controlled by the lock.
+        #[prost(message, tag = "60")]
+        LockSendNotAuthorized(LockOperationNotAuthorized),
+        /// The account is not authorized to return funds controlled by the lock.
+        #[prost(message, tag = "61")]
+        LockReturnNotAuthorized(LockOperationNotAuthorized),
+        /// The account is not authorized to cancel the lock.
+        #[prost(message, tag = "62")]
+        LockCancelNotAuthorized(LockOperationNotAuthorized),
+        /// The lock does not allow funding with the particular token.
+        #[prost(message, tag = "63")]
+        LockTokenImpermissible(LockTokenImpermissible),
+        /// The recipient is not permitted to receive funds controlled by the lock.
+        #[prost(message, tag = "64")]
+        LockRecipientImpermissible(LockOperationNotAuthorized),
     }
 }
 /// Data generated as part of initializing a single contract instance.

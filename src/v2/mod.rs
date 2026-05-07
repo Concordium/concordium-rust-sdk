@@ -2913,6 +2913,53 @@ impl Client {
             response,
         })
     }
+
+    /// Retrieve the information about the given lock in the given block.
+    ///
+    /// This endpoint is only relevant starting from Concordium Protocol Version
+    /// 9 and onwards.
+    pub async fn get_lock_info(
+        &mut self,
+        lock_id: protocol_level_tokens::LockId,
+        bi: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<QueryResponse<protocol_level_tokens::LockInfoResponse>> {
+        let request = generated::LockInfoRequest {
+            block_hash: Some((&bi.into_block_identifier()).into()),
+            lock_id: Some(lock_id.into()),
+        };
+        let response = self.client.get_lock_info(request).await?;
+        let block_hash = extract_metadata(&response)?;
+        let response = protocol_level_tokens::LockInfoResponse::try_from(response.into_inner())?;
+        Ok(QueryResponse {
+            block_hash,
+            response,
+        })
+    }
+
+    /// Retrieve the list of locks that exist at the end of the given block.
+    ///
+    /// This endpoint is only relevant starting from Concordium Protocol Version
+    /// 9 and onwards.
+    pub async fn get_lock_list(
+        &mut self,
+        bi: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<impl Stream<Item = Result<protocol_level_tokens::LockId, tonic::Status>>>,
+    > {
+        let response = self
+            .client
+            .get_lock_list(&bi.into_block_identifier())
+            .await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(lock_id) => Ok(lock_id.into()),
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
 }
 
 /// A stream of finalized blocks. This contains a background task that polls

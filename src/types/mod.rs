@@ -42,6 +42,7 @@ use concordium_base::{
             AccountAddress, AccountCredentialWithoutProofs, AccountKeys, CredentialPublicKeys,
         },
     },
+    protocol_level_locks,
     protocol_level_tokens::{TokenAmount, TokenHolder, TokenId},
     smart_contracts::{
         ContractEvent, ModuleReference, OwnedParameter, OwnedReceiveName, WasmVersion,
@@ -2836,6 +2837,53 @@ pub enum RejectReason {
     TokenUpdateTransactionFailed {
         #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
         reject_reason: protocol_level_tokens::EncodedTokenModuleRejectReason,
+    },
+    /// The provided lock identifier does not match a lock currently on chain.
+    /// Introduced in protocol version 11.
+    NonExistentLockId {
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
+        lock_id: protocol_level_locks::LockId,
+    },
+    /// The operation could not be completed because the lock is expired.
+    /// Introduced in protocol version 11.
+    LockExpired {
+        lock_id: protocol_level_locks::LockId,
+    },
+    /// The account is not authorized to fund the lock.
+    /// Introduced in protocol version 11.
+    LockFundNotAuthorized {
+        lock_id: protocol_level_locks::LockId,
+        account: AccountAddress,
+    },
+    /// The account is not authorized to send funds controlled by the lock.
+    /// Introduced in protocol version 11.
+    LockSendNotAuthorized {
+        lock_id: protocol_level_locks::LockId,
+        account: AccountAddress,
+    },
+    /// The account is not authorized to return funds controlled by the lock.
+    /// Introduced in protocol version 11.
+    LockReturnNotAuthorized {
+        lock_id: protocol_level_locks::LockId,
+        account: AccountAddress,
+    },
+    /// The account is not authorized to cancel the lock.
+    /// Introduced in protocol version 11.
+    LockCancelNotAuthorized {
+        lock_id: protocol_level_locks::LockId,
+        account: AccountAddress,
+    },
+    /// The lock does not permit the specified token.
+    /// Introduced in protocol version 11.
+    LockTokenImpermissible {
+        lock_id: protocol_level_locks::LockId,
+        token_id: protocol_level_tokens::TokenId,
+    },
+    /// The recipient is not permitted to receive funds controlled by the lock.
+    /// Introduced in protocol version 11.
+    LockRecipientImpermissible {
+        lock_id: protocol_level_locks::LockId,
+        account: AccountAddress,
     },
 }
 

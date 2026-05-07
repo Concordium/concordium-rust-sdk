@@ -621,11 +621,22 @@ impl TokenClient {
             return Err(TokenError::InvalidTokenAmount);
         }
 
-        // Check if amount to be burned exceeds account's token amount in possesion
-        let burnable_amount = self
-            .balance_of(&address.into(), None::<BlockIdentifier>)
+        // Check if amount to be burned exceeds account's unencumbered token balance.
+        let account_info = self
+            .client
+            .get_account_info(&address.into(), BlockIdentifier::LastFinal)
             .await?
-            .ok_or(TokenError::InsufficientSupply)?;
+            .response;
+        let Some(token_state) = account_info
+            .tokens
+            .iter()
+            .find(|t| t.token_id == self.info.token_id.clone())
+        else {
+            return Err(TokenError::InsufficientSupply);
+        };
+
+        let module_state = token_state.state.decode_module_state()?;
+        let burnable_amount = module_state.available.unwrap_or(token_state.state.balance);
 
         if burnable_amount.value() < amount.value() {
             return Err(TokenError::InsufficientSupply);
@@ -723,13 +734,17 @@ impl TokenClient {
             .await?
             .response;
 
-        // Check the sender ballance
-        let sender_balance = sender_info
+        // Check the sender's unencumbered balance.
+        let sender_balance = if let Some(t) = sender_info
             .tokens()
             .iter()
             .find(|&t| t.token_id == *token_id)
-            .map(|t| t.state.balance)
-            .unwrap_or(TokenAmount::from_raw(0, decimals));
+        {
+            let module_state = t.state.decode_module_state()?;
+            module_state.available.unwrap_or(t.state.balance)
+        } else {
+            TokenAmount::from_raw(0, decimals)
+        };
 
         let payload_total = TokenAmount::from_raw(
             payload
@@ -1037,10 +1052,22 @@ mod tests {
             allow_list: Option<bool>,
             deny_list: Option<bool>,
         ) -> MockInfo {
-            let module_state = (allow_list.is_some() || deny_list.is_some())
+            self.account_info_with_available(balance, None, allow_list, deny_list)
+        }
+
+        fn account_info_with_available(
+            &self,
+            balance: u64,
+            available: Option<u64>,
+            allow_list: Option<bool>,
+            deny_list: Option<bool>,
+        ) -> MockInfo {
+            let module_state = (allow_list.is_some() || deny_list.is_some() || available.is_some())
                 .then_some(TokenModuleAccountState {
                     allow_list,
                     deny_list,
+                    available: available.map(|x| TokenAmount::from_raw(x, self.decimals)),
+                    ..Default::default()
                 })
                 .map(|s| cbor::cbor_encode(&s).into());
 
@@ -1139,6 +1166,33 @@ mod tests {
 
         // creating payload
         let payload = fixture.payload(10, 1_000_000);
+
+        let result = TokenClient::inner_validate_transfer(
+            &mut client,
+            &fixture.token_id,
+            fixture.decimals,
+            token_module_state,
+            fixture.sender,
+            payload,
+        )
+        .await;
+
+        assert_matches!(result, Err(TokenError::InsufficientFunds));
+    }
+
+    #[tokio::test]
+    async fn fail_validate_transfer_insufficient_available_balance() {
+        let fixture = TransferFixture::new();
+        let mut client = MockClient::new();
+
+        let sender_info =
+            fixture.account_info_with_available(1_000_000_000, Some(500_000), None, None);
+        let recipient_info = fixture.account_info(0, None, None);
+        client.add_account_info(fixture.sender, sender_info);
+        client.add_account_info(fixture.recipient, recipient_info);
+
+        let token_module_state = fixture.token_module_state(None, None, None);
+        let payload = fixture.payload(1, 600_000);
 
         let result = TokenClient::inner_validate_transfer(
             &mut client,
