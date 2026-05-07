@@ -2585,6 +2585,38 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
                     reject_reason: token_module_reject_reason.try_into()?,
                 }
             }
+            reject_reason::Reason::NonExistentLockId(lock_id) => Self::NonExistentLockId {
+                lock_id: lock_id.into(),
+            },
+            reject_reason::Reason::LockExpired(lock_id) => Self::LockExpired {
+                lock_id: lock_id.into(),
+            },
+            reject_reason::Reason::LockFundNotAuthorized(v) => Self::LockFundNotAuthorized {
+                lock_id: v.lock_id.require()?.into(),
+                account: v.account.require()?.try_into()?,
+            },
+            reject_reason::Reason::LockSendNotAuthorized(v) => Self::LockSendNotAuthorized {
+                lock_id: v.lock_id.require()?.into(),
+                account: v.account.require()?.try_into()?,
+            },
+            reject_reason::Reason::LockReturnNotAuthorized(v) => Self::LockReturnNotAuthorized {
+                lock_id: v.lock_id.require()?.into(),
+                account: v.account.require()?.try_into()?,
+            },
+            reject_reason::Reason::LockCancelNotAuthorized(v) => Self::LockCancelNotAuthorized {
+                lock_id: v.lock_id.require()?.into(),
+                account: v.account.require()?.try_into()?,
+            },
+            reject_reason::Reason::LockTokenImpermissible(v) => Self::LockTokenImpermissible {
+                lock_id: v.lock_id.require()?.into(),
+                token_id: v.token_id.require()?.try_into()?,
+            },
+            reject_reason::Reason::LockRecipientImpermissible(v) => {
+                Self::LockRecipientImpermissible {
+                    lock_id: v.lock_id.require()?.into(),
+                    account: v.account.require()?.try_into()?,
+                }
+            }
         })
     }
 }

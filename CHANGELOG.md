@@ -22,6 +22,7 @@
   - `protocol_level_tokens::lock_client::LockClient` for interacting with existing locks.
   - `protocol_level_tokens::lock_client::{create_lock, create_lock_proposal, get_next_lock_id}` public helper functions.
   - `TokenClient` transfer/burn validation now uses the unencumbered `available` balance when present.
+  - Added SDK support for the new lock-related `RejectReason` variants introduced in the grpc schema.
 
 ## 9.0.1
 
