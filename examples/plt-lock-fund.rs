@@ -24,7 +24,7 @@ struct App {
     amount: Decimal,
     #[structopt(
         long = "lock-id",
-        help = "Lock id in the form P{account_index}L{sequence_number}T{creation_order}L"
+        help = "Base58Check-encoded lock id."
     )]
     lock_id: LockId,
 }
