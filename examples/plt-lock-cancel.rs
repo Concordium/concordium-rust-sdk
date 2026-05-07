@@ -16,10 +16,7 @@ struct App {
     endpoint: v2::Endpoint,
     #[structopt(long = "account")]
     account: PathBuf,
-    #[structopt(
-        long = "lock-id",
-        help = "Base58Check-encoded lock id."
-    )]
+    #[structopt(long = "lock-id", help = "Base58Check-encoded lock id.")]
     lock_id: LockId,
 }
 

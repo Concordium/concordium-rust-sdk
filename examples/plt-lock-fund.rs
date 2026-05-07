@@ -22,10 +22,7 @@ struct App {
     token_id: TokenId,
     #[structopt(long = "amount", help = "Amount to lock.", default_value = "100.0")]
     amount: Decimal,
-    #[structopt(
-        long = "lock-id",
-        help = "Base58Check-encoded lock id."
-    )]
+    #[structopt(long = "lock-id", help = "Base58Check-encoded lock id.")]
     lock_id: LockId,
 }
 

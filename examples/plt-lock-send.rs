@@ -29,10 +29,7 @@ struct App {
     source: AccountAddress,
     #[structopt(long = "recipient", help = "Recipient address.")]
     recipient: AccountAddress,
-    #[structopt(
-        long = "lock-id",
-        help = "Base58Check-encoded lock id."
-    )]
+    #[structopt(long = "lock-id", help = "Base58Check-encoded lock id.")]
     lock_id: LockId,
 }
 
