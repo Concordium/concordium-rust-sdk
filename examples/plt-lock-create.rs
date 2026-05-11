@@ -61,7 +61,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Await the lock creation.
     let lock = pending.wait_for_finalization(None).await?;
-    println!("created lock: {:?}", lock.lock_info().lock);
+    println!("created lock: {:}", lock.lock_info().lock);
 
     Ok(())
 }
