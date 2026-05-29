@@ -467,13 +467,16 @@ impl LockClient {
 
     /// Validate that the lock can be cancelled by the given sender.
     ///
-    /// This refreshes the latest finalized lock info, checks expiry, and
+    /// This refreshes the latest finalized lock info, and
     /// dispatches controller-specific validation based on the lock
     /// variant to verify that the sender has the
     /// cancel capability.
     pub async fn validate_cancel(&mut self, sender: AccountAddress) -> LockResult<()> {
         self.update_lock_info().await?;
-        self.ensure_not_expired()?;
+
+        if self.ensure_not_expired().is_err() {
+            return Ok(());
+        };
         self.info.controller.validate_cancel(sender)
     }
 
