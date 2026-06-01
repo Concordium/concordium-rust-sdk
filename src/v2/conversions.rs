@@ -2607,12 +2607,12 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
                 lock_id: v.lock_id.require()?.into(),
                 account: v.account.require()?.try_into()?,
             },
-            reject_reason::Reason::LockTokenImpermissible(v) => Self::LockTokenImpermissible {
+            reject_reason::Reason::LockTokenNotPermitted(v) => Self::LockTokenNotPermitted {
                 lock_id: v.lock_id.require()?.into(),
                 token_id: v.token_id.require()?.try_into()?,
             },
-            reject_reason::Reason::LockRecipientImpermissible(v) => {
-                Self::LockRecipientImpermissible {
+            reject_reason::Reason::LockRecipientNotPermitted(v) => {
+                Self::LockRecipientNotPermitted {
                     lock_id: v.lock_id.require()?.into(),
                     account: v.account.require()?.try_into()?,
                 }

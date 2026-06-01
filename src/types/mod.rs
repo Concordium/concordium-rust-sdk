@@ -2875,13 +2875,13 @@ pub enum RejectReason {
     },
     /// The lock does not permit the specified token.
     /// Introduced in protocol version 11.
-    LockTokenImpermissible {
+    LockTokenNotPermitted {
         lock_id: protocol_level_locks::LockId,
         token_id: protocol_level_tokens::TokenId,
     },
     /// The recipient is not permitted to receive funds controlled by the lock.
     /// Introduced in protocol version 11.
-    LockRecipientImpermissible {
+    LockRecipientNotPermitted {
         lock_id: protocol_level_locks::LockId,
         account: AccountAddress,
     },

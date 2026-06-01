@@ -1226,7 +1226,7 @@ pub mod reject_reason {
         pub account: ::core::option::Option<super::AccountAddress>,
     }
     #[derive(Clone, PartialEq, ::prost::Message)]
-    pub struct LockTokenImpermissible {
+    pub struct LockTokenNotPermitted {
         #[prost(message, optional, tag = "1")]
         pub lock_id: ::core::option::Option<super::plt::LockId>,
         #[prost(message, optional, tag = "2")]
@@ -1445,10 +1445,10 @@ pub mod reject_reason {
         LockCancelNotAuthorized(LockOperationNotAuthorized),
         /// The lock does not allow funding with the particular token.
         #[prost(message, tag = "63")]
-        LockTokenImpermissible(LockTokenImpermissible),
+        LockTokenNotPermitted(LockTokenNotPermitted),
         /// The recipient is not permitted to receive funds controlled by the lock.
         #[prost(message, tag = "64")]
-        LockRecipientImpermissible(LockOperationNotAuthorized),
+        LockRecipientNotPermitted(LockOperationNotAuthorized),
     }
 }
 /// Data generated as part of initializing a single contract instance.
