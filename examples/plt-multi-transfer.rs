@@ -2,10 +2,9 @@
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_base::{
-    base::Energy,
     contracts_common::AccountAddress,
     protocol_level_tokens::{meta_operations, ConversionRule, TokenAmount, TokenId},
-    transactions::{construct, cost},
+    transactions::{construct, ExactSizeTransactionSigner},
 };
 use concordium_rust_sdk::{
     common::types::TransactionTime,
@@ -130,15 +129,8 @@ async fn main() -> anyhow::Result<()> {
     let expiry: TransactionTime =
         TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
 
-    let energy = construct::GivenEnergy::Add {
-        num_sigs: transfers.len() as u32,
-        energy: cost::META_UPDATE_TRANSACTIONS
-            + Energy {
-                energy: cost::PLT_TRANSFER.energy * transfers.len() as u64,
-            },
-    };
     let txn = construct::meta_update_operations(
-        energy,
+        keys.num_keys(),
         keys.address,
         nonce,
         expiry,
