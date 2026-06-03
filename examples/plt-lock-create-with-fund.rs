@@ -76,7 +76,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Construct composed payload.
     let pending = create_lock_proposal(keys.address, config)
-        .fund(FundTokens {
+        .append_fund(FundTokens {
             token_id,
             amount: token_amount,
             memo: None,

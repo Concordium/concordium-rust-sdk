@@ -10,7 +10,7 @@ use concordium_base::{
         LockId, LockInfo,
     },
     protocol_level_tokens::{
-        meta_operations::{self, MetaUpdateOperations},
+        meta_operations::{self, MetaUpdateOperation, MetaUpdateOperations},
         CborMemo, TokenAmount, TokenId,
     },
     transactions::{construct, BlockItem, ExactSizeTransactionSigner},
@@ -27,6 +27,11 @@ use crate::{
 
 const DEFAULT_EXPIRY_SECS: u32 = 300;
 
+/// Internal abstraction over the lock-info RPC used by query helpers.
+///
+/// This exists as a small test seam: production code implements it for
+/// [`Client`], while unit tests can provide stubs that return controlled query
+/// responses without connecting to a node.
 #[async_trait]
 trait LockQuery {
     async fn get_lock_info(
@@ -47,6 +52,12 @@ impl LockQuery for Client {
     }
 }
 
+/// Internal dispatch trait for controller-specific client-side validation.
+///
+/// The high-level lock client validates operations through this trait so each
+/// lock-controller variant can implement its own capability and configuration
+/// checks while the public API remains independent of the concrete controller
+/// type.
 trait Validate {
     fn validate_fund(&self, sender: AccountAddress, payload: &FundTokens) -> LockResult<()>;
     fn validate_send(&self, sender: AccountAddress, payload: &SendTokens) -> LockResult<()>;
@@ -197,15 +208,21 @@ impl PendingLockCreation {
 }
 
 #[derive(Debug, Clone)]
-enum PendingOperation {
+enum AppendedOperation {
+    Raw(MetaUpdateOperation),
     Fund(FundTokens),
     Send(SendTokens),
     Return(ReturnTokens),
     Cancel(Option<CborMemo>),
 }
 
-/// Builder for composing a lock creation with subsequent operations in a
-/// single meta-update transaction.
+/// Builder for composing a lock creation with surrounding meta-update
+/// operations in a single transaction.
+///
+/// Prepended operations are emitted before the `lockCreate`. Appended
+/// operations are emitted after it. Typed append helpers for lock operations do
+/// not require a lock id up front; they are resolved against the predicted lock
+/// id at submission time.
 ///
 /// The lock identifier is predicted at submission time from the sender's
 /// account index and next nonce. This minimises, but does not eliminate, the
@@ -215,7 +232,8 @@ enum PendingOperation {
 pub struct LockCreateProposal {
     sender: AccountAddress,
     config: LockConfig,
-    operations: Vec<PendingOperation>,
+    prepended_operations: Vec<MetaUpdateOperation>,
+    appended_operations: Vec<AppendedOperation>,
 }
 
 impl LockCreateProposal {
@@ -223,52 +241,166 @@ impl LockCreateProposal {
         Self {
             sender,
             config,
-            operations: Vec::new(),
+            prepended_operations: Vec::new(),
+            appended_operations: Vec::new(),
         }
     }
 
-    /// Chain a fund operation onto the lock-creation proposal.
+    /// Prepend a raw meta-update operation before the `lockCreate`.
+    ///
+    /// # Arguments
+    ///
+    /// * `operation` - The raw meta-update operation to place before the lock
+    ///   creation.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let proposal = create_lock_proposal(sender, config)
+    ///     .prepend_operation(meta_operations::mint_tokens(token_id.clone(), amount));
+    /// ```
+    pub fn prepend_operation(mut self, operation: MetaUpdateOperation) -> Self {
+        self.prepended_operations.push(operation);
+        self
+    }
+
+    /// Append a raw meta-update operation after the `lockCreate`.
+    ///
+    /// # Arguments
+    ///
+    /// * `operation` - The raw meta-update operation to place after the lock
+    ///   creation.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let proposal = create_lock_proposal(sender, config)
+    ///     .append_operation(meta_operations::mint_tokens(token_id.clone(), amount));
+    /// ```
+    pub fn append_operation(mut self, operation: MetaUpdateOperation) -> Self {
+        self.appended_operations
+            .push(AppendedOperation::Raw(operation));
+        self
+    }
+
+    /// Append a fund operation after the `lockCreate`.
     ///
     /// The fund operation is stored without a lock id and is resolved against
     /// the predicted lock id at submission time.
-    pub fn fund(mut self, payload: FundTokens) -> Self {
-        self.operations.push(PendingOperation::Fund(payload));
+    ///
+    /// # Arguments
+    ///
+    /// * `payload` - The lock-funding parameters to append after the creation.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let proposal = create_lock_proposal(sender, config).append_fund(FundTokens {
+    ///     token_id,
+    ///     amount,
+    ///     memo: None,
+    /// });
+    /// ```
+    pub fn append_fund(mut self, payload: FundTokens) -> Self {
+        self.appended_operations
+            .push(AppendedOperation::Fund(payload));
         self
     }
 
-    /// Chain a send operation onto the lock-creation proposal.
+    /// Append a send operation after the `lockCreate`.
     ///
     /// The send operation is stored without a lock id and is resolved against
     /// the predicted lock id at submission time.
-    pub fn send(mut self, payload: SendTokens) -> Self {
-        self.operations.push(PendingOperation::Send(payload));
+    ///
+    /// # Arguments
+    ///
+    /// * `payload` - The locked-funds send parameters to append after the
+    ///   creation.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let proposal = create_lock_proposal(sender, config).append_send(payload);
+    /// ```
+    pub fn append_send(mut self, payload: SendTokens) -> Self {
+        self.appended_operations
+            .push(AppendedOperation::Send(payload));
         self
     }
 
-    /// Chain a return operation onto the lock-creation proposal.
+    /// Append a return operation after the `lockCreate`.
     ///
-    /// The return operation is stored without a lock id and is resolved
-    /// against the predicted lock id at submission time.
-    pub fn return_funds(mut self, payload: ReturnTokens) -> Self {
-        self.operations.push(PendingOperation::Return(payload));
+    /// The return operation is stored without a lock id and is resolved against
+    /// the predicted lock id at submission time.
+    ///
+    /// # Arguments
+    ///
+    /// * `payload` - The locked-funds return parameters to append after the
+    ///   creation.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let proposal = create_lock_proposal(sender, config).append_return_funds(payload);
+    /// ```
+    pub fn append_return_funds(mut self, payload: ReturnTokens) -> Self {
+        self.appended_operations
+            .push(AppendedOperation::Return(payload));
         self
     }
 
-    /// Chain a cancel operation onto the lock-creation proposal.
+    /// Append a cancel operation after the `lockCreate`.
     ///
-    /// The cancel operation is stored without a lock id and is resolved
-    /// against the predicted lock id at submission time.
-    pub fn cancel(mut self, memo: Option<CborMemo>) -> Self {
-        self.operations.push(PendingOperation::Cancel(memo));
+    /// The cancel operation is stored without a lock id and is resolved against
+    /// the predicted lock id at submission time.
+    ///
+    /// # Arguments
+    ///
+    /// * `memo` - The optional memo to attach to the cancel operation.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let proposal = create_lock_proposal(sender, config).append_cancel(None);
+    /// ```
+    pub fn append_cancel(mut self, memo: Option<CborMemo>) -> Self {
+        self.appended_operations
+            .push(AppendedOperation::Cancel(memo));
         self
     }
 
     /// Submit the proposal as a single meta-update transaction.
     ///
     /// The lock id is predicted at submission time from the sender's account
-    /// index and next nonce, then injected into all chained operations before
-    /// submission. The returned [`PendingLockCreation`] can be awaited to
-    /// resolve the finalized lock.
+    /// index and next nonce, then injected into all typed appended lock
+    /// operations before submission. The returned [`PendingLockCreation`] can
+    /// be awaited to resolve the finalized lock.
+    ///
+    /// # Arguments
+    ///
+    /// * `client` - The node client used to predict the next lock id and submit
+    ///   the transaction.
+    /// * `signer` - The account keys used to sign the transaction.
+    /// * `meta` - Optional transaction metadata overriding the default nonce
+    ///   and expiry handling.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LockError`] if lock-id prediction fails, transaction signing
+    /// or submission fails, or the provided metadata cannot be used.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let pending = create_lock_proposal(sender, config)
+    ///     .append_fund(FundTokens {
+    ///         token_id,
+    ///         amount,
+    ///         memo: None,
+    ///     })
+    ///     .submit(&mut client, &keys, None)
+    ///     .await?;
+    /// ```
     pub async fn submit(
         self,
         client: &mut Client,
@@ -277,7 +409,12 @@ impl LockCreateProposal {
     ) -> LockResult<PendingLockCreation> {
         let lock_id = get_next_lock_id(client, self.sender, 0).await?;
 
-        let operations = resolve_pending_operations(self.config, self.operations, lock_id);
+        let operations = resolve_pending_operations(
+            self.config,
+            self.prepended_operations,
+            self.appended_operations,
+            lock_id,
+        );
         let hash = sign_and_send_with_client(client, signer, &operations, meta).await?;
         Ok(PendingLockCreation {
             client: client.clone(),
@@ -308,8 +445,25 @@ pub async fn get_next_lock_id(
     Ok(LockId::new(account_index, nonce, creation_order))
 }
 
-/// Construct a proposal for composing lock creation with additional operations
-/// in a single meta-update transaction.
+/// Construct a proposal for composing lock creation with additional
+/// meta-update operations in a single transaction.
+///
+/// # Arguments
+///
+/// * `sender` - The account that will submit the composed transaction.
+/// * `config` - The lock configuration to use for the `lockCreate` operation.
+///
+/// # Examples
+///
+/// ```ignore
+/// let proposal = create_lock_proposal(sender, config)
+///     .prepend_operation(meta_operations::mint_tokens(token_id.clone(), amount))
+///     .append_fund(FundTokens {
+///         token_id,
+///         amount,
+///         memo: None,
+///     });
+/// ```
 pub fn create_lock_proposal(sender: AccountAddress, config: LockConfig) -> LockCreateProposal {
     LockCreateProposal::new(sender, config)
 }
@@ -353,7 +507,7 @@ impl LockClient {
     /// The lock info is fetched from the latest finalized block and decoded
     /// from the query response.
     pub async fn from_lock_id(mut client: Client, lock_id: LockId) -> LockResult<Self> {
-        let info = from_lock_id_impl(&mut client, lock_id).await?;
+        let info = query_lock_info_impl(&mut client, lock_id).await?;
         Ok(Self::new(client, info))
     }
 
@@ -698,10 +852,6 @@ fn ensure_locked_amount(
     }
 }
 
-async fn from_lock_id_impl<LQ: LockQuery>(lq: &mut LQ, lock_id: LockId) -> LockResult<LockInfo> {
-    query_lock_info_impl(lq, lock_id).await
-}
-
 async fn query_lock_info_impl<LQ: LockQuery>(lq: &mut LQ, lock_id: LockId) -> LockResult<LockInfo> {
     Ok(lq
         .get_lock_info(lock_id, BlockIdentifier::LastFinal)
@@ -752,20 +902,23 @@ fn created_lock_id_from_summary(summary: crate::types::BlockItemSummary) -> Lock
 
 fn resolve_pending_operations(
     config: LockConfig,
-    operations: Vec<PendingOperation>,
+    prepended_operations: Vec<MetaUpdateOperation>,
+    appended_operations: Vec<AppendedOperation>,
     lock_id: LockId,
 ) -> MetaUpdateOperations {
-    let mut ops = Vec::with_capacity(operations.len() + 1);
+    let mut ops = Vec::with_capacity(prepended_operations.len() + appended_operations.len() + 1);
+    ops.extend(prepended_operations);
     ops.push(meta_operations::lock_create(config));
-    for op in operations {
+    for op in appended_operations {
         let op = match op {
-            PendingOperation::Fund(payload) => meta_operations::lock_fund(
+            AppendedOperation::Raw(operation) => operation,
+            AppendedOperation::Fund(payload) => meta_operations::lock_fund(
                 payload.token_id,
                 lock_id.clone(),
                 payload.amount,
                 payload.memo,
             ),
-            PendingOperation::Send(payload) => meta_operations::lock_send(
+            AppendedOperation::Send(payload) => meta_operations::lock_send(
                 payload.token_id,
                 lock_id.clone(),
                 payload.source,
@@ -773,14 +926,14 @@ fn resolve_pending_operations(
                 payload.amount,
                 payload.memo,
             ),
-            PendingOperation::Return(payload) => meta_operations::lock_return(
+            AppendedOperation::Return(payload) => meta_operations::lock_return(
                 payload.token_id,
                 lock_id.clone(),
                 payload.source,
                 payload.amount,
                 payload.memo,
             ),
-            PendingOperation::Cancel(memo) => meta_operations::lock_cancel(lock_id.clone(), memo),
+            AppendedOperation::Cancel(memo) => meta_operations::lock_cancel(lock_id.clone(), memo),
         };
         ops.push(op);
     }
@@ -1014,11 +1167,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn from_lock_id_query_error() {
+    async fn query_lock_info_query_error() {
         let mut stub = StubLockQuery {
             result: Some(Err(QueryError::NotFound)),
         };
-        let result = from_lock_id_impl(&mut stub, LockId::new(10001, 5, 0)).await;
+        let result = query_lock_info_impl(&mut stub, LockId::new(10001, 5, 0)).await;
         assert!(matches!(
             result,
             Err(LockError::Query(QueryError::NotFound))
@@ -1049,13 +1202,21 @@ mod tests {
 
     #[test]
     fn pending_operations_order() {
-        let operations = vec![
-            PendingOperation::Fund(FundTokens {
+        let prepended_operations = vec![meta_operations::mint_tokens(
+            "CCD".parse().unwrap(),
+            TokenAmount::from_raw(5, 0),
+        )];
+        let appended_operations = vec![
+            AppendedOperation::Fund(FundTokens {
                 token_id: "CCD".parse().unwrap(),
                 amount: TokenAmount::from_raw(10, 0),
                 memo: None,
             }),
-            PendingOperation::Cancel(None),
+            AppendedOperation::Raw(meta_operations::burn_tokens(
+                "CCD".parse().unwrap(),
+                TokenAmount::from_raw(3, 0),
+            )),
+            AppendedOperation::Cancel(None),
         ];
         let lock_id = LockId::new(10001, 5, 0);
         let resolved = resolve_pending_operations(
@@ -1069,17 +1230,30 @@ mod tests {
                     memo: None,
                 }),
             },
-            operations,
+            prepended_operations,
+            appended_operations,
             lock_id.clone(),
         );
-        assert_eq!(resolved.operations.len(), 3);
+        assert_eq!(resolved.operations.len(), 5);
         match &resolved.operations[0] {
-            MetaUpdateOperation::LockCreate(_) => {}
-            other => panic!("expected lockCreate first, got {other:?}"),
+            MetaUpdateOperation::Mint(_) => {}
+            other => panic!("expected mint first, got {other:?}"),
         }
         match &resolved.operations[1] {
+            MetaUpdateOperation::LockCreate(_) => {}
+            other => panic!("expected lockCreate second, got {other:?}"),
+        }
+        match &resolved.operations[2] {
             MetaUpdateOperation::LockFund(details) => assert_eq!(details.lock, lock_id),
-            other => panic!("expected lockFund second, got {other:?}"),
+            other => panic!("expected lockFund third, got {other:?}"),
+        }
+        match &resolved.operations[3] {
+            MetaUpdateOperation::Burn(_) => {}
+            other => panic!("expected burn fourth, got {other:?}"),
+        }
+        match &resolved.operations[4] {
+            MetaUpdateOperation::LockCancel(details) => assert_eq!(details.lock, lock_id),
+            other => panic!("expected lockCancel fifth, got {other:?}"),
         }
     }
 }

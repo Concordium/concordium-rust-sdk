@@ -105,7 +105,7 @@ async fn main() -> anyhow::Result<()> {
         .get_next_account_sequence_number(&keys.address)
         .await?
         .nonce;
-    let expiry = TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
+    let expiry = TransactionTime::minutes_after(5);
     let txn = construct::meta_update_operations(
         keys.num_keys(),
         keys.address,
