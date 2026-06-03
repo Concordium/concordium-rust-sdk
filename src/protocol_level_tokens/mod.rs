@@ -137,6 +137,8 @@ impl TryFrom<generated::plt::TokenTransferEvent> for TokenTransferEvent {
                 .memo
                 .map(concordium_base::transactions::Memo::try_from)
                 .transpose()?,
+            from_lock: event.from_lock.map(Into::into),
+            to_lock: event.to_lock.map(Into::into),
         })
     }
 }
