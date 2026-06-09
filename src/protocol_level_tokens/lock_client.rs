@@ -984,7 +984,13 @@ mod tests {
         AccountTransactionDetails, AccountTransactionEffects, BlockItemSummary,
         BlockItemSummaryDetails, RejectReason,
     };
-    use crate::{types::hashes::TransactionHash, v2::Upward};
+    use crate::{
+        protocol_level_tokens::{
+            LockCreateEvent, LockDestroyEvent, MetaEvent, TokenEvent, TokenEventDetails,
+        },
+        types::hashes::TransactionHash,
+        v2::Upward,
+    };
     use concordium_base::{
         base::{Energy, TransactionIndex},
         common::types::TransactionTime,
@@ -994,6 +1000,7 @@ mod tests {
         },
         protocol_level_tokens::{
             meta_operations::MetaUpdateOperation, CborHolderAccount, CoinInfo, RawCbor,
+            TokenHolder, TokenTransferEvent,
         },
         transactions::TransactionType,
     };
@@ -1003,6 +1010,8 @@ mod tests {
         0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E,
         0x1F, 0x20,
     ]);
+    const OTHER_ADDRESS: AccountAddress = AccountAddress([0x21; 32]);
+    const THIRD_ADDRESS: AccountAddress = AccountAddress([0x22; 32]);
 
     fn holder(address: AccountAddress) -> CborHolderAccount {
         CborHolderAccount {
@@ -1198,6 +1207,93 @@ mod tests {
             created_lock_id_from_summary(summary),
             Err(LockError::CreationFailed(_))
         ));
+    }
+
+    #[test]
+    fn meta_update_lock_lifecycle_events_affect_sender_only() {
+        let lock_id = LockId::new(10001, 5, 0);
+        let lock_create = summary_with_effects(AccountTransactionEffects::MetaUpdate {
+            events: vec![MetaEvent::LockCreate(LockCreateEvent {
+                lock_id: lock_id.clone(),
+                lock_config: RawCbor::from(Vec::new()),
+            })],
+        });
+        assert_eq!(
+            lock_create.affected_addresses().known().unwrap(),
+            vec![ADDRESS]
+        );
+
+        let lock_destroy = summary_with_effects(AccountTransactionEffects::MetaUpdate {
+            events: vec![MetaEvent::LockDestroy(LockDestroyEvent { lock_id })],
+        });
+        assert_eq!(
+            lock_destroy.affected_addresses().known().unwrap(),
+            vec![ADDRESS]
+        );
+    }
+
+    #[test]
+    fn meta_update_token_transfer_with_lock_metadata_affects_token_holders() {
+        let summary = summary_with_effects(AccountTransactionEffects::MetaUpdate {
+            events: vec![MetaEvent::Token(TokenEvent {
+                token_id: "CCD".parse().unwrap(),
+                event: TokenEventDetails::Transfer(TokenTransferEvent {
+                    from: TokenHolder::Account {
+                        address: OTHER_ADDRESS,
+                    },
+                    to: TokenHolder::Account {
+                        address: THIRD_ADDRESS,
+                    },
+                    amount: TokenAmount::from_raw(10, 0),
+                    memo: None,
+                    from_lock: Some(LockId::new(10001, 5, 0)),
+                    to_lock: Some(LockId::new(10002, 6, 0)),
+                }),
+            })],
+        });
+
+        assert_eq!(
+            summary.affected_addresses().known().unwrap(),
+            vec![ADDRESS, OTHER_ADDRESS, THIRD_ADDRESS]
+        );
+    }
+
+    #[test]
+    fn meta_update_summary_json_matches_wallet_proxy_contract() {
+        let lock_id = LockId::new(10001, 5, 0);
+        let summary = summary_with_effects(AccountTransactionEffects::MetaUpdate {
+            events: vec![
+                MetaEvent::LockCreate(LockCreateEvent {
+                    lock_id: lock_id.clone(),
+                    lock_config: RawCbor::from(vec![0xa1, 0x64, b't', b'e', b's', b't', 0x01]),
+                }),
+                MetaEvent::LockDestroy(LockDestroyEvent { lock_id }),
+                MetaEvent::Token(TokenEvent {
+                    token_id: "CCD".parse().unwrap(),
+                    event: TokenEventDetails::Transfer(TokenTransferEvent {
+                        from: TokenHolder::Account {
+                            address: OTHER_ADDRESS,
+                        },
+                        to: TokenHolder::Account {
+                            address: THIRD_ADDRESS,
+                        },
+                        amount: TokenAmount::from_raw(10, 0),
+                        memo: None,
+                        from_lock: Some(LockId::new(10001, 5, 0)),
+                        to_lock: Some(LockId::new(10002, 6, 0)),
+                    }),
+                }),
+            ],
+        });
+
+        let json = serde_json::to_value(summary).expect("serialize summary");
+        assert_eq!(json["type"]["contents"], "metaUpdate");
+        assert_eq!(json["result"]["outcome"], "success");
+        assert_eq!(json["result"]["events"][0]["tag"], "LockCreated");
+        assert_eq!(json["result"]["events"][1]["tag"], "LockDestroyed");
+        assert_eq!(json["result"]["events"][2]["tag"], "TokenTransfer");
+        assert!(json["result"]["events"][2].get("fromLock").is_some());
+        assert!(json["result"]["events"][2].get("toLock").is_some());
     }
 
     #[test]
