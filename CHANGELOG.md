@@ -1,5 +1,6 @@
 ## Unreleased
 
+- Added `v2::Client::check_health` for checking node health via the `concordium.health.Health/Check` gRPC endpoint. Returns `Ok(())` when the node reports itself healthy, and an error when it is unreachable or unhealthy.
 - Implemented new role based access operations from `concordium-base`.
   - `token_client` now supports new operations for RBAC in `concordium-base`
     - `TokenOperations`: support for role based access: `AssignAdminRoles`, `RevokeAdminRoles`

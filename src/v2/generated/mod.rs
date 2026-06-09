@@ -5,5 +5,8 @@ pub mod concordium {
         pub mod plt {
             include!("concordium.v2.plt.rs");
         }
+        pub mod health {
+            include!("concordium.health.rs");
+        }
     }
 }

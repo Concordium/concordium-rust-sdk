@@ -98,6 +98,7 @@ pub mod proto_schema_version;
 #[derive(Clone, Debug)]
 pub struct Client {
     client: generated::queries_client::QueriesClient<tonic::transport::Channel>,
+    health_client: generated::health::health_client::HealthClient<tonic::transport::Channel>,
 }
 
 /// A query response with the addition of the block hash used by the query.
@@ -1188,8 +1189,14 @@ impl Client {
         E: TryInto<tonic::transport::Endpoint>,
         E::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>>,
     {
-        let client = generated::queries_client::QueriesClient::connect(endpoint).await?;
-        Ok(Self { client })
+        let endpoint = tonic::transport::Endpoint::new(endpoint)?;
+        let channel = endpoint.connect().await?;
+        let client = generated::queries_client::QueriesClient::new(channel.clone());
+        let health_client = generated::health::health_client::HealthClient::new(channel);
+        Ok(Self {
+            client,
+            health_client,
+        })
     }
 
     /// Get the information for the given account in the given block. If either
@@ -2277,6 +2284,22 @@ impl Client {
             .await?;
         let node_info = types::NodeInfo::try_from(response.into_inner())?;
         Ok(node_info)
+    }
+
+    /// Check the health of the node.
+    ///
+    /// Returns `Ok(())` when the node reports itself as healthy and ready to
+    /// serve requests. Returns an error if the node is unreachable, not yet
+    /// caught up to the head of the chain, or reports any other unhealthy
+    /// status.
+    ///
+    /// This is a lightweight liveness check suitable for polling until the
+    /// node is ready before running tests or sending transactions.
+    pub async fn check_health(&mut self) -> endpoints::RPCResult<()> {
+        self.health_client
+            .check(generated::health::NodeHealthRequest {})
+            .await?;
+        Ok(())
     }
 
     /// Get the projected earliest time a baker wins the opportunity to bake a

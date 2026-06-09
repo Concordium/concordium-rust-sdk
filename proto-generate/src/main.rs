@@ -5,7 +5,10 @@ fn main() {
         .out_dir("../src/v2/generated")
         .include_file("mod.rs")
         .compile_protos(
-            &["../concordium-base/concordium-grpc-api/v2/concordium/service.proto"],
+            &[
+                "../concordium-base/concordium-grpc-api/v2/concordium/service.proto",
+                "../concordium-base/concordium-grpc-api/v2/concordium/health.proto",
+            ],
             &["../concordium-base/concordium-grpc-api/"],
         )
         .expect("compile protos");
