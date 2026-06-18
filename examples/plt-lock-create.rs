@@ -5,7 +5,7 @@ use concordium_base::{
     common::types::TransactionTime,
     protocol_level_locks::{
         LockConfig, LockController, LockControllerSimpleV0, LockControllerSimpleV0Capability,
-        LockControllerSimpleV0Grant,
+        LockControllerSimpleV0Grant, LockRecipients,
     },
     protocol_level_tokens::{CborHolderAccount, TokenId},
 };
@@ -35,9 +35,9 @@ async fn main() -> anyhow::Result<()> {
     let keys = WalletAccount::from_json_file(app.account).context("Could not read account keys")?;
     let client = v2::Client::new(app.endpoint).await?;
 
-    // Construct lock configuration payload.
+    // Construct an any-recipient lock configuration payload.
     let config = LockConfig {
-        recipients: vec![CborHolderAccount::from(keys.address)],
+        recipients: LockRecipients::Any,
         expiry: TransactionTime::hours_after(1),
         controller: LockController::SimpleV0(LockControllerSimpleV0 {
             grants: vec![LockControllerSimpleV0Grant {

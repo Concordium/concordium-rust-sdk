@@ -7,7 +7,7 @@ use concordium_base::{
     hashes::TransactionHash,
     protocol_level_locks::{
         LockConfig, LockController, LockControllerSimpleV0, LockControllerSimpleV0Capability,
-        LockId, LockInfo,
+        LockId, LockInfo, LockRecipients,
     },
     protocol_level_tokens::{
         meta_operations::{self, MetaUpdateOperation, MetaUpdateOperations},
@@ -104,7 +104,7 @@ pub struct SendTokens {
     pub token_id: TokenId,
     /// The account whose funds are currently locked under the lock.
     pub source: AccountAddress,
-    /// The recipient account that must be present in the lock's recipient list.
+    /// The recipient account to receive the locked funds.
     pub recipient: AccountAddress,
     /// The amount of locked tokens to send.
     pub amount: TokenAmount,
@@ -153,7 +153,7 @@ pub enum LockError {
     /// The token is not configured in the lock controller.
     #[error("the token is not configured for this lock.")]
     TokenNotConfigured,
-    /// The recipient is not part of the lock's configured recipient list.
+    /// The recipient is not part of the lock's configured limited recipient list.
     #[error("the recipient is not configured for this lock.")]
     RecipientNotAllowed,
     /// The submitted lock-creation transaction could not be resolved into a lock.
@@ -580,7 +580,8 @@ impl LockClient {
     /// dispatches controller-specific validation based on the lock
     /// variant, verifies that the source has
     /// sufficient funds locked under this lock for the requested token, and
-    /// checks that the recipient is configured for the lock.
+    /// checks the recipient against the lock's limited recipient list when
+    /// applicable.
     pub async fn validate_send(
         &mut self,
         sender: AccountAddress,
@@ -590,12 +591,7 @@ impl LockClient {
         self.ensure_not_expired()?;
         self.info.controller.validate_send(sender, payload)?;
         self.ensure_locked_amount(payload.source, &payload.token_id, payload.amount)?;
-        if !self
-            .info
-            .recipients
-            .iter()
-            .any(|recipient| recipient.address == payload.recipient)
-        {
+        if !recipient_allowed(&self.info, payload.recipient) {
             return Err(LockError::RecipientNotAllowed);
         }
         Ok(())
@@ -823,6 +819,15 @@ fn ensure_capability_simple_v0(
     }
 }
 
+fn recipient_allowed(info: &LockInfo, recipient: AccountAddress) -> bool {
+    match &info.recipients {
+        LockRecipients::Any => true,
+        LockRecipients::Limited(recipients) => recipients
+            .iter()
+            .any(|allowed_recipient| allowed_recipient.address == recipient),
+    }
+}
+
 fn ensure_locked_amount(
     info: &LockInfo,
     source: AccountAddress,
@@ -995,7 +1000,7 @@ mod tests {
         base::{Energy, TransactionIndex},
         common::types::TransactionTime,
         protocol_level_locks::{
-            LockAccountFunds, LockControllerSimpleV0, LockControllerSimpleV0Grant,
+            LockAccountFunds, LockControllerSimpleV0, LockControllerSimpleV0Grant, LockRecipients,
             LockedTokenAmount,
         },
         protocol_level_tokens::{
@@ -1023,7 +1028,7 @@ mod tests {
     fn example_lock_info() -> LockInfo {
         LockInfo {
             lock: LockId::new(10001, 5, 0),
-            recipients: vec![holder(ADDRESS)],
+            recipients: LockRecipients::Limited(vec![holder(ADDRESS)]),
             expiry: TransactionTime::seconds_after(3600),
             controller: LockController::SimpleV0(LockControllerSimpleV0 {
                 grants: vec![LockControllerSimpleV0Grant {
@@ -1112,6 +1117,23 @@ mod tests {
             ),
             Err(LockError::InsufficientFunds)
         ));
+    }
+
+    #[test]
+    fn recipient_allowed_accepts_any_recipients() {
+        let mut info = example_lock_info();
+        info.recipients = LockRecipients::Any;
+
+        assert!(recipient_allowed(&info, ADDRESS));
+        assert!(recipient_allowed(&info, OTHER_ADDRESS));
+    }
+
+    #[test]
+    fn recipient_allowed_rejects_missing_limited_recipient() {
+        let info = example_lock_info();
+
+        assert!(recipient_allowed(&info, ADDRESS));
+        assert!(!recipient_allowed(&info, OTHER_ADDRESS));
     }
 
     #[test]
@@ -1317,7 +1339,7 @@ mod tests {
         let lock_id = LockId::new(10001, 5, 0);
         let resolved = resolve_pending_operations(
             LockConfig {
-                recipients: vec![holder(ADDRESS)],
+                recipients: LockRecipients::Limited(vec![holder(ADDRESS)]),
                 expiry: TransactionTime::from_seconds(10_000_000),
                 controller: LockController::SimpleV0(LockControllerSimpleV0 {
                     grants: vec![],

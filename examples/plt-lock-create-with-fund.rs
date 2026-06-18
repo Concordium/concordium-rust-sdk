@@ -5,7 +5,7 @@ use concordium_base::{
     common::types::TransactionTime,
     protocol_level_locks::{
         LockConfig, LockController, LockControllerSimpleV0, LockControllerSimpleV0Capability,
-        LockControllerSimpleV0Grant,
+        LockControllerSimpleV0Grant, LockRecipients,
     },
     protocol_level_tokens::{CborHolderAccount, ConversionRule, TokenAmount, TokenId},
 };
@@ -54,9 +54,9 @@ async fn main() -> anyhow::Result<()> {
         ConversionRule::AllowRounding,
     )?;
 
-    // Construct lock configuration payload.
+    // Construct a limited-recipient lock configuration payload.
     let config = LockConfig {
-        recipients: vec![CborHolderAccount::from(keys.address)],
+        recipients: LockRecipients::Limited(vec![CborHolderAccount::from(keys.address)]),
         expiry: TransactionTime::hours_after(1),
         controller: LockController::SimpleV0(LockControllerSimpleV0 {
             grants: vec![LockControllerSimpleV0Grant {

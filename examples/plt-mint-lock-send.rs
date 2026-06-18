@@ -5,7 +5,7 @@ use concordium_base::{
     contracts_common::AccountAddress,
     protocol_level_locks::{
         LockConfig, LockController, LockControllerSimpleV0, LockControllerSimpleV0Capability,
-        LockControllerSimpleV0Grant,
+        LockControllerSimpleV0Grant, LockRecipients,
     },
     protocol_level_tokens::{
         meta_operations, CborHolderAccount, ConversionRule, TokenAmount, TokenId,
@@ -69,7 +69,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Construct composed payload.
     let config = LockConfig {
-        recipients: vec![CborHolderAccount::from(app.recipient)],
+        recipients: LockRecipients::Limited(vec![CborHolderAccount::from(app.recipient)]),
         expiry: TransactionTime::hours_after(1),
         controller: LockController::SimpleV0(LockControllerSimpleV0 {
             grants: vec![LockControllerSimpleV0Grant {
