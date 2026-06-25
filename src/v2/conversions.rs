@@ -9,7 +9,8 @@ use super::{
 use crate::types::{
     chain_parameters,
     queries::{ConcordiumBFTDetails, ProtocolVersionInt},
-    AccountReleaseSchedule, ActiveBakerPoolStatus,
+    AccountReleaseSchedule, ActiveBakerPoolStatus, LockAccountRejectReasonDetails,
+    LockTokenRejectReasonDetails,
 };
 use chrono::TimeZone;
 use concordium_base::{
@@ -2592,29 +2593,41 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
                 lock_id: lock_id.into(),
             },
             reject_reason::Reason::LockFundNotAuthorized(v) => Self::LockFundNotAuthorized {
-                lock_id: v.lock_id.require()?.into(),
-                account: v.account.require()?.try_into()?,
+                details: LockAccountRejectReasonDetails {
+                    lock_id: v.lock_id.require()?.into(),
+                    account: v.account.require()?.try_into()?,
+                },
             },
             reject_reason::Reason::LockSendNotAuthorized(v) => Self::LockSendNotAuthorized {
-                lock_id: v.lock_id.require()?.into(),
-                account: v.account.require()?.try_into()?,
+                details: LockAccountRejectReasonDetails {
+                    lock_id: v.lock_id.require()?.into(),
+                    account: v.account.require()?.try_into()?,
+                },
             },
             reject_reason::Reason::LockReturnNotAuthorized(v) => Self::LockReturnNotAuthorized {
-                lock_id: v.lock_id.require()?.into(),
-                account: v.account.require()?.try_into()?,
+                details: LockAccountRejectReasonDetails {
+                    lock_id: v.lock_id.require()?.into(),
+                    account: v.account.require()?.try_into()?,
+                },
             },
             reject_reason::Reason::LockCancelNotAuthorized(v) => Self::LockCancelNotAuthorized {
-                lock_id: v.lock_id.require()?.into(),
-                account: v.account.require()?.try_into()?,
+                details: LockAccountRejectReasonDetails {
+                    lock_id: v.lock_id.require()?.into(),
+                    account: v.account.require()?.try_into()?,
+                },
             },
             reject_reason::Reason::LockTokenNotPermitted(v) => Self::LockTokenNotPermitted {
-                lock_id: v.lock_id.require()?.into(),
-                token_id: v.token_id.require()?.try_into()?,
+                details: LockTokenRejectReasonDetails {
+                    lock_id: v.lock_id.require()?.into(),
+                    token_id: v.token_id.require()?.try_into()?,
+                },
             },
             reject_reason::Reason::LockRecipientNotPermitted(v) => {
                 Self::LockRecipientNotPermitted {
-                    lock_id: v.lock_id.require()?.into(),
-                    account: v.account.require()?.try_into()?,
+                    details: LockAccountRejectReasonDetails {
+                        lock_id: v.lock_id.require()?.into(),
+                        account: v.account.require()?.try_into()?,
+                    },
                 }
             }
         })
