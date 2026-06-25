@@ -5,7 +5,7 @@ use concordium_base::{
     common::types::TransactionTime,
     protocol_level_locks::{
         LockConfig, LockController, LockControllerSimpleV0, LockControllerSimpleV0Capability,
-        LockControllerSimpleV0Grant, LockRecipients,
+        LockControllerSimpleV0Grant, LockMetadata, LockRecipients,
     },
     protocol_level_tokens::{CborHolderAccount, TokenId},
 };
@@ -35,6 +35,13 @@ async fn main() -> anyhow::Result<()> {
     let keys = WalletAccount::from_json_file(app.account).context("Could not read account keys")?;
     let client = v2::Client::new(app.endpoint).await?;
 
+    // Construct typed metadata, then store it in the lock configuration as raw CBOR bytes.
+    let metadata = LockMetadata {
+        name: Some("Example lock".to_string()),
+        description: Some("Created by the Rust SDK lock-create example".to_string()),
+        ..Default::default()
+    };
+
     // Construct an any-recipient lock configuration payload.
     let config = LockConfig {
         recipients: LockRecipients::Any,
@@ -53,6 +60,7 @@ async fn main() -> anyhow::Result<()> {
             keep_alive: false,
             memo: None,
         }),
+        metadata: Some(metadata.encode_raw_cbor()),
     };
 
     // Submit transaction.

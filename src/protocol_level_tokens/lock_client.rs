@@ -998,10 +998,10 @@ mod tests {
     };
     use concordium_base::{
         base::{Energy, TransactionIndex},
-        common::types::TransactionTime,
+        common::{cbor::value::Value, types::TransactionTime},
         protocol_level_locks::{
-            LockAccountFunds, LockControllerSimpleV0, LockControllerSimpleV0Grant, LockRecipients,
-            LockedTokenAmount,
+            LockAccountFunds, LockControllerSimpleV0, LockControllerSimpleV0Grant, LockMetadata,
+            LockRecipients, LockedTokenAmount,
         },
         protocol_level_tokens::{
             meta_operations::MetaUpdateOperation, CborHolderAccount, CoinInfo, RawCbor,
@@ -1009,6 +1009,7 @@ mod tests {
         },
         transactions::TransactionType,
     };
+    use std::collections::HashMap;
 
     const ADDRESS: AccountAddress = AccountAddress([
         0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
@@ -1022,6 +1023,17 @@ mod tests {
         CborHolderAccount {
             coin_info: Some(CoinInfo::CCD),
             address,
+        }
+    }
+
+    fn example_lock_metadata() -> LockMetadata {
+        LockMetadata {
+            name: Some("SDK test lock".to_string()),
+            description: Some("Metadata used by SDK lock tests".to_string()),
+            additional: HashMap::from([(
+                "issuer".to_string(),
+                Value::Text("Concordium".to_string()),
+            )]),
         }
     }
 
@@ -1044,6 +1056,7 @@ mod tests {
                 keep_alive: false,
                 memo: None,
             }),
+            metadata: Some(example_lock_metadata().encode_raw_cbor()),
             funds: vec![LockAccountFunds {
                 account: holder(ADDRESS),
                 amounts: vec![LockedTokenAmount {
@@ -1347,6 +1360,7 @@ mod tests {
                     keep_alive: false,
                     memo: None,
                 }),
+                metadata: Some(example_lock_metadata().encode_raw_cbor()),
             },
             prepended_operations,
             appended_operations,

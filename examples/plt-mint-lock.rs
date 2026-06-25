@@ -5,7 +5,7 @@ use concordium_base::{
     contracts_common::AccountAddress,
     protocol_level_locks::{
         LockConfig, LockController, LockControllerSimpleV0, LockControllerSimpleV0Capability,
-        LockControllerSimpleV0Grant, LockRecipients,
+        LockControllerSimpleV0Grant, LockMetadata, LockRecipients,
     },
     protocol_level_tokens::{
         meta_operations, CborHolderAccount, ConversionRule, TokenAmount, TokenId,
@@ -67,6 +67,12 @@ async fn main() -> anyhow::Result<()> {
 
     let lock_id = get_next_lock_id(&mut client, keys.address, 0).await?;
 
+    let metadata = LockMetadata {
+        name: Some("Mint and lock".to_string()),
+        description: Some("Created by the Rust SDK mint-lock example".to_string()),
+        ..Default::default()
+    };
+
     // Construct composed payload.
     let config = LockConfig {
         recipients: LockRecipients::Limited(vec![CborHolderAccount::from(app.recipient)]),
@@ -83,20 +89,13 @@ async fn main() -> anyhow::Result<()> {
             keep_alive: false,
             memo: None,
         }),
+        metadata: Some(metadata.encode_raw_cbor()),
     };
 
     let operations = [
         meta_operations::mint_tokens(app.token_id.clone(), token_amount),
         meta_operations::lock_create(config),
         meta_operations::lock_fund(app.token_id.clone(), lock_id.clone(), token_amount, None),
-        meta_operations::lock_send(
-            app.token_id.clone(),
-            lock_id,
-            keys.address,
-            app.recipient,
-            token_amount,
-            None,
-        ),
     ]
     .into_iter()
     .collect();
