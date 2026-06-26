@@ -2657,6 +2657,28 @@ pub use concordium_base::{
     updates::*,
 };
 
+/// Details for lock reject reasons involving an account.
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
+pub struct LockAccountRejectReasonDetails {
+    /// The lock involved in the rejected operation.
+    pub lock_id: protocol_level_locks::LockId,
+    /// The account involved in the rejected operation.
+    pub account: AccountAddress,
+}
+
+/// Details for lock reject reasons involving a token.
+#[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
+pub struct LockTokenRejectReasonDetails {
+    /// The lock involved in the rejected operation.
+    pub lock_id: protocol_level_locks::LockId,
+    /// The token involved in the rejected operation.
+    pub token_id: protocol_level_tokens::TokenId,
+}
+
 #[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde_deprecated", serde(tag = "tag"))]
@@ -2847,43 +2869,44 @@ pub enum RejectReason {
     /// The operation could not be completed because the lock is expired.
     /// Introduced in protocol version 11.
     LockExpired {
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
         lock_id: protocol_level_locks::LockId,
     },
     /// The account is not authorized to fund the lock.
     /// Introduced in protocol version 11.
     LockFundNotAuthorized {
-        lock_id: protocol_level_locks::LockId,
-        account: AccountAddress,
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
+        details: LockAccountRejectReasonDetails,
     },
     /// The account is not authorized to send funds controlled by the lock.
     /// Introduced in protocol version 11.
     LockSendNotAuthorized {
-        lock_id: protocol_level_locks::LockId,
-        account: AccountAddress,
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
+        details: LockAccountRejectReasonDetails,
     },
     /// The account is not authorized to return funds controlled by the lock.
     /// Introduced in protocol version 11.
     LockReturnNotAuthorized {
-        lock_id: protocol_level_locks::LockId,
-        account: AccountAddress,
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
+        details: LockAccountRejectReasonDetails,
     },
     /// The account is not authorized to cancel the lock.
     /// Introduced in protocol version 11.
     LockCancelNotAuthorized {
-        lock_id: protocol_level_locks::LockId,
-        account: AccountAddress,
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
+        details: LockAccountRejectReasonDetails,
     },
     /// The lock does not permit the specified token.
     /// Introduced in protocol version 11.
     LockTokenNotPermitted {
-        lock_id: protocol_level_locks::LockId,
-        token_id: protocol_level_tokens::TokenId,
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
+        details: LockTokenRejectReasonDetails,
     },
     /// The recipient is not permitted to receive funds controlled by the lock.
     /// Introduced in protocol version 11.
     LockRecipientNotPermitted {
-        lock_id: protocol_level_locks::LockId,
-        account: AccountAddress,
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
+        details: LockAccountRejectReasonDetails,
     },
 }
 
@@ -3135,6 +3158,98 @@ impl WalletAccount {
         Ok(Self::from_json_reader(
             std::fs::File::open(path).context("Unable to open key file.")?,
         )?)
+    }
+}
+
+#[cfg(all(test, feature = "serde_deprecated"))]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn lock_id() -> protocol_level_locks::LockId {
+        protocol_level_locks::LockId::new(1, 2, 3)
+    }
+
+    fn account() -> AccountAddress {
+        AccountAddress([1u8; 32])
+    }
+
+    #[test]
+    fn lock_reject_reasons_use_expected_json() {
+        let lock_id = lock_id();
+        let account = account();
+        let token_id =
+            protocol_level_tokens::TokenId::try_from("CCD".to_string()).expect("valid token id");
+        let lock_id_json = serde_json::to_value(&lock_id).expect("serialize lock id");
+        let account_json = serde_json::to_value(account).expect("serialize account address");
+        let token_id_json = serde_json::to_value(&token_id).expect("serialize token id");
+
+        let account_details = LockAccountRejectReasonDetails {
+            lock_id: lock_id.clone(),
+            account,
+        };
+        let token_details = LockTokenRejectReasonDetails {
+            lock_id: lock_id.clone(),
+            token_id,
+        };
+        let account_details_json = json!({"lockId": lock_id_json.clone(), "account": account_json});
+        let token_details_json = json!({"lockId": lock_id_json.clone(), "tokenId": token_id_json});
+
+        let cases = [
+            (
+                RejectReason::LockExpired {
+                    lock_id: lock_id.clone(),
+                },
+                json!({"tag": "LockExpired", "contents": lock_id_json}),
+            ),
+            (
+                RejectReason::LockFundNotAuthorized {
+                    details: account_details.clone(),
+                },
+                json!({"tag": "LockFundNotAuthorized", "contents": account_details_json.clone()}),
+            ),
+            (
+                RejectReason::LockSendNotAuthorized {
+                    details: account_details.clone(),
+                },
+                json!({"tag": "LockSendNotAuthorized", "contents": account_details_json.clone()}),
+            ),
+            (
+                RejectReason::LockReturnNotAuthorized {
+                    details: account_details.clone(),
+                },
+                json!({"tag": "LockReturnNotAuthorized", "contents": account_details_json.clone()}),
+            ),
+            (
+                RejectReason::LockCancelNotAuthorized {
+                    details: account_details.clone(),
+                },
+                json!({"tag": "LockCancelNotAuthorized", "contents": account_details_json.clone()}),
+            ),
+            (
+                RejectReason::LockTokenNotPermitted {
+                    details: token_details,
+                },
+                json!({"tag": "LockTokenNotPermitted", "contents": token_details_json}),
+            ),
+            (
+                RejectReason::LockRecipientNotPermitted {
+                    details: account_details,
+                },
+                json!({"tag": "LockRecipientNotPermitted", "contents": account_details_json}),
+            ),
+        ];
+
+        for (reason, expected) in cases {
+            let encoded = serde_json::to_value(&reason).expect("serialize reject reason");
+            assert_eq!(encoded, expected);
+            let decoded = serde_json::from_value::<RejectReason>(expected.clone())
+                .expect("deserialize reject reason");
+            assert_eq!(
+                serde_json::to_value(decoded).expect("serialize decoded reject reason"),
+                expected
+            );
+        }
     }
 }
 
