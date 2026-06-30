@@ -5,7 +5,7 @@ use concordium_base::{
     common::types::TransactionTime,
     protocol_level_locks::{
         LockConfig, LockController, LockControllerSimpleV0, LockControllerSimpleV0Capability,
-        LockControllerSimpleV0Grant, LockRecipients,
+        LockControllerSimpleV0Grant, LockMetadata, LockRecipients,
     },
     protocol_level_tokens::{CborHolderAccount, ConversionRule, TokenAmount, TokenId},
 };
@@ -54,6 +54,12 @@ async fn main() -> anyhow::Result<()> {
         ConversionRule::AllowRounding,
     )?;
 
+    let metadata = LockMetadata {
+        name: Some("Funded example lock".to_string()),
+        description: Some("Created and funded by a Rust SDK example".to_string()),
+        ..Default::default()
+    };
+
     // Construct a limited-recipient lock configuration payload.
     let config = LockConfig {
         recipients: LockRecipients::Limited(vec![CborHolderAccount::from(keys.address)]),
@@ -72,6 +78,7 @@ async fn main() -> anyhow::Result<()> {
             keep_alive: false,
             memo: None,
         }),
+        metadata: Some(metadata.encode_raw_cbor()),
     };
 
     // Construct composed payload.
