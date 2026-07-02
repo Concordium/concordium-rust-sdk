@@ -9,7 +9,7 @@ use crate::types::{
     BakerKeyPairs, HigherLevelAccessStructure, ProtocolVersion, UpdateKeyPair, UpdateKeysIndex,
     UpdateKeysThreshold, UpdatePublicKey,
 };
-use anyhow::{anyhow, bail, ensure};
+use anyhow::{anyhow, bail, ensure, Context};
 use concordium_base::{
     common::{
         types::{Amount, CredentialIndex, KeyIndex, KeyPair},
@@ -29,7 +29,7 @@ use concordium_base::{
         },
     },
 };
-use std::{collections::BTreeMap, collections::BTreeSet, sync::atomic::AtomicU64};
+use std::{collections::BTreeMap, collections::BTreeSet};
 
 // ── Input types ───────────────────────────────────────────────────────────────
 
@@ -573,7 +573,12 @@ impl GenesisBuilderCPV3 {
             accounts_public,
             baker_credentials: baker_creds,
             foundation_index: foundation_idx,
-        } = build_accounts(self.inner.account_inputs, &crypto_params, &ar_info_map)?;
+        } = build_accounts(
+            self.inner.account_inputs,
+            &crypto_params,
+            &ip_info_map,
+            &ar_info_map,
+        )?;
 
         tracing::info!(
             "There are {} accounts in genesis, {} of which are bakers.",
@@ -857,9 +862,35 @@ fn build_anonymity_revokers(
 /// Builds account data from inputs.
 ///
 /// Returns `(full_account_data, public_accounts, baker_credentials, foundation_index)`.
+fn validate_account_credentials(
+    credentials: &super::types::GenesisCredentials,
+    ips: &BTreeMap<IpIdentity, IpInfo<IpPairing>>,
+    ars: &BTreeMap<ArIdentity, ArInfo<ArCurve>>,
+) -> anyhow::Result<()> {
+    for credential in credentials.values() {
+        let issuer = credential.issuer();
+        ensure!(
+            ips.contains_key(&issuer),
+            "Account credential references unknown identity provider {}.",
+            issuer
+        );
+        if let AccountCredentialWithoutProofs::Normal { cdv, .. } = credential {
+            for ar_identity in cdv.ar_data.keys() {
+                ensure!(
+                    ars.contains_key(ar_identity),
+                    "Account credential references unknown anonymity revoker {}.",
+                    ar_identity
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
 fn build_accounts(
     inputs: Vec<AccountInputItem>,
     params: &GlobalContext<ArCurve>,
+    ips: &BTreeMap<IpIdentity, IpInfo<IpPairing>>,
     ars: &BTreeMap<ArIdentity, ArInfo<ArCurve>>,
 ) -> anyhow::Result<AccountBuildOutput> {
     let mut account_data: Vec<super::types::GenesisAccount> = Vec::new();
@@ -886,6 +917,8 @@ fn build_accounts(
                         "There are two accounts marked as foundation accounts."
                     );
                 }
+
+                validate_account_credentials(&account.credentials.value, ips, ars)?;
 
                 let baker = if let Some(stake) = stake {
                     let baker_id = BakerId::from(AccountIndex::from(idx));
@@ -939,6 +972,7 @@ fn build_accounts(
                         "There are two accounts marked as foundation accounts."
                     );
                 }
+                validate_account_credentials(&account.credentials, ips, ars)?;
                 // For assemble mode: only public data is available; no private
                 // baker key material to echo back.
                 accounts_public.push(account);
@@ -946,6 +980,11 @@ fn build_accounts(
             }
 
             AccountInputItem::Fresh(cfg) => {
+                ensure!(
+                    ips.contains_key(&cfg.identity_provider),
+                    "Account batch references unknown identity provider {}.",
+                    cfg.identity_provider
+                );
                 if cfg.foundation {
                     ensure!(
                         foundation_index.is_none(),
@@ -964,10 +1003,14 @@ fn build_accounts(
                     "Signature threshold must be at most the number of keys."
                 );
 
-                let num_bakers = AtomicU64::new(0);
                 let params_ref = params;
-                let ars_ref = ars;
-
+                let num_ars_minus_one = ars.len().checked_sub(1).context(
+                    "At least one anonymity revoker must be configured for fresh accounts.",
+                )?;
+                let ar_threshold = id::secret_sharing::Threshold::try_new(std::cmp::max(
+                    1,
+                    u8::try_from(num_ars_minus_one)?,
+                ))?;
                 let mut batch: Vec<(
                     super::types::GenesisAccount,
                     GenesisAccountPublic,
@@ -988,11 +1031,10 @@ fn build_accounts(
                             YearMonth::new(created_at.year + 5, created_at.month).unwrap();
 
                         let id_cred_sec = Value::<ArCurve>::generate_non_zero(&mut csprng);
-                        let ar_threshold = std::cmp::max(1, u8::try_from(ars_ref.len() - 1)?);
                         let sharing_data = compute_sharing_data(
                             &id_cred_sec,
-                            ars_ref,
-                            ar_threshold.try_into().unwrap(),
+                            ars,
+                            ar_threshold,
                             &params_ref.on_chain_commitment_key,
                             &mut csprng,
                         );
@@ -1089,7 +1131,6 @@ fn build_accounts(
                                 stake <= cfg.balance,
                                 "Initial stake must not be above the initial balance."
                             );
-                            num_bakers.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
                             let keys = BakerKeyPairs::generate(&mut csprng);
                             let baker_id = BakerId::from(AccountIndex::from(n));
                             let creds = BakerCredentials::new(baker_id, keys);
@@ -1392,6 +1433,7 @@ impl GenesisBuilderCPV2 {
         } = build_accounts(
             self.inner.account_inputs,
             &crypto_params,
+            &identity_provider_infos,
             &anonymity_revoker_infos,
         )?;
 
@@ -1574,7 +1616,12 @@ impl GenesisBuilderCPV1 {
             accounts_public,
             baker_credentials: baker_creds,
             foundation_index: foundation_idx,
-        } = build_accounts(self.inner.account_inputs, &crypto_params, &ar_info_map)?;
+        } = build_accounts(
+            self.inner.account_inputs,
+            &crypto_params,
+            &ip_info_map,
+            &ar_info_map,
+        )?;
 
         tracing::info!(
             "There are {} accounts in genesis, {} of which are bakers.",
@@ -1805,7 +1852,12 @@ impl GenesisBuilderCPV0 {
             accounts_public,
             baker_credentials: baker_creds,
             foundation_index: foundation_idx,
-        } = build_accounts(self.inner.account_inputs, &crypto_params, &ar_info_map)?;
+        } = build_accounts(
+            self.inner.account_inputs,
+            &crypto_params,
+            &ip_info_map,
+            &ar_info_map,
+        )?;
 
         tracing::info!(
             "There are {} accounts in genesis, {} of which are bakers.",
@@ -1991,5 +2043,170 @@ fn build_governance_keys_v0(
                 generated_level2_key_pairs: gen_level2,
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_ip_and_ar_maps(
+        params: &GlobalContext<ArCurve>,
+    ) -> (
+        BTreeMap<IpIdentity, IpInfo<IpPairing>>,
+        BTreeMap<ArIdentity, ArInfo<ArCurve>>,
+    ) {
+        let mut csprng = rand::thread_rng();
+        let ips = build_identity_providers(
+            vec![IpInputItem::Fresh {
+                start_id: IpIdentity::from(0),
+                count: 1,
+            }],
+            &mut csprng,
+        )
+        .unwrap()
+        .info_map;
+        let ars = build_anonymity_revokers(
+            vec![ArInputItem::Fresh {
+                start_id: ArIdentity::try_from(1).unwrap(),
+                count: 1,
+            }],
+            params,
+            &mut csprng,
+        )
+        .unwrap()
+        .info_map;
+        (ips, ars)
+    }
+
+    fn sample_public_account(
+        params: &GlobalContext<ArCurve>,
+        ips: &BTreeMap<IpIdentity, IpInfo<IpPairing>>,
+        ars: &BTreeMap<ArIdentity, ArInfo<ArCurve>>,
+    ) -> GenesisAccountPublic {
+        build_accounts(
+            vec![AccountInputItem::Fresh(FreshAccountConfig {
+                count: 1,
+                stake: None,
+                balance: Amount::from_micro_ccd(1),
+                num_keys: 1,
+                threshold: 1.try_into().unwrap(),
+                identity_provider: IpIdentity::from(0),
+                restake_earnings: false,
+                foundation: true,
+            })],
+            params,
+            ips,
+            ars,
+        )
+        .unwrap()
+        .accounts_public
+        .into_iter()
+        .next()
+        .unwrap()
+    }
+
+    #[test]
+    fn fresh_accounts_require_known_identity_provider() {
+        let params = GlobalContext::<ArCurve>::generate("test-genesis".to_string());
+        let result = build_accounts(
+            vec![AccountInputItem::Fresh(FreshAccountConfig {
+                count: 1,
+                stake: None,
+                balance: Amount::from_micro_ccd(1),
+                num_keys: 1,
+                threshold: 1.try_into().unwrap(),
+                identity_provider: IpIdentity::from(0),
+                restake_earnings: false,
+                foundation: true,
+            })],
+            &params,
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+        );
+
+        let err = match result {
+            Ok(_) => panic!("fresh account batch should reject unknown identity provider"),
+            Err(err) => err,
+        };
+
+        assert!(
+            err.to_string()
+                .contains("Account batch references unknown identity provider 0."),
+            "unexpected error: {err:#}"
+        );
+    }
+
+    #[test]
+    fn existing_public_accounts_require_known_identity_provider() {
+        let params = GlobalContext::<ArCurve>::generate("test-genesis".to_string());
+        let (ips, ars) = sample_ip_and_ar_maps(&params);
+        let mut account = sample_public_account(&params, &ips, &ars);
+        match account.credentials.values_mut().next().unwrap() {
+            AccountCredentialWithoutProofs::Initial { icdv } => {
+                icdv.ip_identity = IpIdentity::from(99);
+            }
+            AccountCredentialWithoutProofs::Normal { cdv, .. } => {
+                cdv.ip_identity = IpIdentity::from(99);
+            }
+        }
+
+        let result = build_accounts(
+            vec![AccountInputItem::ExistingPublic {
+                account,
+                foundation: true,
+            }],
+            &params,
+            &ips,
+            &ars,
+        );
+
+        let err = match result {
+            Ok(_) => panic!("existing public account should reject unknown identity provider"),
+            Err(err) => err,
+        };
+
+        assert!(
+            err.to_string()
+                .contains("Account credential references unknown identity provider 99."),
+            "unexpected error: {err:#}"
+        );
+    }
+
+    #[test]
+    fn existing_public_accounts_require_known_anonymity_revokers() {
+        let params = GlobalContext::<ArCurve>::generate("test-genesis".to_string());
+        let (ips, ars) = sample_ip_and_ar_maps(&params);
+        let mut account = sample_public_account(&params, &ips, &ars);
+        if let AccountCredentialWithoutProofs::Normal { cdv, .. } =
+            account.credentials.values_mut().next().unwrap()
+        {
+            let (_, ar_data) = cdv.ar_data.pop_first().unwrap();
+            cdv.ar_data
+                .insert(ArIdentity::try_from(2).unwrap(), ar_data);
+        } else {
+            panic!("sample account unexpectedly had an initial credential");
+        }
+
+        let result = build_accounts(
+            vec![AccountInputItem::ExistingPublic {
+                account,
+                foundation: true,
+            }],
+            &params,
+            &ips,
+            &ars,
+        );
+
+        let err = match result {
+            Ok(_) => panic!("existing public account should reject unknown anonymity revoker"),
+            Err(err) => err,
+        };
+
+        assert!(
+            err.to_string()
+                .contains("Account credential references unknown anonymity revoker 2."),
+            "unexpected error: {err:#}"
+        );
     }
 }
