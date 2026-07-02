@@ -25,4 +25,6 @@ pub mod signatures;
 
 pub mod indexer;
 
+pub mod genesis;
+
 pub use concordium_base as base;
