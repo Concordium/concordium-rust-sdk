@@ -1,3 +1,4 @@
+#[cfg(feature = "serde_deprecated")]
 pub(crate) mod timestamp_millis {
     use serde::Deserialize;
     /// Serialize (via Serde) chrono::DateTime in milliseconds as an u64.
@@ -52,6 +53,7 @@ pub(crate) mod byte_array_hex {
     }
 }
 
+#[cfg(feature = "serde_deprecated")]
 pub(crate) mod account_amounts {
     use concordium_base::{
         common::{types::Amount, SerdeDeserialize, SerdeSerialize},
@@ -109,6 +111,7 @@ pub(crate) mod account_amounts {
     }
 }
 
+#[cfg(feature = "serde_deprecated")]
 pub(crate) mod duration_millis {
     use serde::Deserialize;
     /// Serialize (via Serde) chrono::Duration in milliseconds as an i64.

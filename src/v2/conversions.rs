@@ -26,7 +26,10 @@ use concordium_base::{
     updates,
 };
 use cooldown::CooldownStatus;
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    io::Cursor,
+};
 
 fn consume<A: Deserial>(bytes: &[u8]) -> Result<A, tonic::Status> {
     let mut cursor = std::io::Cursor::new(bytes);
@@ -496,6 +499,7 @@ impl From<ProtocolVersion> for super::types::ProtocolVersion {
             ProtocolVersion::ProtocolVersion7 => super::types::ProtocolVersion::P7,
             ProtocolVersion::ProtocolVersion8 => super::types::ProtocolVersion::P8,
             ProtocolVersion::ProtocolVersion9 => super::types::ProtocolVersion::P9,
+            ProtocolVersion::ProtocolVersion10 => super::types::ProtocolVersion::P10,
         }
     }
 }
@@ -512,6 +516,7 @@ impl From<super::types::ProtocolVersion> for ProtocolVersion {
             super::types::ProtocolVersion::P7 => ProtocolVersion::ProtocolVersion7,
             super::types::ProtocolVersion::P8 => ProtocolVersion::ProtocolVersion8,
             super::types::ProtocolVersion::P9 => ProtocolVersion::ProtocolVersion9,
+            super::types::ProtocolVersion::P10 => ProtocolVersion::ProtocolVersion10,
         }
     }
 }
@@ -735,11 +740,10 @@ impl TryFrom<ArThreshold> for crate::id::secret_sharing::Threshold {
 
     fn try_from(value: ArThreshold) -> Result<Self, Self::Error> {
         if let Ok(v) = u8::try_from(value.value) {
-            if v == 0 {
-                Err(tonic::Status::internal("Unexpected zero AR threshold."))
-            } else {
-                Ok(Self(v))
-            }
+            Self::try_from(v).map_err(|e| {
+                let () = e;
+                tonic::Status::internal("Unexpected zero AR threshold.")
+            })
         } else {
             Err(tonic::Status::internal("Unexpected AR threshold."))
         }
@@ -1292,6 +1296,56 @@ impl TryFrom<AccountTransaction>
     }
 }
 
+impl TryFrom<AccountTransactionV1>
+    for concordium_base::transactions::AccountTransactionV1<
+        concordium_base::transactions::EncodedPayload,
+    >
+{
+    type Error = tonic::Status;
+
+    fn try_from(value: AccountTransactionV1) -> Result<Self, Self::Error> {
+        let payload: concordium_base::transactions::EncodedPayload =
+            value.payload.require()?.try_into()?;
+        let payload_size = payload.size();
+        let header = {
+            let header = value.header.require()?;
+            let sender = header.sender.require()?.try_into()?;
+            let sponsor = match header.sponsor {
+                Some(sponsor) => Some(sponsor.try_into()?),
+                None => None,
+            };
+            let nonce = header.sequence_number.require()?.into();
+            let energy_amount = header.energy_amount.require()?.into();
+            let expiry = header.expiry.require()?.into();
+            concordium_base::transactions::TransactionHeaderV1 {
+                sponsor,
+                sender,
+                nonce,
+                energy_amount,
+                payload_size,
+                expiry,
+            }
+        };
+        Ok(Self {
+            signatures: concordium_base::common::types::TransactionSignaturesV1 {
+                sender: value
+                    .signatures
+                    .to_owned()
+                    .require()?
+                    .sender_signatures
+                    .require()?
+                    .try_into()?,
+                sponsor: match value.signatures.require()?.sponsor_signatures {
+                    Some(sponsor_sigs) => Some(sponsor_sigs.try_into()?),
+                    None => None,
+                },
+            },
+            header,
+            payload,
+        })
+    }
+}
+
 impl TryFrom<CredentialDeployment>
     for crate::id::types::AccountCredentialMessage<
         crate::id::constants::IpPairing,
@@ -1388,8 +1442,31 @@ impl TryFrom<block_item::BlockItem>
                 Item::CredentialDeployment(Box::new(cd.try_into()?))
             }
             block_item::BlockItem::UpdateInstruction(ui) => Item::UpdateInstruction(ui.try_into()?),
+            block_item::BlockItem::AccountTransactionV1(atv1) => {
+                Item::AccountTransactionV1(atv1.try_into()?)
+            }
+            block_item::BlockItem::RawBlockItem(bytes) => {
+                match concordium_base::transactions::BlockItem::deserial(&mut Cursor::new(bytes)) {
+                    Ok(bi) => Ok(bi),
+                    Err(err) => Err(tonic::Status::new(
+                        tonic::Code::InvalidArgument,
+                        err.to_string(),
+                    )),
+                }?
+            }
         };
         Ok(out)
+    }
+}
+
+impl TryFrom<SponsorDetails> for super::types::SponsorDetails {
+    type Error = tonic::Status;
+
+    fn try_from(v: SponsorDetails) -> Result<Self, Self::Error> {
+        Ok(Self {
+            cost: v.cost.require()?.into(),
+            sponsor: v.sponsor.require()?.try_into()?,
+        })
     }
 }
 
@@ -1400,6 +1477,10 @@ impl TryFrom<AccountTransactionDetails> for super::types::AccountTransactionDeta
         Ok(Self {
             cost: v.cost.require()?.into(),
             sender: v.sender.require()?.try_into()?,
+            sponsor: match v.sponsor {
+                None => None,
+                Some(sponsor) => Some(sponsor.try_into()?),
+            },
             effects: Upward::from(v.effects.map(TryFrom::try_from).transpose()?),
         })
     }

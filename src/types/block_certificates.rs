@@ -4,7 +4,6 @@
 
 use concordium_base::{
     base::{BakerId, Epoch, Round},
-    common::Serial,
     hashes,
     hashes::BlockHash,
 };
@@ -121,7 +120,6 @@ pub mod raw {
 
     use concordium_base::{
         base::{Epoch, Round},
-        common::Serial,
         hashes::BlockHash,
     };
 

@@ -1,4 +1,73 @@
-## Unreleased changes
+## Unreleased
+
+- Exposed `get_blocks` function on the v2 client which returns a stream of blocks `ArrivedBlockInfo`. This endpoint can be used to listen for new blocks arriving on chain.
+
+## 9.0.1
+
+- Fixes a bug where using `serde` to convert `BlockItemSummary` would result in data loss with regards to transaction sponsor details.
+
+## 9.0.0
+
+- Support for `ProtocolVersion::P10`.
+- The flag `serde_deprecated` now guards `serde::Serialize` and `serde::Deserialize` implemetations on the following types. The implementations will eventually be removed.
+  - `protocol_level_tokens::AccountToken`
+  - `protocol_level_tokens::TokenAccountState`
+  - `types::AccountEncryptedAmount`
+  - `types::AccountReleaseSchedule`
+  - `types::Release`
+  - `types::BakerInfo`
+  - `types::BakerPoolInfo`
+  - `types::AccountStakingInfo`
+  - `types::Cooldown`
+  - `types::AccountInfo`
+  - `types::BirkParameters`
+  - `types::BirkBaker`
+  - `types::StakePendingChange`
+  - `types::RewardsOverview`
+  - `types::CommonRewardData`
+  - `types::PoolPendingChange`
+  - `types::CurrentPaydayBakerPoolStatus`
+  - `types::lottery_power_parser`
+  - `types::BakerPoolStatus`
+  - `types::ActiveBakerPoolStatus`
+  - `types::PassiveDelegationStatus`
+  - `types::PoolStatus`
+  - `types::TransactionStatusInBlock`
+  - `types::TransactionStatus`
+  - `types::SpecialTransactionOutcome`
+  - `types::BlockSummaryData`
+  - `types::FinalizationSummary`
+  - `types::FinalizationSummaryParty`
+  - `types::BlockItemSummary`
+  - `types::NewEncryptedAmountEvent`
+  - `types::EncryptedAmountRemovedEvent`
+  - `types::BakerAddedEvent`
+  - `types::BakerKeysEvent`
+  - `types::EncryptedSelfAmountAddedEvent`
+  - `types::ContractInitializedEvent`
+  - `types::RejectReason`
+  - `types::queries::BlockInfo`
+  - `types::queries::ConsensusInfo`
+  - `types::queries::ConcordiumBFTDetails`
+  - `types::queries::Branch`
+  - `types::queries::AccountNonceResponse`
+  - `types::queries::PendingUpdate`
+  - `types::queries::PendingUpdateEffect`
+  - `types::smart_contracts::InstanceInfo`
+  - `types::smart_contracts::ContractContext`
+  - `types::smart_contracts::InvokeContractResult`
+  - Support for sponsored transactions.
+
+## 8.1.0
+
+- Implemented `web3id::v1` module that contains functionality to support the verification flow of Concordium verifiable presentations V1.
+  This includes
+  - creating verification request anchor (VRA)
+  - verifying presentations
+  - creating verification audit anchor (VAA)
+   
+  The main entrypoints in the module are `v1::create_verification_request_and_submit_request_anchor` 
+  and `v1::verify_presentation_and_submit_audit_anchor`.
 
 ## 8.0.0
 

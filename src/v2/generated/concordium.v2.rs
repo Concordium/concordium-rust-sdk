@@ -6,6 +6,7 @@ pub struct AccountAddress {
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
 /// A memo which can be included as part of a transfer. Max size is 256 bytes.
+/// This message can occur starting from protocol version 2.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Memo {
     #[prost(bytes = "vec", tag = "1")]
@@ -53,7 +54,7 @@ pub struct BlockHeight {
     #[prost(uint64, tag = "1")]
     pub value: u64,
 }
-/// The ID of a baker, which is the index of its account.
+/// The ID of a validator, which is the index of its account.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct BakerId {
     #[prost(uint64, tag = "1")]
@@ -75,6 +76,8 @@ pub struct ModuleRef {
 /// Source bytes of a versioned smart contract module.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VersionedModuleSource {
+    /// This field will not be extended in future versions of the API, instead new data versions will
+    /// use optional fields in `ModuleSourceV1`.
     #[prost(oneof = "versioned_module_source::Module", tags = "1, 2")]
     pub module: ::core::option::Option<versioned_module_source::Module>,
 }
@@ -92,6 +95,8 @@ pub mod versioned_module_source {
         #[prost(bytes = "vec", tag = "1")]
         pub value: ::prost::alloc::vec::Vec<u8>,
     }
+    /// This field will not be extended in future versions of the API, instead new data versions will
+    /// use optional fields in `ModuleSourceV1`.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Module {
         #[prost(message, tag = "1")]
@@ -187,65 +192,69 @@ pub struct EncryptedBalance {
 /// Entity to which the account delegates a portion of its stake.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct DelegationTarget {
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "delegation_target::Target", tags = "1, 2")]
     pub target: ::core::option::Option<delegation_target::Target>,
 }
 /// Nested message and enum types in `DelegationTarget`.
 pub mod delegation_target {
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, Copy, PartialEq, ::prost::Oneof)]
     pub enum Target {
-        /// Delegate passively, i.e., to no specific baker.
+        /// Delegate passively, i.e., to no specific validator.
         #[prost(message, tag = "1")]
         Passive(super::Empty),
-        /// Delegate to a specific baker.
+        /// Delegate to a specific validator.
         #[prost(message, tag = "2")]
         Baker(super::BakerId),
     }
 }
-/// Baker's public key used to check whether they won the lottery or not.
+/// Validator's public key used to check whether they won the lottery or not.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerElectionVerifyKey {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
-/// Baker's public key used to check that they are indeed the ones who
+/// Validator's public key used to check that they are indeed the ones who
 /// produced the block.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerSignatureVerifyKey {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
-/// Baker's public key used to check signatures on finalization records.
-/// This is only used if the baker has sufficient stake to participate in
+/// Validator's public key used to check signatures on finalization records.
+/// This is only used if the validator has sufficient stake to participate in
 /// finalization.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerAggregationVerifyKey {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
-/// Information about a baker.
+/// Information about a validator.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerInfo {
-    /// Identity of the baker. This is actually the account index of
-    /// the account controlling the baker.
+    /// Identity of the validator. This is actually the account index of
+    /// the account controlling the validator.
     #[prost(message, optional, tag = "1")]
     pub baker_id: ::core::option::Option<BakerId>,
-    /// Baker's public key used to check whether they won the lottery or not.
+    /// Validator's public key used to check whether they won the lottery or not.
     #[prost(message, optional, tag = "2")]
     pub election_key: ::core::option::Option<BakerElectionVerifyKey>,
-    /// Baker's public key used to check that they are indeed the ones who
+    /// Validator's public key used to check that they are indeed the ones who
     /// produced the block.
     #[prost(message, optional, tag = "3")]
     pub signature_key: ::core::option::Option<BakerSignatureVerifyKey>,
-    /// Baker's public key used to check signatures on finalization records.
-    /// This is only used if the baker has sufficient stake to participate in
+    /// Validator's public key used to check signatures on finalization records.
+    /// This is only used if the validator has sufficient stake to participate in
     /// finalization.
     #[prost(message, optional, tag = "4")]
     pub aggregation_key: ::core::option::Option<BakerAggregationVerifyKey>,
 }
-/// Pending change to the stake either of a baker or delegator.
+/// Pending change to the stake either of a validator or delegator.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct StakePendingChange {
+    /// This field will not be extended in future versions of the API, since it is not used starting
+    /// from Concordium Protocol Version 7.
     #[prost(oneof = "stake_pending_change::Change", tags = "1, 2")]
     pub change: ::core::option::Option<stake_pending_change::Change>,
 }
@@ -259,6 +268,8 @@ pub mod stake_pending_change {
         #[prost(message, optional, tag = "2")]
         pub effective_time: ::core::option::Option<super::Timestamp>,
     }
+    /// This field will not be extended in future versions of the API, since it is not used starting
+    /// from Concordium Protocol Version 7.
     #[derive(Clone, Copy, PartialEq, ::prost::Oneof)]
     pub enum Change {
         #[prost(message, tag = "1")]
@@ -282,14 +293,14 @@ pub struct CommissionRates {
     /// Fraction of finalization rewards charged by the pool owner.
     #[prost(message, optional, tag = "1")]
     pub finalization: ::core::option::Option<AmountFraction>,
-    /// Fraction of baking rewards charged by the pool owner.
+    /// Fraction of block production rewards charged by the pool owner.
     #[prost(message, optional, tag = "2")]
     pub baking: ::core::option::Option<AmountFraction>,
     /// Fraction of transaction rewards charged by the pool owner.
     #[prost(message, optional, tag = "3")]
     pub transaction: ::core::option::Option<AmountFraction>,
 }
-/// Additional information about a baking pool.
+/// Additional information about a validator pool.
 /// This information is added with the introduction of delegation.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerPoolInfo {
@@ -303,10 +314,11 @@ pub struct BakerPoolInfo {
     #[prost(message, optional, tag = "3")]
     pub commission_rates: ::core::option::Option<CommissionRates>,
 }
-/// Information about the account stake, if the account is either a baker or a
+/// Information about the account stake, if the account is either a validator or a
 /// delegator.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountStakingInfo {
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "account_staking_info::StakingInfo", tags = "1, 2")]
     pub staking_info: ::core::option::Option<account_staking_info::StakingInfo>,
 }
@@ -317,17 +329,19 @@ pub mod account_staking_info {
         /// Amount staked at present.
         #[prost(message, optional, tag = "1")]
         pub staked_amount: ::core::option::Option<super::Amount>,
-        /// A flag indicating whether rewards paid to the baker are automatically
+        /// A flag indicating whether rewards paid to the validator are automatically
         /// restaked or not.
         #[prost(bool, tag = "2")]
         pub restake_earnings: bool,
-        /// Information about the baker that is staking.
+        /// Information about the validator that is staking.
         #[prost(message, optional, tag = "3")]
         pub baker_info: ::core::option::Option<super::BakerInfo>,
         /// If present, any pending change to the delegated stake.
+        /// Starting from Concordium Protocol Version 7 this will never be present, due to changes for
+        /// the staking cooldown.
         #[prost(message, optional, tag = "4")]
         pub pending_change: ::core::option::Option<super::StakePendingChange>,
-        /// Present if the account is currently a baker, i.e., it is in the baking
+        /// Present if the account is currently a validator, i.e., it is in the validator
         /// committee of the current epoch.
         #[prost(message, optional, tag = "5")]
         pub pool_info: ::core::option::Option<super::BakerPoolInfo>,
@@ -354,9 +368,10 @@ pub mod account_staking_info {
         #[prost(message, optional, tag = "4")]
         pub pending_change: ::core::option::Option<super::StakePendingChange>,
     }
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum StakingInfo {
-        /// The account is a baker.
+        /// The account is a validator.
         #[prost(message, tag = "1")]
         Baker(Baker),
         /// The account is a delegator.
@@ -414,11 +429,13 @@ pub struct EncryptionKey {
 /// An address of either a contract or an account.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Address {
+    /// This field will not be extended in future versions of the API.
     #[prost(oneof = "address::Type", tags = "1, 2")]
     pub r#type: ::core::option::Option<address::Type>,
 }
 /// Nested message and enum types in `Address`.
 pub mod address {
+    /// This field will not be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Type {
         #[prost(message, tag = "1")]
@@ -430,11 +447,13 @@ pub mod address {
 /// A public key used to verify transaction signatures from an account.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountVerifyKey {
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "account_verify_key::Key", tags = "1")]
     pub key: ::core::option::Option<account_verify_key::Key>,
 }
 /// Nested message and enum types in `AccountVerifyKey`.
 pub mod account_verify_key {
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Key {
         #[prost(bytes, tag = "1")]
@@ -579,11 +598,13 @@ pub struct NormalCredentialValues {
 /// Credential that is part of an account.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountCredential {
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "account_credential::CredentialValues", tags = "1, 2")]
     pub credential_values: ::core::option::Option<account_credential::CredentialValues>,
 }
 /// Nested message and enum types in `AccountCredential`.
 pub mod account_credential {
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum CredentialValues {
         #[prost(message, tag = "1")]
@@ -608,12 +629,14 @@ pub struct Cooldown {
 }
 /// Nested message and enum types in `Cooldown`.
 pub mod cooldown {
-    /// The status of a cooldown. When stake is removed from a baker or delegator
+    /// The status of a cooldown. When stake is removed from a validator or delegator
     /// (from protocol version 7) it first enters the pre-pre-cooldown state.
     /// The next time the stake snaphot is taken (at the epoch transition before
     /// a payday) it enters the pre-cooldown state. At the subsequent payday, it
     /// enters the cooldown state. At the payday after the end of the cooldown
     /// period, the stake is finally released.
+    ///
+    /// This type might be extended in future versions of the API.
     #[derive(
         Clone,
         Copy,
@@ -705,12 +728,12 @@ pub struct AccountInfo {
     /// Internal index of the account. Accounts on the chain get sequential
     /// indices. These should generally not be used outside of the chain,
     /// the account address is meant to be used to refer to accounts,
-    /// however the account index serves the role of the baker id, if the
-    /// account is a baker. Hence it is exposed here as well.
+    /// however the account index serves the role of the validator id, if the
+    /// account is a validator. Hence it is exposed here as well.
     #[prost(message, optional, tag = "8")]
     pub index: ::core::option::Option<AccountIndex>,
-    /// Present if the account is a baker or delegator. In that case
-    /// it is the information about the baker or delegator.
+    /// Present if the account is a validator or delegator. In that case
+    /// it is the information about the validator or delegator.
     #[prost(message, optional, tag = "9")]
     pub stake: ::core::option::Option<AccountStakingInfo>,
     /// Canonical address of the account. This is derived from the first credential
@@ -750,6 +773,7 @@ pub mod account_info {
 /// Input to queries which take a block as a parameter.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockHashInput {
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "block_hash_input::BlockHashInput", tags = "1, 2, 3, 4, 5")]
     pub block_hash_input: ::core::option::Option<block_hash_input::BlockHashInput>,
 }
@@ -769,6 +793,7 @@ pub mod block_hash_input {
         #[prost(bool, tag = "3")]
         pub restrict: bool,
     }
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum BlockHashInput {
         /// Query for the best block.
@@ -791,6 +816,7 @@ pub mod block_hash_input {
 /// Input to queries which take an epoch as a parameter.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EpochRequest {
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "epoch_request::EpochRequestInput", tags = "1, 2")]
     pub epoch_request_input: ::core::option::Option<epoch_request::EpochRequestInput>,
 }
@@ -807,6 +833,7 @@ pub mod epoch_request {
         #[prost(message, optional, tag = "2")]
         pub epoch: ::core::option::Option<super::Epoch>,
     }
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum EpochRequestInput {
         /// Query by genesis index and epoch number.
@@ -820,6 +847,7 @@ pub mod epoch_request {
 /// Input to queries which take an account as a parameter.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountIdentifierInput {
+    /// This field might be extended in future versions of the API.
     #[prost(
         oneof = "account_identifier_input::AccountIdentifierInput",
         tags = "1, 2, 3"
@@ -830,6 +858,7 @@ pub struct AccountIdentifierInput {
 }
 /// Nested message and enum types in `AccountIdentifierInput`.
 pub mod account_identifier_input {
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum AccountIdentifierInput {
         /// Identify the account by the address of the account.
@@ -918,6 +947,9 @@ pub struct InstanceInfoRequest {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InstanceInfo {
     /// The information depends on the smart contract version used by the instance.
+    ///
+    /// This field will not be extended in future versions of the API, instead new data versions will
+    /// use optional fields in `InstanceInfo.V1`.
     #[prost(oneof = "instance_info::Version", tags = "1, 2")]
     pub version: ::core::option::Option<instance_info::Version>,
 }
@@ -965,6 +997,9 @@ pub mod instance_info {
         pub source_module: ::core::option::Option<super::ModuleRef>,
     }
     /// The information depends on the smart contract version used by the instance.
+    ///
+    /// This field will not be extended in future versions of the API, instead new data versions will
+    /// use optional fields in `InstanceInfo.V1`.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Version {
         #[prost(message, tag = "1")]
@@ -1033,6 +1068,7 @@ pub struct ContractStateV0 {
 /// Status of a block item known to the node.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockItemStatus {
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "block_item_status::Status", tags = "1, 2, 3")]
     pub status: ::core::option::Option<block_item_status::Status>,
 }
@@ -1048,6 +1084,7 @@ pub mod block_item_status {
         #[prost(message, optional, tag = "1")]
         pub outcome: ::core::option::Option<super::BlockItemSummaryInBlock>,
     }
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Status {
         /// Block item is received, but not yet in any blocks.
@@ -1081,7 +1118,7 @@ pub struct Energy {
     #[prost(uint64, tag = "1")]
     pub value: u64,
 }
-/// A number representing a slot for baking a block.
+/// A number representing a slot for producing a block.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct Slot {
     #[prost(uint64, tag = "1")]
@@ -1108,6 +1145,7 @@ pub struct Duration {
 /// rejected transaction is payment.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RejectReason {
+    /// This field might be extended in future versions of the API.
     #[prost(
         oneof = "reject_reason::Reason",
         tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56"
@@ -1163,6 +1201,7 @@ pub mod reject_reason {
         #[prost(message, repeated, tag = "1")]
         pub ids: ::prost::alloc::vec::Vec<super::CredentialRegistrationId>,
     }
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Reason {
         /// Raised while validating a Wasm module that is not well formed.
@@ -1207,26 +1246,26 @@ pub mod reject_reason {
         /// Rejected due to contract logic in receive function of a contract.
         #[prost(message, tag = "13")]
         RejectedReceive(RejectedReceive),
-        /// Proof that the baker owns relevant private keys is not valid.
+        /// Proof that the validator owns relevant private keys is not valid.
         #[prost(message, tag = "14")]
         InvalidProof(super::Empty),
-        /// Tried to add baker for an account that already has a baker.
+        /// Tried to add validator for an account that already has a validator.
         #[prost(message, tag = "15")]
         AlreadyABaker(super::BakerId),
-        /// Tried to remove a baker for an account that has no baker.
+        /// Tried to remove a validator for an account that has no validator.
         #[prost(message, tag = "16")]
         NotABaker(super::AccountAddress),
         /// The amount on the account was insufficient to cover the proposed stake.
         #[prost(message, tag = "17")]
         InsufficientBalanceForBakerStake(super::Empty),
-        /// The amount provided is under the threshold required for becoming a baker.
+        /// The amount provided is under the threshold required for becoming a validator.
         #[prost(message, tag = "18")]
         StakeUnderMinimumThresholdForBaking(super::Empty),
-        /// The change could not be made because the baker is in cooldown for
+        /// The change could not be made because the validator is in cooldown for
         /// another change.
         #[prost(message, tag = "19")]
         BakerInCooldown(super::Empty),
-        /// A baker with the given aggregation key already exists.
+        /// A validator with the given aggregation key already exists.
         #[prost(message, tag = "20")]
         DuplicateAggregationKey(super::BakerAggregationVerifyKey),
         /// Encountered credential ID that does not exist.
@@ -1300,20 +1339,20 @@ pub mod reject_reason {
         /// from/to public to/from encrypted).
         #[prost(message, tag = "40")]
         NotAllowedToHandleEncrypted(super::Empty),
-        /// A configure baker transaction is missing one or more arguments in order
-        /// to add a baker.
+        /// A `ConfigureBaker` transaction is missing one or more arguments in order
+        /// to add a validator.
         #[prost(message, tag = "41")]
         MissingBakerAddParameters(super::Empty),
-        /// Finalization reward commission is not in the valid range for a baker.
+        /// Finalization reward commission is not in the valid range for a validator.
         #[prost(message, tag = "42")]
         FinalizationRewardCommissionNotInRange(super::Empty),
-        /// Baking reward commission is not in the valid range for a baker.
+        /// Block production reward commission is not in the valid range for a validator.
         #[prost(message, tag = "43")]
         BakingRewardCommissionNotInRange(super::Empty),
-        /// Transaction fee commission is not in the valid range for a baker.
+        /// Transaction fee commission is not in the valid range for a validator.
         #[prost(message, tag = "44")]
         TransactionFeeCommissionNotInRange(super::Empty),
-        /// Tried to add baker for an account that already has a delegator.
+        /// Tried to add validator for an account that already has a delegator.
         #[prost(message, tag = "45")]
         AlreadyADelegator(super::Empty),
         /// The amount on the account was insufficient to cover the proposed stake.
@@ -1332,7 +1371,7 @@ pub mod reject_reason {
         /// Account is not a delegation account.
         #[prost(message, tag = "50")]
         NotADelegator(super::AccountAddress),
-        /// Delegation target is not a baker
+        /// Delegation target is not a validator
         #[prost(message, tag = "51")]
         DelegationTargetNotABaker(super::BakerId),
         /// The amount would result in pool capital higher than the maximum
@@ -1419,12 +1458,13 @@ pub struct InstanceUpdatedEvent {
 /// A single invocation will produce a sequence of these effects.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ContractTraceElement {
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "contract_trace_element::Element", tags = "1, 2, 3, 4, 5")]
     pub element: ::core::option::Option<contract_trace_element::Element>,
 }
 /// Nested message and enum types in `ContractTraceElement`.
 pub mod contract_trace_element {
-    /// A contract transferred an amount to an account.
+    /// A contract transferred an amount of CCD to an account.
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Transferred {
         /// Sender contract.
@@ -1459,6 +1499,7 @@ pub mod contract_trace_element {
         pub success: bool,
     }
     /// A previously interrupted contract was resumed.
+    /// This message can occur starting from protocol version 5.
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Upgraded {
         /// The that was upgraded.
@@ -1471,12 +1512,13 @@ pub mod contract_trace_element {
         #[prost(message, optional, tag = "3")]
         pub to: ::core::option::Option<super::ModuleRef>,
     }
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Element {
         /// A contract instance was updated.
         #[prost(message, tag = "1")]
         Updated(super::InstanceUpdatedEvent),
-        /// A contract transferred an amount to an account.
+        /// A contract transferred an amount of CCD to an account.
         #[prost(message, tag = "2")]
         Transferred(Transferred),
         /// A contract was interrupted.
@@ -1487,23 +1529,24 @@ pub mod contract_trace_element {
         #[prost(message, tag = "4")]
         Resumed(Resumed),
         /// A contract was upgraded.
+        /// This trace element can occur starting from protocol version 5.
         #[prost(message, tag = "5")]
         Upgraded(Upgraded),
     }
 }
-/// Result of a successful change of baker keys.
+/// Result of a successful change of validator keys.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerKeysEvent {
-    /// ID of the baker whose keys were changed.
+    /// ID of the validator whose keys were changed.
     #[prost(message, optional, tag = "1")]
     pub baker_id: ::core::option::Option<BakerId>,
-    /// Account address of the baker.
+    /// Account address of the validator.
     #[prost(message, optional, tag = "2")]
     pub account: ::core::option::Option<AccountAddress>,
     /// The new public key for verifying block signatures.
     #[prost(message, optional, tag = "3")]
     pub sign_key: ::core::option::Option<BakerSignatureVerifyKey>,
-    /// The new public key for verifying whether the baker won the block
+    /// The new public key for verifying whether the validator won the block
     /// lottery.
     #[prost(message, optional, tag = "4")]
     pub election_key: ::core::option::Option<BakerElectionVerifyKey>,
@@ -1511,9 +1554,12 @@ pub struct BakerKeysEvent {
     #[prost(message, optional, tag = "5")]
     pub aggregation_key: ::core::option::Option<BakerAggregationVerifyKey>,
 }
+/// The associated transaction type can no longer be created starting from protocol version 4.
+/// Hence, this message does not occur anymore.
+/// The functionality was replaced in protocol version 4 by the `BakerConfigured` transaction type.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct BakerStakeUpdatedData {
-    /// Affected baker.
+    /// Affected validator.
     #[prost(message, optional, tag = "1")]
     pub baker_id: ::core::option::Option<BakerId>,
     /// New stake.
@@ -1571,9 +1617,12 @@ pub struct RegisteredData {
     #[prost(bytes = "vec", tag = "1")]
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
-/// Events that may result from the ConfigureBaker transaction.
+/// Events that may result from the `ConfigureBaker` transaction which adds, modify, or removes a validator pool starting in protocol version 4.
+/// Before protocol version 4, distinct transaction types (`BakerAdded`, `BakerRemoved`, `BakerStakeUpdated`, `BakerRestakeEarningsUpdated`,
+/// and `BakerKeysUpdated`) existed which emitted validator related events instead.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerEvent {
+    /// This field might be extended in future versions of the API.
     #[prost(
         oneof = "baker_event::Event",
         tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14"
@@ -1582,34 +1631,39 @@ pub struct BakerEvent {
 }
 /// Nested message and enum types in `BakerEvent`.
 pub mod baker_event {
-    /// A baker was added.
+    /// A validator was added.
+    /// This message/event is always accompanied by `BakerEvent::BakerSetRestakeEarnings`, and starting from protocol version 4 also `BakerEvent::BakerSetOpenStatus`,
+    /// `BakerEvent::BakerSetMetadataURL`, `BakerEvent::BakerSetTransactionFeeCommission`, `BakerEvent::BakerSetBakingRewardCommission` and `BakerEvent::BakerSetFinalizationRewardCommission` events in the same transaction.
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BakerAdded {
-        /// The keys with which the baker registered.
+        /// The keys with which the validator registered.
         #[prost(message, optional, tag = "1")]
         pub keys_event: ::core::option::Option<super::BakerKeysEvent>,
-        /// The amount the account staked to become a baker. This amount is
+        /// The amount the account staked to become a validator. This amount is
         /// locked.
         #[prost(message, optional, tag = "2")]
         pub stake: ::core::option::Option<super::Amount>,
-        /// Whether the baker will automatically add earnings to their stake or
+        /// Whether the validator will automatically add earnings to their stake or
         /// not.
         #[prost(bool, tag = "3")]
         pub restake_earnings: bool,
     }
-    /// Baker stake increased.
+    /// Validator stake increased.
     #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct BakerStakeIncreased {
-        /// Baker's id.
+        /// Validator's id.
         #[prost(message, optional, tag = "1")]
         pub baker_id: ::core::option::Option<super::BakerId>,
         /// The new stake.
         #[prost(message, optional, tag = "2")]
         pub new_stake: ::core::option::Option<super::Amount>,
     }
+    /// The validator's stake was decreased.
+    /// The behavior of decreasing the stake of validators changed in protocol version 7
+    /// (see <https://proposals.concordium.com/updates/P7.html> for more details).
     #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct BakerStakeDecreased {
-        /// Baker's id.
+        /// Validator's id.
         #[prost(message, optional, tag = "1")]
         pub baker_id: ::core::option::Option<super::BakerId>,
         /// The new stake.
@@ -1618,57 +1672,62 @@ pub mod baker_event {
     }
     #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct BakerRestakeEarningsUpdated {
-        /// Baker's id.
+        /// Validator's id.
         #[prost(message, optional, tag = "1")]
         pub baker_id: ::core::option::Option<super::BakerId>,
         /// The new value of the flag.
         #[prost(bool, tag = "2")]
         pub restake_earnings: bool,
     }
-    /// Updated open status for a baker pool.
+    /// Updated open status for a validator pool.
+    /// This message can occur starting from protocol version 4.
     #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct BakerSetOpenStatus {
-        /// Baker's id.
+        /// Validator's id.
         #[prost(message, optional, tag = "1")]
         pub baker_id: ::core::option::Option<super::BakerId>,
         /// The new open status.
         #[prost(enumeration = "super::OpenStatus", tag = "2")]
         pub open_status: i32,
     }
-    /// Updated metadata url for a baker pool.
+    /// Updated metadata url for a validator pool.
+    /// This message can occur starting from protocol version 4.
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BakerSetMetadataUrl {
-        /// Baker's id.
+        /// Validator's id.
         #[prost(message, optional, tag = "1")]
         pub baker_id: ::core::option::Option<super::BakerId>,
         /// The URL.
         #[prost(string, tag = "2")]
         pub url: ::prost::alloc::string::String,
     }
-    /// Updated transaction fee commission for a baker pool.
+    /// Updated transaction fee commission for a validator pool.
+    /// This message can occur starting from protocol version 4.
     #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct BakerSetTransactionFeeCommission {
-        /// Baker's id.
+        /// Validator's id.
         #[prost(message, optional, tag = "1")]
         pub baker_id: ::core::option::Option<super::BakerId>,
         /// The transaction fee commission.
         #[prost(message, optional, tag = "2")]
         pub transaction_fee_commission: ::core::option::Option<super::AmountFraction>,
     }
-    /// Updated baking reward commission for baker pool
+    /// Updated block production reward commission for validator pool.
+    /// This message can occur starting from protocol version 4.
     #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct BakerSetBakingRewardCommission {
-        /// Baker's id
+        /// Validator's id
         #[prost(message, optional, tag = "1")]
         pub baker_id: ::core::option::Option<super::BakerId>,
-        /// The baking reward commission
+        /// The block production reward commission
         #[prost(message, optional, tag = "2")]
         pub baking_reward_commission: ::core::option::Option<super::AmountFraction>,
     }
-    /// Updated finalization reward commission for baker pool
+    /// Updated finalization reward commission for validator pool.
+    /// This message can occur starting from protocol version 4.
     #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct BakerSetFinalizationRewardCommission {
-        /// Baker's id
+        /// Validator's id
         #[prost(message, optional, tag = "1")]
         pub baker_id: ::core::option::Option<super::BakerId>,
         /// The finalization reward commission
@@ -1678,68 +1737,99 @@ pub mod baker_event {
         >,
     }
     /// Removed an existing delegator.
+    /// An existing delegation was removed by a transaction sent from a delegator that switched its staking behavior to being a validator.
+    /// If the account is a delegator in the current payday, it will remain so until the
+    /// next payday with respect to staking reward payouts, although the delegation record will be removed from the account immediately.
+    /// If the cause of the delegation removal is a transaction sent by the delegator that decreased the delegator's stake to 0,
+    /// the `DelegationEvent::DelegationRemoved` is emitted instead of this event/message.
+    /// This message can occur starting from protocol version 7.
     #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct DelegationRemoved {
         /// Delegator's id.
         #[prost(message, optional, tag = "1")]
         pub delegator_id: ::core::option::Option<super::DelegatorId>,
     }
-    /// A baker has been suspended.
+    /// The validator has been suspended by a transaction sent from the validator itself.
+    /// If the validator is suspended by the protocol (e.g., due to inactivity), the `BlockSpecialEvent::ValidatorSuspended`
+    /// event is emitted instead of this event.
+    /// This message can occur starting from protocol version 8.
     #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct BakerSuspended {
-        /// Suspended baker's id
+        /// Suspended validator's id
         #[prost(message, optional, tag = "1")]
         pub baker_id: ::core::option::Option<super::BakerId>,
     }
-    /// A baker has been resumed.
+    /// A validator has been resumed by a transaction sent from the validator itself.
+    /// This message can occur starting from protocol version 8.
     #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct BakerResumed {
-        /// The resumed baker's id
+        /// The resumed validator's id
         #[prost(message, optional, tag = "1")]
         pub baker_id: ::core::option::Option<super::BakerId>,
     }
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Event {
-        /// A baker was added.
+        /// A validator was added.
+        /// This event is always accompanied by `BakerEvent::BakerSetRestakeEarnings`, and starting from protocol version 4 also `BakerEvent::BakerSetOpenStatus`,
+        /// `BakerEvent::BakerSetMetadataURL`, `BakerEvent::BakerSetTransactionFeeCommission`, `BakerEvent::BakerSetBakingRewardCommission` and `BakerEvent::BakerSetFinalizationRewardCommission` events in the same transaction.
         #[prost(message, tag = "1")]
         BakerAdded(BakerAdded),
-        /// A baker was removed.
+        /// A validator was removed by a transaction sent by the validator that decreased the validator's own stake to 0.
+        /// When a validator is removed, it results in its delegators targeting the pool to be moved to the passive delegation.
+        /// The behavior of validators being removed changed in protocol version 7
+        /// (see <https://proposals.concordium.com/updates/P7.html> for more details).
+        /// If the cause of the validator removal is a transaction from an existing validator that switched its staking behavior to `delegation`,
+        /// the `DelegationEvent::BakerRemoved` is emitted instead of this event.
         #[prost(message, tag = "2")]
         BakerRemoved(super::BakerId),
-        /// The baker's stake was increased.
+        /// The validator's stake was increased.
         #[prost(message, tag = "3")]
         BakerStakeIncreased(BakerStakeIncreased),
-        /// The baker's stake was decreased.
+        /// The validator's stake was decreased.
+        /// The behavior of decreasing the stake of validators changed in protocol version 7
+        /// (see <https://proposals.concordium.com/updates/P7.html> for more details).
         #[prost(message, tag = "4")]
         BakerStakeDecreased(BakerStakeDecreased),
-        /// The baker's setting for restaking earnings was updated.
+        /// The validator's setting for restaking earnings was updated.
         #[prost(message, tag = "5")]
         BakerRestakeEarningsUpdated(BakerRestakeEarningsUpdated),
-        /// Baker keys were updated.
+        /// Validator keys were updated.
         #[prost(message, tag = "6")]
         BakerKeysUpdated(super::BakerKeysEvent),
-        /// The baker's open status was updated.
+        /// The validator's open status was updated.
         #[prost(message, tag = "7")]
         BakerSetOpenStatus(BakerSetOpenStatus),
-        /// The baker's metadata URL was updated.
+        /// The validator's metadata URL was updated.
         #[prost(message, tag = "8")]
         BakerSetMetadataUrl(BakerSetMetadataUrl),
-        /// The baker's transaction fee commission was updated.
+        /// The validator's transaction fee commission was updated.
         #[prost(message, tag = "9")]
         BakerSetTransactionFeeCommission(BakerSetTransactionFeeCommission),
-        /// The baker's baking reward commission was updated.
+        /// The validator's block production reward commission was updated.
         #[prost(message, tag = "10")]
         BakerSetBakingRewardCommission(BakerSetBakingRewardCommission),
-        /// The baker's finalization reward commission was updated.
+        /// The validator's finalization reward commission was updated.
         #[prost(message, tag = "11")]
         BakerSetFinalizationRewardCommission(BakerSetFinalizationRewardCommission),
-        /// An existing delegator was removed.
+        /// An existing delegation was removed by a transaction sent from a delegator that switched its staking behavior to being a validator.
+        /// This event is always accompanied by `BakerEvent::BakerAdded`, `BakerEvent::BakerSetRestakeEarnings`, and starting from protocol version 4 also `BakerEvent::BakerSetOpenStatus`,
+        /// `BakerEvent::BakerSetMetadataURL`, `BakerEvent::BakerSetTransactionFeeCommission`, `BakerEvent::BakerSetBakingRewardCommission` and `BakerEvent::BakerSetFinalizationRewardCommission` events in the same transaction.
+        /// If the account is a delegator in the current payday, it will remain so until the
+        /// next payday with respect to staking reward payouts, although the delegation record will be removed from the account immediately.
+        /// If the cause of the delegation removal is a transaction sent by the delegator that decreased the delegator's stake to 0,
+        /// the `DelegationEvent::DelegationRemoved` is emitted instead of this event.
+        /// This event was introduced in protocol version version 7.
         #[prost(message, tag = "12")]
         DelegationRemoved(DelegationRemoved),
-        /// The baker's account has been suspended.
+        /// The validator has been suspended by a transaction sent from the validator itself.
+        /// If the validator is suspended by the protocol (e.g., due to inactivity), the `BlockSpecialEvent::ValidatorSuspended`
+        /// event is emitted instead of this event.
+        /// This event can occur starting from protocol version 8.
         #[prost(message, tag = "13")]
         BakerSuspended(BakerSuspended),
-        /// The baker's account has been suspended.
+        /// The validator has been resumed by a transaction sent from the validator itself.
+        /// This event can occur starting from protocol version 8.
         #[prost(message, tag = "14")]
         BakerResumed(BakerResumed),
     }
@@ -1750,8 +1840,11 @@ pub struct DelegatorId {
     #[prost(message, optional, tag = "1")]
     pub id: ::core::option::Option<AccountIndex>,
 }
+/// Events that may result from the `ConfigureDelegation` transaction which adds, modify, or removes a delegator starting in protocol version 4.
+/// There was no delegation feature before protocol version 4.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct DelegationEvent {
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "delegation_event::Event", tags = "1, 2, 3, 4, 5, 6, 7")]
     pub event: ::core::option::Option<delegation_event::Event>,
 }
@@ -1789,16 +1882,18 @@ pub mod delegation_event {
         /// Delegator's id
         #[prost(message, optional, tag = "1")]
         pub delegator_id: ::core::option::Option<super::DelegatorId>,
-        /// New delegation target
+        /// New delegation target (either to a validator pool or passive delegation)
         #[prost(message, optional, tag = "2")]
         pub delegation_target: ::core::option::Option<super::DelegationTarget>,
     }
+    /// This message can occur starting from protocol version 7.
     #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct BakerRemoved {
-        /// Baker's id
+        /// Validator's id
         #[prost(message, optional, tag = "1")]
         pub baker_id: ::core::option::Option<super::BakerId>,
     }
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, Copy, PartialEq, ::prost::Oneof)]
     pub enum Event {
         /// The delegator's stake increased.
@@ -1810,16 +1905,28 @@ pub mod delegation_event {
         /// The delegator's restaking setting was updated.
         #[prost(message, tag = "3")]
         DelegationSetRestakeEarnings(DelegationSetRestakeEarnings),
-        /// The delegator's delegation target was updated.
+        /// The delegator's delegation target (either a validator pool or passive delegation) was updated by a transaction from the delegator.
         #[prost(message, tag = "4")]
         DelegationSetDelegationTarget(DelegationSetDelegationTarget),
         /// A delegator was added.
+        /// This event is always accompanied by `DelegationEvent::DelegationSetDelegationTarget`, `DelegationEvent::DelegationSetRestakeEarnings `, and `DelegationEvent::DelegationStakeIncreased` events in the same transaction.
         #[prost(message, tag = "5")]
         DelegationAdded(super::DelegatorId),
-        /// A delegator was removed.
+        /// A delegator was removed by a transaction sent from the delegator that decreased the delegators's stake to 0.
+        /// If the account is a delegator in the current payday, it will remain so until the
+        /// next payday with respect to staking reward payouts, although the delegation record will be removed from the account immediately.
+        /// If the cause of the delegation removal is a transaction sent from a delegator that switched its staking behavior to being a validator,
+        /// the `BakerEvent::DelegationRemoved` is emitted instead of this event.
         #[prost(message, tag = "6")]
         DelegationRemoved(super::DelegatorId),
-        /// An existing baker was removed.
+        /// An existing validator was removed by a transaction sent from an validator that switched its staking behavior to `delegation`.
+        /// This event is always accompanied by `DelegationEvent::DelegationAdded`, `DelegationEvent::DelegationSetDelegationTarget`, `DelegationEvent::DelegationSetRestakeEarnings `, and `DelegationEvent::DelegationStakeIncreased` events in the same transaction.
+        /// When a validator is removed, it results in its delegators targeting the pool to be moved to the passive delegation.
+        /// The behavior of validators being removed changed in protocol version 7.
+        /// (see <https://proposals.concordium.com/updates/P7.html> for more details).
+        /// If the cause of the validator removal is a transaction that decreased the validator's own stake to 0,
+        /// the `BakerEvent::BakerRemoved` is emitted instead of this event.
+        /// This event can occur starting from protocol version 7.
         #[prost(message, tag = "7")]
         BakerRemoved(BakerRemoved),
     }
@@ -1828,6 +1935,7 @@ pub mod delegation_event {
 /// correspond to a unique transaction that was successful.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountTransactionEffects {
+    /// This field might be extended in future versions of the API.
     #[prost(
         oneof = "account_transaction_effects::Effect",
         tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20"
@@ -1866,11 +1974,15 @@ pub mod account_transaction_effects {
         #[prost(message, optional, tag = "2")]
         pub receiver: ::core::option::Option<super::AccountAddress>,
         /// Memo.
+        /// This field can occur starting from protocol version 2.
         #[prost(message, optional, tag = "3")]
         pub memo: ::core::option::Option<super::Memo>,
     }
-    /// An account was deregistered as a baker. This is the result of a
-    /// successful UpdateBakerStake transaction.
+    /// A validator updated its stake. This is the result of a
+    /// successful `UpdateBakerStake` transaction.
+    /// The associated transaction type can no longer be created starting from protocol version 4.
+    /// Hence, this message does not occur anymore.
+    /// The functionality was replaced in protocol version 4 by the `BakerConfigured` transaction type.
     #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct BakerStakeUpdated {
         /// If the stake was updated (that is, it changed and did not stay the
@@ -1880,12 +1992,15 @@ pub mod account_transaction_effects {
     }
     /// An encrypted amount was transferred. This is the result of a successful
     /// EncryptedAmountTransfer transaction.
+    /// The associated transaction type can no longer be created starting from protocol 7.
+    /// Hence, this message does not occur anymore.
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct EncryptedAmountTransferred {
         #[prost(message, optional, tag = "1")]
         pub removed: ::core::option::Option<super::EncryptedAmountRemovedEvent>,
         #[prost(message, optional, tag = "2")]
         pub added: ::core::option::Option<super::NewEncryptedAmountEvent>,
+        /// This field can occur starting from protocol version 2.
         #[prost(message, optional, tag = "3")]
         pub memo: ::core::option::Option<super::Memo>,
     }
@@ -1909,6 +2024,7 @@ pub mod account_transaction_effects {
         #[prost(message, repeated, tag = "2")]
         pub amount: ::prost::alloc::vec::Vec<super::NewRelease>,
         /// Optional memo.
+        /// This field can occur starting from protocol version 2.
         #[prost(message, optional, tag = "3")]
         pub memo: ::core::option::Option<super::Memo>,
     }
@@ -1926,8 +2042,10 @@ pub mod account_transaction_effects {
         #[prost(message, optional, tag = "3")]
         pub new_threshold: ::core::option::Option<super::AccountThreshold>,
     }
-    /// A baker was configured. The details of what happened are contained in
-    /// the list of BakerEvents.
+    /// A validator was configured. The details of what happened are contained in
+    /// the list of `BakerEvents`.
+    /// The associated transaction type is available starting from protocol version 4 and replaces the existing transaction types and effects from earlier protocols (`BakerAdded`,
+    /// `BakerRemoved`, `BakerStakeUpdated`, `BakerRestakeEarningsUpdated`, and `BakerKeysUpdated`).
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BakerConfigured {
         #[prost(message, repeated, tag = "1")]
@@ -1935,11 +2053,14 @@ pub mod account_transaction_effects {
     }
     /// An account configured delegation. The details of what happened are
     /// contained in the list of DelegationEvents.
+    /// The associated transaction type is available starting from protocol version 4 and replaces the existing transaction types and effects from earlier protocols (`BakerAdded`,
+    /// `BakerRemoved`, `BakerStakeUpdated`, `BakerRestakeEarningsUpdated`, and `BakerKeysUpdated`).
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct DelegationConfigured {
         #[prost(message, repeated, tag = "1")]
         pub events: ::prost::alloc::vec::Vec<super::DelegationEvent>,
     }
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Effect {
         /// No effects other than payment from this transaction.
@@ -1958,26 +2079,45 @@ pub mod account_transaction_effects {
         /// A simple account to account transfer occurred.
         #[prost(message, tag = "5")]
         AccountTransfer(AccountTransfer),
-        /// A baker was added.
+        /// A validator was added.
+        /// The associated transaction type can no longer be created starting from protocol version 4.
+        /// Hence, this effect does not occur anymore.
+        /// The functionality was replaced in protocol version 4 by the `BakerConfigured` transaction type.
         #[prost(message, tag = "6")]
         BakerAdded(super::baker_event::BakerAdded),
-        /// A baker was removed.
+        /// A validator was removed.
+        /// The associated transaction type can no longer be created starting from protocol version 4.
+        /// Hence, this effect does not occur anymore.
+        /// The functionality was replaced in protocol version 4 by the `BakerConfigured` transaction type.
         #[prost(message, tag = "7")]
         BakerRemoved(super::BakerId),
-        /// A baker's stake was updated.
+        /// A validator's stake was updated.
+        /// The associated transaction type can no longer be created starting from protocol version 4.
+        /// Hence, this effect does not occur anymore.
+        /// The functionality was replaced in protocol version 4 by the `BakerConfigured` transaction type.
         #[prost(message, tag = "8")]
         BakerStakeUpdated(BakerStakeUpdated),
-        /// A baker's restake earnings setting was updated.
+        /// A validator's restake earnings setting was updated.
+        /// The associated transaction type can no longer be created starting from protocol version 4.
+        /// Hence, this effect does not occur anymore.
+        /// The functionality was replaced in protocol version 4 by the `BakerConfigured` transaction type.
         #[prost(message, tag = "9")]
         BakerRestakeEarningsUpdated(super::baker_event::BakerRestakeEarningsUpdated),
-        /// A baker's keys were updated.
+        /// A validator's keys were updated.
+        /// The associated transaction type can no longer be created starting from protocol version 4.
+        /// Hence, this effect does not occur anymore.
+        /// The functionality was replaced in protocol version 4 by the `BakerConfigured` transaction type.
         #[prost(message, tag = "10")]
         BakerKeysUpdated(super::BakerKeysEvent),
         /// An encrypted amount was transferred.
+        /// The associated transaction type can no longer be created starting from protocol 7.
+        /// Hence, this effect does not occur anymore.
         #[prost(message, tag = "11")]
         EncryptedAmountTransferred(EncryptedAmountTransferred),
         /// An account transferred part of its public balance to its encrypted
         /// balance.
+        /// The associated transaction type can no longer be created starting from protocol 7.
+        /// Hence, this effect does not occur anymore.
         #[prost(message, tag = "12")]
         TransferredToEncrypted(super::EncryptedSelfAmountAddedEvent),
         /// An account transferred part of its encrypted balance to its public balance.
@@ -1995,10 +2135,13 @@ pub mod account_transaction_effects {
         /// Some data was registered on the chain.
         #[prost(message, tag = "17")]
         DataRegistered(super::RegisteredData),
-        /// A baker was configured. The details of what happened are contained in a list of BakerEvents.
+        /// A validator was configured. The details of what happened are contained in a list of `BakerEvents`.
+        /// The associated transaction type is available starting from protocol version 4 and replaces the existing transaction types and effects from earlier protocols (`BakerAdded`,
+        /// `BakerRemoved`, `BakerStakeUpdated`, `BakerRestakeEarningsUpdated`, and `BakerKeysUpdated`).
         #[prost(message, tag = "18")]
         BakerConfigured(BakerConfigured),
         /// A delegator was configured. The details of what happened are contained in a list of DelegatorEvents.
+        /// This transaction type is available starting from protocol version 4.
         #[prost(message, tag = "19")]
         DelegationConfigured(DelegationConfigured),
         /// Token update transaction effect.
@@ -2152,7 +2295,7 @@ pub struct AuthorizationsV0 {
     #[prost(message, optional, tag = "10")]
     pub parameter_gas_rewards: ::core::option::Option<AccessStructure>,
     /// Access structure for updating the pool parameters. For V0 this is only
-    /// the baker stake threshold, for V1 there are more.
+    /// the validator stake threshold, for V1 there are more.
     #[prost(message, optional, tag = "11")]
     pub pool_parameters: ::core::option::Option<AccessStructure>,
     /// Access structure for adding new anonymity revokers.
@@ -2169,7 +2312,7 @@ pub struct AuthorizationsV0 {
 pub struct AuthorizationsV1 {
     #[prost(message, optional, tag = "1")]
     pub v0: ::core::option::Option<AuthorizationsV0>,
-    /// Access structure for updating the cooldown periods related to baking and delegation.
+    /// Access structure for updating the cooldown periods related to validation and delegation.
     #[prost(message, optional, tag = "2")]
     pub parameter_cooldown: ::core::option::Option<AccessStructure>,
     /// Access structure for updating the length of the reward period.
@@ -2283,21 +2426,39 @@ pub struct CommissionRanges {
     /// The range of allowed finalization commissions.
     #[prost(message, optional, tag = "1")]
     pub finalization: ::core::option::Option<InclusiveRangeAmountFraction>,
-    /// The range of allowed baker commissions.
+    /// The range of allowed validator commissions.
     #[prost(message, optional, tag = "2")]
     pub baking: ::core::option::Option<InclusiveRangeAmountFraction>,
     /// The range of allowed transaction commissions.
     #[prost(message, optional, tag = "3")]
     pub transaction: ::core::option::Option<InclusiveRangeAmountFraction>,
 }
-/// A bound on the relative share of the total staked capital that a baker can
-/// have as its stake. This is required to be greater than 0.
+/// The capital bound is a chain parameter that is set to guarantee network decentralization by preventing
+/// a single validator from gaining excessive power in the consensus protocol.
+/// The capital bound is required to be set to a value greater than 0 (capital_bound > 0).
+/// The value roughly describes the maximum proportion of the total stake in the protocol (from all validators including passive delegation)
+/// to the stake of a validator that a validator can achieve where the total stake of the validator is considered effective
+/// (meaning the validator's total stake is used for caculating the lottery power or finalizer weight in the consensus).
+/// Once a validator passes this bound, some of the validator's total stake no longer contributes to the validator's effective stake.
+/// Delegators are prevented from increasing their delegation to the pool
+/// (via sending a `ConfigureDelegation` transaction) if that would cause the pool to exceed the capital bound cap.
+/// See the comment at the `delegated_capital_cap` type for the exact formula.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct CapitalBound {
     #[prost(message, optional, tag = "1")]
     pub value: ::core::option::Option<AmountFraction>,
 }
-/// A leverage factor.
+/// The leverage factor (leverage bound) is a chain parameter that is set to guarantee that each validator
+/// has skin in the game with respect to its delegators by providing some of the CCD staked at the validator's pool from the validator's funds.
+/// The leverage factor is required to be set to a value greater than or equal to 1 (1 <= leverage_factor).
+/// The leverage factor is the maximum proportion of total stake of a validator (including the validator's own stake and the delegated
+/// stake to the validator) to the validator's own stake (excluding delegated stake to the validator)
+/// that a validator can achieve where the total stake of the validator is considered effective
+/// (meaning the validator's total stake is used for caculating the lottery power or finalizer weight in the consensus).
+/// Once a validator passes this bound, some of the validator's total stake no longer contributes to the validator's effective stake.
+/// Delegators are prevented from increasing their delegation to the pool
+/// (via sending a `ConfigureDelegation` transaction) if that would cause the pool to exceed the leverage bound cap.
+/// See the comment at the `delegated_capital_cap` type for the exact formula.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct LeverageFactor {
     #[prost(message, optional, tag = "1")]
@@ -2349,23 +2510,23 @@ pub struct PoolParametersCpv1 {
     /// Fraction of finalization rewards charged by the passive delegation.
     #[prost(message, optional, tag = "1")]
     pub passive_finalization_commission: ::core::option::Option<AmountFraction>,
-    /// Fraction of baking rewards charged by the passive delegation.
+    /// Fraction of block production rewards charged by the passive delegation.
     #[prost(message, optional, tag = "2")]
     pub passive_baking_commission: ::core::option::Option<AmountFraction>,
     /// Fraction of transaction rewards charged by the L-pool.
     #[prost(message, optional, tag = "3")]
     pub passive_transaction_commission: ::core::option::Option<AmountFraction>,
-    /// Bounds on the commission rates that may be charged by bakers.
+    /// Bounds on the commission rates that may be charged by validators.
     #[prost(message, optional, tag = "4")]
     pub commission_bounds: ::core::option::Option<CommissionRanges>,
-    /// Minimum equity capital required for a new baker.
+    /// Minimum equity capital required for a new validator.
     #[prost(message, optional, tag = "5")]
     pub minimum_equity_capital: ::core::option::Option<Amount>,
-    /// Maximum fraction of the total staked capital of that a new baker can
+    /// Maximum fraction of the total staked capital of that a new validator can
     /// have.
     #[prost(message, optional, tag = "6")]
     pub capital_bound: ::core::option::Option<CapitalBound>,
-    /// The maximum leverage that a baker can have as a ratio of total stake
+    /// The maximum leverage that a validator can have as a ratio of total stake
     /// to equity capital.
     #[prost(message, optional, tag = "7")]
     pub leverage_bound: ::core::option::Option<LeverageFactor>,
@@ -2403,7 +2564,7 @@ pub struct ProtocolUpdate {
     #[prost(bytes = "vec", tag = "4")]
     pub specification_auxiliary_data: ::prost::alloc::vec::Vec<u8>,
 }
-/// The minting rate and the distribution of newly-minted CCD among bakers,
+/// The minting rate and the distribution of newly-minted CCD among validators,
 /// finalizers, and the foundation account. It must be the case that
 /// baking_reward + finalization_reward <= 1. The remaining amount is the
 /// platform development charge.
@@ -2412,7 +2573,7 @@ pub struct MintDistributionCpv0 {
     /// Mint rate per slot.
     #[prost(message, optional, tag = "1")]
     pub mint_per_slot: ::core::option::Option<MintRate>,
-    /// The fraction of newly created CCD allocated to baker rewards.
+    /// The fraction of newly created CCD allocated to validator rewards.
     #[prost(message, optional, tag = "2")]
     pub baking_reward: ::core::option::Option<AmountFraction>,
     /// The fraction of newly created CCD allocated to finalization rewards.
@@ -2422,7 +2583,7 @@ pub struct MintDistributionCpv0 {
 /// Parameters determining the distribution of transaction fees.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct TransactionFeeDistribution {
-    /// The fraction allocated to the baker.
+    /// The fraction allocated to the validator.
     #[prost(message, optional, tag = "1")]
     pub baker: ::core::option::Option<AmountFraction>,
     /// The fraction allocated to the GAS account.
@@ -2432,7 +2593,7 @@ pub struct TransactionFeeDistribution {
 /// Distribution of gas rewards for chain parameters version 0 and 1.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct GasRewards {
-    /// The fraction paid to the baker.
+    /// The fraction paid to the validator.
     #[prost(message, optional, tag = "1")]
     pub baker: ::core::option::Option<AmountFraction>,
     /// Fraction paid for including a finalization proof in a block.
@@ -2448,7 +2609,7 @@ pub struct GasRewards {
 /// Distribution of gas rewards for chain parameters version 2.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct GasRewardsCpv2 {
-    /// The fraction paid to the baker.
+    /// The fraction paid to the validator.
     #[prost(message, optional, tag = "1")]
     pub baker: ::core::option::Option<AmountFraction>,
     /// Fraction paid for including each account creation transaction in a block.
@@ -2458,11 +2619,10 @@ pub struct GasRewardsCpv2 {
     #[prost(message, optional, tag = "4")]
     pub chain_update: ::core::option::Option<AmountFraction>,
 }
-/// Minimum stake needed to become a baker. This only applies to protocol version
-/// 1-3.
+/// Minimum stake needed to become a validator. This only applies to protocol version 1-3.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct BakerStakeThreshold {
-    /// Minimum threshold required for registering as a baker.
+    /// Minimum threshold required for registering as a validator.
     #[prost(message, optional, tag = "1")]
     pub baker_stake_threshold: ::core::option::Option<Amount>,
 }
@@ -2470,11 +2630,15 @@ pub struct BakerStakeThreshold {
 /// even themselves. They can only be performed by Root level keys.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RootUpdate {
+    /// This field will not be extended in future versions of the API, instead new data versions will
+    /// use optional fields in either `HigherLevelKeys` or `AuthorizationsV1`.
     #[prost(oneof = "root_update::UpdateType", tags = "1, 2, 3, 4")]
     pub update_type: ::core::option::Option<root_update::UpdateType>,
 }
 /// Nested message and enum types in `RootUpdate`.
 pub mod root_update {
+    /// This field will not be extended in future versions of the API, instead new data versions will
+    /// use optional fields in either `HigherLevelKeys` or `AuthorizationsV1`.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum UpdateType {
         /// The root keys were updated.
@@ -2495,11 +2659,15 @@ pub mod root_update {
 /// They can update themselves or level 2 keys. They can only be performed by level 1 keys.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Level1Update {
+    /// This field will not be extended in future versions of the API, instead new data versions will
+    /// use optional fields in either `HigherLevelKeys` or `AuthorizationsV1`.
     #[prost(oneof = "level1_update::UpdateType", tags = "1, 2, 3")]
     pub update_type: ::core::option::Option<level1_update::UpdateType>,
 }
 /// Nested message and enum types in `Level1Update`.
 pub mod level1_update {
+    /// This field will not be extended in future versions of the API, instead new data versions will
+    /// use optional fields in either `HigherLevelKeys` or `AuthorizationsV1`.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum UpdateType {
         /// The level 1 keys were updated.
@@ -2516,6 +2684,7 @@ pub mod level1_update {
 /// The payload of a chain update.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdatePayload {
+    /// This field might be extended in future versions of the API.
     #[prost(
         oneof = "update_payload::Payload",
         tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24"
@@ -2524,6 +2693,7 @@ pub struct UpdatePayload {
 }
 /// Nested message and enum types in `UpdatePayload`.
 pub mod update_payload {
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Payload {
         /// The protocol version was updated.
@@ -2550,7 +2720,7 @@ pub mod update_payload {
         /// The gas rewards were updated.
         #[prost(message, tag = "8")]
         GasRewardsUpdate(super::GasRewards),
-        /// The minimum amount of CCD needed to be come a baker was updated.
+        /// The minimum amount of CCD needed to be come a validator was updated.
         #[prost(message, tag = "9")]
         BakerStakeThresholdUpdate(super::BakerStakeThreshold),
         /// The root keys were updated.
@@ -2600,10 +2770,21 @@ pub mod update_payload {
         CreatePltUpdate(super::plt::CreatePlt),
     }
 }
+/// Details about the sponsor of a transaction.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SponsorDetails {
+    /// The cost of the transaction. Paid by the sponsor.
+    #[prost(message, optional, tag = "1")]
+    pub cost: ::core::option::Option<Amount>,
+    /// The sponsor of the transaction.
+    #[prost(message, optional, tag = "2")]
+    pub sponsor: ::core::option::Option<AccountAddress>,
+}
 /// Details about an account transaction.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountTransactionDetails {
-    /// The cost of the transaction. Paid by the sender.
+    /// The cost of the transaction. Paid by the sender. This will be zero if the
+    /// transaction is sponsored.
     #[prost(message, optional, tag = "1")]
     pub cost: ::core::option::Option<Amount>,
     /// The sender of the transaction.
@@ -2612,6 +2793,9 @@ pub struct AccountTransactionDetails {
     /// The effects of the transaction.
     #[prost(message, optional, tag = "3")]
     pub effects: ::core::option::Option<AccountTransactionEffects>,
+    /// The optional sponsor details of the transaction.
+    #[prost(message, optional, tag = "4")]
+    pub sponsor: ::core::option::Option<SponsorDetails>,
 }
 /// Details of an account creation. These transactions are free, and we only
 /// ever get a response for them if the account is created, hence no failure
@@ -2660,6 +2844,8 @@ pub struct BlockItemSummary {
     #[prost(message, optional, tag = "3")]
     pub hash: ::core::option::Option<TransactionHash>,
     /// Details that are specific to different transaction types.
+    ///
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "block_item_summary::Details", tags = "4, 5, 6, 7")]
     pub details: ::core::option::Option<block_item_summary::Details>,
 }
@@ -2671,6 +2857,8 @@ pub mod block_item_summary {
         pub value: u64,
     }
     /// Details that are specific to different transaction types.
+    ///
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Details {
         /// Details about an account transaction.
@@ -2868,7 +3056,7 @@ pub struct BlockInfo {
     /// The time of the slot in which the block was baked.
     #[prost(message, optional, tag = "10")]
     pub slot_time: ::core::option::Option<Timestamp>,
-    /// The baker id of account baking this block. Not provided for a genesis block.
+    /// The validator id of the account producing this block. Not provided for a genesis block.
     #[prost(message, optional, tag = "11")]
     pub baker: ::core::option::Option<BakerId>,
     /// Whether the block is finalized.
@@ -2902,22 +3090,24 @@ pub struct PoolInfoRequest {
     /// Block in which to query the pool information.
     #[prost(message, optional, tag = "1")]
     pub block_hash: ::core::option::Option<BlockHashInput>,
-    /// The 'BakerId' of the pool owner.
+    /// The validator id of the pool owner.
     #[prost(message, optional, tag = "2")]
     pub baker: ::core::option::Option<BakerId>,
 }
-/// A pending change to a baker pool.
+/// A pending change to a validator pool.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct PoolPendingChange {
+    /// This field will not be extended in future versions of the API, since it is not used starting
+    /// from Concordium Protocol Version 7.
     #[prost(oneof = "pool_pending_change::Change", tags = "1, 2")]
     pub change: ::core::option::Option<pool_pending_change::Change>,
 }
 /// Nested message and enum types in `PoolPendingChange`.
 pub mod pool_pending_change {
-    /// A reduction in baker equity capital is pending.
+    /// A reduction in validator equity capital is pending.
     #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct Reduce {
-        /// New baker equity capital.
+        /// New validator equity capital.
         #[prost(message, optional, tag = "1")]
         pub reduced_equity_capital: ::core::option::Option<super::Amount>,
         /// Timestamp when the change takes effect.
@@ -2931,6 +3121,8 @@ pub mod pool_pending_change {
         #[prost(message, optional, tag = "1")]
         pub effective_time: ::core::option::Option<super::Timestamp>,
     }
+    /// This field will not be extended in future versions of the API, since it is not used starting
+    /// from Concordium Protocol Version 7.
     #[derive(Clone, Copy, PartialEq, ::prost::Oneof)]
     pub enum Change {
         #[prost(message, tag = "1")]
@@ -2939,25 +3131,25 @@ pub mod pool_pending_change {
         Remove(Remove),
     }
 }
-/// Information about a baker pool in the current reward period.
+/// Information about a validator pool in the current reward period.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct PoolCurrentPaydayInfo {
     /// The number of blocks baked in the current reward period.
     #[prost(uint64, tag = "1")]
     pub blocks_baked: u64,
-    /// Whether the baker has contributed a finalization proof in the current reward period.
+    /// Whether the validator has contributed a finalization proof in the current reward period.
     #[prost(bool, tag = "2")]
     pub finalization_live: bool,
     /// The transaction fees accruing to the pool in the current reward period.
     #[prost(message, optional, tag = "3")]
     pub transaction_fees_earned: ::core::option::Option<Amount>,
-    /// The effective stake of the baker in the current reward period.
+    /// The effective stake of the validator in the current reward period.
     #[prost(message, optional, tag = "4")]
     pub effective_stake: ::core::option::Option<Amount>,
-    /// The lottery power of the baker in the current reward period.
+    /// The lottery power of the validator in the current reward period.
     #[prost(double, tag = "5")]
     pub lottery_power: f64,
-    /// The effective equity capital of the baker for the current reward period.
+    /// The effective equity capital of the validator for the current reward period.
     #[prost(message, optional, tag = "6")]
     pub baker_equity_capital: ::core::option::Option<Amount>,
     /// The effective delegated capital to the pool for the current reward period.
@@ -2985,7 +3177,7 @@ pub struct PoolCurrentPaydayInfo {
 /// will also be absent, as stake changes are immediate.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PoolInfoResponse {
-    /// The 'BakerId' of the pool owner.
+    /// The validator id of the pool owner.
     #[prost(message, optional, tag = "1")]
     pub baker: ::core::option::Option<BakerId>,
     /// The account address of the pool owner.
@@ -2997,8 +3189,21 @@ pub struct PoolInfoResponse {
     /// The capital delegated to the pool by other accounts. Absent if the pool is removed.
     #[prost(message, optional, tag = "4")]
     pub delegated_capital: ::core::option::Option<Amount>,
-    /// The maximum amount that may be delegated to the pool, accounting for leverage and stake limits.
+    /// The maximum amount that may be delegated to the pool, accounting for leverage and capital bounds.
     /// Absent if the pool is removed.
+    ///
+    /// leverage_bound_cap for pool p: Lₚ = λ * Cₚ - Cₚ = (λ - 1) * Cₚ
+    /// capital_bound_cap for pool p: Bₚ = max (0, floor( (κ * (T - Dₚ) - Cₚ) / (1 - K) ))
+    /// delegated_capital_cap for pool p = min (Lₚ, Bₚ)
+    ///
+    /// Where
+    /// κ is the `CapitalBound`.
+    /// λ is the `LeverageFactor`.
+    /// T is the total staked capital on the whole chain (including passive
+    /// delegation).
+    /// Dₚ is the delegated capital of pool p.
+    /// Cₚ is the equity capital (staked by the pool owner excluding delegated stake
+    /// to the pool) of pool p.
     #[prost(message, optional, tag = "5")]
     pub delegated_capital_cap: ::core::option::Option<Amount>,
     /// The pool info associated with the pool: open status, metadata URL and commission rates.
@@ -3016,7 +3221,7 @@ pub struct PoolInfoResponse {
     #[prost(message, optional, tag = "9")]
     pub all_pool_total_capital: ::core::option::Option<Amount>,
     /// A flag indicating whether the pool owner is suspended.
-    /// Absent if the protocol version does not support validator suspension or the pool is removed.
+    /// Absent if the protocol version does not support validator suspension (meaning prior protocol version 8) or the pool is removed.
     #[prost(bool, optional, tag = "10")]
     pub is_suspended: ::core::option::Option<bool>,
 }
@@ -3043,6 +3248,7 @@ pub struct PassiveDelegationInfo {
 /// Request for GetBlocksAtHeight.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct BlocksAtHeightRequest {
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "blocks_at_height_request::BlocksAtHeight", tags = "1, 2")]
     pub blocks_at_height: ::core::option::Option<
         blocks_at_height_request::BlocksAtHeight,
@@ -3071,6 +3277,7 @@ pub mod blocks_at_height_request {
         #[prost(bool, tag = "3")]
         pub restrict: bool,
     }
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, Copy, PartialEq, ::prost::Oneof)]
     pub enum BlocksAtHeight {
         #[prost(message, tag = "1")]
@@ -3090,6 +3297,8 @@ pub struct BlocksAtHeightResponse {
 /// Contains information related to tokenomics at the end of a given block.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct TokenomicsInfo {
+    /// This field will not be extended in future versions of the API, instead new data versions will
+    /// use optional fields in `TokenomicsInfo.V1`.
     #[prost(oneof = "tokenomics_info::Tokenomics", tags = "1, 2")]
     pub tokenomics: ::core::option::Option<tokenomics_info::Tokenomics>,
 }
@@ -3104,7 +3313,7 @@ pub mod tokenomics_info {
         /// The total CCD in encrypted balances.
         #[prost(message, optional, tag = "2")]
         pub total_encrypted_amount: ::core::option::Option<super::Amount>,
-        /// The amount in the baking reward account.
+        /// The amount in the block production reward account.
         #[prost(message, optional, tag = "3")]
         pub baking_reward_account: ::core::option::Option<super::Amount>,
         /// The amount in the finalization reward account.
@@ -3126,7 +3335,7 @@ pub mod tokenomics_info {
         /// The total CCD in encrypted balances.
         #[prost(message, optional, tag = "2")]
         pub total_encrypted_amount: ::core::option::Option<super::Amount>,
-        /// The amount in the baking reward account.
+        /// The amount in the block production reward account.
         #[prost(message, optional, tag = "3")]
         pub baking_reward_account: ::core::option::Option<super::Amount>,
         /// The amount in the finalization reward account.
@@ -3144,13 +3353,15 @@ pub mod tokenomics_info {
         /// The rate at which CCD will be minted (as a proportion of the total supply) at the next payday.
         #[prost(message, optional, tag = "8")]
         pub next_payday_mint_rate: ::core::option::Option<super::MintRate>,
-        /// The total capital put up as stake by bakers and delegators.
+        /// The total capital put up as stake by validators and delegators.
         #[prost(message, optional, tag = "9")]
         pub total_staked_capital: ::core::option::Option<super::Amount>,
         /// The protocol version.
         #[prost(enumeration = "super::ProtocolVersion", tag = "10")]
         pub protocol_version: i32,
     }
+    /// This field will not be extended in future versions of the API, instead new data versions will
+    /// use optional fields in `TokenomicsInfo.V1`.
     #[derive(Clone, Copy, PartialEq, ::prost::Oneof)]
     pub enum Tokenomics {
         #[prost(message, tag = "1")]
@@ -3192,6 +3403,7 @@ pub struct InvokeInstanceRequest {
 /// Response type for InvokeInstance.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InvokeInstanceResponse {
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "invoke_instance_response::Result", tags = "1, 2")]
     pub result: ::core::option::Option<invoke_instance_response::Result>,
 }
@@ -3227,6 +3439,7 @@ pub mod invoke_instance_response {
         #[prost(message, repeated, tag = "3")]
         pub effects: ::prost::alloc::vec::Vec<super::ContractTraceElement>,
     }
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Result {
         #[prost(message, tag = "1")]
@@ -3241,7 +3454,7 @@ pub struct GetPoolDelegatorsRequest {
     /// Block in which to query the delegators.
     #[prost(message, optional, tag = "1")]
     pub block_hash: ::core::option::Option<BlockHashInput>,
-    /// The 'BakerId' of the pool owner.
+    /// The validator id of the pool owner.
     #[prost(message, optional, tag = "2")]
     pub baker: ::core::option::Option<BakerId>,
 }
@@ -3279,7 +3492,7 @@ pub struct Branch {
     pub children: ::prost::alloc::vec::Vec<Branch>,
 }
 /// The leadership election nonce is an unpredictable value updated once an
-/// epoch to make sure that bakers cannot predict too far in the future when
+/// epoch to make sure that validators cannot predict too far in the future when
 /// they will win the right to bake blocks.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct LeadershipElectionNonce {
@@ -3287,16 +3500,18 @@ pub struct LeadershipElectionNonce {
     pub value: ::prost::alloc::vec::Vec<u8>,
 }
 /// Response type for GetElectionInfo.
-/// Contains information related to baker election for a perticular block.
+/// Contains information related to validator election for a perticular block.
+/// The `ElectionInfo` will be the same for all blocks in the same epoch.
+/// Moreover, from protocol version 4, it is the same for all blocks in the same payday.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ElectionInfo {
-    /// Baking lottery election difficulty. Present only in protocol versions 1-5.
+    /// Block production lottery election difficulty. Present only in protocol versions 1-5.
     #[prost(message, optional, tag = "1")]
     pub election_difficulty: ::core::option::Option<ElectionDifficulty>,
     /// Current leadership election nonce for the lottery.
     #[prost(message, optional, tag = "2")]
     pub election_nonce: ::core::option::Option<LeadershipElectionNonce>,
-    /// List of the currently eligible bakers.
+    /// List of the currently eligible validators.
     #[prost(message, repeated, tag = "3")]
     pub baker_election_info: ::prost::alloc::vec::Vec<election_info::Baker>,
 }
@@ -3304,21 +3519,22 @@ pub struct ElectionInfo {
 pub mod election_info {
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Baker {
-        /// The ID of the baker.
+        /// The ID of the validator.
         #[prost(message, optional, tag = "1")]
         pub baker: ::core::option::Option<super::BakerId>,
-        /// The account address of the baker.
+        /// The account address of the validator.
         #[prost(message, optional, tag = "2")]
         pub account: ::core::option::Option<super::AccountAddress>,
-        /// The lottery power of the baker, rounded to the nearest representable "double".
+        /// The lottery power of the validator, rounded to the nearest representable "double".
         #[prost(double, tag = "3")]
         pub lottery_power: f64,
     }
 }
 /// A protocol generated event that is not directly caused by a transaction. This
-/// includes minting new CCD, rewarding different bakers and delegators, etc.
+/// includes minting new CCD, rewarding different validators and delegators, etc.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockSpecialEvent {
+    /// This field might be extended in future versions of the API.
     #[prost(
         oneof = "block_special_event::Event",
         tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10"
@@ -3346,18 +3562,21 @@ pub mod block_special_event {
             pub amount: ::core::option::Option<super::super::Amount>,
         }
     }
-    /// Payment to each baker of a previous epoch, in proportion to the number
-    /// of blocks they contributed.
+    /// Rewards issued to each validator at the end of an epoch for producing blocks in the epoch,
+    /// in proportion to the number of blocks they contributed. This only occurs in protocol versions
+    /// 1 to 3. From protocol version 4, it is replaced by `PaydayPoolReward` and `PaydayAccountReward` messages.
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct BakingRewards {
-        /// The amount awarded to each baker.
+        /// The amount awarded to each validator.
         #[prost(message, optional, tag = "1")]
         pub baker_rewards: ::core::option::Option<AccountAmounts>,
-        /// The remaining balance of the baker reward account.
+        /// The remaining balance of the validator reward account.
         #[prost(message, optional, tag = "2")]
         pub remainder: ::core::option::Option<super::Amount>,
     }
-    /// Minting of new CCD.
+    /// Minting of new CCDs.
+    /// Starting from protocol version 4, this event occurs only in each payday block.
+    /// Before protocol version 4, this event occured every block (slot).
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Mint {
         /// The amount allocated to the banking reward account.
@@ -3384,7 +3603,7 @@ pub mod block_special_event {
         pub remainder: ::core::option::Option<super::Amount>,
     }
     /// Disbursement of fees from a block between the GAS account,
-    /// the baker, and the foundation. It should always be that:
+    /// the validator, and the foundation. It should always be that:
     ///
     /// ```transaction_fees + old_gas_account = new_gas_account + baker_reward + foundation_charge```
     #[derive(Clone, PartialEq, ::prost::Message)]
@@ -3398,20 +3617,20 @@ pub mod block_special_event {
         /// The new balance of the GAS account.
         #[prost(message, optional, tag = "3")]
         pub new_gas_account: ::core::option::Option<super::Amount>,
-        /// The amount awarded to the baker.
+        /// The amount awarded to the validator.
         #[prost(message, optional, tag = "4")]
         pub baker_reward: ::core::option::Option<super::Amount>,
         /// The amount awarded to the foundation.
         #[prost(message, optional, tag = "5")]
         pub foundation_charge: ::core::option::Option<super::Amount>,
-        /// The baker of the block, who receives the award.
+        /// The validator of the block, who receives the award.
         #[prost(message, optional, tag = "6")]
         pub baker: ::core::option::Option<super::AccountAddress>,
         /// The foundation account.
         #[prost(message, optional, tag = "7")]
         pub foundation_account: ::core::option::Option<super::AccountAddress>,
     }
-    /// Foundation tax.
+    /// Foundation tax paid at a payday block starting from protocol version 4.
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct PaydayFoundationReward {
         /// The account that got rewarded.
@@ -3421,7 +3640,20 @@ pub mod block_special_event {
         #[prost(message, optional, tag = "2")]
         pub development_charge: ::core::option::Option<super::Amount>,
     }
-    /// Reward payment to the given account.
+    /// Reward payment to the given account at a payday block starting from protocol version 4.
+    /// When listed in a block summary, the delegated pool of the account is
+    /// given by the last `PaydayPoolReward` outcome included before this outcome.
+    ///
+    /// For example:
+    /// PaydayPoolReward to pool 1
+    /// PaydayAccountReward to account 5
+    /// PaydayAccountReward to account 6
+    /// PaydayAccountReward to account 1 (is the payout to the validator itself)
+    /// PaydayPoolReward to `None`
+    /// PaydayAccountReward to account 10
+    /// PaydayAccountReward to account 3
+    /// Means 5, 6 are receiving rewards from delegating to validator 1 and 10, 3 are receiving rewards from passive
+    /// delegation.
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct PaydayAccountReward {
         /// The account that got rewarded.
@@ -3430,7 +3662,7 @@ pub mod block_special_event {
         /// The transaction fee reward at payday to the account.
         #[prost(message, optional, tag = "2")]
         pub transaction_fees: ::core::option::Option<super::Amount>,
-        /// The baking reward at payday to the account.
+        /// The block production reward at payday to the account.
         #[prost(message, optional, tag = "3")]
         pub baker_reward: ::core::option::Option<super::Amount>,
         /// The finalization reward at payday to the account.
@@ -3449,7 +3681,7 @@ pub mod block_special_event {
         /// The new balance of the GAS account.
         #[prost(message, optional, tag = "3")]
         pub new_gas_account: ::core::option::Option<super::Amount>,
-        /// The amount awarded to the baker.
+        /// The amount awarded to the validator.
         #[prost(message, optional, tag = "4")]
         pub baker_reward: ::core::option::Option<super::Amount>,
         /// The amount awarded to the passive delegators.
@@ -3458,11 +3690,24 @@ pub mod block_special_event {
         /// The amount awarded to the foundation.
         #[prost(message, optional, tag = "6")]
         pub foundation_charge: ::core::option::Option<super::Amount>,
-        /// The baker of the block, who will receive the award.
+        /// The validator of the block, who will receive the award.
         #[prost(message, optional, tag = "7")]
         pub baker: ::core::option::Option<super::BakerId>,
     }
-    /// Payment distributed to a pool or passive delegators.
+    /// Payment distributed to a pool or passive delegators at a payday block starting from protocol version 4.
+    /// When listed in a block summary, the reward distribution to the delagtors of the given pool is
+    /// given by the following `PaydayAccountReward` outcomes included after this outcome.
+    ///
+    /// For example:
+    /// PaydayPoolReward to pool 1
+    /// PaydayAccountReward to account 5
+    /// PaydayAccountReward to account 6
+    /// PaydayAccountReward to account 1 (is the payout to the validator itself)
+    /// PaydayPoolReward to `None`
+    /// PaydayAccountReward to account 10
+    /// PaydayAccountReward to account 3
+    /// Means 5, 6 are receiving rewards from delegating to validator 1 and 10, 3 are receiving rewards from passive
+    /// delegation.
     #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct PaydayPoolReward {
         /// The pool owner (passive delegators when not present).
@@ -3471,7 +3716,7 @@ pub mod block_special_event {
         /// Accrued transaction fees for pool.
         #[prost(message, optional, tag = "2")]
         pub transaction_fees: ::core::option::Option<super::Amount>,
-        /// Accrued baking rewards for pool.
+        /// Accrued block production rewards for pool.
         #[prost(message, optional, tag = "3")]
         pub baker_reward: ::core::option::Option<super::Amount>,
         /// Accrued finalization rewards for pool.
@@ -3479,6 +3724,7 @@ pub mod block_special_event {
         pub finalization_reward: ::core::option::Option<super::Amount>,
     }
     /// The id of a validator that got suspended due to too many missed rounds.
+    /// The message can occur starting from protocol version 8.
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct ValidatorSuspended {
         /// The id of the suspended validator.
@@ -3490,6 +3736,7 @@ pub mod block_special_event {
     }
     /// The id of a validator that is primed for suspension at the next snapshot
     /// epoch due to too many missed rounds.
+    /// The message can occur starting from protocol version 8.
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct ValidatorPrimedForSuspension {
         /// The id of the primed validator.
@@ -3499,26 +3746,46 @@ pub mod block_special_event {
         #[prost(message, optional, tag = "2")]
         pub account: ::core::option::Option<super::AccountAddress>,
     }
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Event {
+        /// Rewards issued to each validator at the end of an epoch for producing blocks in the epoch,
+        /// in proportion to the number of blocks they contributed. This only occurs in protocol versions
+        /// 1 to 3. From protocol version 4, it is replaced by `PaydayPoolReward` and `PaydayAccountReward` messages.
         #[prost(message, tag = "1")]
         BakingRewards(BakingRewards),
+        /// Minting of new CCDs.
+        /// Starting from protocol version 4, this event occurs in each payday block.
+        /// Before protocol version 4, this event occured every block (slot).
         #[prost(message, tag = "2")]
         Mint(Mint),
         #[prost(message, tag = "3")]
         FinalizationRewards(FinalizationRewards),
         #[prost(message, tag = "4")]
         BlockReward(BlockReward),
+        /// Foundation rewards paid out at a payday block starting from protocol version 4.
         #[prost(message, tag = "5")]
         PaydayFoundationReward(PaydayFoundationReward),
+        /// Reward payment to the given account at a payday block (from passive deleagtion or delegation to a validator or being a validator) starting from protocol version 4.
+        /// When listed in a block summary, the delegated pool of the account is
+        /// given by the last `PaydayPoolReward` outcome included before this outcome.
         #[prost(message, tag = "6")]
         PaydayAccountReward(PaydayAccountReward),
         #[prost(message, tag = "7")]
         BlockAccrueReward(BlockAccrueReward),
+        /// Payment distributed to a pool or passive delegators at a payday block starting from protocol version 4.
+        /// When listed in a block summary, the reward distribution to the delagtors of the given pool is
+        /// given by the following `PaydayAccountReward` outcomes included after this outcome.
         #[prost(message, tag = "8")]
         PaydayPoolReward(PaydayPoolReward),
+        /// The protocol suspends validators due to inactivity.
+        /// If the validator is suspended  by a transaction sent from the validator itself, the `BakerEvent::BakerSuspended`
+        /// event is emitted instead of this event.
+        /// The event can occur starting from protocol version 8.
         #[prost(message, tag = "9")]
         ValidatorSuspended(ValidatorSuspended),
+        /// The protocol primes validators for suspension due to inactivity.
+        /// The event can occur starting from protocol version 8.
         #[prost(message, tag = "10")]
         ValidatorPrimedForSuspension(ValidatorPrimedForSuspension),
     }
@@ -3530,6 +3797,8 @@ pub struct PendingUpdate {
     #[prost(message, optional, tag = "1")]
     pub effective_time: ::core::option::Option<TransactionTime>,
     /// The effect of the update.
+    ///
+    /// This field might be extended in future versions of the API.
     #[prost(
         oneof = "pending_update::Effect",
         tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26"
@@ -3539,6 +3808,8 @@ pub struct PendingUpdate {
 /// Nested message and enum types in `PendingUpdate`.
 pub mod pending_update {
     /// The effect of the update.
+    ///
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Effect {
         /// Updates to the root keys.
@@ -3580,7 +3851,7 @@ pub mod pending_update {
         /// Updates to the GAS rewards.
         #[prost(message, tag = "14")]
         GasRewards(super::GasRewards),
-        /// Updates baker stake threshold. Is only relevant prior to protocol version 4.
+        /// Updates validator stake threshold. Is only relevant prior to protocol version 4.
         #[prost(message, tag = "15")]
         PoolParametersCpv0(super::BakerStakeThreshold),
         /// Updates pool parameters. Introduced in protocol version 4.
@@ -3730,8 +4001,7 @@ pub struct BannedPeer {
     #[prost(message, optional, tag = "1")]
     pub ip_address: ::core::option::Option<IpAddress>,
 }
-/// The banned peers given by
-/// their IP addresses.
+/// The banned peers given by their IP addresses.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BannedPeers {
     #[prost(message, repeated, tag = "1")]
@@ -3777,7 +4047,9 @@ pub mod peers_info {
         /// Network related statistics for the peer.
         #[prost(message, optional, tag = "3")]
         pub network_stats: ::core::option::Option<peer::NetworkStats>,
-        /// consensus related information of the peer.
+        /// Consensus related information of the peer.
+        ///
+        /// This field might be extended in future versions of the API.
         #[prost(oneof = "peer::ConsensusInfo", tags = "4, 5")]
         pub consensus_info: ::core::option::Option<peer::ConsensusInfo>,
     }
@@ -3800,6 +4072,7 @@ pub mod peers_info {
             #[prost(uint64, tag = "4")]
             pub latency: u64,
         }
+        /// This type might be extended in future versions of the API.
         #[derive(
             Clone,
             Copy,
@@ -3850,7 +4123,9 @@ pub mod peers_info {
                 }
             }
         }
-        /// consensus related information of the peer.
+        /// Consensus related information of the peer.
+        ///
+        /// This field might be extended in future versions of the API.
         #[derive(Clone, Copy, PartialEq, ::prost::Oneof)]
         pub enum ConsensusInfo {
             /// The peer is of type `Bootstrapper` is not participating in consensus
@@ -3883,6 +4158,8 @@ pub struct NodeInfo {
     #[prost(message, optional, tag = "5")]
     pub network_info: ::core::option::Option<node_info::NetworkInfo>,
     /// Details of the node.
+    ///
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "node_info::Details", tags = "6, 7")]
     pub details: ::core::option::Option<node_info::Details>,
 }
@@ -3907,30 +4184,34 @@ pub mod node_info {
         #[prost(uint64, tag = "5")]
         pub avg_bps_out: u64,
     }
-    /// Consensus info for a node configured with baker keys.
+    /// Consensus info for a node configured with validator keys.
     #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct BakerConsensusInfo {
         #[prost(message, optional, tag = "1")]
         pub baker_id: ::core::option::Option<super::BakerId>,
-        /// Status of the baker configured node.
+        /// Status of the validator configured node.
+        ///
+        /// This field might be extended in future versions of the API.
         #[prost(oneof = "baker_consensus_info::Status", tags = "2, 3, 4")]
         pub status: ::core::option::Option<baker_consensus_info::Status>,
     }
     /// Nested message and enum types in `BakerConsensusInfo`.
     pub mod baker_consensus_info {
         /// Tagging message type for a node that
-        /// is configured with baker keys and active in
-        /// the current baking committee
+        /// is configured with validator keys and active in
+        /// the current validation committee
         #[derive(Clone, Copy, PartialEq, ::prost::Message)]
         pub struct ActiveBakerCommitteeInfo {}
         /// Tagging message type for a node that
-        /// is configured with baker keys and active in
-        /// the current finalizer committee (and also baking committee).
+        /// is configured with validator keys and active in
+        /// the current finalizer committee (and also validation committee).
         #[derive(Clone, Copy, PartialEq, ::prost::Message)]
         pub struct ActiveFinalizerCommitteeInfo {}
         /// The committee information of a node configured with
-        /// baker keys but somehow the node is _not_ part of the
-        /// current baking committee.
+        /// validator keys but somehow the node is _not_ part of the
+        /// current validation committee.
+        ///
+        /// This type might be extended in future versions of the API.
         #[derive(
             Clone,
             Copy,
@@ -3944,14 +4225,14 @@ pub mod node_info {
         )]
         #[repr(i32)]
         pub enum PassiveCommitteeInfo {
-            /// The node is started with baker keys however it is currently not in the baking committee.
+            /// The node is started with validator keys however it is currently not in the validation committee.
             /// The node is __not__ baking.
             NotInCommittee = 0,
-            /// The account is registered as a baker but not in the current `Epoch`.
+            /// The account is registered as a validator but not in the current `Epoch`.
             /// The node is __not__ baking.
             AddedButNotActiveInCommittee = 1,
-            /// The node has configured invalid baker keys i.e., the configured
-            /// baker keys do not match the current keys on the baker account.
+            /// The node has configured invalid validator keys i.e., the configured
+            /// validator keys do not match the current keys on the validator account.
             /// The node is __not__ baking.
             AddedButWrongKeys = 2,
         }
@@ -3981,18 +4262,20 @@ pub mod node_info {
                 }
             }
         }
-        /// Status of the baker configured node.
+        /// Status of the validator configured node.
+        ///
+        /// This field might be extended in future versions of the API.
         #[derive(Clone, Copy, PartialEq, ::prost::Oneof)]
         pub enum Status {
             /// The node is currently not baking.
             #[prost(enumeration = "PassiveCommitteeInfo", tag = "2")]
             PassiveCommitteeInfo(i32),
-            /// The node is configured with baker keys and
-            /// is member of the baking committee.
+            /// The node is configured with validator keys and
+            /// is member of the validation committee.
             #[prost(message, tag = "3")]
             ActiveBakerCommitteeInfo(ActiveBakerCommitteeInfo),
-            /// The node is configured with baker keys and
-            /// is member of the baking and finalization committees.
+            /// The node is configured with validator keys and
+            /// is member of the validator and finalization committees.
             #[prost(message, tag = "4")]
             ActiveFinalizerCommitteeInfo(ActiveFinalizerCommitteeInfo),
         }
@@ -4000,11 +4283,13 @@ pub mod node_info {
     /// The node is a regular node.
     #[derive(Clone, Copy, PartialEq, ::prost::Message)]
     pub struct Node {
+        /// This field might be extended in future versions of the API.
         #[prost(oneof = "node::ConsensusStatus", tags = "1, 2, 3")]
         pub consensus_status: ::core::option::Option<node::ConsensusStatus>,
     }
     /// Nested message and enum types in `Node`.
     pub mod node {
+        /// This field might be extended in future versions of the API.
         #[derive(Clone, Copy, PartialEq, ::prost::Oneof)]
         pub enum ConsensusStatus {
             /// The node is not running consensus.
@@ -4014,18 +4299,20 @@ pub mod node_info {
             #[prost(message, tag = "1")]
             NotRunning(super::super::Empty),
             /// Consensus info for a node that is
-            /// not configured with baker keys.
+            /// not configured with validator keys.
             /// The node is only processing blocks and
             /// relaying blocks and transactions and responding to
             /// catchup messages.
             #[prost(message, tag = "2")]
             Passive(super::super::Empty),
-            /// The node is configured with baker credentials and consensus is running.
+            /// The node is configured with validator credentials and consensus is running.
             #[prost(message, tag = "3")]
             Active(super::BakerConsensusInfo),
         }
     }
     /// Details of the node.
+    ///
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, Copy, PartialEq, ::prost::Oneof)]
     pub enum Details {
         /// The node is a bootstrapper and is not running consensus.
@@ -4039,18 +4326,20 @@ pub mod node_info {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SendBlockItemRequest {
-    #[prost(oneof = "send_block_item_request::BlockItem", tags = "1, 2, 3")]
+    /// This field might be extended in future versions of the API.
+    #[prost(oneof = "send_block_item_request::BlockItem", tags = "1, 2, 3, 4, 5")]
     pub block_item: ::core::option::Option<send_block_item_request::BlockItem>,
 }
 /// Nested message and enum types in `SendBlockItemRequest`.
 pub mod send_block_item_request {
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum BlockItem {
         /// Account transactions are messages which are signed and paid for by an account.
         #[prost(message, tag = "1")]
         AccountTransaction(super::AccountTransaction),
         /// Credential deployments create new accounts. They are not paid for
-        /// directly by the sender. Instead, bakers are rewarded by the protocol for
+        /// directly by the sender. Instead, validators are rewarded by the protocol for
         /// including them.
         #[prost(message, tag = "2")]
         CredentialDeployment(super::CredentialDeployment),
@@ -4058,22 +4347,35 @@ pub mod send_block_item_request {
         /// to make future update instructions.
         #[prost(message, tag = "3")]
         UpdateInstruction(super::UpdateInstruction),
+        /// Account transactions v1 are messages which are signed and paid for by
+        /// either an account or a sponsor.
+        #[prost(message, tag = "4")]
+        AccountTransactionV1(super::AccountTransactionV1),
+        /// A block item which has already been serialized to the format expected by the node.
+        #[prost(bytes, tag = "5")]
+        RawBlockItem(::prost::alloc::vec::Vec<u8>),
     }
 }
 /// Credential deployments create new accounts. They are not paid for
-/// directly by the sender. Instead, bakers are rewarded by the protocol for
+/// directly by the sender. Instead, validators are rewarded by the protocol for
 /// including them.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CredentialDeployment {
     #[prost(message, optional, tag = "1")]
     pub message_expiry: ::core::option::Option<TransactionTime>,
     /// The credential to be added.
+    ///
+    /// This field will not be extended in future versions of the API and the Concordium Node API will
+    /// always output the `raw_payload` in queries.
     #[prost(oneof = "credential_deployment::Payload", tags = "2")]
     pub payload: ::core::option::Option<credential_deployment::Payload>,
 }
 /// Nested message and enum types in `CredentialDeployment`.
 pub mod credential_deployment {
     /// The credential to be added.
+    ///
+    /// This field will not be extended in future versions of the API and the Concordium Node API will
+    /// always output the `raw_payload` in queries.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Payload {
         /// A raw payload, which is just the encoded payload.
@@ -4112,6 +4414,17 @@ pub struct AccountTransactionSignature {
     #[prost(map = "uint32, message", tag = "1")]
     pub signatures: ::std::collections::HashMap<u32, AccountSignatureMap>,
 }
+/// Account transaction signatures from the sender and optionally the sponsor of
+/// the transaction.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AccountTransactionV1Signatures {
+    /// Signatures from the sender of the transaction.
+    #[prost(message, optional, tag = "1")]
+    pub sender_signatures: ::core::option::Option<AccountTransactionSignature>,
+    /// The optional signature of the sponsor of the transaction.
+    #[prost(message, optional, tag = "2")]
+    pub sponsor_signatures: ::core::option::Option<AccountTransactionSignature>,
+}
 /// Header of an account transaction that contains basic data to check whether
 /// the sender and the transaction are valid. The header is shared by all transaction types.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -4128,6 +4441,26 @@ pub struct AccountTransactionHeader {
     /// Latest time the transaction can included in a block.
     #[prost(message, optional, tag = "5")]
     pub expiry: ::core::option::Option<TransactionTime>,
+}
+/// Header v1 of an account transaction with support for sponsored transactions.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AccountTransactionHeaderV1 {
+    /// Sender of the transaction.
+    #[prost(message, optional, tag = "1")]
+    pub sender: ::core::option::Option<AccountAddress>,
+    /// Sequence number of the transaction.
+    #[prost(message, optional, tag = "2")]
+    pub sequence_number: ::core::option::Option<SequenceNumber>,
+    /// Maximum amount of energy the transaction can take to execute.
+    #[prost(message, optional, tag = "3")]
+    pub energy_amount: ::core::option::Option<Energy>,
+    /// Latest time the transaction can included in a block.
+    #[prost(message, optional, tag = "5")]
+    pub expiry: ::core::option::Option<TransactionTime>,
+    /// The optional address of the account that sponsors the transaction, i.e.
+    /// pays the transaction fees associated with the execution.
+    #[prost(message, optional, tag = "6")]
+    pub sponsor: ::core::option::Option<AccountAddress>,
 }
 /// Data required to initialize a new contract instance.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -4174,6 +4507,7 @@ pub struct TransferPayload {
     pub receiver: ::core::option::Option<AccountAddress>,
 }
 /// Payload of a transfer between two accounts with a memo.
+/// This message can occur starting from protocol version 2.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TransferWithMemoPayload {
     /// Amount of CCD to send.
@@ -4189,6 +4523,8 @@ pub struct TransferWithMemoPayload {
 /// The payload for an account transaction.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccountTransactionPayload {
+    /// This field will not be extended in future versions of the API and the Concordium Node API will
+    /// always output the `raw_payload` in queries.
     #[prost(
         oneof = "account_transaction_payload::Payload",
         tags = "1, 2, 3, 4, 5, 6, 7"
@@ -4197,13 +4533,14 @@ pub struct AccountTransactionPayload {
 }
 /// Nested message and enum types in `AccountTransactionPayload`.
 pub mod account_transaction_payload {
+    /// This field will not be extended in future versions of the API and the Concordium Node API will
+    /// always output the `raw_payload` in queries.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Payload {
         /// A pre-serialized payload in the binary serialization format defined
         /// by the protocol.
         #[prost(bytes, tag = "1")]
         RawPayload(::prost::alloc::vec::Vec<u8>),
-        /// A transfer between two accounts. With an optional memo.
         #[prost(message, tag = "2")]
         DeployModule(super::VersionedModuleSource),
         #[prost(message, tag = "3")]
@@ -4212,6 +4549,7 @@ pub mod account_transaction_payload {
         UpdateContract(super::UpdateContractPayload),
         #[prost(message, tag = "5")]
         Transfer(super::TransferPayload),
+        /// This payload can occur starting from protocol version 2.
         #[prost(message, tag = "6")]
         TransferWithMemo(super::TransferWithMemoPayload),
         #[prost(message, tag = "7")]
@@ -4227,6 +4565,15 @@ pub struct PreAccountTransaction {
     #[prost(message, optional, tag = "2")]
     pub payload: ::core::option::Option<AccountTransactionPayload>,
 }
+/// An unsigned account transaction v1. This is used with the
+/// `GetTransactionSignHash` endpoint to obtain the message to sign.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PreAccountTransactionV1 {
+    #[prost(message, optional, tag = "1")]
+    pub header: ::core::option::Option<AccountTransactionHeaderV1>,
+    #[prost(message, optional, tag = "2")]
+    pub payload: ::core::option::Option<AccountTransactionPayload>,
+}
 /// Account transactions are messages which are signed and paid for by the sender
 /// account.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -4235,6 +4582,21 @@ pub struct AccountTransaction {
     pub signature: ::core::option::Option<AccountTransactionSignature>,
     #[prost(message, optional, tag = "2")]
     pub header: ::core::option::Option<AccountTransactionHeader>,
+    #[prost(message, optional, tag = "3")]
+    pub payload: ::core::option::Option<AccountTransactionPayload>,
+}
+/// Account transactions v1 are messages which are signed and paid for by the sender
+/// account or by the sponsor.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AccountTransactionV1 {
+    /// The signatures on the transaction by the source account and other
+    /// relevant parties such as sponsors.
+    #[prost(message, optional, tag = "1")]
+    pub signatures: ::core::option::Option<AccountTransactionV1Signatures>,
+    /// The transaction header data.
+    #[prost(message, optional, tag = "2")]
+    pub header: ::core::option::Option<AccountTransactionHeaderV1>,
+    /// The account transaction payload.
     #[prost(message, optional, tag = "3")]
     pub payload: ::core::option::Option<AccountTransactionPayload>,
 }
@@ -4250,11 +4612,13 @@ pub struct UpdateInstructionHeader {
 /// The payload for an UpdateInstruction.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateInstructionPayload {
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "update_instruction_payload::Payload", tags = "3")]
     pub payload: ::core::option::Option<update_instruction_payload::Payload>,
 }
 /// Nested message and enum types in `UpdateInstructionPayload`.
 pub mod update_instruction_payload {
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Payload {
         /// A raw payload encoded according to the format defined by the protocol.
@@ -4298,7 +4662,7 @@ pub struct ChainParametersV0 {
     /// Micro CCD per euro exchange rate.
     #[prost(message, optional, tag = "3")]
     pub micro_ccd_per_euro: ::core::option::Option<ExchangeRate>,
-    /// Extra number of epochs before reduction in stake, or baker
+    /// Extra number of epochs before reduction in stake, or validator
     /// deregistration is completed.
     #[prost(message, optional, tag = "4")]
     pub baker_cooldown_epochs: ::core::option::Option<Epoch>,
@@ -4317,7 +4681,7 @@ pub struct ChainParametersV0 {
     /// The foundation account.
     #[prost(message, optional, tag = "9")]
     pub foundation_account: ::core::option::Option<AccountAddress>,
-    /// Minimum threshold for becoming a baker.
+    /// Minimum threshold for becoming a validator.
     #[prost(message, optional, tag = "10")]
     pub minimum_threshold_for_baking: ::core::option::Option<Amount>,
     /// Keys allowed to do root updates.
@@ -4342,7 +4706,7 @@ pub struct ChainParametersV1 {
     /// Micro CCD per euro exchange rate.
     #[prost(message, optional, tag = "3")]
     pub micro_ccd_per_euro: ::core::option::Option<ExchangeRate>,
-    /// Extra number of epochs before reduction in stake, or baker
+    /// Extra number of epochs before reduction in stake, or validator
     /// deregistration is completed.
     #[prost(message, optional, tag = "4")]
     pub cooldown_parameters: ::core::option::Option<CooldownParametersCpv1>,
@@ -4366,7 +4730,7 @@ pub struct ChainParametersV1 {
     /// The foundation account.
     #[prost(message, optional, tag = "10")]
     pub foundation_account: ::core::option::Option<AccountAddress>,
-    /// Parameters governing baking pools and their commissions.
+    /// Parameters governing validator pools and their commissions.
     #[prost(message, optional, tag = "11")]
     pub pool_parameters: ::core::option::Option<PoolParametersCpv1>,
     /// Keys allowed to do root updates.
@@ -4391,7 +4755,7 @@ pub struct ChainParametersV2 {
     /// Micro CCD per euro exchange rate.
     #[prost(message, optional, tag = "3")]
     pub micro_ccd_per_euro: ::core::option::Option<ExchangeRate>,
-    /// Extra number of epochs before reduction in stake, or baker
+    /// Extra number of epochs before reduction in stake, or validator
     /// deregistration is completed.
     #[prost(message, optional, tag = "4")]
     pub cooldown_parameters: ::core::option::Option<CooldownParametersCpv1>,
@@ -4415,7 +4779,7 @@ pub struct ChainParametersV2 {
     /// The foundation account.
     #[prost(message, optional, tag = "10")]
     pub foundation_account: ::core::option::Option<AccountAddress>,
-    /// Parameters governing baking pools and their commissions.
+    /// Parameters governing validator pools and their commissions.
     #[prost(message, optional, tag = "11")]
     pub pool_parameters: ::core::option::Option<PoolParametersCpv1>,
     /// Keys allowed to do root updates.
@@ -4445,7 +4809,7 @@ pub struct ChainParametersV3 {
     /// Micro CCD per euro exchange rate.
     #[prost(message, optional, tag = "3")]
     pub micro_ccd_per_euro: ::core::option::Option<ExchangeRate>,
-    /// Extra number of epochs before reduction in stake, or baker
+    /// Extra number of epochs before reduction in stake, or validator
     /// deregistration is completed.
     #[prost(message, optional, tag = "4")]
     pub cooldown_parameters: ::core::option::Option<CooldownParametersCpv1>,
@@ -4469,7 +4833,7 @@ pub struct ChainParametersV3 {
     /// The foundation account.
     #[prost(message, optional, tag = "10")]
     pub foundation_account: ::core::option::Option<AccountAddress>,
-    /// Parameters governing baking pools and their commissions.
+    /// Parameters governing validator pools and their commissions.
     #[prost(message, optional, tag = "11")]
     pub pool_parameters: ::core::option::Option<PoolParametersCpv1>,
     /// Keys allowed to do root updates.
@@ -4493,11 +4857,15 @@ pub struct ChainParametersV3 {
 /// Chain parameters.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ChainParameters {
+    /// This field will not be extended in future versions of the API, instead new data versions will
+    /// use optional fields in `ChainParametersV3`.
     #[prost(oneof = "chain_parameters::Parameters", tags = "1, 2, 3, 4")]
     pub parameters: ::core::option::Option<chain_parameters::Parameters>,
 }
 /// Nested message and enum types in `ChainParameters`.
 pub mod chain_parameters {
+    /// This field will not be extended in future versions of the API, instead new data versions will
+    /// use optional fields in `ChainParametersV3`.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Parameters {
         /// Chain parameters that apply when the block is a protocol version 1-3 block.
@@ -4517,7 +4885,7 @@ pub mod chain_parameters {
 /// Details about a finalizer for the finalization round.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct FinalizationSummaryParty {
-    /// Baker ID. Every finalizer is in particular a baker.
+    /// Validator ID. Every finalizer is in particular a validator.
     #[prost(message, optional, tag = "1")]
     pub baker: ::core::option::Option<BakerId>,
     /// The weight of the finalizer in the committee. This is an "absolute" weight.
@@ -4554,11 +4922,13 @@ pub struct FinalizationSummary {
 /// Finalization summary that may or may not be part of the block.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockFinalizationSummary {
+    /// This field will not be extended in future versions of the API.
     #[prost(oneof = "block_finalization_summary::Summary", tags = "1, 2")]
     pub summary: ::core::option::Option<block_finalization_summary::Summary>,
 }
 /// Nested message and enum types in `BlockFinalizationSummary`.
 pub mod block_finalization_summary {
+    /// This field will not be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Summary {
         /// There is no finalization data in the block.
@@ -4574,18 +4944,20 @@ pub struct BlockItem {
     /// The hash of the block item that identifies it to the chain.
     #[prost(message, optional, tag = "1")]
     pub hash: ::core::option::Option<TransactionHash>,
-    #[prost(oneof = "block_item::BlockItem", tags = "2, 3, 4")]
+    /// This field might be extended in future versions of the API.
+    #[prost(oneof = "block_item::BlockItem", tags = "2, 3, 4, 5, 6")]
     pub block_item: ::core::option::Option<block_item::BlockItem>,
 }
 /// Nested message and enum types in `BlockItem`.
 pub mod block_item {
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum BlockItem {
         /// Account transactions are messages which are signed and paid for by an account.
         #[prost(message, tag = "2")]
         AccountTransaction(super::AccountTransaction),
         /// Credential deployments create new accounts. They are not paid for
-        /// directly by the sender. Instead, bakers are rewarded by the protocol for
+        /// directly by the sender. Instead, validators are rewarded by the protocol for
         /// including them.
         #[prost(message, tag = "3")]
         CredentialDeployment(super::CredentialDeployment),
@@ -4593,29 +4965,36 @@ pub mod block_item {
         /// to make future update instructions.
         #[prost(message, tag = "4")]
         UpdateInstruction(super::UpdateInstruction),
+        /// Account transactions v1 are messages which are signed and paid for by
+        /// either an account or a sponsor.
+        #[prost(message, tag = "5")]
+        AccountTransactionV1(super::AccountTransactionV1),
+        /// A block item which has already been serialized to the format expected by the node.
+        #[prost(bytes, tag = "6")]
+        RawBlockItem(::prost::alloc::vec::Vec<u8>),
     }
 }
-/// Information about a particular baker with respect to
-/// the current reward period.
+/// Information about a particular validator with respect to
+/// the current reward period. The below values are historical value from the last payday block.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakerRewardPeriodInfo {
-    /// The baker id and public keys for the baker.
+    /// The validator id and public keys for the validator.
     #[prost(message, optional, tag = "1")]
     pub baker: ::core::option::Option<BakerInfo>,
-    /// The effective stake of the baker for the consensus protocol.
+    /// The effective stake of the validator for the consensus protocol.
     /// The returned amount accounts for delegation, capital bounds and leverage bounds.
     #[prost(message, optional, tag = "2")]
     pub effective_stake: ::core::option::Option<Amount>,
-    /// The effective commission rate for the baker that applies for the reward period.
+    /// The effective commission rate for the validator that applies for the reward period.
     #[prost(message, optional, tag = "3")]
     pub commission_rates: ::core::option::Option<CommissionRates>,
-    /// The amount staked by the baker itself.
+    /// The amount staked by the validator itself.
     #[prost(message, optional, tag = "4")]
     pub equity_capital: ::core::option::Option<Amount>,
-    /// The total amount of capital delegated to this baker pool.
+    /// The total amount of capital delegated to this validator pool.
     #[prost(message, optional, tag = "5")]
     pub delegated_capital: ::core::option::Option<Amount>,
-    /// Whether the baker is a finalizer or not.
+    /// Whether the validator is a finalizer or not.
     #[prost(bool, tag = "6")]
     pub is_finalizer: bool,
 }
@@ -4647,20 +5026,20 @@ pub struct QuorumCertificate {
     pub aggregate_signature: ::core::option::Option<QuorumSignature>,
     /// A list of the finalizers that formed the quorum certificate
     /// i.e., the ones who have contributed to the 'aggregate_siganture'.
-    /// The finalizers are identified by their baker id as this is stable
+    /// The finalizers are identified by their validator id as this is stable
     /// across protocols and epochs.
     #[prost(message, repeated, tag = "5")]
     pub signatories: ::prost::alloc::vec::Vec<BakerId>,
 }
 /// The finalizer round is a map from a 'Round'
-/// to the list of finalizers (identified by their 'BakerId') that signed
+/// to the list of finalizers (identified by their validator id) that signed
 /// off the round.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FinalizerRound {
     /// The round that was signed off.
     #[prost(message, optional, tag = "1")]
     pub round: ::core::option::Option<Round>,
-    /// The finalizers (identified by their 'BakerId' that
+    /// The finalizers (identified by their validator id) that
     /// signed off the in 'round'.
     #[prost(message, repeated, tag = "2")]
     pub finalizers: ::prost::alloc::vec::Vec<BakerId>,
@@ -4727,8 +5106,7 @@ pub struct EpochFinalizationEntry {
     #[prost(message, optional, tag = "3")]
     pub successor_proof: ::core::option::Option<SuccessorProof>,
 }
-/// Certificates for a block for protocols supporting
-/// ConcordiumBFT.
+/// Certificates for a block for protocols supporting ConcordiumBFT.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockCertificates {
     /// The quorum certificate. Is present if and only if the block is
@@ -4744,16 +5122,16 @@ pub struct BlockCertificates {
     #[prost(message, optional, tag = "3")]
     pub epoch_finalization_entry: ::core::option::Option<EpochFinalizationEntry>,
 }
-/// Details of which baker won the lottery in a given round in consensus version 1.
+/// Details of which validator won the lottery in a given round in consensus version 1.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct WinningBaker {
     /// The round number.
     #[prost(message, optional, tag = "1")]
     pub round: ::core::option::Option<Round>,
-    /// The baker that won the round.
+    /// The validator that won the round.
     #[prost(message, optional, tag = "2")]
     pub winner: ::core::option::Option<BakerId>,
-    /// True if the baker produced a block in this round on the finalized chain, and False otherwise.
+    /// True if the validator produced a block in this round on the finalized chain, and False otherwise.
     #[prost(bool, tag = "3")]
     pub present: bool,
 }
@@ -4762,11 +5140,13 @@ pub struct WinningBaker {
 /// state is successfully loaded.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DryRunRequest {
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "dry_run_request::Request", tags = "1, 2, 3")]
     pub request: ::core::option::Option<dry_run_request::Request>,
 }
 /// Nested message and enum types in `DryRunRequest`.
 pub mod dry_run_request {
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Request {
         /// Load the state of the specified block to use for subsequent requests.
@@ -4787,11 +5167,13 @@ pub mod dry_run_request {
 /// Run a query as part of a dry run. Queries do not update the block state.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DryRunStateQuery {
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "dry_run_state_query::Query", tags = "1, 2, 3")]
     pub query: ::core::option::Option<dry_run_state_query::Query>,
 }
 /// Nested message and enum types in `DryRunStateQuery`.
 pub mod dry_run_state_query {
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Query {
         /// Look up information on a particular account.
@@ -4842,11 +5224,13 @@ pub struct DryRunInvokeInstance {
 /// An operation that can update the state as part of a dry run.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DryRunStateOperation {
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "dry_run_state_operation::Operation", tags = "1, 2, 3")]
     pub operation: ::core::option::Option<dry_run_state_operation::Operation>,
 }
 /// Nested message and enum types in `DryRunStateOperation`.
 pub mod dry_run_state_operation {
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Operation {
         /// Sets the current block time to the given timestamp for the purposes of future
@@ -4924,11 +5308,13 @@ pub struct DryRunResponse {
     /// The remaining available energy quota after the dry run operation.
     #[prost(message, optional, tag = "3")]
     pub quota_remaining: ::core::option::Option<Energy>,
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "dry_run_response::Response", tags = "1, 2")]
     pub response: ::core::option::Option<dry_run_response::Response>,
 }
 /// Nested message and enum types in `DryRunResponse`.
 pub mod dry_run_response {
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Response {
         /// The request produced an error. The request otherwise has no effect on the state.
@@ -4941,6 +5327,7 @@ pub mod dry_run_response {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DryRunErrorResponse {
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "dry_run_error_response::Error", tags = "1, 2, 3, 4, 5, 6, 8, 9")]
     pub error: ::core::option::Option<dry_run_error_response::Error>,
 }
@@ -5005,6 +5392,7 @@ pub mod dry_run_error_response {
         #[prost(message, optional, tag = "3")]
         pub reason: ::core::option::Option<super::RejectReason>,
     }
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Error {
         /// The current block state is undefined. It should be initialized with
@@ -5044,6 +5432,7 @@ pub mod dry_run_error_response {
 /// The dry run operation completed successfully.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DryRunSuccessResponse {
+    /// This field might be extended in future versions of the API.
     #[prost(oneof = "dry_run_success_response::Response", tags = "1, 2, 3, 4, 5, 6, 7")]
     pub response: ::core::option::Option<dry_run_success_response::Response>,
 }
@@ -5097,6 +5486,7 @@ pub mod dry_run_success_response {
         #[prost(message, repeated, tag = "3")]
         pub effects: ::prost::alloc::vec::Vec<super::ContractTraceElement>,
     }
+    /// This field might be extended in future versions of the API.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Response {
         /// The state from the specified block was successfully loaded.
@@ -5336,7 +5726,7 @@ pub struct RoundExistingBlock {
     /// The round for which the node saw a block.
     #[prost(message, optional, tag = "1")]
     pub round: ::core::option::Option<Round>,
-    /// The baker that baked the block.
+    /// The validator that baked the block.
     #[prost(message, optional, tag = "2")]
     pub baker: ::core::option::Option<BakerId>,
     /// The hash of the block.
@@ -5352,22 +5742,22 @@ pub struct RoundExistingQc {
     #[prost(message, optional, tag = "2")]
     pub epoch: ::core::option::Option<Epoch>,
 }
-/// The keys an stake of a specific baker.
+/// The keys and stake of a specific validator.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FullBakerInfo {
-    /// The baker's identity.
+    /// The validator's identity.
     #[prost(message, optional, tag = "1")]
     pub baker_identity: ::core::option::Option<BakerId>,
-    /// The baker's election verify key.
+    /// The validator's election verify key.
     #[prost(message, optional, tag = "2")]
     pub election_verify_key: ::core::option::Option<BakerElectionVerifyKey>,
-    /// The baker's signature verify key.
+    /// The validator's signature verify key.
     #[prost(message, optional, tag = "3")]
     pub signature_verify_key: ::core::option::Option<BakerSignatureVerifyKey>,
-    /// The baker's aggregation verify key.
+    /// The validator's aggregation verify key.
     #[prost(message, optional, tag = "4")]
     pub aggregation_verify_key: ::core::option::Option<BakerAggregationVerifyKey>,
-    /// The stake of the baker.
+    /// The stake of the validator.
     #[prost(message, optional, tag = "5")]
     pub stake: ::core::option::Option<Amount>,
 }
@@ -5380,14 +5770,14 @@ pub struct FinalizationCommitteeHash {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BakersAndFinalizers {
-    /// The set of bakers.
+    /// The set of validators.
     #[prost(message, repeated, tag = "1")]
     pub bakers: ::prost::alloc::vec::Vec<FullBakerInfo>,
-    /// The IDs of the bakers that are finalizers.
+    /// The IDs of the validators that are finalizers.
     /// The order determines the finalizer index.
     #[prost(message, repeated, tag = "2")]
     pub finalizers: ::prost::alloc::vec::Vec<BakerId>,
-    /// The total effective stake of the bakers.
+    /// The total effective stake of the validators.
     #[prost(message, optional, tag = "3")]
     pub baker_total_stake: ::core::option::Option<Amount>,
     /// The total effective stake of the finalizers.
@@ -5399,16 +5789,16 @@ pub struct BakersAndFinalizers {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EpochBakers {
-    /// The bakers and finalizers for the previous epoch.
-    /// If the current epoch is 0, then this is the same as the bakers for the current epoch.
+    /// The validators and finalizers for the previous epoch.
+    /// If the current epoch is 0, then this is the same as the validators for the current epoch.
     #[prost(message, optional, tag = "1")]
     pub previous_epoch_bakers: ::core::option::Option<BakersAndFinalizers>,
-    /// The bakers and finalizers for the current epoch.
-    /// If this is absent, it should be treated as the same as the bakers for the previous epoch.
+    /// The validators and finalizers for the current epoch.
+    /// If this is absent, it should be treated as the same as the validators for the previous epoch.
     #[prost(message, optional, tag = "2")]
     pub current_epoch_bakers: ::core::option::Option<BakersAndFinalizers>,
-    /// The bakers and finalizers for the next epoch.
-    /// If this is absent, it should be treated as the same as the bakers for the current epoch.
+    /// The validators and finalizers for the next epoch.
+    /// If this is absent, it should be treated as the same as the validators for the current epoch.
     #[prost(message, optional, tag = "3")]
     pub next_epoch_bakers: ::core::option::Option<BakersAndFinalizers>,
     /// The first epoch of the next payday.
@@ -5482,7 +5872,7 @@ pub struct ConsensusDetailedStatus {
     /// The live blocks organized by height after the last finalized block.
     #[prost(message, repeated, tag = "7")]
     pub branches: ::prost::alloc::vec::Vec<BranchBlocks>,
-    /// Which bakers the node has seen legally-signed blocks with live parents from in
+    /// Which validators the node has seen legally-signed blocks with live parents from in
     /// non-finalized rounds.
     #[prost(message, repeated, tag = "8")]
     pub round_existing_blocks: ::prost::alloc::vec::Vec<RoundExistingBlock>,
@@ -5504,7 +5894,7 @@ pub struct ConsensusDetailedStatus {
     /// to determine the epoch and round of the last finalized block.
     #[prost(message, optional, tag = "13")]
     pub latest_finalization_entry: ::core::option::Option<RawFinalizationEntry>,
-    /// The bakers and finalizers for the previous, current and next epoch, relative to the last
+    /// The validators and finalizers for the previous, current and next epoch, relative to the last
     /// finalized block.
     #[prost(message, optional, tag = "14")]
     pub epoch_bakers: ::core::option::Option<EpochBakers>,
@@ -5525,6 +5915,8 @@ pub struct AccountPending {
     pub first_timestamp: ::core::option::Option<Timestamp>,
 }
 /// Information about how open the pool is to new delegators.
+///
+/// This type might be extended in future versions of the API.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum OpenStatus {
@@ -5555,6 +5947,8 @@ impl OpenStatus {
     }
 }
 /// Version of smart contract.
+///
+/// This type might be extended in future versions of the API.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum ContractVersion {
@@ -5582,6 +5976,8 @@ impl ContractVersion {
     }
 }
 /// The type of a credential.
+///
+/// This type might be extended in future versions of the API.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum CredentialType {
@@ -5611,6 +6007,8 @@ impl CredentialType {
     }
 }
 /// The type of chain update.
+///
+/// This type might be extended in future versions of the API.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum UpdateType {
@@ -5708,6 +6106,8 @@ impl UpdateType {
     }
 }
 /// The type of transaction.
+///
+/// This type might be extended in future versions of the API.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum TransactionType {
@@ -5715,22 +6115,35 @@ pub enum TransactionType {
     InitContract = 1,
     Update = 2,
     Transfer = 3,
+    /// Deprecated in protocol version 4.
     AddBaker = 4,
+    /// Deprecated in protocol version 4.
     RemoveBaker = 5,
+    /// Deprecated in protocol version 4.
     UpdateBakerStake = 6,
+    /// Deprecated in protocol version 4.
     UpdateBakerRestakeEarnings = 7,
+    /// Deprecated in protocol version 4.
     UpdateBakerKeys = 8,
     UpdateCredentialKeys = 9,
+    /// Deprecated in protocol version 7.
     EncryptedAmountTransfer = 10,
+    /// Deprecated in protocol version 7.
     TransferToEncrypted = 11,
     TransferToPublic = 12,
     TransferWithSchedule = 13,
     UpdateCredentials = 14,
     RegisterData = 15,
+    /// Introduced in protocol version 2.
     TransferWithMemo = 16,
+    /// Deprecated in protocol version 7.
+    /// Introduced in protocol version 2.
     EncryptedAmountTransferWithMemo = 17,
+    /// Introduced in protocol version 2.
     TransferWithScheduleAndMemo = 18,
+    /// Introduced in protocol version 4.
     ConfigureBaker = 19,
+    /// Introduced in protocol version 4.
     ConfigureDelegation = 20,
     /// Introduced in protocol version 9.
     TokenUpdate = 21,
@@ -5800,6 +6213,8 @@ impl TransactionType {
     }
 }
 /// The different versions of the protocol.
+///
+/// This type might be extended in future versions of the API.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum ProtocolVersion {
@@ -5812,6 +6227,7 @@ pub enum ProtocolVersion {
     ProtocolVersion7 = 6,
     ProtocolVersion8 = 7,
     ProtocolVersion9 = 8,
+    ProtocolVersion10 = 9,
 }
 impl ProtocolVersion {
     /// String value of the enum field names used in the ProtoBuf definition.
@@ -5829,6 +6245,7 @@ impl ProtocolVersion {
             Self::ProtocolVersion7 => "PROTOCOL_VERSION_7",
             Self::ProtocolVersion8 => "PROTOCOL_VERSION_8",
             Self::ProtocolVersion9 => "PROTOCOL_VERSION_9",
+            Self::ProtocolVersion10 => "PROTOCOL_VERSION_10",
         }
     }
     /// Creates an enum from field names used in the ProtoBuf definition.
@@ -5843,6 +6260,7 @@ impl ProtocolVersion {
             "PROTOCOL_VERSION_7" => Some(Self::ProtocolVersion7),
             "PROTOCOL_VERSION_8" => Some(Self::ProtocolVersion8),
             "PROTOCOL_VERSION_9" => Some(Self::ProtocolVersion9),
+            "PROTOCOL_VERSION_10" => Some(Self::ProtocolVersion10),
             _ => None,
         }
     }
@@ -7391,6 +7809,43 @@ pub mod queries_client {
                     GrpcMethod::new(
                         "concordium.v2.Queries",
                         "GetAccountTransactionSignHash",
+                    ),
+                );
+            self.inner.unary(req, path, codec).await
+        }
+        /// Get the hash to be signed for an account transaction v1. The
+        /// hash returned should be signed and the signatures included as an
+        /// AccountTransactionV1Signatures when calling `SendBlockItem`. This is
+        /// provided as a convenience to support cases where the right SDK is not
+        /// available for interacting with the node. If an SDK is available then it is
+        /// strongly recommended to compute this hash off-line using it. That reduces
+        /// the trust in the node, removes networking failure modes, and will perform
+        /// better.
+        pub async fn get_account_transaction_v1_sign_hash(
+            &mut self,
+            request: impl tonic::IntoRequest<super::PreAccountTransactionV1>,
+        ) -> std::result::Result<
+            tonic::Response<super::AccountTransactionSignHash>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetAccountTransactionV1SignHash",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "concordium.v2.Queries",
+                        "GetAccountTransactionV1SignHash",
                     ),
                 );
             self.inner.unary(req, path, codec).await

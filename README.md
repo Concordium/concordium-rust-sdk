@@ -103,3 +103,7 @@ cargo run
 
 Updating these files should only be done when the node's API, determined by the
 schemas, changes and we need to support the new API in the SDK.
+
+The flag `serde_deprecated` guards `serde::Serialize` and `serde::Deserialize`
+implementations for composite data structures where these implementations will
+eventually be deprecated. Enable the flag to use them.

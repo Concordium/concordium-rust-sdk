@@ -37,7 +37,7 @@ It makes potentially extended information explicit in the types and allows each 
 Several types and fields in the SDK are now wrapped in [`Upward`] and the wrapper provides several methods to ease the migration depending on the desired behavior of the application.
 For some situations unknown information should cause an error, where in other situations it is safe to ignore, and maybe logging warnings to be handled in a future iteration of the application.
 
-```rust,no_compile
+```rust,ignore
 if let Upward::Known(details) = block_item_summary.details {
     // Data is familiar so we handle details as usual.
 } else {
@@ -47,13 +47,13 @@ if let Upward::Known(details) = block_item_summary.details {
 
 To produce an error in the case of unknown data use [`known_or_err`], converting [`Upward<A>`] into [`Result<A, UnknownDataError>`](v2::upward::UnknownDataError).
 
-```rust,no_compile
+```rust,ignore
 let details = block_item_summary.details.known_or_err()?;
 ```
 
 Alternatively [`known_or`] or similarly named variants can be used for directly mapping the unknown data case to an error.
 
-```rust,no_compile
+```rust,ignore
 let details = block_item_summary.details.known_or(MyError::UnknownData)?;
 ```
 
