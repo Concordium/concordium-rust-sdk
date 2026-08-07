@@ -1594,7 +1594,14 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
                         super::types::RootUpdate::Level2KeysUpdate(Box::new(u.try_into()?))
                     }
                     root_update::UpdateType::Level2KeysUpdateV1(u) => {
-                        super::types::RootUpdate::Level2KeysUpdateV1(Box::new(u.try_into()?))
+                        let authorizations: super::types::AuthorizationsV1 = u.try_into()?;
+                        if authorizations.token_parameters.is_some() {
+                            super::types::RootUpdate::Level2KeysUpdateV3(Box::new(authorizations))
+                        } else if authorizations.create_plt.is_some() {
+                            super::types::RootUpdate::Level2KeysUpdateV2(Box::new(authorizations))
+                        } else {
+                            super::types::RootUpdate::Level2KeysUpdateV1(Box::new(authorizations))
+                        }
                     }
                 })
             }
@@ -1607,7 +1614,14 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
                         super::types::Level1Update::Level2KeysUpdate(Box::new(u.try_into()?))
                     }
                     level1_update::UpdateType::Level2KeysUpdateV1(u) => {
-                        super::types::Level1Update::Level2KeysUpdateV1(Box::new(u.try_into()?))
+                        let authorizations: super::types::AuthorizationsV1 = u.try_into()?;
+                        if authorizations.token_parameters.is_some() {
+                            super::types::Level1Update::Level2KeysUpdateV3(Box::new(authorizations))
+                        } else if authorizations.create_plt.is_some() {
+                            super::types::Level1Update::Level2KeysUpdateV2(Box::new(authorizations))
+                        } else {
+                            super::types::Level1Update::Level2KeysUpdateV1(Box::new(authorizations))
+                        }
                     }
                 })
             }
@@ -6012,6 +6026,76 @@ mod test {
             },
         };
         assert_eq!(converted, expected);
+    }
+
+    fn test_authorizations_v1(create_plt: bool, token_parameters: bool) -> AuthorizationsV1 {
+        let mut rng = StdRng::seed_from_u64(42);
+        let (_, key) = gen_public_key(&mut rng);
+        let access = AccessStructure {
+            access_public_keys: vec![UpdateKeysIndex { value: 0 }],
+            access_threshold: Some(UpdateKeysThreshold { value: 1 }),
+        };
+        AuthorizationsV1 {
+            v0: Some(AuthorizationsV0 {
+                keys: vec![UpdatePublicKey { value: key }],
+                emergency: Some(access.clone()),
+                protocol: Some(access.clone()),
+                parameter_consensus: Some(access.clone()),
+                parameter_euro_per_energy: Some(access.clone()),
+                parameter_micro_ccd_per_euro: Some(access.clone()),
+                parameter_foundation_account: Some(access.clone()),
+                parameter_mint_distribution: Some(access.clone()),
+                parameter_transaction_fee_distribution: Some(access.clone()),
+                parameter_gas_rewards: Some(access.clone()),
+                pool_parameters: Some(access.clone()),
+                add_anonymity_revoker: Some(access.clone()),
+                add_identity_provider: Some(access.clone()),
+            }),
+            parameter_cooldown: Some(access.clone()),
+            parameter_time: Some(access.clone()),
+            create_plt: create_plt.then(|| access.clone()),
+            token_parameters: token_parameters.then_some(access),
+        }
+    }
+
+    #[test]
+    fn test_level2_authorization_update_version_conversions() {
+        let convert_root = |authorizations| {
+            crate::types::UpdatePayload::try_from(UpdatePayload {
+                payload: Some(update_payload::Payload::RootUpdate(generated::RootUpdate {
+                    update_type: Some(root_update::UpdateType::Level2KeysUpdateV1(authorizations)),
+                })),
+            })
+            .expect("convert root authorization update")
+        };
+
+        assert!(matches!(
+            convert_root(test_authorizations_v1(false, false)),
+            crate::types::UpdatePayload::Root(crate::types::RootUpdate::Level2KeysUpdateV1(_))
+        ));
+        assert!(matches!(
+            convert_root(test_authorizations_v1(true, false)),
+            crate::types::UpdatePayload::Root(crate::types::RootUpdate::Level2KeysUpdateV2(_))
+        ));
+        assert!(matches!(
+            convert_root(test_authorizations_v1(true, true)),
+            crate::types::UpdatePayload::Root(crate::types::RootUpdate::Level2KeysUpdateV3(_))
+        ));
+
+        let level1 = crate::types::UpdatePayload::try_from(UpdatePayload {
+            payload: Some(update_payload::Payload::Level1Update(
+                generated::Level1Update {
+                    update_type: Some(level1_update::UpdateType::Level2KeysUpdateV1(
+                        test_authorizations_v1(true, true),
+                    )),
+                },
+            )),
+        })
+        .expect("convert level 1 authorization update");
+        assert!(matches!(
+            level1,
+            crate::types::UpdatePayload::Level1(crate::types::Level1Update::Level2KeysUpdateV3(_))
+        ));
     }
 
     #[test]
