@@ -168,8 +168,9 @@ impl Level2AccessConfig {
 
 /// Full level-2 governance key configuration for CPV1 and later (P4+).
 ///
-/// Each field corresponds to one on-chain update type. `create_plt` must be
-/// `None` for P4–P8 and `Some` for P9+.
+/// Each field corresponds to one on-chain update type.
+/// - `create_plt` must be `None` for P4–P8 and `Some` for P9+.
+/// - `token_parameters` must be `Some` only for P11.
 pub struct Level2GovernanceKeysConfig {
     /// Level-2 public keys; each [`GovernanceKeySpec`] entry adds existing or
     /// fresh keys to the shared pool referenced by the access structures below.
@@ -205,6 +206,9 @@ pub struct Level2GovernanceKeysConfig {
     /// Keys authorised to create a new PLT. Must be `None` for P4–P8 and
     /// `Some` for P9+.
     pub create_plt: Option<Level2AccessConfig>,
+    /// Keys authorised to update token and lock-related chain parameters.
+    /// Must be `Some` for P11 and `None` for earlier protocol versions.
+    pub token_parameters: Option<Level2AccessConfig>,
 }
 
 /// Full governance key generation configuration for CPV1 and later.
@@ -542,7 +546,13 @@ impl GenesisBuilderCPV3 {
     /// Build the CPV3 genesis block.
     ///
     /// The protocol version was fixed at construction via a factory function.
-    /// Returns an error if validation fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when required builder inputs are missing or invalid. In
+    /// particular, P8 requires all PLT authorization fields to be absent,
+    /// P9–P10 require `create_plt` and reject `token_parameters` and
+    /// `max_lock_duration`, and P11 requires all three fields.
     pub fn build(self) -> anyhow::Result<GenesisOutputCPV3> {
         let mut csprng = rand::thread_rng();
         let pv = self.protocol_version;
@@ -599,16 +609,39 @@ impl GenesisBuilderCPV3 {
             generated_level2_key_pairs: gen_level2,
         } = build_governance_keys(governance_keys_input, &mut csprng)?;
 
-        // 7. Validate createPLT requirement.
+        // 7. Validate protocol-specific authorization and chain parameters.
         match pv {
             ProtocolVersion::P8 => {
                 if governance_keys.level_2_keys.create_plt.is_some() {
                     bail!("P8 does not support createPLT authorization.");
                 }
+                if governance_keys.level_2_keys.token_parameters.is_some() {
+                    bail!("P8 does not support tokenParameters authorization.");
+                }
+                if params.chain.max_lock_duration.is_some() {
+                    bail!("P8 does not support maxLockDuration.");
+                }
             }
-            ProtocolVersion::P9 | ProtocolVersion::P10 | ProtocolVersion::P11 => {
+            ProtocolVersion::P9 | ProtocolVersion::P10 => {
                 if governance_keys.level_2_keys.create_plt.is_none() {
                     bail!("{:?} requires createPLT authorization.", pv);
+                }
+                if governance_keys.level_2_keys.token_parameters.is_some() {
+                    bail!("{:?} does not support tokenParameters authorization.", pv);
+                }
+                if params.chain.max_lock_duration.is_some() {
+                    bail!("{:?} does not support maxLockDuration.", pv);
+                }
+            }
+            ProtocolVersion::P11 => {
+                if governance_keys.level_2_keys.create_plt.is_none() {
+                    bail!("P11 requires createPLT authorization.");
+                }
+                if governance_keys.level_2_keys.token_parameters.is_none() {
+                    bail!("P11 requires tokenParameters authorization.");
+                }
+                if params.chain.max_lock_duration.is_none() {
+                    bail!("P11 requires maxLockDuration.");
                 }
             }
             _ => unreachable!("Protocol version validated at construction."),
@@ -690,6 +723,18 @@ pub fn genesis_builder_p10() -> GenesisBuilderCPV3 {
 }
 
 /// Returns a [`GenesisBuilderCPV3`] targeting protocol version **P11**.
+///
+/// P11 builds require `create_plt` and `token_parameters` governance access
+/// structures and a `max_lock_duration` chain parameter. Call
+/// [`GenesisBuilderCPV3::build`] after supplying the remaining common inputs.
+///
+/// # Examples
+///
+/// ```
+/// use concordium_rust_sdk::genesis::genesis_builder_p11;
+///
+/// let builder = genesis_builder_p11();
+/// ```
 pub fn genesis_builder_p11() -> GenesisBuilderCPV3 {
     GenesisBuilderCPV3::new(ProtocolVersion::P11)
 }
@@ -1264,6 +1309,11 @@ fn build_governance_keys(
                 .as_ref()
                 .map(|c| c.access_structure(&level2_public))
                 .transpose()?;
+            let token_parameters = l2
+                .token_parameters
+                .as_ref()
+                .map(|c| c.access_structure(&level2_public))
+                .transpose()?;
 
             let v0 = AuthorizationsV0 {
                 keys: level2_public,
@@ -1285,6 +1335,7 @@ fn build_governance_keys(
                 cooldown_parameters,
                 time_parameters,
                 create_plt,
+                token_parameters,
             };
 
             let collection = UpdateKeysCollectionSkeleton {
@@ -1458,10 +1509,16 @@ impl GenesisBuilderCPV2 {
             generated_level2_key_pairs,
         } = build_governance_keys(governance_keys_input, &mut csprng)?;
 
-        // 7. CPV2 does not support createPLT authorization.
+        // 7. CPV2 does not support P9+ governance authorizations.
         if governance_keys.level_2_keys.create_plt.is_some() {
             bail!(
                 "{:?} (CPV2) does not support createPLT authorization.",
+                self.protocol_version
+            );
+        }
+        if governance_keys.level_2_keys.token_parameters.is_some() {
+            bail!(
+                "{:?} (CPV2) does not support tokenParameters authorization.",
                 self.protocol_version
             );
         }
@@ -1644,9 +1701,15 @@ impl GenesisBuilderCPV1 {
             generated_level2_key_pairs: gen_level2,
         } = build_governance_keys(governance_keys_input, &mut csprng)?;
 
-        // 7. CPV1 does not support createPLT authorization.
+        // 7. CPV1 does not support P9+ governance authorizations.
         if governance_keys.level_2_keys.create_plt.is_some() {
             bail!("{:?} (CPV1) does not support createPLT authorization.", pv);
+        }
+        if governance_keys.level_2_keys.token_parameters.is_some() {
+            bail!(
+                "{:?} (CPV1) does not support tokenParameters authorization.",
+                pv
+            );
         }
 
         // 8. Resolve chain parameters.

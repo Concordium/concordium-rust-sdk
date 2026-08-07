@@ -319,6 +319,9 @@ pub struct Level2Keys {
     /// Access structure for creating a protocol level token.
     /// Supported from protocol version 9.
     pub create_plt: Option<AccessStructure>,
+    /// Access structure for updating token and lock-related chain parameters.
+    /// Supported from protocol version 11.
+    pub token_parameters: Option<AccessStructure>,
 }
 
 impl Level2Keys {
@@ -432,12 +435,14 @@ impl TryFrom<Level2Keys> for types::AuthorizationsV1 {
             .take()
             .ok_or(Level2KeysConversionError::MissingField("time_parameters"))?;
         let create_plt = value.create_plt.take();
+        let token_parameters = value.token_parameters.take();
         let v0: types::AuthorizationsV0 = value.try_into()?;
         Ok(Self {
             v0,
             cooldown_parameters,
             time_parameters,
             create_plt,
+            token_parameters,
         })
     }
 }
@@ -644,6 +649,9 @@ pub struct ChainParameters {
     /// without being suspended as a validator.
     /// Supported from protocol version 8.
     pub validator_max_missed_rounds: Option<u64>,
+    /// Maximum relative duration for protocol-level token locks.
+    /// Supported from protocol version 11.
+    pub max_lock_duration: Option<Duration>,
     /// Keys allowed to do chain updates.
     pub keys: UpdateKeys,
 }

@@ -59,6 +59,7 @@ fn make_gov_keys(needs_plt: bool) -> GovernanceKeysGenerateConfig {
             } else {
                 None
             },
+            token_parameters: None,
         },
     }
 }
@@ -163,6 +164,7 @@ fn make_chain_params_cpv3() -> GenesisChainParametersV3 {
         cooldown_parameters,
         finalization_committee_parameters,
         validator_score_parameters,
+        max_lock_duration: None,
     }
 }
 
@@ -224,21 +226,53 @@ fn test_p9_genesis_via_factory() {
     assert!(!serialize_genesis(&output.genesis_data).is_empty());
 }
 
-/// P10 and P11 via factory functions.
+/// P10 remains valid without P11-only fields.
 #[test]
-fn test_p10_p11_via_factory() {
-    for (builder, needs_plt) in [(genesis_builder_p10(), true), (genesis_builder_p11(), true)] {
-        let output = builder
-            .generate_crypto_params("test-cpv3".to_string())
-            .generate_identity_providers(IpIdentity::from(0), 1)
-            .generate_anonymity_revokers(ArIdentity::try_from(1u32).unwrap(), 1)
-            .generate_accounts(foundation_account())
-            .generate_governance_keys(make_gov_keys(needs_plt))
-            .with_protocol(make_protocol_params_cpv3())
-            .build()
-            .expect("build must succeed");
-        assert!(!serialize_genesis(&output.genesis_data).is_empty());
-    }
+fn test_p10_via_factory() {
+    let output = genesis_builder_p10()
+        .generate_crypto_params("test-p10".to_string())
+        .generate_identity_providers(IpIdentity::from(0), 1)
+        .generate_anonymity_revokers(ArIdentity::try_from(1u32).unwrap(), 1)
+        .generate_accounts(foundation_account())
+        .generate_governance_keys(make_gov_keys(true))
+        .with_protocol(make_protocol_params_cpv3())
+        .build()
+        .expect("P10 build must succeed");
+    assert!(!serialize_genesis(&output.genesis_data).is_empty());
+}
+
+fn make_p11_gov_keys() -> GovernanceKeysGenerateConfig {
+    let mut config = make_gov_keys(true);
+    config.level2.token_parameters = Some(make_access(&[0, 1, 2], 2));
+    config
+}
+
+fn make_p11_protocol_params() -> ProtocolParamsCPV3 {
+    let mut params = make_protocol_params_cpv3();
+    params.chain.max_lock_duration = Some(Duration::from_millis(86_400_000));
+    params
+}
+
+#[test]
+fn test_p11_genesis_via_factory() {
+    let output = genesis_builder_p11()
+        .generate_crypto_params("test-p11".to_string())
+        .generate_identity_providers(IpIdentity::from(0), 1)
+        .generate_anonymity_revokers(ArIdentity::try_from(1u32).unwrap(), 1)
+        .generate_accounts(foundation_account())
+        .generate_governance_keys(make_p11_gov_keys())
+        .with_protocol(make_p11_protocol_params())
+        .build()
+        .expect("P11 build must succeed");
+
+    assert!(output
+        .governance_keys
+        .level_2_keys
+        .token_parameters
+        .is_some());
+    let bytes = serialize_genesis(&output.genesis_data);
+    assert!(!bytes.is_empty());
+    assert_eq!(output.genesis_data.hash(), output.genesis_data.hash());
 }
 
 /// AC: P9 without createPLT returns a clear error.
@@ -255,6 +289,94 @@ fn test_p9_requires_create_plt() {
 
     assert!(result.is_err());
     assert!(result.err().unwrap().to_string().contains("createPLT"));
+}
+
+#[test]
+fn test_p11_requires_token_parameters() {
+    let result = genesis_builder_p11()
+        .generate_crypto_params("test-p11-missing-token-auth".to_string())
+        .generate_identity_providers(IpIdentity::from(0), 1)
+        .generate_anonymity_revokers(ArIdentity::try_from(1u32).unwrap(), 1)
+        .generate_accounts(foundation_account())
+        .generate_governance_keys(make_gov_keys(true))
+        .with_protocol(make_p11_protocol_params())
+        .build();
+
+    assert!(result
+        .err()
+        .expect("P11 without tokenParameters must fail")
+        .to_string()
+        .contains("tokenParameters"));
+}
+
+#[test]
+fn test_p11_requires_max_lock_duration() {
+    let result = genesis_builder_p11()
+        .generate_crypto_params("test-p11-missing-max-duration".to_string())
+        .generate_identity_providers(IpIdentity::from(0), 1)
+        .generate_anonymity_revokers(ArIdentity::try_from(1u32).unwrap(), 1)
+        .generate_accounts(foundation_account())
+        .generate_governance_keys(make_p11_gov_keys())
+        .with_protocol(make_protocol_params_cpv3())
+        .build();
+
+    assert!(result
+        .err()
+        .expect("P11 without maxLockDuration must fail")
+        .to_string()
+        .contains("maxLockDuration"));
+}
+
+#[test]
+fn test_p8_through_p10_reject_token_parameters() {
+    for (name, builder, needs_plt) in [
+        ("P8", genesis_builder_p8(), false),
+        ("P9", genesis_builder_p9(), true),
+        ("P10", genesis_builder_p10(), true),
+    ] {
+        let mut governance = make_gov_keys(needs_plt);
+        governance.level2.token_parameters = Some(make_access(&[0, 1, 2], 2));
+        let result = builder
+            .generate_crypto_params(format!("test-{name}-token-auth"))
+            .generate_identity_providers(IpIdentity::from(0), 1)
+            .generate_anonymity_revokers(ArIdentity::try_from(1u32).unwrap(), 1)
+            .generate_accounts(foundation_account())
+            .generate_governance_keys(governance)
+            .with_protocol(make_protocol_params_cpv3())
+            .build();
+
+        assert!(result
+            .err()
+            .expect("pre-P11 tokenParameters must fail")
+            .to_string()
+            .contains("tokenParameters"));
+    }
+}
+
+#[test]
+fn test_p8_through_p10_reject_max_lock_duration() {
+    for (name, builder, needs_plt) in [
+        ("P8", genesis_builder_p8(), false),
+        ("P9", genesis_builder_p9(), true),
+        ("P10", genesis_builder_p10(), true),
+    ] {
+        let mut params = make_protocol_params_cpv3();
+        params.chain.max_lock_duration = Some(Duration::from_millis(1));
+        let result = builder
+            .generate_crypto_params(format!("test-{name}-max-duration"))
+            .generate_identity_providers(IpIdentity::from(0), 1)
+            .generate_anonymity_revokers(ArIdentity::try_from(1u32).unwrap(), 1)
+            .generate_accounts(foundation_account())
+            .generate_governance_keys(make_gov_keys(needs_plt))
+            .with_protocol(params)
+            .build();
+
+        assert!(result
+            .err()
+            .expect("pre-P11 maxLockDuration must fail")
+            .to_string()
+            .contains("maxLockDuration"));
+    }
 }
 
 /// AC: building without protocol parameters returns a clear error.

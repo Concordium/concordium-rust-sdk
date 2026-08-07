@@ -57,6 +57,7 @@ fn make_gov_keys_cpv1() -> GovernanceKeysGenerateConfig {
             cooldown_parameters: make_access(k, 2),
             time_parameters: make_access(k, 2),
             create_plt: None,
+            token_parameters: None,
         },
     }
 }

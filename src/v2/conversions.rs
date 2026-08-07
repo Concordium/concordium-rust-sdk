@@ -1646,6 +1646,9 @@ impl TryFrom<UpdatePayload> for super::types::UpdatePayload {
             update_payload::Payload::CreatePltUpdate(create_plt) => {
                 Self::CreatePlt(create_plt.try_into()?)
             }
+            update_payload::Payload::MaxLockDurationUpdate(duration) => {
+                Self::MaxLockDuration(duration.into())
+            }
         })
     }
 }
@@ -1774,7 +1777,8 @@ impl TryFrom<AuthorizationsV1> for super::types::AuthorizationsV1 {
             v0: value.v0.require()?.try_into()?,
             cooldown_parameters: value.parameter_cooldown.require()?.try_into()?,
             time_parameters: value.parameter_time.require()?.try_into()?,
-            create_plt: value.create_plt.map(|x| x.try_into()).transpose()?,
+            create_plt: value.create_plt.map(TryInto::try_into).transpose()?,
+            token_parameters: value.token_parameters.map(TryInto::try_into).transpose()?,
         })
     }
 }
@@ -1831,6 +1835,7 @@ impl TryFrom<AuthorizationsV0> for chain_parameters::Level2Keys {
             cooldown_parameters: None,
             time_parameters: None,
             create_plt: None,
+            token_parameters: None,
         })
     }
 }
@@ -1846,7 +1851,8 @@ impl TryFrom<AuthorizationsV1> for chain_parameters::Level2Keys {
                 .map(TryInto::try_into)
                 .transpose()?,
             time_parameters: value.parameter_time.map(TryInto::try_into).transpose()?,
-            create_plt: value.create_plt.map(|x| x.try_into()).transpose()?,
+            create_plt: value.create_plt.map(TryInto::try_into).transpose()?,
+            token_parameters: value.token_parameters.map(TryInto::try_into).transpose()?,
             ..keys
         })
     }
@@ -2630,6 +2636,9 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
                     },
                 }
             }
+            reject_reason::Reason::LockDurationTooLong(lock_id) => Self::LockDurationTooLong {
+                lock_id: lock_id.into(),
+            },
         })
     }
 }
@@ -2951,6 +2960,7 @@ impl TryFrom<ChainParametersV0> for chain_parameters::ChainParameters {
                 .unwrap_or_default(),
             finalization_committee_parameters: Default::default(),
             validator_max_missed_rounds: None,
+            max_lock_duration: None,
 
             keys: chain_parameters::UpdateKeys {
                 root_keys: value.root_keys.map(TryInto::try_into).transpose()?,
@@ -3014,6 +3024,7 @@ impl TryFrom<ChainParametersV1> for chain_parameters::ChainParameters {
                 .unwrap_or_default(),
             finalization_committee_parameters: Default::default(),
             validator_max_missed_rounds: None,
+            max_lock_duration: None,
             keys: chain_parameters::UpdateKeys {
                 root_keys: value.root_keys.map(TryInto::try_into).transpose()?,
                 level_1_keys: value.level1_keys.map(TryInto::try_into).transpose()?,
@@ -3087,6 +3098,7 @@ impl TryFrom<ChainParametersV2> for chain_parameters::ChainParameters {
                 .map(Into::into)
                 .unwrap_or_default(),
             validator_max_missed_rounds: None,
+            max_lock_duration: None,
             keys: chain_parameters::UpdateKeys {
                 root_keys: value.root_keys.map(TryInto::try_into).transpose()?,
                 level_1_keys: value.level1_keys.map(TryInto::try_into).transpose()?,
@@ -3162,6 +3174,7 @@ impl TryFrom<ChainParametersV3> for chain_parameters::ChainParameters {
             validator_max_missed_rounds: value
                 .validator_score_parameters
                 .map(|vsp| vsp.maximum_missed_rounds),
+            max_lock_duration: value.max_lock_duration.map(Into::into),
             keys: chain_parameters::UpdateKeys {
                 root_keys: value.root_keys.map(TryInto::try_into).transpose()?,
                 level_1_keys: value.level1_keys.map(TryInto::try_into).transpose()?,
@@ -3934,6 +3947,9 @@ impl TryFrom<pending_update::Effect> for super::types::queries::PendingUpdateEff
             pending_update::Effect::ValidatorScoreParameters(update) => {
                 PendingUpdateEffect::ValidatorScoreParameters(update.try_into()?)
             }
+            pending_update::Effect::MaxLockDuration(duration) => {
+                PendingUpdateEffect::MaxLockDuration(duration.into())
+            }
         };
         Ok(out)
     }
@@ -3985,6 +4001,10 @@ impl TryFrom<NextUpdateSequenceNumbers> for super::types::queries::NextUpdateSeq
                 .unwrap_or_default(),
             protocol_level_tokens: message
                 .protocol_level_tokens
+                .map(Into::into)
+                .unwrap_or_default(),
+            max_lock_duration: message
+                .max_lock_duration
                 .map(Into::into)
                 .unwrap_or_default(),
         })
@@ -4739,6 +4759,7 @@ mod test {
             },
             finalization_committee_parameters: Default::default(),
             validator_max_missed_rounds: None,
+            max_lock_duration: None,
             keys: chain_parameters::UpdateKeys {
                 root_keys: Some(concordium_base::updates::HigherLevelAccessStructure::<
                     concordium_base::updates::RootKeysKind,
@@ -4818,6 +4839,7 @@ mod test {
                     cooldown_parameters: None,
                     time_parameters: None,
                     create_plt: None,
+                    token_parameters: None,
                 }),
             },
         };
@@ -5025,6 +5047,7 @@ mod test {
                     access_threshold: Some(UpdateKeysThreshold { value: 277 }),
                 }),
                 create_plt: None,
+                token_parameters: None,
             }),
         };
         let params = ChainParameters {
@@ -5093,6 +5116,7 @@ mod test {
             },
             finalization_committee_parameters: Default::default(),
             validator_max_missed_rounds: None,
+            max_lock_duration: None,
             keys: chain_parameters::UpdateKeys {
                 root_keys: Some(concordium_base::updates::HigherLevelAccessStructure::<
                     concordium_base::updates::RootKeysKind,
@@ -5178,6 +5202,7 @@ mod test {
                         threshold: 277.try_into().unwrap(),
                     }),
                     create_plt: None,
+                    token_parameters: None,
                 }),
             },
         };
@@ -5392,6 +5417,7 @@ mod test {
                     access_threshold: Some(UpdateKeysThreshold { value: 277 }),
                 }),
                 create_plt: None,
+                token_parameters: None,
             }),
             finalization_committee_parameters: Some(FinalizationCommitteeParameters {
                 minimum_finalizers: 601,
@@ -5481,6 +5507,7 @@ mod test {
                 )),
             },
             validator_max_missed_rounds: None,
+            max_lock_duration: None,
             keys: chain_parameters::UpdateKeys {
                 root_keys: Some(concordium_base::updates::HigherLevelAccessStructure::<
                     concordium_base::updates::RootKeysKind,
@@ -5566,6 +5593,7 @@ mod test {
                         threshold: 277.try_into().unwrap(),
                     }),
                     create_plt: None,
+                    token_parameters: None,
                 }),
             },
         };
@@ -5786,6 +5814,10 @@ mod test {
                     ],
                     access_threshold: Some(UpdateKeysThreshold { value: 293 }),
                 }),
+                token_parameters: Some(AccessStructure {
+                    access_public_keys: vec![UpdateKeysIndex { value: 307 }],
+                    access_threshold: Some(UpdateKeysThreshold { value: 311 }),
+                }),
             }),
             finalization_committee_parameters: Some(FinalizationCommitteeParameters {
                 minimum_finalizers: 601,
@@ -5797,6 +5829,7 @@ mod test {
             validator_score_parameters: Some(ValidatorScoreParameters {
                 maximum_missed_rounds: 607,
             }),
+            max_lock_duration: Some(Duration { value: 613 }),
         };
         let params = ChainParameters {
             parameters: Some(generated::chain_parameters::Parameters::V3(cpv3)),
@@ -5878,6 +5911,7 @@ mod test {
                 )),
             },
             validator_max_missed_rounds: Some(607),
+            max_lock_duration: Some(contracts_common::Duration::from_millis(613)),
             keys: chain_parameters::UpdateKeys {
                 root_keys: Some(concordium_base::updates::HigherLevelAccessStructure::<
                     concordium_base::updates::RootKeysKind,
@@ -5970,9 +6004,104 @@ mod test {
                         .into(),
                         threshold: 293.try_into().unwrap(),
                     }),
+                    token_parameters: Some(updates::AccessStructure {
+                        authorized_keys: [base::UpdateKeysIndex::from(307)].into(),
+                        threshold: 311.try_into().unwrap(),
+                    }),
                 }),
             },
         };
         assert_eq!(converted, expected);
+    }
+
+    #[test]
+    fn test_max_lock_duration_update_conversions() {
+        let payload = UpdatePayload {
+            payload: Some(update_payload::Payload::MaxLockDurationUpdate(Duration {
+                value: 1_234,
+            })),
+        };
+        let converted = crate::types::UpdatePayload::try_from(payload)
+            .expect("convert max lock duration payload");
+        assert!(matches!(
+            converted.update_type(),
+            updates::UpdateType::UpdateMaxLockDuration
+        ));
+        assert!(matches!(
+            converted,
+            crate::types::UpdatePayload::MaxLockDuration(duration)
+                if duration == contracts_common::Duration::from_millis(1_234)
+        ));
+
+        let pending = crate::types::queries::PendingUpdateEffect::try_from(
+            pending_update::Effect::MaxLockDuration(Duration { value: 5_678 }),
+        )
+        .expect("convert pending max lock duration update");
+        assert!(matches!(
+            pending,
+            crate::types::queries::PendingUpdateEffect::MaxLockDuration(duration)
+                if duration == contracts_common::Duration::from_millis(5_678)
+        ));
+    }
+
+    #[test]
+    fn test_max_lock_duration_sequence_number_compatibility() {
+        let sequence = || Some(SequenceNumber { value: 7 });
+        let mut message = NextUpdateSequenceNumbers {
+            root_keys: sequence(),
+            level1_keys: sequence(),
+            level2_keys: sequence(),
+            protocol: sequence(),
+            election_difficulty: sequence(),
+            euro_per_energy: sequence(),
+            micro_ccd_per_euro: sequence(),
+            foundation_account: sequence(),
+            mint_distribution: sequence(),
+            transaction_fee_distribution: sequence(),
+            gas_rewards: sequence(),
+            pool_parameters: sequence(),
+            add_anonymity_revoker: sequence(),
+            add_identity_provider: sequence(),
+            cooldown_parameters: sequence(),
+            time_parameters: sequence(),
+            timeout_parameters: sequence(),
+            min_block_time: sequence(),
+            block_energy_limit: sequence(),
+            finalization_committee_parameters: sequence(),
+            validator_score_parameters: sequence(),
+            protocol_level_tokens: sequence(),
+            max_lock_duration: None,
+        };
+
+        let converted = crate::types::queries::NextUpdateSequenceNumbers::try_from(message)
+            .expect("convert pre-P11 sequence numbers");
+        assert_eq!(converted.max_lock_duration, Default::default());
+
+        message.max_lock_duration = Some(SequenceNumber { value: 11 });
+        let converted = crate::types::queries::NextUpdateSequenceNumbers::try_from(message)
+            .expect("convert P11 sequence numbers");
+        assert_eq!(converted.max_lock_duration.number, 11);
+    }
+
+    #[test]
+    fn test_lock_duration_too_long_conversion_preserves_lock_id() {
+        let converted = crate::types::RejectReason::try_from(RejectReason {
+            reason: Some(reject_reason::Reason::LockDurationTooLong(
+                generated::plt::LockId {
+                    account_index: 13,
+                    sequence_number: 17,
+                    creation_order: 19,
+                },
+            )),
+        })
+        .expect("convert lock duration rejection");
+
+        assert!(matches!(
+            converted,
+            crate::types::RejectReason::LockDurationTooLong { lock_id }
+                if lock_id.account_index == 13
+                    && lock_id.sequence_number == 17
+                    && lock_id.creation_order == 19
+        ));
     }
 }

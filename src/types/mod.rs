@@ -2908,6 +2908,12 @@ pub enum RejectReason {
         #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
         details: LockAccountRejectReasonDetails,
     },
+    /// The requested expiry exceeds the maximum permitted lock duration.
+    /// Introduced in protocol version 11.
+    LockDurationTooLong {
+        #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
+        lock_id: protocol_level_locks::LockId,
+    },
 }
 
 /// The network information of a node.
