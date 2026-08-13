@@ -18,11 +18,10 @@
 - Moved the `TokenModuleEvent` from the `concordium-base` as `EncodedTokenModuleEvent`.
 - Moved the `TokenModuleRejectReason` from the `concordium-base` as `EncodedTokenModuleRejectReason`.
 - Support for `ProtocolVersion::P11`.
-- Added complete P11 maximum lock duration support:
   - Query views expose optional `token_parameters` authorization and `max_lock_duration` chain parameters, pending updates, and sequence numbers while preserving pre-P11 response compatibility.
   - Update payloads and summaries expose `MaxLockDuration`, and `LockDurationTooLong` rejection responses preserve the proposed lock ID.
   - CPV3 genesis builders support P11 `token_parameters` and `max_lock_duration` inputs with protocol-specific validation for P8–P11.
-- Support for `MetaUpdate` transaction type (added in P11).
+  - Support for `MetaUpdate` transaction type.
 - Adds high level lock support for interacting with locks on-chain.
   - `protocol_level_tokens::LockInfoResponse` for lazily decoding `GetLockInfo` responses.
   - `v2::Client::{get_lock_info, get_lock_list}` query wrappers.
