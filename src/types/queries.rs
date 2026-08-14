@@ -402,6 +402,9 @@ pub enum PendingUpdateEffect {
         serde(rename = "validatorScoreParameters")
     )]
     ValidatorScoreParameters(ValidatorScoreParameters),
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "maxLockDuration"))]
+    /// Maximum relative duration for protocol-level token locks.
+    MaxLockDuration(Duration),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -449,8 +452,11 @@ pub struct NextUpdateSequenceNumbers {
     /// Updates to the validator score parameters for chain parameters version 3
     /// onwards.
     pub validator_score_parameters: UpdateSequenceNumber,
-    // Updates to the protocol level tokens. Introduced in protocol version 9.
+    /// Updates to protocol-level tokens. Introduced in protocol version 9.
     pub protocol_level_tokens: UpdateSequenceNumber,
+    /// Updates to the maximum relative lock duration. Introduced in protocol
+    /// version 11.
+    pub max_lock_duration: UpdateSequenceNumber,
 }
 
 /// The status of the node with respect to its participation in the consensus

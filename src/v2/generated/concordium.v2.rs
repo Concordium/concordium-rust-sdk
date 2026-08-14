@@ -1165,7 +1165,7 @@ pub struct RejectReason {
     /// This field might be extended in future versions of the API.
     #[prost(
         oneof = "reject_reason::Reason",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64"
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65"
     )]
     pub reason: ::core::option::Option<reject_reason::Reason>,
 }
@@ -1449,6 +1449,9 @@ pub mod reject_reason {
         /// The recipient is not permitted to receive funds controlled by the lock.
         #[prost(message, tag = "64")]
         LockRecipientNotPermitted(LockOperationNotAuthorized),
+        /// The requested expiry exceeds the maximum permitted lock duration.
+        #[prost(message, tag = "65")]
+        LockDurationTooLong(super::plt::LockId),
     }
 }
 /// Data generated as part of initializing a single contract instance.
@@ -2381,6 +2384,9 @@ pub struct AuthorizationsV1 {
     /// This is present from protocol version 9.
     #[prost(message, optional, tag = "4")]
     pub create_plt: ::core::option::Option<AccessStructure>,
+    /// Access structure for updating token and lock-related chain parameters.
+    #[prost(message, optional, tag = "5")]
+    pub token_parameters: ::core::option::Option<AccessStructure>,
 }
 /// Description either of an anonymity revoker or identity provider.
 /// Metadata that should be visible on the chain.
@@ -2746,7 +2752,7 @@ pub struct UpdatePayload {
     /// This field might be extended in future versions of the API.
     #[prost(
         oneof = "update_payload::Payload",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24"
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25"
     )]
     pub payload: ::core::option::Option<update_payload::Payload>,
 }
@@ -2827,6 +2833,9 @@ pub mod update_payload {
         /// Create a new protocol-level token.
         #[prost(message, tag = "24")]
         CreatePltUpdate(super::plt::CreatePlt),
+        /// The maximum relative duration for protocol-level token locks was updated.
+        #[prost(message, tag = "25")]
+        MaxLockDurationUpdate(super::Duration),
     }
 }
 /// Details about the sponsor of a transaction.
@@ -3860,7 +3869,7 @@ pub struct PendingUpdate {
     /// This field might be extended in future versions of the API.
     #[prost(
         oneof = "pending_update::Effect",
-        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26"
+        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27"
     )]
     pub effect: ::core::option::Option<pending_update::Effect>,
 }
@@ -3946,6 +3955,9 @@ pub mod pending_update {
         /// Updates to the validator score parameters for chain parameters version 3.
         #[prost(message, tag = "26")]
         ValidatorScoreParameters(super::ValidatorScoreParameters),
+        /// Updates to the maximum relative duration for protocol-level token locks.
+        #[prost(message, tag = "27")]
+        MaxLockDuration(super::Duration),
     }
 }
 /// The response for `GetNextUpdateSequenceNumbers`.
@@ -4017,6 +4029,9 @@ pub struct NextUpdateSequenceNumbers {
     /// Updates to the protocol level tokens. Introduced in protocol version 9.
     #[prost(message, optional, tag = "22")]
     pub protocol_level_tokens: ::core::option::Option<SequenceNumber>,
+    /// Updates to the maximum relative duration for protocol-level token locks.
+    #[prost(message, optional, tag = "23")]
+    pub max_lock_duration: ::core::option::Option<SequenceNumber>,
 }
 /// A request to send a new block item to the chain.
 /// An IP address
@@ -4912,6 +4927,9 @@ pub struct ChainParametersV3 {
     /// Validator score parameters
     #[prost(message, optional, tag = "16")]
     pub validator_score_parameters: ::core::option::Option<ValidatorScoreParameters>,
+    /// Maximum relative duration for protocol-level token locks.
+    #[prost(message, optional, tag = "17")]
+    pub max_lock_duration: ::core::option::Option<Duration>,
 }
 /// Chain parameters.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -6103,6 +6121,7 @@ pub enum UpdateType {
     UpdateFinalizationCommitteeParameters = 19,
     UpdateValidatorScoreParameters = 20,
     UpdateCreatePlt = 21,
+    UpdateMaxLockDuration = 22,
 }
 impl UpdateType {
     /// String value of the enum field names used in the ProtoBuf definition.
@@ -6137,6 +6156,7 @@ impl UpdateType {
             }
             Self::UpdateValidatorScoreParameters => "UPDATE_VALIDATOR_SCORE_PARAMETERS",
             Self::UpdateCreatePlt => "UPDATE_CREATE_PLT",
+            Self::UpdateMaxLockDuration => "UPDATE_MAX_LOCK_DURATION",
         }
     }
     /// Creates an enum from field names used in the ProtoBuf definition.
@@ -6170,6 +6190,7 @@ impl UpdateType {
                 Some(Self::UpdateValidatorScoreParameters)
             }
             "UPDATE_CREATE_PLT" => Some(Self::UpdateCreatePlt),
+            "UPDATE_MAX_LOCK_DURATION" => Some(Self::UpdateMaxLockDuration),
             _ => None,
         }
     }

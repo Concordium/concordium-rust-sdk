@@ -203,6 +203,9 @@ pub struct ChainParametersV3 {
     pub finalization_committee_parameters: FinalizationCommitteeParameters,
     /// Scoring parameters used to rank and exclude underperforming validators.
     pub validator_score_parameters: ValidatorScoreParameters,
+    /// Maximum relative duration for protocol-level token locks.
+    /// Present for P11 and absent for P8–P10.
+    pub max_lock_duration: Option<Duration>,
 }
 
 // ── Governance key collection ─────────────────────────────────────────────────
@@ -256,8 +259,9 @@ pub type UpdateKeysCollectionCPV0 = UpdateKeysCollectionSkeleton<AuthorizationsV
 
 /// Governance key collection for CPV1 and later genesis blocks (P4+).
 ///
-/// Uses [`AuthorizationsV1`]. For P4–P7 the `create_plt` field must be absent;
-/// for P9+ it must be present.
+/// Uses [`AuthorizationsV1`]. For P4–P8 the `create_plt` field must be absent;
+/// for P9+ it must be present. The `token_parameters` field must be present only
+/// for P11.
 pub type UpdateKeysCollectionCPV1 = UpdateKeysCollectionSkeleton<AuthorizationsV1>;
 
 // ── Account types ─────────────────────────────────────────────────────────────
@@ -535,6 +539,9 @@ pub struct GenesisChainParametersV3 {
     pub finalization_committee_parameters: FinalizationCommitteeParameters,
     /// Scoring parameters used to rank and exclude underperforming validators.
     pub validator_score_parameters: ValidatorScoreParameters,
+    /// Maximum relative duration for protocol-level token locks.
+    /// Must be present for P11 and absent for P8–P10.
+    pub max_lock_duration: Option<Duration>,
 }
 
 impl GenesisChainParametersV3 {
@@ -555,6 +562,7 @@ impl GenesisChainParametersV3 {
             cooldown_parameters: self.cooldown_parameters,
             finalization_committee_parameters: self.finalization_committee_parameters,
             validator_score_parameters: self.validator_score_parameters,
+            max_lock_duration: self.max_lock_duration,
             foundation_account_index,
         }
     }

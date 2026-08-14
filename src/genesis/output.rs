@@ -87,6 +87,7 @@ pub type GenesisOutputCPV2 = GenesisOutputCPV<UpdateKeysCollectionCPV1>;
 ///
 /// Contains every artifact that went into the genesis block — including
 /// pre-existing ones echoed back — plus the typed [`GenesisData`] value.
-/// Governance keys are typed for CPV3 ([`AuthorizationsV1`](crate::types::AuthorizationsV1),
-/// `create_plt` must be present for P9+). Covers P8+.
+/// Governance keys are typed for CPV3 ([`AuthorizationsV1`](crate::types::AuthorizationsV1)).
+/// P8 omits `create_plt`; P9–P10 require `create_plt`; P11 additionally requires
+/// `token_parameters` authorization and a `max_lock_duration` chain parameter.
 pub type GenesisOutputCPV3 = GenesisOutputCPV<UpdateKeysCollectionCPV1>;
