@@ -6,8 +6,8 @@ use concordium_base::{
     contracts_common::AccountAddress,
     hashes::TransactionHash,
     protocol_level_locks::{
-        LockConfig, LockController, LockControllerSimpleV0, LockControllerSimpleV0Capability,
-        LockId, LockInfo, LockRecipients,
+        LockConfig, LockConfigSimpleV0, LockControllerSimpleV0Capability, LockId, LockInfo,
+        LockRecipients,
     },
     protocol_level_tokens::{
         meta_operations::{self, MetaUpdateOperation, MetaUpdateOperations},
@@ -52,12 +52,12 @@ impl LockQuery for Client {
     }
 }
 
-/// Internal dispatch trait for controller-specific client-side validation.
+/// Internal dispatch trait for lock-configuration-specific client-side validation.
 ///
 /// The high-level lock client validates operations through this trait so each
-/// lock-controller variant can implement its own capability and configuration
-/// checks while the public API remains independent of the concrete controller
-/// type.
+/// lock configuration variant can implement its own capability and
+/// configuration checks while the public API remains independent of the
+/// concrete configuration type.
 trait Validate {
     fn validate_fund(&self, sender: AccountAddress, payload: &FundTokens) -> LockResult<()>;
     fn validate_send(&self, sender: AccountAddress, payload: &SendTokens) -> LockResult<()>;
@@ -141,7 +141,7 @@ pub enum LockError {
     /// Error returned when an RPC call fails.
     #[error("RPC error: {0}.")]
     RPC(#[from] RPCError),
-    /// The sender lacks the controller capability required by the operation.
+    /// The sender lacks the required simple-lock capability.
     #[error("the sender does not have the required capability.")]
     MissingCapability,
     /// The lock has expired and can no longer be operated on.
@@ -150,7 +150,7 @@ pub enum LockError {
     /// The requested amount exceeds the funds available for the operation.
     #[error("insufficient funds available for the requested operation.")]
     InsufficientFunds,
-    /// The token is not configured in the lock controller.
+    /// The token is not configured in the lock configuration.
     #[error("the token is not configured for this lock.")]
     TokenNotConfigured,
     /// The recipient is not part of the lock's configured limited recipient list.
@@ -544,7 +544,7 @@ impl LockClient {
     /// Validate that the lock can be funded with the given payload.
     ///
     /// This refreshes the latest finalized lock info, checks expiry,
-    /// dispatches controller-specific validation based on the lock
+    /// dispatches configuration-specific validation based on the lock
     /// variant, verifies that the token is configured
     /// for the lock, and checks that the sender has enough unencumbered
     /// balance available.
@@ -555,7 +555,7 @@ impl LockClient {
     ) -> LockResult<()> {
         self.update_lock_info().await?;
         self.ensure_not_expired()?;
-        self.info.controller.validate_fund(sender, payload)?;
+        self.info.config.validate_fund(sender, payload)?;
 
         let info = self
             .client
@@ -577,7 +577,7 @@ impl LockClient {
     /// Validate that locked funds can be sent with the given payload.
     ///
     /// This refreshes the latest finalized lock info, checks expiry,
-    /// dispatches controller-specific validation based on the lock
+    /// dispatches configuration-specific validation based on the lock
     /// variant, verifies that the source has
     /// sufficient funds locked under this lock for the requested token, and
     /// checks the recipient against the lock's limited recipient list when
@@ -589,7 +589,7 @@ impl LockClient {
     ) -> LockResult<()> {
         self.update_lock_info().await?;
         self.ensure_not_expired()?;
-        self.info.controller.validate_send(sender, payload)?;
+        self.info.config.validate_send(sender, payload)?;
         self.ensure_locked_amount(payload.source, &payload.token_id, payload.amount)?;
         if !recipient_allowed(&self.info, payload.recipient) {
             return Err(LockError::RecipientNotAllowed);
@@ -600,7 +600,7 @@ impl LockClient {
     /// Validate that locked funds can be returned with the given payload.
     ///
     /// This refreshes the latest finalized lock info, checks expiry,
-    /// dispatches controller-specific validation based on the lock
+    /// dispatches configuration-specific validation based on the lock
     /// variant, and verifies that the source has
     /// sufficient funds locked under this lock for the requested token.
     pub async fn validate_return(
@@ -610,7 +610,7 @@ impl LockClient {
     ) -> LockResult<()> {
         self.update_lock_info().await?;
         self.ensure_not_expired()?;
-        self.info.controller.validate_return(sender, payload)?;
+        self.info.config.validate_return(sender, payload)?;
         self.ensure_locked_amount(payload.source, &payload.token_id, payload.amount)?;
         Ok(())
     }
@@ -618,16 +618,15 @@ impl LockClient {
     /// Validate that the lock can be cancelled by the given sender.
     ///
     /// This refreshes the latest finalized lock info, and
-    /// dispatches controller-specific validation based on the lock
-    /// variant to verify that the sender has the
-    /// cancel capability.
+    /// dispatches configuration-specific validation based on the lock
+    /// variant to verify that the sender has the cancel capability.
     pub async fn validate_cancel(&mut self, sender: AccountAddress) -> LockResult<()> {
         self.update_lock_info().await?;
 
         if self.ensure_not_expired().is_err() {
             return Ok(());
         };
-        self.info.controller.validate_cancel(sender)
+        self.info.config.validate_cancel(sender)
     }
 
     /// Fund the lock from the sender account.
@@ -748,40 +747,41 @@ impl LockClient {
 
 fn ensure_not_expired(info: &LockInfo) -> LockResult<()> {
     let now = chrono::Utc::now().timestamp() as u64;
-    if info.expiry.seconds <= now {
+    let LockConfig::SimpleV0(config) = &info.config;
+    if config.expiry.seconds <= now {
         Err(LockError::Expired)
     } else {
         Ok(())
     }
 }
 
-impl Validate for LockController {
+impl Validate for LockConfig {
     fn validate_fund(&self, sender: AccountAddress, payload: &FundTokens) -> LockResult<()> {
         match self {
-            LockController::SimpleV0(controller) => controller.validate_fund(sender, payload),
+            LockConfig::SimpleV0(config) => config.validate_fund(sender, payload),
         }
     }
 
     fn validate_send(&self, sender: AccountAddress, payload: &SendTokens) -> LockResult<()> {
         match self {
-            LockController::SimpleV0(controller) => controller.validate_send(sender, payload),
+            LockConfig::SimpleV0(config) => config.validate_send(sender, payload),
         }
     }
 
     fn validate_return(&self, sender: AccountAddress, payload: &ReturnTokens) -> LockResult<()> {
         match self {
-            LockController::SimpleV0(controller) => controller.validate_return(sender, payload),
+            LockConfig::SimpleV0(config) => config.validate_return(sender, payload),
         }
     }
 
     fn validate_cancel(&self, sender: AccountAddress) -> LockResult<()> {
         match self {
-            LockController::SimpleV0(controller) => controller.validate_cancel(sender),
+            LockConfig::SimpleV0(config) => config.validate_cancel(sender),
         }
     }
 }
 
-impl Validate for LockControllerSimpleV0 {
+impl Validate for LockConfigSimpleV0 {
     fn validate_fund(&self, sender: AccountAddress, payload: &FundTokens) -> LockResult<()> {
         ensure_capability_simple_v0(self, sender, LockControllerSimpleV0Capability::Fund)?;
         if !self.tokens.iter().any(|token| token == &payload.token_id) {
@@ -804,11 +804,11 @@ impl Validate for LockControllerSimpleV0 {
 }
 
 fn ensure_capability_simple_v0(
-    controller: &LockControllerSimpleV0,
+    config: &LockConfigSimpleV0,
     sender: AccountAddress,
     capability: LockControllerSimpleV0Capability,
 ) -> LockResult<()> {
-    if controller
+    if config
         .grants
         .iter()
         .any(|grant| grant.account.address == sender && grant.roles.contains(&capability))
@@ -820,7 +820,8 @@ fn ensure_capability_simple_v0(
 }
 
 fn recipient_allowed(info: &LockInfo, recipient: AccountAddress) -> bool {
-    match &info.recipients {
+    let LockConfig::SimpleV0(config) = &info.config;
+    match &config.recipients {
         LockRecipients::Any => true,
         LockRecipients::Limited(recipients) => recipients
             .iter()
@@ -1000,7 +1001,7 @@ mod tests {
         base::{Energy, TransactionIndex},
         common::{cbor::value::Value, types::TransactionTime},
         protocol_level_locks::{
-            LockAccountFunds, LockControllerSimpleV0, LockControllerSimpleV0Grant, LockMetadata,
+            LockAccountFunds, LockConfigSimpleV0, LockControllerSimpleV0Grant, LockMetadata,
             LockRecipients, LockedTokenAmount,
         },
         protocol_level_tokens::{
@@ -1040,9 +1041,9 @@ mod tests {
     fn example_lock_info() -> LockInfo {
         LockInfo {
             lock: LockId::new(10001, 5, 0),
-            recipients: LockRecipients::Limited(vec![holder(ADDRESS)]),
-            expiry: TransactionTime::seconds_after(3600),
-            controller: LockController::SimpleV0(LockControllerSimpleV0 {
+            config: LockConfig::SimpleV0(LockConfigSimpleV0 {
+                recipients: LockRecipients::Limited(vec![holder(ADDRESS)]),
+                expiry: TransactionTime::seconds_after(3600),
                 grants: vec![LockControllerSimpleV0Grant {
                     account: holder(ADDRESS),
                     roles: vec![
@@ -1055,8 +1056,8 @@ mod tests {
                 tokens: vec!["CCD".parse().unwrap()],
                 keep_alive: false,
                 memo: None,
+                metadata: Some(example_lock_metadata().encode_raw_cbor()),
             }),
-            metadata: Some(example_lock_metadata().encode_raw_cbor()),
             funds: vec![LockAccountFunds {
                 account: holder(ADDRESS),
                 amounts: vec![LockedTokenAmount {
@@ -1070,23 +1071,24 @@ mod tests {
     #[test]
     fn ensure_not_expired_rejects_expired_locks() {
         let mut info = example_lock_info();
-        info.expiry = TransactionTime::from_seconds(1);
+        let LockConfig::SimpleV0(config) = &mut info.config;
+        config.expiry = TransactionTime::from_seconds(1);
         assert!(matches!(ensure_not_expired(&info), Err(LockError::Expired)));
     }
 
     #[test]
-    fn controller_validate_fund_checks_grants_and_tokens() {
+    fn config_validate_fund_checks_grants_and_tokens() {
         let info = example_lock_info();
         let valid = FundTokens {
             token_id: "CCD".parse().unwrap(),
             amount: TokenAmount::from_raw(1, 0),
             memo: None,
         };
-        assert!(info.controller.validate_fund(ADDRESS, &valid).is_ok());
+        assert!(info.config.validate_fund(ADDRESS, &valid).is_ok());
 
         let other = AccountAddress([9u8; 32]);
         assert!(matches!(
-            info.controller.validate_fund(other, &valid),
+            info.config.validate_fund(other, &valid),
             Err(LockError::MissingCapability)
         ));
 
@@ -1096,7 +1098,7 @@ mod tests {
             memo: None,
         };
         assert!(matches!(
-            info.controller.validate_fund(ADDRESS, &wrong_token),
+            info.config.validate_fund(ADDRESS, &wrong_token),
             Err(LockError::TokenNotConfigured)
         ));
     }
@@ -1135,7 +1137,8 @@ mod tests {
     #[test]
     fn recipient_allowed_accepts_any_recipients() {
         let mut info = example_lock_info();
-        info.recipients = LockRecipients::Any;
+        let LockConfig::SimpleV0(config) = &mut info.config;
+        config.recipients = LockRecipients::Any;
 
         assert!(recipient_allowed(&info, ADDRESS));
         assert!(recipient_allowed(&info, OTHER_ADDRESS));
@@ -1351,17 +1354,15 @@ mod tests {
         ];
         let lock_id = LockId::new(10001, 5, 0);
         let resolved = resolve_pending_operations(
-            LockConfig {
+            LockConfig::SimpleV0(LockConfigSimpleV0 {
                 recipients: LockRecipients::Limited(vec![holder(ADDRESS)]),
                 expiry: TransactionTime::from_seconds(10_000_000),
-                controller: LockController::SimpleV0(LockControllerSimpleV0 {
-                    grants: vec![],
-                    tokens: vec!["CCD".parse().unwrap()],
-                    keep_alive: false,
-                    memo: None,
-                }),
+                grants: vec![],
+                tokens: vec!["CCD".parse().unwrap()],
+                keep_alive: false,
+                memo: None,
                 metadata: Some(example_lock_metadata().encode_raw_cbor()),
-            },
+            }),
             prepended_operations,
             appended_operations,
             lock_id.clone(),

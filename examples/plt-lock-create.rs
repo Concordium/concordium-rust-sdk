@@ -4,7 +4,7 @@ use clap::AppSettings;
 use concordium_base::{
     common::types::TransactionTime,
     protocol_level_locks::{
-        LockConfig, LockController, LockControllerSimpleV0, LockControllerSimpleV0Capability,
+        LockConfig, LockConfigSimpleV0, LockControllerSimpleV0Capability,
         LockControllerSimpleV0Grant, LockMetadata, LockRecipients,
     },
     protocol_level_tokens::{CborHolderAccount, TokenId},
@@ -43,25 +43,23 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Construct an any-recipient lock configuration payload.
-    let config = LockConfig {
+    let config = LockConfig::SimpleV0(LockConfigSimpleV0 {
         recipients: LockRecipients::Any,
         expiry: TransactionTime::hours_after(1),
-        controller: LockController::SimpleV0(LockControllerSimpleV0 {
-            grants: vec![LockControllerSimpleV0Grant {
-                account: CborHolderAccount::from(keys.address),
-                roles: vec![
-                    LockControllerSimpleV0Capability::Fund,
-                    LockControllerSimpleV0Capability::Send,
-                    LockControllerSimpleV0Capability::Return,
-                    LockControllerSimpleV0Capability::Cancel,
-                ],
-            }],
-            tokens: vec![app.token_id],
-            keep_alive: false,
-            memo: None,
-        }),
+        grants: vec![LockControllerSimpleV0Grant {
+            account: CborHolderAccount::from(keys.address),
+            roles: vec![
+                LockControllerSimpleV0Capability::Fund,
+                LockControllerSimpleV0Capability::Send,
+                LockControllerSimpleV0Capability::Return,
+                LockControllerSimpleV0Capability::Cancel,
+            ],
+        }],
+        tokens: vec![app.token_id],
+        keep_alive: false,
+        memo: None,
         metadata: Some(metadata.encode_raw_cbor()),
-    };
+    });
 
     // Submit transaction.
     let pending = create_lock(client, &keys, config, None).await?;
