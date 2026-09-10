@@ -1,4 +1,4 @@
-//! Example that returns funds controlled by an existing lock.
+//! Example that releases funds controlled by an existing lock.
 use anyhow::Context;
 use clap::AppSettings;
 use concordium_base::{
@@ -7,7 +7,7 @@ use concordium_base::{
     protocol_level_tokens::{ConversionRule, TokenAmount, TokenId},
 };
 use concordium_rust_sdk::{
-    protocol_level_tokens::lock_client::{LockClient, ReturnTokens, Validation},
+    protocol_level_tokens::lock_client::{LockClient, ReleaseTokens, Validation},
     types::WalletAccount,
     v2::{self, BlockIdentifier},
 };
@@ -23,7 +23,7 @@ struct App {
     account: PathBuf,
     #[structopt(long = "token", help = "Token id of token.")]
     token_id: TokenId,
-    #[structopt(long = "amount", help = "Amount to return.", default_value = "100.0")]
+    #[structopt(long = "amount", help = "Amount to release.", default_value = "100.0")]
     amount: Decimal,
     #[structopt(long = "source", help = "Source address.")]
     source: AccountAddress,
@@ -58,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
     // Construct the lock client
     let mut lock = LockClient::from_lock_id(client, app.lock_id).await?;
     // Construct payload.
-    let payload = ReturnTokens {
+    let payload = ReleaseTokens {
         token_id,
         source: app.source,
         amount: token_amount,
@@ -66,7 +66,7 @@ async fn main() -> anyhow::Result<()> {
     };
     // Submit transaction.
     let hash = lock
-        .return_funds(&keys, payload, None, Validation::Validate)
+        .release_funds(&keys, payload, None, Validation::Validate)
         .await?;
     println!("submitted transaction: {}", hash);
 

@@ -61,7 +61,7 @@ impl LockQuery for Client {
 trait Validate {
     fn validate_fund(&self, sender: AccountAddress, payload: &FundTokens) -> LockResult<()>;
     fn validate_send(&self, sender: AccountAddress, payload: &SendTokens) -> LockResult<()>;
-    fn validate_return(&self, sender: AccountAddress, payload: &ReturnTokens) -> LockResult<()>;
+    fn validate_release(&self, sender: AccountAddress, payload: &ReleaseTokens) -> LockResult<()>;
     fn validate_cancel(&self, sender: AccountAddress) -> LockResult<()>;
 }
 
@@ -112,16 +112,16 @@ pub struct SendTokens {
     pub memo: Option<CborMemo>,
 }
 
-/// Details for returning locked funds.
+/// Details for releasing locked funds.
 #[derive(Debug, Clone)]
-pub struct ReturnTokens {
-    /// The token whose locked funds are being returned.
+pub struct ReleaseTokens {
+    /// The token whose locked funds are being released.
     pub token_id: TokenId,
     /// The account whose funds are currently locked under the lock.
     pub source: AccountAddress,
-    /// The amount of locked tokens to return.
+    /// The amount of locked tokens to release.
     pub amount: TokenAmount,
-    /// Optional memo to attach to the return operation.
+    /// Optional memo to attach to the release operation.
     pub memo: Option<CborMemo>,
 }
 
@@ -212,7 +212,7 @@ enum AppendedOperation {
     Raw(MetaUpdateOperation),
     Fund(FundTokens),
     Send(SendTokens),
-    Return(ReturnTokens),
+    Release(ReleaseTokens),
     Cancel(Option<CborMemo>),
 }
 
@@ -328,24 +328,24 @@ impl LockCreateProposal {
         self
     }
 
-    /// Append a return operation after the `lockCreate`.
+    /// Append a release operation after the `lockCreate`.
     ///
-    /// The return operation is stored without a lock id and is resolved against
+    /// The release operation is stored without a lock id and is resolved against
     /// the predicted lock id at submission time.
     ///
     /// # Arguments
     ///
-    /// * `payload` - The locked-funds return parameters to append after the
+    /// * `payload` - The locked-funds release parameters to append after the
     ///   creation.
     ///
     /// # Examples
     ///
     /// ```ignore
-    /// let proposal = create_lock_proposal(sender, config).append_return_funds(payload);
+    /// let proposal = create_lock_proposal(sender, config).append_release_funds(payload);
     /// ```
-    pub fn append_return_funds(mut self, payload: ReturnTokens) -> Self {
+    pub fn append_release_funds(mut self, payload: ReleaseTokens) -> Self {
         self.appended_operations
-            .push(AppendedOperation::Return(payload));
+            .push(AppendedOperation::Release(payload));
         self
     }
 
@@ -597,20 +597,20 @@ impl LockClient {
         Ok(())
     }
 
-    /// Validate that locked funds can be returned with the given payload.
+    /// Validate that locked funds can be released with the given payload.
     ///
     /// This refreshes the latest finalized lock info, checks expiry,
     /// dispatches configuration-specific validation based on the lock
     /// variant, and verifies that the source has
     /// sufficient funds locked under this lock for the requested token.
-    pub async fn validate_return(
+    pub async fn validate_release(
         &mut self,
         sender: AccountAddress,
-        payload: &ReturnTokens,
+        payload: &ReleaseTokens,
     ) -> LockResult<()> {
         self.update_lock_info().await?;
         self.ensure_not_expired()?;
-        self.info.config.validate_return(sender, payload)?;
+        self.info.config.validate_release(sender, payload)?;
         self.ensure_locked_amount(payload.source, &payload.token_id, payload.amount)?;
         Ok(())
     }
@@ -677,21 +677,21 @@ impl LockClient {
         self.sign_and_send(signer, &operations, meta).await
     }
 
-    /// Return locked funds to the owner.
+    /// Release locked funds to the owner.
     ///
     /// If `validation` is [`Validation::Validate`], the operation is validated
     /// against the latest finalized state before submission.
-    pub async fn return_funds(
+    pub async fn release_funds(
         &mut self,
         signer: &WalletAccount,
-        payload: ReturnTokens,
+        payload: ReleaseTokens,
         meta: Option<TransactionMetadata>,
         validation: Validation,
     ) -> LockResult<TransactionHash> {
         if validation == Validation::Validate {
-            self.validate_return(signer.address, &payload).await?;
+            self.validate_release(signer.address, &payload).await?;
         }
-        let operations = MetaUpdateOperations::new(vec![meta_operations::lock_return(
+        let operations = MetaUpdateOperations::new(vec![meta_operations::lock_release(
             payload.token_id,
             self.info.lock.clone(),
             payload.source,
@@ -768,9 +768,9 @@ impl Validate for LockConfig {
         }
     }
 
-    fn validate_return(&self, sender: AccountAddress, payload: &ReturnTokens) -> LockResult<()> {
+    fn validate_release(&self, sender: AccountAddress, payload: &ReleaseTokens) -> LockResult<()> {
         match self {
-            LockConfig::SimpleV0(config) => config.validate_return(sender, payload),
+            LockConfig::SimpleV0(config) => config.validate_release(sender, payload),
         }
     }
 
@@ -794,8 +794,8 @@ impl Validate for LockConfigSimpleV0 {
         ensure_capability_simple_v0(self, sender, LockControllerSimpleV0Capability::Send)
     }
 
-    fn validate_return(&self, sender: AccountAddress, _payload: &ReturnTokens) -> LockResult<()> {
-        ensure_capability_simple_v0(self, sender, LockControllerSimpleV0Capability::Return)
+    fn validate_release(&self, sender: AccountAddress, _payload: &ReleaseTokens) -> LockResult<()> {
+        ensure_capability_simple_v0(self, sender, LockControllerSimpleV0Capability::Release)
     }
 
     fn validate_cancel(&self, sender: AccountAddress) -> LockResult<()> {
@@ -932,7 +932,7 @@ fn resolve_pending_operations(
                 payload.amount,
                 payload.memo,
             ),
-            AppendedOperation::Return(payload) => meta_operations::lock_return(
+            AppendedOperation::Release(payload) => meta_operations::lock_release(
                 payload.token_id,
                 lock_id.clone(),
                 payload.source,
@@ -1049,7 +1049,7 @@ mod tests {
                     roles: vec![
                         LockControllerSimpleV0Capability::Fund,
                         LockControllerSimpleV0Capability::Send,
-                        LockControllerSimpleV0Capability::Return,
+                        LockControllerSimpleV0Capability::Release,
                         LockControllerSimpleV0Capability::Cancel,
                     ],
                 }],

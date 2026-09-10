@@ -2624,7 +2624,7 @@ impl TryFrom<RejectReason> for super::types::RejectReason {
                     account: v.account.require()?.try_into()?,
                 },
             },
-            reject_reason::Reason::LockReturnNotAuthorized(v) => Self::LockReturnNotAuthorized {
+            reject_reason::Reason::LockReleaseNotAuthorized(v) => Self::LockReleaseNotAuthorized {
                 details: LockAccountRejectReasonDetails {
                     lock_id: v.lock_id.require()?.into(),
                     account: v.account.require()?.try_into()?,

@@ -1437,9 +1437,9 @@ pub mod reject_reason {
         /// The account is not authorized to send funds controlled by the lock.
         #[prost(message, tag = "60")]
         LockSendNotAuthorized(LockOperationNotAuthorized),
-        /// The account is not authorized to return funds controlled by the lock.
+        /// The account is not authorized to release funds controlled by the lock.
         #[prost(message, tag = "61")]
-        LockReturnNotAuthorized(LockOperationNotAuthorized),
+        LockReleaseNotAuthorized(LockOperationNotAuthorized),
         /// The account is not authorized to cancel the lock.
         #[prost(message, tag = "62")]
         LockCancelNotAuthorized(LockOperationNotAuthorized),
