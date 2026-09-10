@@ -9,6 +9,7 @@ readme = "README.md"
 include = ["src/", "examples/", "CHANGELOG.md"]
 description = "An SDK to use the Concordium blockchain."
 repository = "https://github.com/Concordium/concordium-rust-sdk"
+resolver = "3"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
