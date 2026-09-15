@@ -1,5 +1,7 @@
 ## Unreleased
 
+- **BREAKING (devnet):** Lock configurations now use `LockConfig::SimpleV0(LockConfigSimpleV0 { recipients, expiry, grants, tokens, keep_alive, memo, metadata })`; `LockInfo` now exposes its tagged configuration through `config`.
+
 - Added a `genesis` module for building Concordium genesis blocks.
   - Factory functions `genesis_builder_p1` through `genesis_builder_p11` create a typed builder for the corresponding protocol version.
   - `GenesisData` holds the assembled genesis block; `serialize_genesis` writes it to bytes suitable for storing as a `genesis.dat` file, and `GenesisData::hash` computes the genesis block hash.

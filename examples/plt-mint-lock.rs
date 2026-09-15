@@ -4,7 +4,7 @@ use clap::AppSettings;
 use concordium_base::{
     contracts_common::AccountAddress,
     protocol_level_locks::{
-        LockConfig, LockController, LockControllerSimpleV0, LockControllerSimpleV0Capability,
+        LockConfig, LockConfigSimpleV0, LockControllerSimpleV0Capability,
         LockControllerSimpleV0Grant, LockMetadata, LockRecipients,
     },
     protocol_level_tokens::{
@@ -74,23 +74,21 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Construct composed payload.
-    let config = LockConfig {
+    let config = LockConfig::SimpleV0(LockConfigSimpleV0 {
         recipients: LockRecipients::Limited(vec![CborHolderAccount::from(app.recipient)]),
         expiry: TransactionTime::hours_after(1),
-        controller: LockController::SimpleV0(LockControllerSimpleV0 {
-            grants: vec![LockControllerSimpleV0Grant {
-                account: CborHolderAccount::from(keys.address),
-                roles: vec![
-                    LockControllerSimpleV0Capability::Fund,
-                    LockControllerSimpleV0Capability::Send,
-                ],
-            }],
-            tokens: vec![app.token_id.clone()],
-            keep_alive: false,
-            memo: None,
-        }),
+        grants: vec![LockControllerSimpleV0Grant {
+            account: CborHolderAccount::from(keys.address),
+            roles: vec![
+                LockControllerSimpleV0Capability::Fund,
+                LockControllerSimpleV0Capability::Send,
+            ],
+        }],
+        tokens: vec![app.token_id.clone()],
+        keep_alive: false,
+        memo: None,
         metadata: Some(metadata.encode_raw_cbor()),
-    };
+    });
 
     let operations = [
         meta_operations::mint_tokens(app.token_id.clone(), token_amount),

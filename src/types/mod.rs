@@ -2884,9 +2884,9 @@ pub enum RejectReason {
         #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
         details: LockAccountRejectReasonDetails,
     },
-    /// The account is not authorized to return funds controlled by the lock.
+    /// The account is not authorized to release funds controlled by the lock.
     /// Introduced in protocol version 11.
-    LockReturnNotAuthorized {
+    LockReleaseNotAuthorized {
         #[cfg_attr(feature = "serde_deprecated", serde(rename = "contents"))]
         details: LockAccountRejectReasonDetails,
     },
@@ -3221,10 +3221,10 @@ mod tests {
                 json!({"tag": "LockSendNotAuthorized", "contents": account_details_json.clone()}),
             ),
             (
-                RejectReason::LockReturnNotAuthorized {
+                RejectReason::LockReleaseNotAuthorized {
                     details: account_details.clone(),
                 },
-                json!({"tag": "LockReturnNotAuthorized", "contents": account_details_json.clone()}),
+                json!({"tag": "LockReleaseNotAuthorized", "contents": account_details_json.clone()}),
             ),
             (
                 RejectReason::LockCancelNotAuthorized {
