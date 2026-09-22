@@ -175,7 +175,7 @@ pub struct ChainParametersV2 {
 /// This is the final form produced by [`GenesisChainParametersV3::resolve`];
 /// it is embedded directly in the serialised genesis state and is not meant to
 /// be constructed by callers directly.
-#[derive(Serialize, Debug)]
+#[derive(Debug)]
 pub struct ChainParametersV3 {
     /// Block timeout configuration for the ConcordiumBFT consensus.
     pub timeout_parameters: TimeoutParameters,
@@ -206,6 +206,30 @@ pub struct ChainParametersV3 {
     /// Maximum relative duration for protocol-level token locks.
     /// Present for P11 and absent for P8–P10.
     pub max_lock_duration: Option<Duration>,
+}
+
+impl Serial for ChainParametersV3 {
+    fn serial<B: Buffer>(&self, out: &mut B) {
+        self.timeout_parameters.serial(out);
+        self.min_block_time.serial(out);
+        self.block_energy_limit.serial(out);
+        self.euro_per_energy.serial(out);
+        self.micro_ccd_per_euro.serial(out);
+        self.cooldown_parameters.serial(out);
+        self.time_parameters.serial(out);
+        self.account_creation_limit.serial(out);
+        self.reward_parameters.serial(out);
+        self.foundation_account_index.serial(out);
+        self.pool_parameters.serial(out);
+        self.finalization_committee_parameters.serial(out);
+        self.validator_score_parameters.serial(out);
+
+        // P11 extends the P8-P10 representation without an option tag. Omitting
+        // this field therefore preserves the existing binary format.
+        if let Some(max_lock_duration) = self.max_lock_duration {
+            max_lock_duration.serial(out);
+        }
+    }
 }
 
 // ── Governance key collection ─────────────────────────────────────────────────
