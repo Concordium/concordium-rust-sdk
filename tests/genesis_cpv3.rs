@@ -241,6 +241,36 @@ fn test_p10_via_factory() {
     assert!(!serialize_genesis(&output.genesis_data).is_empty());
 }
 
+/// Serialization for the P8-P10 CPV3 chain parameters.
+#[test]
+fn test_p10_chain_parameters_serialization_fixture() {
+    use concordium_rust_sdk::{common::to_bytes, types::AccountIndex};
+
+    let chain_parameters = make_chain_params_cpv3().resolve(AccountIndex::from(7));
+    let actual = to_bytes(&chain_parameters);
+    assert_eq!(
+        actual.as_slice(),
+        include_bytes!("fixtures/chain-parameters-p10.fixture")
+    );
+}
+
+/// P11 extends the legacy representation by appending the duration directly,
+/// without introducing an `Option` discriminator into either format.
+#[test]
+fn test_p11_chain_parameters_extend_p10_serialization_fixture() {
+    use concordium_rust_sdk::{common::to_bytes, types::AccountIndex};
+
+    let duration = Duration::from_millis(86_400_000);
+    let mut parameters = make_chain_params_cpv3();
+    parameters.max_lock_duration = Some(duration);
+    let actual = to_bytes(&parameters.resolve(AccountIndex::from(7)));
+    let legacy = include_bytes!("fixtures/chain-parameters-p10.fixture");
+    let encoded_duration = to_bytes(&duration);
+
+    assert_eq!(&actual[..legacy.len()], legacy);
+    assert_eq!(&actual[legacy.len()..], encoded_duration);
+}
+
 fn make_p11_gov_keys() -> GovernanceKeysGenerateConfig {
     let mut config = make_gov_keys(true);
     config.level2.token_parameters = Some(make_access(&[0, 1, 2], 2));
