@@ -3,7 +3,9 @@
 //! operations as its methods.
 //!
 //! Using the [`TokenClient`] is functionally equivalent to using the mid-level
-//! abstractions in [`operations`].
+//! abstractions in [`token_operations`].
+//! Single-token updates emit scoped Token Update transactions;
+//! protocol compatibility is enforced by the node.
 
 use concordium_base::{
     base::Nonce,
@@ -11,8 +13,8 @@ use concordium_base::{
     contracts_common::AccountAddress,
     hashes::TransactionHash,
     protocol_level_tokens::{
-        operations, MetadataUrl, TokenAdminRole, TokenAmount, TokenId, TokenModuleState,
-        TokenOperations,
+        token_operations, TokenAdminRole, TokenAmount, TokenId, TokenMetadataUrlDetails,
+        TokenModuleState, TokenOperations,
     },
     transactions::{send, BlockItem},
 };
@@ -199,7 +201,7 @@ impl TokenClient {
     ) -> TokenResult<TransactionHash> {
         let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
 
-        let operations = [operations::assign_admin_roles(account, roles)]
+        let operations = [token_operations::assign_admin_roles(account, roles)]
             .into_iter()
             .collect();
 
@@ -225,7 +227,7 @@ impl TokenClient {
     ) -> TokenResult<TransactionHash> {
         let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
 
-        let operations = [operations::revoke_admin_roles(account, roles)]
+        let operations = [token_operations::revoke_admin_roles(account, roles)]
             .into_iter()
             .collect();
 
@@ -245,11 +247,11 @@ impl TokenClient {
         &mut self,
         signer: &WalletAccount,
         meta: Option<TransactionMetadata>,
-        metadata_url: MetadataUrl,
+        metadata_url: TokenMetadataUrlDetails,
     ) -> TokenResult<TransactionHash> {
         let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
 
-        let operations = [operations::update_metadata(metadata_url)]
+        let operations = [token_operations::update_metadata(metadata_url)]
             .into_iter()
             .collect();
 
@@ -272,7 +274,7 @@ impl TokenClient {
     ) -> TokenResult<TransactionHash> {
         let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
 
-        let operations = [operations::pause()].into_iter().collect();
+        let operations = [token_operations::pause()].into_iter().collect();
         self.sign_and_send(signer, operations, expiry, nonce).await
     }
 
@@ -292,7 +294,7 @@ impl TokenClient {
     ) -> TokenResult<TransactionHash> {
         let TransactionMetadata { expiry, nonce, .. } = meta.unwrap_or_default();
 
-        let operations = [operations::unpause()].into_iter().collect();
+        let operations = [token_operations::unpause()].into_iter().collect();
         self.sign_and_send(signer, operations, expiry, nonce).await
     }
 
@@ -327,8 +329,10 @@ impl TokenClient {
             .map(|tr| {
                 let receiver = tr.recipient;
                 match tr.memo {
-                    Some(memo) => operations::transfer_tokens_with_memo(receiver, tr.amount, memo),
-                    None => operations::transfer_tokens(receiver, tr.amount),
+                    Some(memo) => {
+                        token_operations::transfer_tokens_with_memo(receiver, tr.amount, memo)
+                    }
+                    None => token_operations::transfer_tokens(receiver, tr.amount),
                 }
             })
             .collect();
@@ -361,7 +365,9 @@ impl TokenClient {
 
         let TransactionMetadata { expiry, nonce } = meta.unwrap_or_default();
 
-        let operations = [operations::mint_tokens(amount)].into_iter().collect();
+        let operations = [token_operations::mint_tokens(amount)]
+            .into_iter()
+            .collect();
 
         self.sign_and_send(signer, operations, expiry, nonce).await
     }
@@ -391,7 +397,9 @@ impl TokenClient {
 
         let TransactionMetadata { expiry, nonce } = meta.unwrap_or_default();
 
-        let operations = [operations::burn_tokens(amount)].into_iter().collect();
+        let operations = [token_operations::burn_tokens(amount)]
+            .into_iter()
+            .collect();
 
         self.sign_and_send(signer, operations, expiry, nonce).await
     }
@@ -423,7 +431,7 @@ impl TokenClient {
 
         let operations = targets
             .into_iter()
-            .map(operations::add_token_allow_list)
+            .map(token_operations::add_token_allow_list)
             .collect();
 
         self.sign_and_send(signer, operations, expiry, nonce).await
@@ -456,7 +464,7 @@ impl TokenClient {
 
         let operations = targets
             .into_iter()
-            .map(operations::remove_token_allow_list)
+            .map(token_operations::remove_token_allow_list)
             .collect();
 
         self.sign_and_send(signer, operations, expiry, nonce).await
@@ -491,7 +499,7 @@ impl TokenClient {
 
         let operations = targets
             .into_iter()
-            .map(operations::add_token_deny_list)
+            .map(token_operations::add_token_deny_list)
             .collect();
 
         self.sign_and_send(signer, operations, expiry, nonce).await
@@ -524,7 +532,7 @@ impl TokenClient {
 
         let operations = targets
             .into_iter()
-            .map(operations::remove_token_deny_list)
+            .map(token_operations::remove_token_deny_list)
             .collect();
 
         self.sign_and_send(signer, operations, expiry, nonce).await
@@ -877,7 +885,7 @@ impl TokenClient {
         let token_id = self.info.token_id.clone();
 
         let transaction = send::token_update_operations(
-            &signer,
+            signer,
             signer.address,
             nonce,
             expiry,

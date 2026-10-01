@@ -4,7 +4,7 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_base::{
     contracts_common::AccountAddress,
-    protocol_level_tokens::{operations, TokenId},
+    protocol_level_tokens::{token_operations, TokenId},
 };
 use concordium_rust_sdk::{
     common::types::TransactionTime,
@@ -78,10 +78,12 @@ async fn main() -> anyhow::Result<()> {
 
     // Create token list operation
     let operation = match app.cmd {
-        AddRemoveAllowDeny::AddAllow => operations::add_token_allow_list(target_address),
-        AddRemoveAllowDeny::RemoveAllow => operations::remove_token_allow_list(target_address),
-        AddRemoveAllowDeny::AddDeny => operations::add_token_deny_list(target_address),
-        AddRemoveAllowDeny::RemoveDeny => operations::remove_token_deny_list(target_address),
+        AddRemoveAllowDeny::AddAllow => token_operations::add_token_allow_list(target_address),
+        AddRemoveAllowDeny::RemoveAllow => {
+            token_operations::remove_token_allow_list(target_address)
+        }
+        AddRemoveAllowDeny::AddDeny => token_operations::add_token_deny_list(target_address),
+        AddRemoveAllowDeny::RemoveDeny => token_operations::remove_token_deny_list(target_address),
     };
 
     // Compose operation to transaction

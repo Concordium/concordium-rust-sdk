@@ -9,12 +9,13 @@ pub mod smart_contracts;
 mod summary_helper;
 pub mod transactions;
 
+use crate::protocol_level_tokens::LockEvent;
 use anyhow::Context;
 pub use concordium_base::hashes;
 // re-export to maintain backwards compatibility.
 use crate::{
     constants::*,
-    protocol_level_tokens::{self, MetaEvent, TokenEvent, TokenEventDetails},
+    protocol_level_tokens::{self, OperationEvent, TokenEvent, TokenEventDetails},
     v2::upward::Upward,
 };
 pub use concordium_base::{
@@ -1121,16 +1122,25 @@ fn add_token_events_addresses(
 
 /// Add addresses that have had PLT balance changes to the affected addresses
 /// set.
-fn add_meta_events_addresses(
+fn add_operation_events_addresses(
     affected_addresses: &mut BTreeSet<AccountAddress>,
-    events: &[MetaEvent],
+    events: &[OperationEvent],
 ) {
-    for meta_event in events {
-        match &meta_event {
-            MetaEvent::Token(token_event) => {
+    for event in events {
+        match event {
+            OperationEvent::Token(token_event) => {
                 add_token_event_addresses(affected_addresses, token_event)
             }
-            MetaEvent::LockCreate(_) | MetaEvent::LockDestroy(_) => {}
+            OperationEvent::Lock(LockEvent::Create(_))
+            | OperationEvent::Lock(LockEvent::Destroy(_)) => {}
+            OperationEvent::Lock(LockEvent::LockAmount(e)) => {
+                let protocol_level_tokens::TokenHolder::Account { address } = e.token_holder;
+                affected_addresses.insert(address);
+            }
+            OperationEvent::Lock(LockEvent::UnlockAmount(e)) => {
+                let protocol_level_tokens::TokenHolder::Account { address } = e.token_holder;
+                affected_addresses.insert(address);
+            }
         }
     }
 }
@@ -2016,16 +2026,10 @@ impl BlockItemSummaryDetails {
                     AccountTransactionEffects::DataRegistered { .. } => vec![at.sender],
                     AccountTransactionEffects::BakerConfigured { .. } => vec![at.sender],
                     AccountTransactionEffects::DelegationConfigured { .. } => vec![at.sender],
-                    AccountTransactionEffects::TokenUpdate { events } => {
+                    AccountTransactionEffects::TokenUpdate { events, .. } => {
                         let mut addresses = BTreeSet::new();
                         addresses.insert(at.sender);
-                        add_token_events_addresses(&mut addresses, events);
-                        addresses.into_iter().collect()
-                    }
-                    AccountTransactionEffects::MetaUpdate { events } => {
-                        let mut addresses = BTreeSet::new();
-                        addresses.insert(at.sender);
-                        add_meta_events_addresses(&mut addresses, events);
+                        add_operation_events_addresses(&mut addresses, events);
                         addresses.into_iter().collect()
                     }
                 };
@@ -2144,7 +2148,6 @@ impl AccountTransactionEffects {
             AccountTransactionEffects::BakerConfigured { .. } => Some(ConfigureBaker),
             AccountTransactionEffects::DelegationConfigured { .. } => Some(ConfigureDelegation),
             AccountTransactionEffects::TokenUpdate { .. } => Some(TokenUpdate),
-            AccountTransactionEffects::MetaUpdate { .. } => Some(MetaUpdate),
         }
     }
 
@@ -2374,15 +2377,10 @@ pub enum AccountTransactionEffects {
     /// kinds of delegation events, therefore each event is wrapped in
     /// [`Upward`] potentially representing some future unknown data.
     DelegationConfigured { data: Vec<Upward<DelegationEvent>> },
-    /// Effect of a successful token update.
+    /// Effect of a successful scoped or unscoped token update.
     TokenUpdate {
-        /// Events produced by the update.
-        events: Vec<protocol_level_tokens::TokenEvent>,
-    },
-    /// Effect of a successful meta update.
-    MetaUpdate {
-        /// Events produced by the update.
-        events: Vec<protocol_level_tokens::MetaEvent>,
+        /// Unified token and lock events produced by the update.
+        events: Vec<protocol_level_tokens::OperationEvent>,
     },
 }
 
