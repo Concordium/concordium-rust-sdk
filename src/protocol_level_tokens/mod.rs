@@ -6,7 +6,7 @@ use concordium_base::protocol_level_tokens;
 
 pub mod lock_client;
 mod lock_info;
-mod meta_event;
+mod operation_event;
 mod token_account_info;
 pub mod token_client;
 mod token_event;
@@ -14,7 +14,7 @@ mod token_info;
 mod token_reject_reason;
 
 pub use lock_info::*;
-pub use meta_event::*;
+pub use operation_event::*;
 pub use protocol_level_locks::*;
 pub use protocol_level_tokens::*;
 pub use token_account_info::*;
@@ -137,8 +137,6 @@ impl TryFrom<generated::plt::TokenTransferEvent> for TokenTransferEvent {
                 .memo
                 .map(concordium_base::transactions::Memo::try_from)
                 .transpose()?,
-            from_lock: event.from_lock.map(Into::into),
-            to_lock: event.to_lock.map(Into::into),
         })
     }
 }
@@ -153,56 +151,44 @@ impl TryFrom<generated::plt::TokenSupplyUpdateEvent> for TokenSupplyUpdateEvent 
         })
     }
 }
-impl TryFrom<generated::plt::MetaEvent> for MetaEvent {
+impl TryFrom<generated::plt::OperationEvent> for OperationEvent {
     type Error = tonic::Status;
-
-    fn try_from(meta_event: generated::plt::MetaEvent) -> Result<Self, Self::Error> {
-        meta_event.event.require()?.try_into()
+    fn try_from(value: generated::plt::OperationEvent) -> Result<Self, Self::Error> {
+        use generated::plt::operation_event::Event;
+        match value.event.require()? {
+            Event::TokenEvent(e) => Ok(Self::Token(e.try_into()?)),
+            Event::LockEvent(e) => Ok(Self::Lock(e.try_into()?)),
+        }
     }
 }
 
-impl TryFrom<generated::plt::meta_event::Event> for MetaEvent {
+impl TryFrom<generated::plt::LockEvent> for LockEvent {
     type Error = tonic::Status;
-
-    fn try_from(event: generated::plt::meta_event::Event) -> Result<Self, Self::Error> {
-        use generated::plt::meta_event::Event as GenEvent;
-        let out = match event {
-            GenEvent::ModuleEvent(token_module_event) => MetaEvent::Token(TokenEvent {
-                token_id: token_module_event.token_id.clone().require()?.try_into()?,
-                event: TokenEventDetails::Module(token_module_event.try_into()?),
-            }),
-            GenEvent::TransferEvent(token_transfer_event) => MetaEvent::Token(TokenEvent {
-                token_id: token_transfer_event
-                    .token_id
-                    .clone()
-                    .require()?
-                    .try_into()?,
-                event: TokenEventDetails::Transfer(token_transfer_event.try_into()?),
-            }),
-            GenEvent::MintEvent(token_supply_update_event) => MetaEvent::Token(TokenEvent {
-                token_id: token_supply_update_event
-                    .token_id
-                    .clone()
-                    .require()?
-                    .try_into()?,
-                event: TokenEventDetails::Mint(token_supply_update_event.try_into()?),
-            }),
-            GenEvent::BurnEvent(token_supply_update_event) => MetaEvent::Token(TokenEvent {
-                token_id: token_supply_update_event
-                    .token_id
-                    .clone()
-                    .require()?
-                    .try_into()?,
-                event: TokenEventDetails::Burn(token_supply_update_event.try_into()?),
-            }),
-            GenEvent::LockCreateEvent(lock_create_event) => {
-                MetaEvent::LockCreate(lock_create_event.try_into()?)
+    fn try_from(e: generated::plt::LockEvent) -> Result<Self, Self::Error> {
+        match e.event.require()? {
+            generated::plt::lock_event::Event::LockCreateEvent(e) => {
+                Ok(Self::Create(e.try_into()?))
             }
-            GenEvent::LockDestroyEvent(lock_destroy_event) => {
-                MetaEvent::LockDestroy(lock_destroy_event.try_into()?)
+            generated::plt::lock_event::Event::LockDestroyEvent(e) => {
+                Ok(Self::Destroy(e.try_into()?))
             }
-        };
-        Ok(out)
+            generated::plt::lock_event::Event::LockAmountEvent(e) => {
+                Ok(Self::LockAmount(LockAmountEvent {
+                    token_holder: e.token_holder.require()?.try_into()?,
+                    lock_id: e.lock_id.require()?.into(),
+                    token_id: e.token_id.require()?.try_into()?,
+                    amount: e.amount.require()?.try_into()?,
+                }))
+            }
+            generated::plt::lock_event::Event::UnlockAmountEvent(e) => {
+                Ok(Self::UnlockAmount(UnlockAmountEvent {
+                    token_holder: e.token_holder.require()?.try_into()?,
+                    lock_id: e.lock_id.require()?.into(),
+                    token_id: e.token_id.require()?.try_into()?,
+                    amount: e.amount.require()?.try_into()?,
+                }))
+            }
+        }
     }
 }
 

@@ -4,7 +4,9 @@ use clap::AppSettings;
 use concordium_base::{
     contracts_common::AccountAddress,
     hashes::HashBytes,
-    protocol_level_tokens::{ConversionRule, MetadataUrl, TokenAdminRole, TokenAmount, TokenId},
+    protocol_level_tokens::{
+        ConversionRule, TokenAdminRole, TokenAmount, TokenId, TokenMetadataUrlDetails,
+    },
 };
 use concordium_rust_sdk::{
     common::types::TransactionTime,
@@ -13,7 +15,7 @@ use concordium_rust_sdk::{
     v2::{self, BlockIdentifier},
 };
 use rust_decimal::Decimal;
-use std::{collections::HashMap, path::PathBuf, str::FromStr};
+use std::{path::PathBuf, str::FromStr};
 use structopt::*;
 
 #[derive(StructOpt)]
@@ -262,8 +264,7 @@ async fn main() -> anyhow::Result<()> {
                 .map(|s| HashBytes::from_str(&s))
                 .transpose()?;
 
-            let metadata = MetadataUrl {
-                additional: HashMap::new(),
+            let metadata = TokenMetadataUrlDetails {
                 checksum_sha_256: checksum,
                 url: metadata_url,
             };

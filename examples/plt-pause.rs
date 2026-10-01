@@ -1,7 +1,7 @@
 //! Example that shows how to pause and unpause (PLT) tokens.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_base::protocol_level_tokens::{operations, TokenId};
+use concordium_base::protocol_level_tokens::{token_operations, TokenId};
 use concordium_rust_sdk::{
     common::types::TransactionTime,
     types::{
@@ -66,8 +66,8 @@ async fn main() -> anyhow::Result<()> {
 
     // Create pause/unpause operation
     let operation = match app.cmd {
-        Status::Pause => operations::pause(),
-        Status::Unpause => operations::unpause(),
+        Status::Pause => token_operations::pause(),
+        Status::Unpause => token_operations::unpause(),
     };
 
     // Compose operation to transaction

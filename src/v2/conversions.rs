@@ -6,6 +6,7 @@ use super::{
     upward::Upward,
     Require,
 };
+use crate::protocol_level_tokens::OperationEvent;
 use crate::types::{
     chain_parameters,
     queries::{ConcordiumBFTDetails, ProtocolVersionInt},
@@ -2149,22 +2150,20 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                 })
             }
             account_transaction_effects::Effect::TokenUpdateEffect(token_effect) => {
-                Ok(Self::TokenUpdate {
-                    events: token_effect
+                let events = if token_effect.events.is_empty() {
+                    token_effect
+                        .token_events
+                        .into_iter()
+                        .map(|event| event.try_into().map(OperationEvent::Token))
+                        .collect::<Result<_, tonic::Status>>()?
+                } else {
+                    token_effect
                         .events
                         .into_iter()
                         .map(TryInto::try_into)
-                        .collect::<Result<_, tonic::Status>>()?,
-                })
-            }
-            account_transaction_effects::Effect::MetaUpdateEffect(meta_effect) => {
-                Ok(Self::MetaUpdate {
-                    events: meta_effect
-                        .events
-                        .into_iter()
-                        .map(TryInto::try_into)
-                        .collect::<Result<_, tonic::Status>>()?,
-                })
+                        .collect::<Result<_, tonic::Status>>()?
+                };
+                Ok(Self::TokenUpdate { events })
             }
         }
     }

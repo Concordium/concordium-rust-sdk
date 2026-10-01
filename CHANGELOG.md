@@ -1,5 +1,10 @@
 ## Unreleased
 
+- **BREAKING:** `AccountTransactionEffects::TokenUpdate::events` is changed to consist of `OperationEvent` instead of `TokenEvent`.
+
+- **BREAKING (devnet):** Removed Meta Update transaction and construction APIs. Token Update now has `Scoped` (`TokenOperations`) and `Unscoped` (`Operations`) payloads;
+  single-token APIs use `token_operations::*` and `send::token_update_operations`, while multi-token and lock APIs use `operations::*` and `send::operations`.
+- **BREAKING (devnet):** Token metadata updates take `TokenMetadataUrlDetails` (URL and optional checksum only).
 - **BREAKING (devnet):** Lock configurations now use `LockConfig::SimpleV0(LockConfigSimpleV0 { recipients, expiry, grants, tokens, keep_alive, memo, metadata })`; `LockInfo` now exposes its tagged configuration through `config`.
 
 - Added a `genesis` module for building Concordium genesis blocks.
