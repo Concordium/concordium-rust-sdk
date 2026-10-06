@@ -3179,6 +3179,87 @@ mod tests {
     }
 
     #[test]
+    fn token_update_summary_json_matches_wallet_proxy_contract() {
+        use crate::protocol_level_tokens::{
+            LockAmountEvent, LockCreateEvent, LockDestroyEvent, UnlockAmountEvent,
+        };
+        use concordium_base::protocol_level_tokens::{RawCbor, TokenTransferEvent};
+
+        let lock_id = protocol_level_locks::LockId::new(10001, 5, 0);
+        let holder = TokenHolder::Account { address: account() };
+        let summary = BlockItemSummary {
+            index: TransactionIndex { index: 0 },
+            energy_cost: Energy::from(0),
+            hash: hashes::TransactionHash::from([0u8; 32]),
+            details: Upward::Known(BlockItemSummaryDetails::AccountTransaction(
+                AccountTransactionDetails {
+                    cost: Amount::from_micro_ccd(0),
+                    sender: account(),
+                    sponsor: None,
+                    effects: Upward::Known(AccountTransactionEffects::TokenUpdate {
+                        events: vec![
+                            OperationEvent::Lock(LockEvent::Create(LockCreateEvent {
+                                lock_id: lock_id.clone(),
+                                lock_config: RawCbor::from(vec![
+                                    0xa1, 0x64, b't', b'e', b's', b't', 0x01,
+                                ]),
+                            })),
+                            OperationEvent::Lock(LockEvent::Destroy(LockDestroyEvent {
+                                lock_id: lock_id.clone(),
+                            })),
+                            OperationEvent::Token(TokenEvent {
+                                token_id: "CCD".parse().unwrap(),
+                                event: TokenEventDetails::Transfer(TokenTransferEvent {
+                                    from: TokenHolder::Account {
+                                        address: AccountAddress([2u8; 32]),
+                                    },
+                                    to: TokenHolder::Account {
+                                        address: AccountAddress([3u8; 32]),
+                                    },
+                                    amount: TokenAmount::from_raw(10, 0),
+                                    memo: None,
+                                }),
+                            }),
+                            OperationEvent::Lock(LockEvent::LockAmount(LockAmountEvent {
+                                token_holder: holder.clone(),
+                                lock_id: lock_id.clone(),
+                                token_id: "CCD".parse().unwrap(),
+                                amount: TokenAmount::from_raw(10, 0),
+                            })),
+                            OperationEvent::Lock(LockEvent::UnlockAmount(UnlockAmountEvent {
+                                token_holder: holder,
+                                lock_id,
+                                token_id: "CCD".parse().unwrap(),
+                                amount: TokenAmount::from_raw(10, 0),
+                            })),
+                        ],
+                    }),
+                },
+            )),
+        };
+
+        let json = serde_json::to_value(summary).expect("serialize summary");
+        assert_eq!(json["type"]["contents"], "tokenUpdate");
+        assert_eq!(json["result"]["outcome"], "success");
+        assert_eq!(json["result"]["events"][0]["tag"], "LockCreated");
+        assert_eq!(json["result"]["events"][1]["tag"], "LockDestroyed");
+        assert_eq!(json["result"]["events"][2]["tag"], "TokenTransfer");
+        let mut amount_event_json = json!({
+            "tag": "LockAmount",
+            "tokenHolder": {"type": "account", "address": account()},
+            "lockId": {"accountIndex": 10001, "sequenceNumber": 5, "creationOrder": 0},
+            "tokenId": "CCD",
+            "amount": {"value": "10", "decimals": 0},
+        });
+        assert_eq!(json["result"]["events"][3], amount_event_json);
+        amount_event_json["tag"] = json!("UnlockAmount");
+        assert_eq!(json["result"]["events"][4], amount_event_json);
+        let decoded: BlockItemSummary =
+            serde_json::from_value(json.clone()).expect("deserialize summary");
+        assert_eq!(serde_json::to_value(decoded).unwrap(), json);
+    }
+
+    #[test]
     fn lock_reject_reasons_use_expected_json() {
         let lock_id = lock_id();
         let account = account();

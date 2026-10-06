@@ -4528,6 +4528,69 @@ mod test {
     use super::*;
 
     #[test]
+    fn token_update_events_prefer_unified_list_and_fall_back_to_legacy() {
+        let token = plt::TokenEvent {
+            token_id: Some(plt::TokenId {
+                value: "CCD".into(),
+            }),
+            event: Some(plt::token_event::Event::ModuleEvent(
+                plt::TokenModuleEvent {
+                    r#type: "opaqueExtension".into(),
+                    details: Some(plt::Cbor { value: vec![0xa0] }),
+                },
+            )),
+        };
+        let unified =
+            crate::types::AccountTransactionEffects::try_from(AccountTransactionEffects {
+                effect: Some(account_transaction_effects::Effect::TokenUpdateEffect(
+                    plt::TokenEffect {
+                        token_events: vec![plt::TokenEvent::default()],
+                        events: vec![plt::OperationEvent {
+                            event: Some(plt::operation_event::Event::TokenEvent(token.clone())),
+                        }],
+                    },
+                )),
+            })
+            .unwrap();
+        let legacy = crate::types::AccountTransactionEffects::try_from(AccountTransactionEffects {
+            effect: Some(account_transaction_effects::Effect::TokenUpdateEffect(
+                plt::TokenEffect {
+                    token_events: vec![token.clone()],
+                    events: vec![],
+                },
+            )),
+        })
+        .unwrap();
+        let crate::types::AccountTransactionEffects::TokenUpdate { events } = &unified else {
+            panic!("expected token update")
+        };
+        let [OperationEvent::Token(inner)] = &events[..] else {
+            panic!("expected one token event")
+        };
+        assert_eq!(
+            serde_json::to_value(inner).unwrap(),
+            serde_json::to_value(
+                crate::protocol_level_tokens::TokenEvent::try_from(token).unwrap()
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            serde_json::to_value(&events[0]).unwrap(),
+            serde_json::to_value(inner).unwrap()
+        );
+        let crate::types::AccountTransactionEffects::TokenUpdate {
+            events: legacy_events,
+        } = legacy
+        else {
+            panic!("expected legacy token update")
+        };
+        assert_eq!(
+            serde_json::to_value(events).unwrap(),
+            serde_json::to_value(legacy_events).unwrap()
+        );
+    }
+
+    #[test]
     fn test_try_from_branch() {
         use crate::types::queries::Branch as QBranch;
 
