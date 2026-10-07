@@ -1,6 +1,6 @@
 //! Types and functions for working with Protocol Level Tokens (PLT).
 
-use crate::v2::{generated, Require};
+use crate::v2::{generated, Require, Upward};
 use concordium_base::protocol_level_locks;
 use concordium_base::protocol_level_tokens;
 
@@ -151,13 +151,18 @@ impl TryFrom<generated::plt::TokenSupplyUpdateEvent> for TokenSupplyUpdateEvent 
         })
     }
 }
-impl TryFrom<generated::plt::OperationEvent> for OperationEvent {
+impl TryFrom<generated::plt::OperationEvent> for Upward<OperationEvent> {
     type Error = tonic::Status;
     fn try_from(value: generated::plt::OperationEvent) -> Result<Self, Self::Error> {
         use generated::plt::operation_event::Event;
-        match value.event.require()? {
-            Event::TokenEvent(e) => Ok(Self::Token(e.try_into()?)),
-            Event::LockEvent(e) => Ok(Self::Lock(e.try_into()?)),
+        match value.event {
+            Some(Event::TokenEvent(e)) if e.event.is_some() => {
+                Ok(Self::Known(OperationEvent::Token(e.try_into()?)))
+            }
+            Some(Event::LockEvent(e)) if e.event.is_some() => {
+                Ok(Self::Known(OperationEvent::Lock(e.try_into()?)))
+            }
+            _ => Ok(Self::Unknown(())),
         }
     }
 }

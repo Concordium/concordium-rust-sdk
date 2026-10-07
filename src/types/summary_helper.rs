@@ -965,7 +965,10 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                         (Some(ty), BlockItemResult::Success { events })
                     }
                     super::AccountTransactionEffects::TokenUpdate { events, .. } => {
-                        let events = events.into_iter().map(Event::from).collect();
+                        let events = events
+                            .into_iter()
+                            .map(|event| event.known_or_err().map(Event::from))
+                            .collect::<Result<_, _>>()?;
                         (
                             Some(TransactionType::TokenUpdate),
                             BlockItemResult::Success { events },
@@ -1546,7 +1549,7 @@ fn convert_account_transaction(
             mk_success(super::AccountTransactionEffects::DelegationConfigured { data })
         }
         TransactionType::TokenUpdate => {
-            let events: Vec<OperationEvent> = events
+            let events: Vec<Upward<OperationEvent>> = events
                 .into_iter()
                 .map(|ev| match ev {
                     Event::TokenModuleEvent { token_id, event } => {
@@ -1586,6 +1589,7 @@ fn convert_account_transaction(
                         other_event
                     ))),
                 })
+                .map(|result| result.map(Upward::Known))
                 .collect::<Result<_, ConversionError>>()?;
             mk_success(super::AccountTransactionEffects::TokenUpdate { events })
         }

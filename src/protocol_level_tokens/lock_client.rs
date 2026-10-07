@@ -19,7 +19,7 @@ use crate::{
     endpoints,
     protocol_level_tokens::{LockEvent, LockInfoResponse, OperationEvent, TokenAccountState},
     types::{AccountTransactionEffects, BlockItemSummaryDetails, WalletAccount},
-    v2::{BlockIdentifier, Client, QueryError, QueryResponse, RPCError},
+    v2::{BlockIdentifier, Client, QueryError, QueryResponse, RPCError, Upward},
 };
 
 const DEFAULT_EXPIRY_SECS: u32 = 300;
@@ -893,7 +893,7 @@ fn created_lock_id_from_summary(summary: crate::types::BlockItemSummary) -> Lock
     events
         .into_iter()
         .find_map(|event| match event {
-            OperationEvent::Lock(LockEvent::Create(event)) => Some(event.lock_id),
+            Upward::Known(OperationEvent::Lock(LockEvent::Create(event))) => Some(event.lock_id),
             _ => None,
         })
         .ok_or_else(|| {
@@ -1238,20 +1238,23 @@ mod tests {
     fn token_update_lock_lifecycle_events_affect_sender_only() {
         let lock_id = LockId::new(10001, 5, 0);
         let lock_create = summary_with_effects(AccountTransactionEffects::TokenUpdate {
-            events: vec![OperationEvent::Lock(LockEvent::Create(LockCreateEvent {
-                lock_id: lock_id.clone(),
-                lock_config: RawCbor::from(Vec::new()),
-            }))],
+            events: vec![Upward::Known(OperationEvent::Lock(LockEvent::Create(
+                LockCreateEvent {
+                    lock_id: lock_id.clone(),
+                    lock_config: RawCbor::from(Vec::new()),
+                },
+            )))],
         });
         assert_eq!(
             lock_create.affected_addresses().known().unwrap(),
             vec![ADDRESS]
         );
+        assert_eq!(created_lock_id_from_summary(lock_create).unwrap(), lock_id);
 
         let lock_destroy = summary_with_effects(AccountTransactionEffects::TokenUpdate {
-            events: vec![OperationEvent::Lock(LockEvent::Destroy(LockDestroyEvent {
-                lock_id,
-            }))],
+            events: vec![Upward::Known(OperationEvent::Lock(LockEvent::Destroy(
+                LockDestroyEvent { lock_id },
+            )))],
         });
         assert_eq!(
             lock_destroy.affected_addresses().known().unwrap(),
@@ -1262,7 +1265,7 @@ mod tests {
     #[test]
     fn token_update_token_transfer_affects_token_holders() {
         let summary = summary_with_effects(AccountTransactionEffects::TokenUpdate {
-            events: vec![OperationEvent::Token(TokenEvent {
+            events: vec![Upward::Known(OperationEvent::Token(TokenEvent {
                 token_id: "CCD".parse().unwrap(),
                 event: TokenEventDetails::Transfer(TokenTransferEvent {
                     from: TokenHolder::Account {
@@ -1274,7 +1277,7 @@ mod tests {
                     amount: TokenAmount::from_raw(10, 0),
                     memo: None,
                 }),
-            })],
+            }))],
         });
 
         assert_eq!(

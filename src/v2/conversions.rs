@@ -6,7 +6,6 @@ use super::{
     upward::Upward,
     Require,
 };
-use crate::protocol_level_tokens::OperationEvent;
 use crate::types::{
     chain_parameters,
     queries::{ConcordiumBFTDetails, ProtocolVersionInt},
@@ -2154,7 +2153,12 @@ impl TryFrom<AccountTransactionEffects> for super::types::AccountTransactionEffe
                     token_effect
                         .token_events
                         .into_iter()
-                        .map(|event| event.try_into().map(OperationEvent::Token))
+                        .map(|event| {
+                            plt::OperationEvent {
+                                event: Some(plt::operation_event::Event::TokenEvent(event)),
+                            }
+                            .try_into()
+                        })
                         .collect::<Result<_, tonic::Status>>()?
                 } else {
                     token_effect
@@ -4518,6 +4522,7 @@ impl TryFrom<ConsensusDetailedStatus> for super::types::queries::ConsensusDetail
 
 #[cfg(test)]
 mod test {
+    use crate::protocol_level_tokens::OperationEvent;
     use concordium_base::{
         base::{self, PartsPerHundredThousands, UpdateKeyPair},
         common::{Deserial, Serial},
@@ -4564,13 +4569,13 @@ mod test {
         let crate::types::AccountTransactionEffects::TokenUpdate { events } = &unified else {
             panic!("expected token update")
         };
-        let [OperationEvent::Token(inner)] = &events[..] else {
+        let [Upward::Known(OperationEvent::Token(inner))] = &events[..] else {
             panic!("expected one token event")
         };
         assert_eq!(
             serde_json::to_value(inner).unwrap(),
             serde_json::to_value(
-                crate::protocol_level_tokens::TokenEvent::try_from(token).unwrap()
+                crate::protocol_level_tokens::TokenEvent::try_from(token.clone()).unwrap()
             )
             .unwrap()
         );
@@ -4588,6 +4593,46 @@ mod test {
             serde_json::to_value(events).unwrap(),
             serde_json::to_value(legacy_events).unwrap()
         );
+
+        for unknown in [
+            plt::OperationEvent::default(),
+            plt::OperationEvent {
+                event: Some(plt::operation_event::Event::TokenEvent(
+                    plt::TokenEvent::default(),
+                )),
+            },
+            plt::OperationEvent {
+                event: Some(plt::operation_event::Event::LockEvent(
+                    plt::LockEvent::default(),
+                )),
+            },
+        ] {
+            assert!(matches!(
+                Upward::<OperationEvent>::try_from(unknown).unwrap(),
+                Upward::Unknown(())
+            ));
+        }
+        let unknown_legacy =
+            crate::types::AccountTransactionEffects::try_from(AccountTransactionEffects {
+                effect: Some(account_transaction_effects::Effect::TokenUpdateEffect(
+                    plt::TokenEffect {
+                        token_events: vec![plt::TokenEvent::default()],
+                        events: vec![],
+                    },
+                )),
+            })
+            .unwrap();
+        assert!(matches!(
+            unknown_legacy,
+            crate::types::AccountTransactionEffects::TokenUpdate { events }
+                if matches!(&events[..], [Upward::Unknown(())])
+        ));
+        let mut malformed = token;
+        malformed.token_id = None;
+        assert!(Upward::<OperationEvent>::try_from(plt::OperationEvent {
+            event: Some(plt::operation_event::Event::TokenEvent(malformed)),
+        })
+        .is_err());
     }
 
     #[test]

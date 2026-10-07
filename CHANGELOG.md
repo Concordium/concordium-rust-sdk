@@ -1,6 +1,6 @@
 ## Unreleased
 
-- **BREAKING:** `AccountTransactionEffects::TokenUpdate::events` is changed to consist of `OperationEvent` instead of `TokenEvent`.
+- **BREAKING:** `AccountTransactionEffects::TokenUpdate::events` is changed to consist of `Upward<OperationEvent>` instead of `TokenEvent`, supporting unified token/lock events and per-event forward compatibility.
 
 - **BREAKING (devnet):** Removed Meta Update transaction and construction APIs. Token Update now has `Scoped` (`TokenOperations`) and `Unscoped` (`Operations`) payloads;
   single-token APIs use `token_operations::*` and `send::token_update_operations`, while multi-token and lock APIs use `operations::*` and `send::operations`.
