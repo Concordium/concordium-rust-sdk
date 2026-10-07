@@ -7,10 +7,8 @@ use concordium_base::{
         LockConfig, LockConfigSimpleV0, LockControllerSimpleV0Capability,
         LockControllerSimpleV0Grant, LockMetadata, LockRecipients,
     },
-    protocol_level_tokens::{
-        meta_operations, CborHolderAccount, ConversionRule, TokenAmount, TokenId,
-    },
-    transactions::{construct, BlockItem, ExactSizeTransactionSigner},
+    protocol_level_tokens::{operations, CborHolderAccount, ConversionRule, TokenAmount, TokenId},
+    transactions::{send, BlockItem},
 };
 use concordium_rust_sdk::{
     common::types::TransactionTime,
@@ -91,9 +89,9 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let operations = [
-        meta_operations::mint_tokens(app.token_id.clone(), token_amount),
-        meta_operations::lock_create(config),
-        meta_operations::lock_fund(app.token_id.clone(), lock_id.clone(), token_amount, None),
+        operations::mint_tokens(app.token_id.clone(), token_amount),
+        operations::create_lock(config),
+        operations::fund_lock(app.token_id.clone(), lock_id.clone(), token_amount, None),
     ]
     .into_iter()
     .collect();
@@ -103,14 +101,7 @@ async fn main() -> anyhow::Result<()> {
         .await?
         .nonce;
     let expiry = TransactionTime::minutes_after(5);
-    let txn = construct::meta_update_operations(
-        keys.num_keys(),
-        keys.address,
-        nonce,
-        expiry,
-        &operations,
-    )
-    .sign(&keys);
+    let txn = send::operations(&keys, keys.address, nonce, expiry, &operations);
     let item = BlockItem::AccountTransaction(txn);
 
     // Submit transaction.

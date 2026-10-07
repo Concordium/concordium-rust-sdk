@@ -9,12 +9,13 @@ pub mod smart_contracts;
 mod summary_helper;
 pub mod transactions;
 
+use crate::protocol_level_tokens::LockEvent;
 use anyhow::Context;
 pub use concordium_base::hashes;
 // re-export to maintain backwards compatibility.
 use crate::{
     constants::*,
-    protocol_level_tokens::{self, MetaEvent, TokenEvent, TokenEventDetails},
+    protocol_level_tokens::{self, OperationEvent, TokenEvent, TokenEventDetails},
     v2::upward::Upward,
 };
 pub use concordium_base::{
@@ -1120,19 +1121,32 @@ fn add_token_events_addresses(
 }
 
 /// Add addresses that have had PLT balance changes to the affected addresses
-/// set.
-fn add_meta_events_addresses(
+/// set. Return unknown if any event is unknown.
+fn add_operation_events_addresses(
     affected_addresses: &mut BTreeSet<AccountAddress>,
-    events: &[MetaEvent],
-) {
-    for meta_event in events {
-        match &meta_event {
-            MetaEvent::Token(token_event) => {
+    events: &[Upward<OperationEvent>],
+) -> Upward<()> {
+    for event in events {
+        let Upward::Known(event) = event else {
+            return Upward::Unknown(());
+        };
+        match event {
+            OperationEvent::Token(token_event) => {
                 add_token_event_addresses(affected_addresses, token_event)
             }
-            MetaEvent::LockCreate(_) | MetaEvent::LockDestroy(_) => {}
+            OperationEvent::Lock(LockEvent::Create(_))
+            | OperationEvent::Lock(LockEvent::Destroy(_)) => {}
+            OperationEvent::Lock(LockEvent::LockAmount(e)) => {
+                let protocol_level_tokens::TokenHolder::Account { address } = e.token_holder;
+                affected_addresses.insert(address);
+            }
+            OperationEvent::Lock(LockEvent::UnlockAmount(e)) => {
+                let protocol_level_tokens::TokenHolder::Account { address } = e.token_holder;
+                affected_addresses.insert(address);
+            }
         }
     }
+    Upward::Known(())
 }
 
 #[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]
@@ -2016,16 +2030,14 @@ impl BlockItemSummaryDetails {
                     AccountTransactionEffects::DataRegistered { .. } => vec![at.sender],
                     AccountTransactionEffects::BakerConfigured { .. } => vec![at.sender],
                     AccountTransactionEffects::DelegationConfigured { .. } => vec![at.sender],
-                    AccountTransactionEffects::TokenUpdate { events } => {
+                    AccountTransactionEffects::TokenUpdate { events, .. } => {
                         let mut addresses = BTreeSet::new();
                         addresses.insert(at.sender);
-                        add_token_events_addresses(&mut addresses, events);
-                        addresses.into_iter().collect()
-                    }
-                    AccountTransactionEffects::MetaUpdate { events } => {
-                        let mut addresses = BTreeSet::new();
-                        addresses.insert(at.sender);
-                        add_meta_events_addresses(&mut addresses, events);
+                        let Upward::Known(()) =
+                            add_operation_events_addresses(&mut addresses, events)
+                        else {
+                            return Upward::Unknown(());
+                        };
                         addresses.into_iter().collect()
                     }
                 };
@@ -2144,7 +2156,6 @@ impl AccountTransactionEffects {
             AccountTransactionEffects::BakerConfigured { .. } => Some(ConfigureBaker),
             AccountTransactionEffects::DelegationConfigured { .. } => Some(ConfigureDelegation),
             AccountTransactionEffects::TokenUpdate { .. } => Some(TokenUpdate),
-            AccountTransactionEffects::MetaUpdate { .. } => Some(MetaUpdate),
         }
     }
 
@@ -2374,15 +2385,14 @@ pub enum AccountTransactionEffects {
     /// kinds of delegation events, therefore each event is wrapped in
     /// [`Upward`] potentially representing some future unknown data.
     DelegationConfigured { data: Vec<Upward<DelegationEvent>> },
-    /// Effect of a successful token update.
+    /// Effect of a successful scoped or unscoped token update.
     TokenUpdate {
-        /// Events produced by the update.
-        events: Vec<protocol_level_tokens::TokenEvent>,
-    },
-    /// Effect of a successful meta update.
-    MetaUpdate {
-        /// Events produced by the update.
-        events: Vec<protocol_level_tokens::MetaEvent>,
+        /// Unified token and lock events produced by the update.
+        ///
+        /// Future versions of the Concordium Node API might introduce new
+        /// event kinds, so each event is wrapped in [`Upward`], potentially
+        /// representing unknown data.
+        events: Vec<Upward<protocol_level_tokens::OperationEvent>>,
     },
 }
 
@@ -3178,6 +3188,117 @@ mod tests {
 
     fn account() -> AccountAddress {
         AccountAddress([1u8; 32])
+    }
+
+    #[test]
+    fn token_update_summary_json_matches_wallet_proxy_contract() {
+        use crate::protocol_level_tokens::{
+            LockAmountEvent, LockCreateEvent, LockDestroyEvent, UnlockAmountEvent,
+        };
+        use concordium_base::protocol_level_tokens::{RawCbor, TokenTransferEvent};
+
+        let lock_id = protocol_level_locks::LockId::new(10001, 5, 0);
+        let holder = TokenHolder::Account { address: account() };
+        let summary = BlockItemSummary {
+            index: TransactionIndex { index: 0 },
+            energy_cost: Energy::from(0),
+            hash: hashes::TransactionHash::from([0u8; 32]),
+            details: Upward::Known(BlockItemSummaryDetails::AccountTransaction(
+                AccountTransactionDetails {
+                    cost: Amount::from_micro_ccd(0),
+                    sender: account(),
+                    sponsor: None,
+                    effects: Upward::Known(AccountTransactionEffects::TokenUpdate {
+                        events: vec![
+                            Upward::Known(OperationEvent::Lock(LockEvent::Create(
+                                LockCreateEvent {
+                                    lock_id: lock_id.clone(),
+                                    lock_config: RawCbor::from(vec![
+                                        0xa1, 0x64, b't', b'e', b's', b't', 0x01,
+                                    ]),
+                                },
+                            ))),
+                            Upward::Known(OperationEvent::Lock(LockEvent::Destroy(
+                                LockDestroyEvent {
+                                    lock_id: lock_id.clone(),
+                                },
+                            ))),
+                            Upward::Known(OperationEvent::Token(TokenEvent {
+                                token_id: "CCD".parse().unwrap(),
+                                event: TokenEventDetails::Transfer(TokenTransferEvent {
+                                    from: TokenHolder::Account {
+                                        address: AccountAddress([2u8; 32]),
+                                    },
+                                    to: TokenHolder::Account {
+                                        address: AccountAddress([3u8; 32]),
+                                    },
+                                    amount: TokenAmount::from_raw(10, 0),
+                                    memo: None,
+                                }),
+                            })),
+                            Upward::Known(OperationEvent::Lock(LockEvent::LockAmount(
+                                LockAmountEvent {
+                                    token_holder: holder.clone(),
+                                    lock_id: lock_id.clone(),
+                                    token_id: "CCD".parse().unwrap(),
+                                    amount: TokenAmount::from_raw(10, 0),
+                                },
+                            ))),
+                            Upward::Known(OperationEvent::Lock(LockEvent::UnlockAmount(
+                                UnlockAmountEvent {
+                                    token_holder: holder,
+                                    lock_id,
+                                    token_id: "CCD".parse().unwrap(),
+                                    amount: TokenAmount::from_raw(10, 0),
+                                },
+                            ))),
+                        ],
+                    }),
+                },
+            )),
+        };
+
+        let json = serde_json::to_value(&summary).expect("serialize summary");
+        assert_eq!(json["type"]["contents"], "tokenUpdate");
+        assert_eq!(json["result"]["outcome"], "success");
+        assert_eq!(json["result"]["events"][0]["tag"], "LockCreated");
+        assert_eq!(json["result"]["events"][1]["tag"], "LockDestroyed");
+        assert_eq!(json["result"]["events"][2]["tag"], "TokenTransfer");
+        let mut amount_event_json = json!({
+            "tag": "LockAmount",
+            "tokenHolder": {"type": "account", "address": account()},
+            "lockId": {"accountIndex": 10001, "sequenceNumber": 5, "creationOrder": 0},
+            "tokenId": "CCD",
+            "amount": {"value": "10", "decimals": 0},
+        });
+        assert_eq!(json["result"]["events"][3], amount_event_json);
+        amount_event_json["tag"] = json!("UnlockAmount");
+        assert_eq!(json["result"]["events"][4], amount_event_json);
+        let decoded: BlockItemSummary =
+            serde_json::from_value(json.clone()).expect("deserialize summary");
+        assert_eq!(serde_json::to_value(decoded).unwrap(), json);
+
+        assert_eq!(
+            summary.affected_addresses().known().unwrap(),
+            vec![
+                account(),
+                AccountAddress([2u8; 32]),
+                AccountAddress([3u8; 32])
+            ]
+        );
+        let mut unknown_summary = summary;
+        let Upward::Known(BlockItemSummaryDetails::AccountTransaction(details)) =
+            &mut unknown_summary.details
+        else {
+            panic!("expected account transaction")
+        };
+        let Upward::Known(AccountTransactionEffects::TokenUpdate { events }) = &mut details.effects
+        else {
+            panic!("expected token update")
+        };
+        events[0] = Upward::Unknown(());
+        assert_eq!(unknown_summary.affected_addresses(), Upward::Unknown(()));
+        assert!(serde_json::to_value(unknown_summary).is_err());
     }
 
     #[test]

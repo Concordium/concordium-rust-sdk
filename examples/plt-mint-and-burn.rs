@@ -1,7 +1,7 @@
 //! Example that shows how to mint and burn (PLT) tokens.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_base::protocol_level_tokens::{operations, TokenAmount, TokenId};
+use concordium_base::protocol_level_tokens::{token_operations, TokenAmount, TokenId};
 use concordium_rust_sdk::{
     common::types::TransactionTime,
     types::{
@@ -86,8 +86,8 @@ async fn main() -> anyhow::Result<()> {
 
     // Create mint/burn tokens operation
     let operation = match app.cmd {
-        MintOrBurn::Mint => operations::mint_tokens(token_amount),
-        MintOrBurn::Burn => operations::burn_tokens(token_amount),
+        MintOrBurn::Mint => token_operations::mint_tokens(token_amount),
+        MintOrBurn::Burn => token_operations::burn_tokens(token_amount),
     };
 
     // Compose operation to transaction

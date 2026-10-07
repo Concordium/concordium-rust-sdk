@@ -1,7 +1,7 @@
 //! Example that shows how to update token metadata for a token.
 use anyhow::Context;
 use clap::AppSettings;
-use concordium_base::protocol_level_tokens::{operations, MetadataUrl, TokenId};
+use concordium_base::protocol_level_tokens::{token_operations, TokenId, TokenMetadataUrlDetails};
 use concordium_rust_sdk::{
     common::types::TransactionTime,
     types::{
@@ -10,7 +10,7 @@ use concordium_rust_sdk::{
     },
     v2::{self},
 };
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 use structopt::*;
 
 #[derive(StructOpt)]
@@ -62,13 +62,12 @@ async fn main() -> anyhow::Result<()> {
         TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
 
     // Create operation to update metadata url
-    let metadata = MetadataUrl {
-        additional: HashMap::new(),
+    let metadata = TokenMetadataUrlDetails {
         checksum_sha_256: None,
         url: app.metadata_url,
     };
 
-    let operation = operations::update_metadata(metadata);
+    let operation = token_operations::update_metadata(metadata);
 
     // Compose operation to transaction
     let txn = send::token_update_operations(

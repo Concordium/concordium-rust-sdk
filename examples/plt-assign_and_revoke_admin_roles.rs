@@ -3,7 +3,7 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_base::{
     contracts_common::AccountAddress,
-    protocol_level_tokens::{operations, TokenAdminRole, TokenId},
+    protocol_level_tokens::{token_operations, TokenAdminRole, TokenId},
 };
 use concordium_rust_sdk::{
     common::types::TransactionTime,
@@ -74,11 +74,11 @@ async fn main() -> anyhow::Result<()> {
 
     // Create assign and revoke operations
     let operation = match app.cmd {
-        AssignOrRevoke::AssignAdminRoles => operations::assign_admin_roles(
+        AssignOrRevoke::AssignAdminRoles => token_operations::assign_admin_roles(
             account,
             vec![TokenAdminRole::Mint, TokenAdminRole::Burn],
         ),
-        AssignOrRevoke::RevokeAdminRoles => operations::revoke_admin_roles(
+        AssignOrRevoke::RevokeAdminRoles => token_operations::revoke_admin_roles(
             account,
             vec![
                 TokenAdminRole::UpdateAdminRoles,

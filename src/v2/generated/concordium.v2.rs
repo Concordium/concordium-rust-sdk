@@ -1997,7 +1997,7 @@ pub struct AccountTransactionEffects {
     /// This field might be extended in future versions of the API.
     #[prost(
         oneof = "account_transaction_effects::Effect",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21"
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20"
     )]
     pub effect: ::core::option::Option<account_transaction_effects::Effect>,
 }
@@ -2206,9 +2206,6 @@ pub mod account_transaction_effects {
         /// Token update transaction effect.
         #[prost(message, tag = "20")]
         TokenUpdateEffect(super::plt::TokenEffect),
-        /// Meta-update transaction effect.
-        #[prost(message, tag = "21")]
-        MetaUpdateEffect(super::plt::MetaEffect),
     }
 }
 /// Election difficulty parameter.
@@ -2385,6 +2382,7 @@ pub struct AuthorizationsV1 {
     #[prost(message, optional, tag = "4")]
     pub create_plt: ::core::option::Option<AccessStructure>,
     /// Access structure for updating token and lock-related chain parameters.
+    /// This is present from protocol version 11.
     #[prost(message, optional, tag = "5")]
     pub token_parameters: ::core::option::Option<AccessStructure>,
 }
@@ -6237,8 +6235,6 @@ pub enum TransactionType {
     ConfigureDelegation = 20,
     /// Introduced in protocol version 9.
     TokenUpdate = 21,
-    /// Introduced in protocol version 11.
-    MetaUpdate = 22,
 }
 impl TransactionType {
     /// String value of the enum field names used in the ProtoBuf definition.
@@ -6271,7 +6267,6 @@ impl TransactionType {
             Self::ConfigureBaker => "CONFIGURE_BAKER",
             Self::ConfigureDelegation => "CONFIGURE_DELEGATION",
             Self::TokenUpdate => "TOKEN_UPDATE",
-            Self::MetaUpdate => "META_UPDATE",
         }
     }
     /// Creates an enum from field names used in the ProtoBuf definition.
@@ -6301,7 +6296,6 @@ impl TransactionType {
             "CONFIGURE_BAKER" => Some(Self::ConfigureBaker),
             "CONFIGURE_DELEGATION" => Some(Self::ConfigureDelegation),
             "TOKEN_UPDATE" => Some(Self::TokenUpdate),
-            "META_UPDATE" => Some(Self::MetaUpdate),
             _ => None,
         }
     }

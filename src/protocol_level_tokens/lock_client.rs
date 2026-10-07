@@ -9,20 +9,17 @@ use concordium_base::{
         LockConfig, LockConfigSimpleV0, LockControllerSimpleV0Capability, LockId, LockInfo,
         LockRecipients,
     },
-    protocol_level_tokens::{
-        meta_operations::{self, MetaUpdateOperation, MetaUpdateOperations},
-        CborMemo, TokenAmount, TokenId,
-    },
-    transactions::{construct, BlockItem, ExactSizeTransactionSigner},
+    protocol_level_tokens::{operations, CborMemo, Operation, Operations, TokenAmount, TokenId},
+    transactions::{send, BlockItem},
 };
 use thiserror::Error;
 use tonic::async_trait;
 
 use crate::{
     endpoints,
-    protocol_level_tokens::{LockInfoResponse, TokenAccountState},
+    protocol_level_tokens::{LockEvent, LockInfoResponse, OperationEvent, TokenAccountState},
     types::{AccountTransactionEffects, BlockItemSummaryDetails, WalletAccount},
-    v2::{BlockIdentifier, Client, QueryError, QueryResponse, RPCError},
+    v2::{BlockIdentifier, Client, QueryError, QueryResponse, RPCError, Upward},
 };
 
 const DEFAULT_EXPIRY_SECS: u32 = 300;
@@ -209,7 +206,7 @@ impl PendingLockCreation {
 
 #[derive(Debug, Clone)]
 enum AppendedOperation {
-    Raw(MetaUpdateOperation),
+    Raw(Operation),
     Fund(FundTokens),
     Send(SendTokens),
     Release(ReleaseTokens),
@@ -232,7 +229,7 @@ enum AppendedOperation {
 pub struct LockCreateProposal {
     sender: AccountAddress,
     config: LockConfig,
-    prepended_operations: Vec<MetaUpdateOperation>,
+    prepended_operations: Vec<Operation>,
     appended_operations: Vec<AppendedOperation>,
 }
 
@@ -257,9 +254,9 @@ impl LockCreateProposal {
     ///
     /// ```ignore
     /// let proposal = create_lock_proposal(sender, config)
-    ///     .prepend_operation(meta_operations::mint_tokens(token_id.clone(), amount));
+    ///     .prepend_operation(operations::mint_tokens(token_id.clone(), amount));
     /// ```
-    pub fn prepend_operation(mut self, operation: MetaUpdateOperation) -> Self {
+    pub fn prepend_operation(mut self, operation: Operation) -> Self {
         self.prepended_operations.push(operation);
         self
     }
@@ -275,9 +272,9 @@ impl LockCreateProposal {
     ///
     /// ```ignore
     /// let proposal = create_lock_proposal(sender, config)
-    ///     .append_operation(meta_operations::mint_tokens(token_id.clone(), amount));
+    ///     .append_operation(operations::mint_tokens(token_id.clone(), amount));
     /// ```
-    pub fn append_operation(mut self, operation: MetaUpdateOperation) -> Self {
+    pub fn append_operation(mut self, operation: Operation) -> Self {
         self.appended_operations
             .push(AppendedOperation::Raw(operation));
         self
@@ -457,7 +454,7 @@ pub async fn get_next_lock_id(
 ///
 /// ```ignore
 /// let proposal = create_lock_proposal(sender, config)
-///     .prepend_operation(meta_operations::mint_tokens(token_id.clone(), amount))
+///     .prepend_operation(operations::mint_tokens(token_id.clone(), amount))
 ///     .append_fund(FundTokens {
 ///         token_id,
 ///         amount,
@@ -479,7 +476,7 @@ pub async fn create_lock(
     config: LockConfig,
     meta: Option<TransactionMetadata>,
 ) -> LockResult<PendingLockCreation> {
-    let operations = MetaUpdateOperations::new(vec![meta_operations::lock_create(config)]);
+    let operations = Operations::new(vec![operations::create_lock(config)]);
     let hash = sign_and_send_with_client(&mut client, signer, &operations, meta).await?;
     Ok(PendingLockCreation { client, hash })
 }
@@ -531,11 +528,11 @@ impl LockClient {
     /// Send a set of raw meta-update operations without validation.
     ///
     /// This is the lower-level submission helper for custom pre-built
-    /// [`MetaUpdateOperations`] targeting the current lock.
+    /// [`Operations`] targeting the current lock.
     pub async fn send_operations(
         &mut self,
         signer: &WalletAccount,
-        operations: MetaUpdateOperations,
+        operations: Operations,
         meta: Option<TransactionMetadata>,
     ) -> LockResult<TransactionHash> {
         self.sign_and_send(signer, &operations, meta).await
@@ -643,7 +640,7 @@ impl LockClient {
         if validation == Validation::Validate {
             self.validate_fund(signer.address, &payload).await?;
         }
-        let operations = MetaUpdateOperations::new(vec![meta_operations::lock_fund(
+        let operations = Operations::new(vec![operations::fund_lock(
             payload.token_id,
             self.info.lock.clone(),
             payload.amount,
@@ -666,7 +663,7 @@ impl LockClient {
         if validation == Validation::Validate {
             self.validate_send(signer.address, &payload).await?;
         }
-        let operations = MetaUpdateOperations::new(vec![meta_operations::lock_send(
+        let operations = Operations::new(vec![operations::send_locked_tokens(
             payload.token_id,
             self.info.lock.clone(),
             payload.source,
@@ -691,7 +688,7 @@ impl LockClient {
         if validation == Validation::Validate {
             self.validate_release(signer.address, &payload).await?;
         }
-        let operations = MetaUpdateOperations::new(vec![meta_operations::lock_release(
+        let operations = Operations::new(vec![operations::release_locked_tokens(
             payload.token_id,
             self.info.lock.clone(),
             payload.source,
@@ -715,17 +712,15 @@ impl LockClient {
         if validation == Validation::Validate {
             self.validate_cancel(signer.address).await?;
         }
-        let operations = MetaUpdateOperations::new(vec![meta_operations::lock_cancel(
-            self.info.lock.clone(),
-            memo,
-        )]);
+        let operations =
+            Operations::new(vec![operations::cancel_lock(self.info.lock.clone(), memo)]);
         self.sign_and_send(signer, &operations, meta).await
     }
 
     async fn sign_and_send(
         &mut self,
         signer: &WalletAccount,
-        operations: &MetaUpdateOperations,
+        operations: &Operations,
         meta: Option<TransactionMetadata>,
     ) -> LockResult<TransactionHash> {
         sign_and_send_with_client(&mut self.client, signer, operations, meta).await
@@ -882,7 +877,7 @@ fn created_lock_id_from_summary(summary: crate::types::BlockItemSummary) -> Lock
         "unknown account transaction effects".into(),
     ))?;
     let events = match effects {
-        AccountTransactionEffects::MetaUpdate { events } => events,
+        AccountTransactionEffects::TokenUpdate { events, .. } => events,
         AccountTransactionEffects::None { .. } => {
             return Err(LockError::CreationFailed(
                 "lock creation transaction was rejected".into(),
@@ -890,7 +885,7 @@ fn created_lock_id_from_summary(summary: crate::types::BlockItemSummary) -> Lock
         }
         _ => {
             return Err(LockError::CreationFailed(
-                "finalized account transaction is not a meta update".into(),
+                "finalized account transaction is not a token update".into(),
             ))
         }
     };
@@ -898,7 +893,7 @@ fn created_lock_id_from_summary(summary: crate::types::BlockItemSummary) -> Lock
     events
         .into_iter()
         .find_map(|event| match event {
-            super::MetaEvent::LockCreate(event) => Some(event.lock_id),
+            Upward::Known(OperationEvent::Lock(LockEvent::Create(event))) => Some(event.lock_id),
             _ => None,
         })
         .ok_or_else(|| {
@@ -908,23 +903,23 @@ fn created_lock_id_from_summary(summary: crate::types::BlockItemSummary) -> Lock
 
 fn resolve_pending_operations(
     config: LockConfig,
-    prepended_operations: Vec<MetaUpdateOperation>,
+    prepended_operations: Vec<Operation>,
     appended_operations: Vec<AppendedOperation>,
     lock_id: LockId,
-) -> MetaUpdateOperations {
+) -> Operations {
     let mut ops = Vec::with_capacity(prepended_operations.len() + appended_operations.len() + 1);
     ops.extend(prepended_operations);
-    ops.push(meta_operations::lock_create(config));
+    ops.push(operations::create_lock(config));
     for op in appended_operations {
         let op = match op {
             AppendedOperation::Raw(operation) => operation,
-            AppendedOperation::Fund(payload) => meta_operations::lock_fund(
+            AppendedOperation::Fund(payload) => operations::fund_lock(
                 payload.token_id,
                 lock_id.clone(),
                 payload.amount,
                 payload.memo,
             ),
-            AppendedOperation::Send(payload) => meta_operations::lock_send(
+            AppendedOperation::Send(payload) => operations::send_locked_tokens(
                 payload.token_id,
                 lock_id.clone(),
                 payload.source,
@@ -932,18 +927,18 @@ fn resolve_pending_operations(
                 payload.amount,
                 payload.memo,
             ),
-            AppendedOperation::Release(payload) => meta_operations::lock_release(
+            AppendedOperation::Release(payload) => operations::release_locked_tokens(
                 payload.token_id,
                 lock_id.clone(),
                 payload.source,
                 payload.amount,
                 payload.memo,
             ),
-            AppendedOperation::Cancel(memo) => meta_operations::lock_cancel(lock_id.clone(), memo),
+            AppendedOperation::Cancel(memo) => operations::cancel_lock(lock_id.clone(), memo),
         };
         ops.push(op);
     }
-    MetaUpdateOperations::new(ops)
+    Operations::new(ops)
 }
 
 fn account_available_balance(state: Option<&TokenAccountState>) -> LockResult<TokenAmount> {
@@ -957,7 +952,7 @@ fn account_available_balance(state: Option<&TokenAccountState>) -> LockResult<To
 async fn sign_and_send_with_client(
     client: &mut Client,
     signer: &WalletAccount,
-    operations: &MetaUpdateOperations,
+    operations: &Operations,
     meta: Option<TransactionMetadata>,
 ) -> LockResult<TransactionHash> {
     let TransactionMetadata { expiry, nonce } = meta.unwrap_or_default();
@@ -971,14 +966,7 @@ async fn sign_and_send_with_client(
                 .nonce
         }
     };
-    let tx = construct::meta_update_operations(
-        signer.num_keys(),
-        signer.address,
-        nonce,
-        expiry,
-        operations,
-    )
-    .sign(signer);
+    let tx = send::operations(signer, signer.address, nonce, expiry, operations);
     let block_item = BlockItem::AccountTransaction(tx);
     Ok(client.send_block_item(&block_item).await?)
 }
@@ -992,7 +980,7 @@ mod tests {
     };
     use crate::{
         protocol_level_tokens::{
-            LockCreateEvent, LockDestroyEvent, MetaEvent, TokenEvent, TokenEventDetails,
+            LockCreateEvent, LockDestroyEvent, OperationEvent, TokenEvent, TokenEventDetails,
         },
         types::hashes::TransactionHash,
         v2::Upward,
@@ -1005,8 +993,7 @@ mod tests {
             LockRecipients, LockedTokenAmount,
         },
         protocol_level_tokens::{
-            meta_operations::MetaUpdateOperation, CborHolderAccount, CoinInfo, RawCbor,
-            TokenHolder, TokenTransferEvent,
+            CborHolderAccount, CoinInfo, Operation, RawCbor, TokenHolder, TokenTransferEvent,
         },
         transactions::TransactionType,
     };
@@ -1228,7 +1215,7 @@ mod tests {
     #[test]
     fn created_lock_id_reject_missing_event() {
         let summary =
-            summary_with_effects(AccountTransactionEffects::MetaUpdate { events: vec![] });
+            summary_with_effects(AccountTransactionEffects::TokenUpdate { events: vec![] });
         assert!(matches!(
             created_lock_id_from_summary(summary),
             Err(LockError::CreationFailed(_))
@@ -1238,7 +1225,7 @@ mod tests {
     #[test]
     fn created_lock_id_reject_failed_transaction() {
         let summary = summary_with_effects(AccountTransactionEffects::None {
-            transaction_type: Some(TransactionType::MetaUpdate),
+            transaction_type: Some(TransactionType::TokenUpdate),
             reject_reason: Upward::Known(RejectReason::ZeroScheduledAmount),
         });
         assert!(matches!(
@@ -1248,21 +1235,26 @@ mod tests {
     }
 
     #[test]
-    fn meta_update_lock_lifecycle_events_affect_sender_only() {
+    fn token_update_lock_lifecycle_events_affect_sender_only() {
         let lock_id = LockId::new(10001, 5, 0);
-        let lock_create = summary_with_effects(AccountTransactionEffects::MetaUpdate {
-            events: vec![MetaEvent::LockCreate(LockCreateEvent {
-                lock_id: lock_id.clone(),
-                lock_config: RawCbor::from(Vec::new()),
-            })],
+        let lock_create = summary_with_effects(AccountTransactionEffects::TokenUpdate {
+            events: vec![Upward::Known(OperationEvent::Lock(LockEvent::Create(
+                LockCreateEvent {
+                    lock_id: lock_id.clone(),
+                    lock_config: RawCbor::from(Vec::new()),
+                },
+            )))],
         });
         assert_eq!(
             lock_create.affected_addresses().known().unwrap(),
             vec![ADDRESS]
         );
+        assert_eq!(created_lock_id_from_summary(lock_create).unwrap(), lock_id);
 
-        let lock_destroy = summary_with_effects(AccountTransactionEffects::MetaUpdate {
-            events: vec![MetaEvent::LockDestroy(LockDestroyEvent { lock_id })],
+        let lock_destroy = summary_with_effects(AccountTransactionEffects::TokenUpdate {
+            events: vec![Upward::Known(OperationEvent::Lock(LockEvent::Destroy(
+                LockDestroyEvent { lock_id },
+            )))],
         });
         assert_eq!(
             lock_destroy.affected_addresses().known().unwrap(),
@@ -1271,9 +1263,9 @@ mod tests {
     }
 
     #[test]
-    fn meta_update_token_transfer_with_lock_metadata_affects_token_holders() {
-        let summary = summary_with_effects(AccountTransactionEffects::MetaUpdate {
-            events: vec![MetaEvent::Token(TokenEvent {
+    fn token_update_token_transfer_affects_token_holders() {
+        let summary = summary_with_effects(AccountTransactionEffects::TokenUpdate {
+            events: vec![Upward::Known(OperationEvent::Token(TokenEvent {
                 token_id: "CCD".parse().unwrap(),
                 event: TokenEventDetails::Transfer(TokenTransferEvent {
                     from: TokenHolder::Account {
@@ -1284,10 +1276,8 @@ mod tests {
                     },
                     amount: TokenAmount::from_raw(10, 0),
                     memo: None,
-                    from_lock: Some(LockId::new(10001, 5, 0)),
-                    to_lock: Some(LockId::new(10002, 6, 0)),
                 }),
-            })],
+            }))],
         });
 
         assert_eq!(
@@ -1297,46 +1287,8 @@ mod tests {
     }
 
     #[test]
-    fn meta_update_summary_json_matches_wallet_proxy_contract() {
-        let lock_id = LockId::new(10001, 5, 0);
-        let summary = summary_with_effects(AccountTransactionEffects::MetaUpdate {
-            events: vec![
-                MetaEvent::LockCreate(LockCreateEvent {
-                    lock_id: lock_id.clone(),
-                    lock_config: RawCbor::from(vec![0xa1, 0x64, b't', b'e', b's', b't', 0x01]),
-                }),
-                MetaEvent::LockDestroy(LockDestroyEvent { lock_id }),
-                MetaEvent::Token(TokenEvent {
-                    token_id: "CCD".parse().unwrap(),
-                    event: TokenEventDetails::Transfer(TokenTransferEvent {
-                        from: TokenHolder::Account {
-                            address: OTHER_ADDRESS,
-                        },
-                        to: TokenHolder::Account {
-                            address: THIRD_ADDRESS,
-                        },
-                        amount: TokenAmount::from_raw(10, 0),
-                        memo: None,
-                        from_lock: Some(LockId::new(10001, 5, 0)),
-                        to_lock: Some(LockId::new(10002, 6, 0)),
-                    }),
-                }),
-            ],
-        });
-
-        let json = serde_json::to_value(summary).expect("serialize summary");
-        assert_eq!(json["type"]["contents"], "metaUpdate");
-        assert_eq!(json["result"]["outcome"], "success");
-        assert_eq!(json["result"]["events"][0]["tag"], "LockCreated");
-        assert_eq!(json["result"]["events"][1]["tag"], "LockDestroyed");
-        assert_eq!(json["result"]["events"][2]["tag"], "TokenTransfer");
-        assert!(json["result"]["events"][2].get("fromLock").is_some());
-        assert!(json["result"]["events"][2].get("toLock").is_some());
-    }
-
-    #[test]
     fn pending_operations_order() {
-        let prepended_operations = vec![meta_operations::mint_tokens(
+        let prepended_operations = vec![operations::mint_tokens(
             "CCD".parse().unwrap(),
             TokenAmount::from_raw(5, 0),
         )];
@@ -1346,7 +1298,7 @@ mod tests {
                 amount: TokenAmount::from_raw(10, 0),
                 memo: None,
             }),
-            AppendedOperation::Raw(meta_operations::burn_tokens(
+            AppendedOperation::Raw(operations::burn_tokens(
                 "CCD".parse().unwrap(),
                 TokenAmount::from_raw(3, 0),
             )),
@@ -1369,23 +1321,23 @@ mod tests {
         );
         assert_eq!(resolved.operations.len(), 5);
         match &resolved.operations[0] {
-            MetaUpdateOperation::Mint(_) => {}
+            Operation::TokenMint(_) => {}
             other => panic!("expected mint first, got {other:?}"),
         }
         match &resolved.operations[1] {
-            MetaUpdateOperation::LockCreate(_) => {}
+            Operation::LockCreate(_) => {}
             other => panic!("expected lockCreate second, got {other:?}"),
         }
         match &resolved.operations[2] {
-            MetaUpdateOperation::LockFund(details) => assert_eq!(details.lock, lock_id),
+            Operation::LockFund(details) => assert_eq!(details.lock, lock_id),
             other => panic!("expected lockFund third, got {other:?}"),
         }
         match &resolved.operations[3] {
-            MetaUpdateOperation::Burn(_) => {}
+            Operation::TokenBurn(_) => {}
             other => panic!("expected burn fourth, got {other:?}"),
         }
         match &resolved.operations[4] {
-            MetaUpdateOperation::LockCancel(details) => assert_eq!(details.lock, lock_id),
+            Operation::LockCancel(details) => assert_eq!(details.lock, lock_id),
             other => panic!("expected lockCancel fifth, got {other:?}"),
         }
     }

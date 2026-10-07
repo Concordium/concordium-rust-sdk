@@ -17,8 +17,8 @@ use super::{
 
 use crate::{
     protocol_level_tokens::{
-        EncodedTokenModuleEvent, LockCreateEvent, LockDestroyEvent, MetaEvent, TokenEvent,
-        TokenEventDetails,
+        EncodedTokenModuleEvent, LockAmountEvent, LockCreateEvent, LockDestroyEvent, LockEvent,
+        OperationEvent, TokenEvent, TokenEventDetails, UnlockAmountEvent,
     },
     types::Address,
     v2::upward::{UnknownDataError, Upward},
@@ -472,6 +472,16 @@ pub(crate) enum Event {
         #[serde(flatten)]
         event: LockDestroyEvent,
     },
+    /// An amount moved to a locked balance.
+    LockAmount {
+        #[serde(flatten)]
+        event: LockAmountEvent,
+    },
+    /// An amount moved to an available balance.
+    UnlockAmount {
+        #[serde(flatten)]
+        event: UnlockAmountEvent,
+    },
 }
 
 impl From<TokenEvent> for Event {
@@ -497,14 +507,16 @@ impl From<TokenEvent> for Event {
     }
 }
 
-impl From<MetaEvent> for Event {
-    fn from(e: MetaEvent) -> Self {
+impl From<OperationEvent> for Event {
+    fn from(e: OperationEvent) -> Self {
         match e {
-            MetaEvent::Token(token_event) => token_event.into(),
-            MetaEvent::LockCreate(lock_create_event) => Event::LockCreated {
+            OperationEvent::Lock(LockEvent::LockAmount(event)) => Event::LockAmount { event },
+            OperationEvent::Lock(LockEvent::UnlockAmount(event)) => Event::UnlockAmount { event },
+            OperationEvent::Token(token_event) => token_event.into(),
+            OperationEvent::Lock(LockEvent::Create(lock_create_event)) => Event::LockCreated {
                 event: lock_create_event,
             },
-            MetaEvent::LockDestroy(lock_destroy_event) => Event::LockDestroyed {
+            OperationEvent::Lock(LockEvent::Destroy(lock_destroy_event)) => Event::LockDestroyed {
                 event: lock_destroy_event,
             },
         }
@@ -952,15 +964,15 @@ impl TryFrom<super::BlockItemSummary> for BlockItemSummary {
                             .collect::<Result<_, _>>()?;
                         (Some(ty), BlockItemResult::Success { events })
                     }
-                    super::AccountTransactionEffects::TokenUpdate { events } => {
-                        let ty = TransactionType::TokenUpdate;
-                        let events: Vec<Event> = events.into_iter().map(|x| x.into()).collect();
-                        (Some(ty), BlockItemResult::Success { events })
-                    }
-                    super::AccountTransactionEffects::MetaUpdate { events } => {
-                        let ty = TransactionType::MetaUpdate;
-                        let events: Vec<Event> = events.into_iter().map(|x| x.into()).collect();
-                        (Some(ty), BlockItemResult::Success { events })
+                    super::AccountTransactionEffects::TokenUpdate { events, .. } => {
+                        let events = events
+                            .into_iter()
+                            .map(|event| event.known_or_err().map(Event::from))
+                            .collect::<Result<_, _>>()?;
+                        (
+                            Some(TransactionType::TokenUpdate),
+                            BlockItemResult::Success { events },
+                        )
                     }
                 };
                 BlockItemSummary {
@@ -1537,64 +1549,49 @@ fn convert_account_transaction(
             mk_success(super::AccountTransactionEffects::DelegationConfigured { data })
         }
         TransactionType::TokenUpdate => {
-            let events = events
+            let events: Vec<Upward<OperationEvent>> = events
                 .into_iter()
                 .map(|ev| match ev {
-                    Event::TokenModuleEvent { token_id, event } => Ok(TokenEvent {
-                        token_id,
-                        event: TokenEventDetails::Module(event),
-                    }),
-                    Event::TokenTransfer { token_id, event } => Ok(TokenEvent {
-                        token_id,
-                        event: TokenEventDetails::Transfer(event),
-                    }),
-                    Event::TokenMint { token_id, event } => Ok(TokenEvent {
+                    Event::TokenModuleEvent { token_id, event } => {
+                        Ok(OperationEvent::Token(TokenEvent {
+                            token_id,
+                            event: TokenEventDetails::Module(event),
+                        }))
+                    }
+                    Event::TokenTransfer { token_id, event } => {
+                        Ok(OperationEvent::Token(TokenEvent {
+                            token_id,
+                            event: TokenEventDetails::Transfer(event),
+                        }))
+                    }
+                    Event::TokenMint { token_id, event } => Ok(OperationEvent::Token(TokenEvent {
                         token_id,
                         event: TokenEventDetails::Mint(event),
-                    }),
-                    Event::TokenBurn { token_id, event } => Ok(TokenEvent {
+                    })),
+                    Event::TokenBurn { token_id, event } => Ok(OperationEvent::Token(TokenEvent {
                         token_id,
                         event: TokenEventDetails::Burn(event),
-                    }),
+                    })),
+                    Event::LockCreated { event } => {
+                        Ok(OperationEvent::Lock(LockEvent::Create(event)))
+                    }
+                    Event::LockDestroyed { event } => {
+                        Ok(OperationEvent::Lock(LockEvent::Destroy(event)))
+                    }
+                    Event::LockAmount { event } => {
+                        Ok(OperationEvent::Lock(LockEvent::LockAmount(event)))
+                    }
+                    Event::UnlockAmount { event } => {
+                        Ok(OperationEvent::Lock(LockEvent::UnlockAmount(event)))
+                    }
                     other_event => Err(ConversionError::InvalidTransactionResult(format!(
                         "Didn't expect event `{:?}` in transaction type `TokenUpdate`",
                         other_event
                     ))),
                 })
+                .map(|result| result.map(Upward::Known))
                 .collect::<Result<_, ConversionError>>()?;
             mk_success(super::AccountTransactionEffects::TokenUpdate { events })
-        }
-        TransactionType::MetaUpdate => {
-            let events = events
-                .into_iter()
-                .map(|ev| match ev {
-                    Event::TokenModuleEvent { token_id, event } => {
-                        Ok(MetaEvent::Token(TokenEvent {
-                            token_id,
-                            event: TokenEventDetails::Module(event),
-                        }))
-                    }
-                    Event::TokenTransfer { token_id, event } => Ok(MetaEvent::Token(TokenEvent {
-                        token_id,
-                        event: TokenEventDetails::Transfer(event),
-                    })),
-                    Event::TokenMint { token_id, event } => Ok(MetaEvent::Token(TokenEvent {
-                        token_id,
-                        event: TokenEventDetails::Mint(event),
-                    })),
-                    Event::TokenBurn { token_id, event } => Ok(MetaEvent::Token(TokenEvent {
-                        token_id,
-                        event: TokenEventDetails::Burn(event),
-                    })),
-                    Event::LockCreated { event } => Ok(MetaEvent::LockCreate(event)),
-                    Event::LockDestroyed { event } => Ok(MetaEvent::LockDestroy(event)),
-                    other_event => Err(ConversionError::InvalidTransactionResult(format!(
-                        "Didn't expect event `{:?}` in transaction type `MetaUpdate`",
-                        other_event
-                    ))),
-                })
-                .collect::<Result<_, ConversionError>>()?;
-            mk_success(super::AccountTransactionEffects::MetaUpdate { events })
         }
     }
 }
