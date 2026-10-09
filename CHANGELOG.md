@@ -1,5 +1,6 @@
-## Unreleased
+## 10.0.0
 
+- Updated `concordium_base` and `concordium-smart-contract-engine` dependencies.
 - Exposed `get_blocks` function on the v2 client which returns a stream of blocks `ArrivedBlockInfo`. This endpoint can be used to listen for new blocks arriving on chain.
 
 ## 9.0.1
