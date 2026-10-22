@@ -3310,6 +3310,7 @@ impl TryFrom<PoolInfoResponse> for super::types::BakerPoolStatus {
                 delegated_capital_cap: value.delegated_capital_cap.require()?.into(),
                 pool_info: pi.try_into()?,
                 baker_stake_pending_change: value.equity_pending_change.try_into()?,
+                is_suspended: value.is_suspended,
             }),
         };
 
@@ -3360,6 +3361,7 @@ impl TryFrom<PoolCurrentPaydayInfo> for super::types::CurrentPaydayBakerPoolStat
             baker_equity_capital: value.baker_equity_capital.require()?.into(),
             delegated_capital: value.delegated_capital.require()?.into(),
             commission_rates: value.commission_rates.require()?.try_into()?,
+            is_primed_for_suspension: value.is_primed_for_suspension,
         })
     }
 }
@@ -4531,6 +4533,108 @@ mod test {
     use rand::{rngs::StdRng, SeedableRng};
 
     use super::*;
+
+    mod pool_suspension {
+        use super::*;
+
+        fn commission_rates() -> CommissionRates {
+            CommissionRates {
+                finalization: Some(AmountFraction {
+                    parts_per_hundred_thousand: 10_000,
+                }),
+                baking: Some(AmountFraction {
+                    parts_per_hundred_thousand: 20_000,
+                }),
+                transaction: Some(AmountFraction {
+                    parts_per_hundred_thousand: 30_000,
+                }),
+            }
+        }
+
+        fn payday_info(primed: Option<bool>) -> PoolCurrentPaydayInfo {
+            PoolCurrentPaydayInfo {
+                blocks_baked: 7,
+                finalization_live: true,
+                transaction_fees_earned: Some(Amount { value: 11 }),
+                effective_stake: Some(Amount { value: 12 }),
+                lottery_power: 0.25,
+                baker_equity_capital: Some(Amount { value: 13 }),
+                delegated_capital: Some(Amount { value: 14 }),
+                commission_rates: Some(commission_rates()),
+                is_primed_for_suspension: primed,
+                ..Default::default()
+            }
+        }
+
+        fn pool_info(suspended: Option<bool>, primed: Option<bool>) -> PoolInfoResponse {
+            PoolInfoResponse {
+                baker: Some(BakerId { value: 42 }),
+                address: Some(AccountAddress { value: vec![1; 32] }),
+                equity_capital: Some(Amount { value: 13 }),
+                delegated_capital: Some(Amount { value: 14 }),
+                delegated_capital_cap: Some(Amount { value: 100 }),
+                pool_info: Some(BakerPoolInfo {
+                    open_status: OpenStatus::OpenForAll as i32,
+                    url: "https://pool.example".into(),
+                    commission_rates: Some(commission_rates()),
+                }),
+                current_payday_info: Some(payday_info(primed)),
+                all_pool_total_capital: Some(Amount { value: 1_000 }),
+                is_suspended: suspended,
+                ..Default::default()
+            }
+        }
+
+        #[test]
+        fn preserves_optional_suspension_flags() {
+            for suspended in [None, Some(false), Some(true)] {
+                for primed in [None, Some(false), Some(true)] {
+                    let pool =
+                        crate::types::BakerPoolStatus::try_from(pool_info(suspended, primed))
+                            .unwrap();
+                    assert_eq!(
+                        pool.active_baker_pool_status.unwrap().is_suspended,
+                        suspended
+                    );
+                    assert_eq!(
+                        pool.current_payday_status.unwrap().is_primed_for_suspension,
+                        primed
+                    );
+                }
+            }
+        }
+
+        #[test]
+        fn removed_pool_retains_payday_suspension_flag_without_active_status() {
+            for primed in [None, Some(false), Some(true)] {
+                let mut response = pool_info(None, primed);
+                response.pool_info = None;
+                response.equity_capital = None;
+                response.delegated_capital = None;
+                response.delegated_capital_cap = None;
+                let pool = crate::types::BakerPoolStatus::try_from(response).unwrap();
+                assert!(pool.active_baker_pool_status.is_none());
+                assert_eq!(
+                    pool.current_payday_status.unwrap().is_primed_for_suspension,
+                    primed
+                );
+            }
+        }
+
+        #[test]
+        fn active_pool_without_payday_status_retains_suspension_flag() {
+            for suspended in [None, Some(false), Some(true)] {
+                let mut response = pool_info(suspended, None);
+                response.current_payday_info = None;
+                let pool = crate::types::BakerPoolStatus::try_from(response).unwrap();
+                assert_eq!(
+                    pool.active_baker_pool_status.unwrap().is_suspended,
+                    suspended
+                );
+                assert!(pool.current_payday_status.is_none());
+            }
+        }
+    }
 
     #[test]
     fn token_update_events_prefer_unified_list_and_fall_back_to_legacy() {

@@ -716,6 +716,13 @@ pub struct CurrentPaydayBakerPoolStatus {
     /// The commission rates that apply for the current reward period for the
     /// baker pool.
     pub commission_rates: CommissionRates,
+    /// Whether the pool owner is primed for suspension.
+    /// Absent when the protocol version does not support validator suspension.
+    #[cfg_attr(
+        feature = "serde_deprecated",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub is_primed_for_suspension: Option<bool>,
 }
 
 // hack due to a bug in Serde that is caused by the combination of
@@ -776,6 +783,14 @@ pub struct ActiveBakerPoolStatus {
     pub pool_info: BakerPoolInfo,
     /// Any pending change to the baker's stake.
     pub baker_stake_pending_change: PoolPendingChange,
+    /// Whether the pool owner is suspended.
+    /// Absent when the protocol version does not support validator suspension.
+    /// Removed pools have no active pool status.
+    #[cfg_attr(
+        feature = "serde_deprecated",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub is_suspended: Option<bool>,
 }
 
 #[cfg_attr(feature = "serde_deprecated", derive(SerdeSerialize, SerdeDeserialize))]

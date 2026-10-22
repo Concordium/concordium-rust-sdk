@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Expose optional validator suspension flags in pool query results:
+  `CurrentPaydayBakerPoolStatus::is_primed_for_suspension` and
+  `ActiveBakerPoolStatus::is_suspended`. Preserve absent values for protocols
+  without suspension support.
 - **BREAKING:** `AccountTransactionEffects::TokenUpdate::events` is changed to consist of `Upward<OperationEvent>` instead of `TokenEvent`, supporting unified token/lock events and per-event forward compatibility.
 
 - **BREAKING (devnet):** Removed Meta Update transaction and construction APIs. Token Update now has `Scoped` (`TokenOperations`) and `Unscoped` (`Operations`) payloads;
