@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Expose optional `CurrentPaydayBakerPoolStatus::missed_rounds` in pool query
+  results. Preserve absent values for protocols without validator suspension
+  support.
 - Expose optional validator suspension flags in pool query results:
   `CurrentPaydayBakerPoolStatus::is_primed_for_suspension` and
   `ActiveBakerPoolStatus::is_suspended`. Preserve absent values for protocols

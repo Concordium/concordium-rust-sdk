@@ -723,6 +723,13 @@ pub struct CurrentPaydayBakerPoolStatus {
         serde(skip_serializing_if = "Option::is_none")
     )]
     pub is_primed_for_suspension: Option<bool>,
+    /// The number of missed rounds in the current reward period.
+    /// Absent when the protocol version does not support validator suspension.
+    #[cfg_attr(
+        feature = "serde_deprecated",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub missed_rounds: Option<u64>,
 }
 
 // hack due to a bug in Serde that is caused by the combination of

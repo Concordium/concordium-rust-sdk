@@ -3362,6 +3362,7 @@ impl TryFrom<PoolCurrentPaydayInfo> for super::types::CurrentPaydayBakerPoolStat
             delegated_capital: value.delegated_capital.require()?.into(),
             commission_rates: value.commission_rates.require()?.try_into()?,
             is_primed_for_suspension: value.is_primed_for_suspension,
+            missed_rounds: value.missed_rounds,
         })
     }
 }
@@ -4599,6 +4600,28 @@ mod test {
                     assert_eq!(
                         pool.current_payday_status.unwrap().is_primed_for_suspension,
                         primed
+                    );
+                }
+            }
+        }
+
+        #[test]
+        fn preserves_optional_missed_rounds_for_active_and_removed_pools() {
+            for missed_rounds in [None, Some(0), Some(7), Some(u64::MAX)] {
+                for active in [true, false] {
+                    let mut response = pool_info(None, None);
+                    response.current_payday_info.as_mut().unwrap().missed_rounds = missed_rounds;
+                    if !active {
+                        response.pool_info = None;
+                        response.equity_capital = None;
+                        response.delegated_capital = None;
+                        response.delegated_capital_cap = None;
+                    }
+                    let pool = crate::types::BakerPoolStatus::try_from(response).unwrap();
+                    assert_eq!(pool.active_baker_pool_status.is_some(), active);
+                    assert_eq!(
+                        pool.current_payday_status.unwrap().missed_rounds,
+                        missed_rounds
                     );
                 }
             }
