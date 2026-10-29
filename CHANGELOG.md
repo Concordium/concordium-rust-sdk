@@ -1,12 +1,8 @@
 ## Unreleased
 
-- **BREAKING (devnet):** Unscoped transaction constructors and lock construction APIs now use base's `transactions::construct::OperationInput` instead of wire `Operation`/`Operations`. `LockClient::send_operations` takes `Vec<OperationInput>`, and proposal prepend/append methods take `OperationInput`. `append_cancel(balance_references: u64, memo: Option<CborMemo>)` requires an explicit count, including zero. Each batch/proposal cancellation retains its supplied count for estimation only; wire payloads and scoped token-update APIs are unchanged. Callers must account for preceding operations such as funding/releasing and state changes before execution; no batch simulation or count inference is performed.
-- Convenience lock cancellation now refreshes latest-finalized lock info once in both validation modes and counts references as the sum of `amounts.len()` across account funds, not the number of accounts or token quantities. Optional eligibility validation uses that same snapshot. Query/decode failures prevent submission without cached fallback. Snapshot estimates can become stale before execution and do not guarantee sufficient energy.
-
 - **BREAKING:** `AccountTransactionEffects::TokenUpdate::events` is changed to consist of `Upward<OperationEvent>` instead of `TokenEvent`, supporting unified token/lock events and per-event forward compatibility.
 
-- **BREAKING (devnet):** Removed Meta Update transaction and construction APIs. Token Update now has `Scoped` (`TokenOperations`) and `Unscoped` (`Operations`) payloads;
-  single-token APIs use `token_operations::*` and `send::token_update_operations`, while multi-token and lock construction uses `construct::OperationInput` and `send::operations` (`operations::*` remains available for wire operations).
+- **BREAKING (devnet):** Removed Meta Update transaction and construction APIs. Token Update now has `Scoped` (`TokenOperations`) and `Unscoped` (`Operations`) payloads.
 - **BREAKING (devnet):** Token metadata updates take `TokenMetadataUrlDetails` (URL and optional checksum only).
 - **BREAKING (devnet):** Lock configurations now use `LockConfig::SimpleV0(LockConfigSimpleV0 { recipients, expiry, grants, tokens, keep_alive, memo, metadata })`; `LockInfo` now exposes its tagged configuration through `config`.
 

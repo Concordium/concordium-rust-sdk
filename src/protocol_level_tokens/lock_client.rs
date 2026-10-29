@@ -254,9 +254,6 @@ impl LockCreateProposal {
     /// # Arguments
     ///
     /// * `operation` - The enriched construction input to place before creation.
-    ///   Cancellation inputs require explicit balance-reference counts; no counts
-    ///   are queried or inferred. Account for preceding operations and state changes
-    ///   before execution. Counts affect estimation only, not wire payloads.
     ///
     /// # Examples
     ///
@@ -276,9 +273,6 @@ impl LockCreateProposal {
     /// # Arguments
     ///
     /// * `operation` - The enriched construction input to place after creation.
-    ///   Cancellation inputs require explicit balance-reference counts; no counts
-    ///   are queried or inferred. Account for preceding operations and state changes
-    ///   before execution. Counts affect estimation only, not wire payloads.
     ///
     /// # Examples
     ///
@@ -370,8 +364,6 @@ impl LockCreateProposal {
     /// * `balance_references` - Explicit estimate of the sum of token-amount entry
     ///   counts across account funds at cancellation, including zero for an empty
     ///   lock. Account for preceding operations such as funding or releasing.
-    ///   This count is retained unchanged for estimation only; it is not queried,
-    ///   inferred, or encoded. State changes before execution can stale estimates.
     /// * `memo` - The optional memo to attach to the cancel operation.
     ///
     /// # Examples
@@ -557,11 +549,8 @@ impl LockClient {
 
     /// Send a set of raw meta-update operations without validation.
     ///
-    /// Accepts base's [`OperationInput`] rather than wire operations. Each
-    /// cancellation requires an explicit estimate of the sum of token-amount
-    /// entry counts across account funds. Counts are passed unchanged for
-    /// estimation only, without queries or simulation. Callers must account for
-    /// preceding operations and state changes before execution.
+    /// This is the lower-level submission helper for custom pre-built
+    /// [`OperationInput`]s targeting the current lock.
     ///
     /// # Arguments
     ///
@@ -759,7 +748,7 @@ impl LockClient {
     /// Estimates balance references by summing `amounts.len()` across account
     /// funds (zero for an empty lock), not accounts or token quantities.
     /// If `validation` is [`Validation::Validate`], eligibility is checked against
-    /// that same snapshot; expired locks retain their existing cancellation behavior.
+    /// that same state.
     /// The estimate can become stale before execution and does not guarantee
     /// sufficient energy. Use [`LockClient::send_operations`] for explicit counts.
     ///
