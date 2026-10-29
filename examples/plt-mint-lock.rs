@@ -7,8 +7,11 @@ use concordium_base::{
         LockConfig, LockConfigSimpleV0, LockControllerSimpleV0Capability,
         LockControllerSimpleV0Grant, LockMetadata, LockRecipients,
     },
-    protocol_level_tokens::{operations, CborHolderAccount, ConversionRule, TokenAmount, TokenId},
-    transactions::{send, BlockItem},
+    protocol_level_tokens::{
+        CborHolderAccount, ConversionRule, LockCreateDetails, LockFundDetails, TokenAmount,
+        TokenId, TokenSupplyUpdateDetailsWithId,
+    },
+    transactions::{construct::OperationInput, send, BlockItem},
 };
 use concordium_rust_sdk::{
     common::types::TransactionTime,
@@ -89,12 +92,18 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let operations = [
-        operations::mint_tokens(app.token_id.clone(), token_amount),
-        operations::create_lock(config),
-        operations::fund_lock(app.token_id.clone(), lock_id.clone(), token_amount, None),
-    ]
-    .into_iter()
-    .collect();
+        OperationInput::TokenMint(TokenSupplyUpdateDetailsWithId {
+            token: app.token_id.clone(),
+            amount: token_amount,
+        }),
+        OperationInput::LockCreate(LockCreateDetails { config }),
+        OperationInput::LockFund(LockFundDetails {
+            token: app.token_id.clone(),
+            lock: lock_id.clone(),
+            amount: token_amount,
+            memo: None,
+        }),
+    ];
 
     let nonce = client
         .get_next_account_sequence_number(&keys.address)
