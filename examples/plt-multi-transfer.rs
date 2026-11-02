@@ -3,8 +3,8 @@ use anyhow::Context;
 use clap::AppSettings;
 use concordium_base::{
     contracts_common::AccountAddress,
-    protocol_level_tokens::{ConversionRule, TokenAmount, TokenId, TokenTransferWithId},
-    transactions::{construct::OperationInput, send},
+    protocol_level_tokens::{operations, ConversionRule, TokenAmount, TokenId},
+    transactions::send,
 };
 use concordium_rust_sdk::{
     common::types::TransactionTime,
@@ -111,12 +111,7 @@ async fn main() -> anyhow::Result<()> {
             "Transfer {} {} to {}",
             token_amount, token_id, receiver_address
         );
-        let transfer = OperationInput::TokenTransfer(TokenTransferWithId {
-            token: token_id,
-            recipient: receiver_address.into(),
-            amount: token_amount,
-            memo: None,
-        });
+        let transfer = operations::transfer_tokens(token_id, receiver_address, token_amount);
         transfers.push(transfer);
     }
 

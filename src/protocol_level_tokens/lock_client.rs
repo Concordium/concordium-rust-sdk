@@ -9,11 +9,8 @@ use concordium_base::{
         LockConfig, LockConfigSimpleV0, LockControllerSimpleV0Capability, LockId, LockInfo,
         LockRecipients,
     },
-    protocol_level_tokens::{
-        CborMemo, LockCancelDetails, LockCreateDetails, LockFundDetails, LockReleaseDetails,
-        LockSendDetails, TokenAmount, TokenId,
-    },
-    transactions::{construct::OperationInput, send, BlockItem},
+    protocol_level_tokens::{operations, CborMemo, OperationInput, TokenAmount, TokenId},
+    transactions::{send, BlockItem},
 };
 use thiserror::Error;
 use tonic::async_trait;
@@ -259,9 +256,7 @@ impl LockCreateProposal {
     ///
     /// ```ignore
     /// let proposal = create_lock_proposal(sender, config)
-    ///     .prepend_operation(OperationInput::TokenMint(TokenSupplyUpdateDetailsWithId {
-    ///         token: token_id.clone(), amount,
-    ///     }));
+    ///     .prepend_operation(operations::mint_tokens(token_id.clone(), amount));
     /// ```
     pub fn prepend_operation(mut self, operation: OperationInput) -> Self {
         self.prepended_operations.push(operation);
@@ -278,9 +273,7 @@ impl LockCreateProposal {
     ///
     /// ```ignore
     /// let proposal = create_lock_proposal(sender, config)
-    ///     .append_operation(OperationInput::TokenMint(TokenSupplyUpdateDetailsWithId {
-    ///         token: token_id.clone(), amount,
-    ///     }));
+    ///     .append_operation(operations::mint_tokens(token_id.clone(), amount));
     /// ```
     pub fn append_operation(mut self, operation: OperationInput) -> Self {
         self.appended_operations
@@ -474,9 +467,7 @@ pub async fn get_next_lock_id(
 ///
 /// ```ignore
 /// let proposal = create_lock_proposal(sender, config)
-///     .prepend_operation(OperationInput::TokenMint(TokenSupplyUpdateDetailsWithId {
-///         token: token_id.clone(), amount,
-///     }))
+///     .prepend_operation(operations::mint_tokens(token_id.clone(), amount))
 ///     .append_fund(FundTokens {
 ///         token_id,
 ///         amount,
@@ -498,7 +489,7 @@ pub async fn create_lock(
     config: LockConfig,
     meta: Option<TransactionMetadata>,
 ) -> LockResult<PendingLockCreation> {
-    let operations = [OperationInput::LockCreate(LockCreateDetails { config })];
+    let operations = [operations::create_lock(config)];
     let hash = sign_and_send_with_client(&mut client, signer, &operations, meta).await?;
     Ok(PendingLockCreation { client, hash })
 }
@@ -565,10 +556,7 @@ impl LockClient {
     /// # Examples
     ///
     /// ```ignore
-    /// lock.send_operations(&keys, vec![OperationInput::LockCancel {
-    ///     details: LockCancelDetails { lock: lock_id, memo: None },
-    ///     balance_references: 3,
-    /// }], None).await?;
+    /// lock.send_operations(&keys, vec![operations::cancel_lock(lock_id, 3, None)], None).await?;
     /// ```
     pub async fn send_operations(
         &mut self,
@@ -684,12 +672,12 @@ impl LockClient {
         if validation == Validation::Validate {
             self.validate_fund(signer.address, &payload).await?;
         }
-        let operations = [OperationInput::LockFund(LockFundDetails {
-            token: payload.token_id,
-            lock: self.info.lock.clone(),
-            amount: payload.amount,
-            memo: payload.memo,
-        })];
+        let operations = [operations::fund_lock(
+            payload.token_id,
+            self.info.lock.clone(),
+            payload.amount,
+            payload.memo,
+        )];
         self.sign_and_send(signer, &operations, meta).await
     }
 
@@ -707,14 +695,14 @@ impl LockClient {
         if validation == Validation::Validate {
             self.validate_send(signer.address, &payload).await?;
         }
-        let operations = [OperationInput::LockSend(LockSendDetails {
-            token: payload.token_id,
-            lock: self.info.lock.clone(),
-            source: payload.source.into(),
-            recipient: payload.recipient.into(),
-            amount: payload.amount,
-            memo: payload.memo,
-        })];
+        let operations = [operations::send_locked_tokens(
+            payload.token_id,
+            self.info.lock.clone(),
+            payload.source,
+            payload.recipient,
+            payload.amount,
+            payload.memo,
+        )];
         self.sign_and_send(signer, &operations, meta).await
     }
 
@@ -732,13 +720,13 @@ impl LockClient {
         if validation == Validation::Validate {
             self.validate_release(signer.address, &payload).await?;
         }
-        let operations = [OperationInput::LockRelease(LockReleaseDetails {
-            token: payload.token_id,
-            lock: self.info.lock.clone(),
-            source: payload.source.into(),
-            amount: payload.amount,
-            memo: payload.memo,
-        })];
+        let operations = [operations::release_locked_tokens(
+            payload.token_id,
+            self.info.lock.clone(),
+            payload.source,
+            payload.amount,
+            payload.memo,
+        )];
         self.sign_and_send(signer, &operations, meta).await
     }
 
@@ -787,13 +775,11 @@ impl LockClient {
             .iter()
             .map(|fund| fund.amounts.len() as u64)
             .sum();
-        let operations = [OperationInput::LockCancel {
-            details: LockCancelDetails {
-                lock: self.info.lock.clone(),
-                memo,
-            },
+        let operations = [operations::cancel_lock(
+            self.info.lock.clone(),
             balance_references,
-        }];
+            memo,
+        )];
         self.sign_and_send(signer, &operations, meta).await
     }
 
@@ -989,43 +975,35 @@ fn resolve_pending_operations(
 ) -> Vec<OperationInput> {
     let mut ops = Vec::with_capacity(prepended_operations.len() + appended_operations.len() + 1);
     ops.extend(prepended_operations);
-    ops.push(OperationInput::LockCreate(LockCreateDetails { config }));
+    ops.push(operations::create_lock(config));
     for op in appended_operations {
         let op = match op {
             AppendedOperation::Raw(operation) => operation,
-            AppendedOperation::Fund(payload) => OperationInput::LockFund(LockFundDetails {
-                token: payload.token_id,
-                lock: lock_id.clone(),
-                amount: payload.amount,
-                memo: payload.memo,
-            }),
-            AppendedOperation::Send(payload) => OperationInput::LockSend(LockSendDetails {
-                token: payload.token_id,
-                lock: lock_id.clone(),
-                source: payload.source.into(),
-                recipient: payload.recipient.into(),
-                amount: payload.amount,
-                memo: payload.memo,
-            }),
-            AppendedOperation::Release(payload) => {
-                OperationInput::LockRelease(LockReleaseDetails {
-                    token: payload.token_id,
-                    lock: lock_id.clone(),
-                    source: payload.source.into(),
-                    amount: payload.amount,
-                    memo: payload.memo,
-                })
-            }
+            AppendedOperation::Fund(payload) => operations::fund_lock(
+                payload.token_id,
+                lock_id.clone(),
+                payload.amount,
+                payload.memo,
+            ),
+            AppendedOperation::Send(payload) => operations::send_locked_tokens(
+                payload.token_id,
+                lock_id.clone(),
+                payload.source,
+                payload.recipient,
+                payload.amount,
+                payload.memo,
+            ),
+            AppendedOperation::Release(payload) => operations::release_locked_tokens(
+                payload.token_id,
+                lock_id.clone(),
+                payload.source,
+                payload.amount,
+                payload.memo,
+            ),
             AppendedOperation::Cancel {
                 balance_references,
                 memo,
-            } => OperationInput::LockCancel {
-                details: LockCancelDetails {
-                    lock: lock_id.clone(),
-                    memo,
-                },
-                balance_references,
-            },
+            } => operations::cancel_lock(lock_id.clone(), balance_references, memo),
         };
         ops.push(op);
     }
@@ -1084,8 +1062,7 @@ mod tests {
             LockRecipients, LockedTokenAmount,
         },
         protocol_level_tokens::{
-            CborHolderAccount, CoinInfo, RawCbor, TokenHolder, TokenSupplyUpdateDetailsWithId,
-            TokenTransferEvent,
+            CborHolderAccount, CoinInfo, RawCbor, TokenHolder, TokenTransferEvent,
         },
         transactions::TransactionType,
     };
@@ -1380,21 +1357,20 @@ mod tests {
 
     #[test]
     fn pending_operations_order() {
-        let prepended_operations =
-            vec![OperationInput::TokenMint(TokenSupplyUpdateDetailsWithId {
-                token: "CCD".parse().unwrap(),
-                amount: TokenAmount::from_raw(5, 0),
-            })];
+        let prepended_operations = vec![operations::mint_tokens(
+            "CCD".parse().unwrap(),
+            TokenAmount::from_raw(5, 0),
+        )];
         let appended_operations = vec![
             AppendedOperation::Fund(FundTokens {
                 token_id: "CCD".parse().unwrap(),
                 amount: TokenAmount::from_raw(10, 0),
                 memo: None,
             }),
-            AppendedOperation::Raw(OperationInput::TokenBurn(TokenSupplyUpdateDetailsWithId {
-                token: "CCD".parse().unwrap(),
-                amount: TokenAmount::from_raw(3, 0),
-            })),
+            AppendedOperation::Raw(operations::burn_tokens(
+                "CCD".parse().unwrap(),
+                TokenAmount::from_raw(3, 0),
+            )),
             AppendedOperation::Cancel {
                 balance_references: 0,
                 memo: None,
