@@ -92,9 +92,7 @@ async fn main() -> anyhow::Result<()> {
         operations::mint_tokens(app.token_id.clone(), token_amount),
         operations::create_lock(config),
         operations::fund_lock(app.token_id.clone(), lock_id.clone(), token_amount, None),
-    ]
-    .into_iter()
-    .collect();
+    ];
 
     let nonce = client
         .get_next_account_sequence_number(&keys.address)

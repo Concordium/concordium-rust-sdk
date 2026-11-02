@@ -9,7 +9,7 @@ use concordium_base::{
         LockConfig, LockConfigSimpleV0, LockControllerSimpleV0Capability, LockId, LockInfo,
         LockRecipients,
     },
-    protocol_level_tokens::{operations, CborMemo, Operation, Operations, TokenAmount, TokenId},
+    protocol_level_tokens::{operations, CborMemo, OperationInput, TokenAmount, TokenId},
     transactions::{send, BlockItem},
 };
 use thiserror::Error;
@@ -206,11 +206,14 @@ impl PendingLockCreation {
 
 #[derive(Debug, Clone)]
 enum AppendedOperation {
-    Raw(Operation),
+    Raw(OperationInput),
     Fund(FundTokens),
     Send(SendTokens),
     Release(ReleaseTokens),
-    Cancel(Option<CborMemo>),
+    Cancel {
+        balance_references: u64,
+        memo: Option<CborMemo>,
+    },
 }
 
 /// Builder for composing a lock creation with surrounding meta-update
@@ -229,7 +232,7 @@ enum AppendedOperation {
 pub struct LockCreateProposal {
     sender: AccountAddress,
     config: LockConfig,
-    prepended_operations: Vec<Operation>,
+    prepended_operations: Vec<OperationInput>,
     appended_operations: Vec<AppendedOperation>,
 }
 
@@ -247,8 +250,7 @@ impl LockCreateProposal {
     ///
     /// # Arguments
     ///
-    /// * `operation` - The raw meta-update operation to place before the lock
-    ///   creation.
+    /// * `operation` - The enriched construction input to place before creation.
     ///
     /// # Examples
     ///
@@ -256,7 +258,7 @@ impl LockCreateProposal {
     /// let proposal = create_lock_proposal(sender, config)
     ///     .prepend_operation(operations::mint_tokens(token_id.clone(), amount));
     /// ```
-    pub fn prepend_operation(mut self, operation: Operation) -> Self {
+    pub fn prepend_operation(mut self, operation: OperationInput) -> Self {
         self.prepended_operations.push(operation);
         self
     }
@@ -265,8 +267,7 @@ impl LockCreateProposal {
     ///
     /// # Arguments
     ///
-    /// * `operation` - The raw meta-update operation to place after the lock
-    ///   creation.
+    /// * `operation` - The enriched construction input to place after creation.
     ///
     /// # Examples
     ///
@@ -274,7 +275,7 @@ impl LockCreateProposal {
     /// let proposal = create_lock_proposal(sender, config)
     ///     .append_operation(operations::mint_tokens(token_id.clone(), amount));
     /// ```
-    pub fn append_operation(mut self, operation: Operation) -> Self {
+    pub fn append_operation(mut self, operation: OperationInput) -> Self {
         self.appended_operations
             .push(AppendedOperation::Raw(operation));
         self
@@ -353,16 +354,28 @@ impl LockCreateProposal {
     ///
     /// # Arguments
     ///
+    /// * `balance_references` - Explicit estimate of the sum of token-amount entry
+    ///   counts across account funds at cancellation, including zero for an empty
+    ///   lock. Account for preceding operations such as funding or releasing.
     /// * `memo` - The optional memo to attach to the cancel operation.
     ///
     /// # Examples
     ///
     /// ```ignore
-    /// let proposal = create_lock_proposal(sender, config).append_cancel(None);
+    /// let proposal = create_lock_proposal(sender, config)
+    ///     .append_fund(FundTokens {
+    ///         token_id,
+    ///         amount,
+    ///         memo: None,
+    ///     })
+    ///     // One account/token balance reference exists when cancellation runs.
+    ///     .append_cancel(1, None);
     /// ```
-    pub fn append_cancel(mut self, memo: Option<CborMemo>) -> Self {
-        self.appended_operations
-            .push(AppendedOperation::Cancel(memo));
+    pub fn append_cancel(mut self, balance_references: u64, memo: Option<CborMemo>) -> Self {
+        self.appended_operations.push(AppendedOperation::Cancel {
+            balance_references,
+            memo,
+        });
         self
     }
 
@@ -476,7 +489,7 @@ pub async fn create_lock(
     config: LockConfig,
     meta: Option<TransactionMetadata>,
 ) -> LockResult<PendingLockCreation> {
-    let operations = Operations::new(vec![operations::create_lock(config)]);
+    let operations = [operations::create_lock(config)];
     let hash = sign_and_send_with_client(&mut client, signer, &operations, meta).await?;
     Ok(PendingLockCreation { client, hash })
 }
@@ -528,11 +541,27 @@ impl LockClient {
     /// Send a set of raw meta-update operations without validation.
     ///
     /// This is the lower-level submission helper for custom pre-built
-    /// [`Operations`] targeting the current lock.
+    /// [`OperationInput`]s targeting the current lock.
+    ///
+    /// # Arguments
+    ///
+    /// * `signer` - Account keys used to sign and submit the transaction.
+    /// * `operations` - Ordered enriched construction inputs.
+    /// * `meta` - Optional nonce and expiry overrides.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LockError`] if nonce lookup or submission fails.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// lock.send_operations(&keys, vec![operations::cancel_lock(lock_id, 3, None)], None).await?;
+    /// ```
     pub async fn send_operations(
         &mut self,
         signer: &WalletAccount,
-        operations: Operations,
+        operations: Vec<OperationInput>,
         meta: Option<TransactionMetadata>,
     ) -> LockResult<TransactionHash> {
         self.sign_and_send(signer, &operations, meta).await
@@ -619,7 +648,10 @@ impl LockClient {
     /// variant to verify that the sender has the cancel capability.
     pub async fn validate_cancel(&mut self, sender: AccountAddress) -> LockResult<()> {
         self.update_lock_info().await?;
+        self.validate_cancel_cached(sender)
+    }
 
+    fn validate_cancel_cached(&self, sender: AccountAddress) -> LockResult<()> {
         if self.ensure_not_expired().is_err() {
             return Ok(());
         };
@@ -640,12 +672,12 @@ impl LockClient {
         if validation == Validation::Validate {
             self.validate_fund(signer.address, &payload).await?;
         }
-        let operations = Operations::new(vec![operations::fund_lock(
+        let operations = [operations::fund_lock(
             payload.token_id,
             self.info.lock.clone(),
             payload.amount,
             payload.memo,
-        )]);
+        )];
         self.sign_and_send(signer, &operations, meta).await
     }
 
@@ -663,14 +695,14 @@ impl LockClient {
         if validation == Validation::Validate {
             self.validate_send(signer.address, &payload).await?;
         }
-        let operations = Operations::new(vec![operations::send_locked_tokens(
+        let operations = [operations::send_locked_tokens(
             payload.token_id,
             self.info.lock.clone(),
             payload.source,
             payload.recipient,
             payload.amount,
             payload.memo,
-        )]);
+        )];
         self.sign_and_send(signer, &operations, meta).await
     }
 
@@ -688,20 +720,44 @@ impl LockClient {
         if validation == Validation::Validate {
             self.validate_release(signer.address, &payload).await?;
         }
-        let operations = Operations::new(vec![operations::release_locked_tokens(
+        let operations = [operations::release_locked_tokens(
             payload.token_id,
             self.info.lock.clone(),
             payload.source,
             payload.amount,
             payload.memo,
-        )]);
+        )];
         self.sign_and_send(signer, &operations, meta).await
     }
 
     /// Cancel the lock.
     ///
-    /// If `validation` is [`Validation::Validate`], the operation is validated
-    /// against the latest finalized state before submission.
+    /// Always refreshes latest finalized lock info once, even without validation.
+    /// Estimates balance references by summing `amounts.len()` across account
+    /// funds (zero for an empty lock), not accounts or token quantities.
+    /// If `validation` is [`Validation::Validate`], eligibility is checked against
+    /// that same state.
+    /// The estimate can become stale before execution and does not guarantee
+    /// sufficient energy. Use [`LockClient::send_operations`] for explicit counts.
+    ///
+    /// # Arguments
+    ///
+    /// * `signer` - Account keys used to sign and submit the cancellation.
+    /// * `memo` - Optional cancellation memo.
+    /// * `meta` - Optional nonce and expiry overrides.
+    /// * `validation` - Whether to check cancellation eligibility after refresh.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LockError`] on query, decoding, validation, or submission failure.
+    /// A failed refresh prevents submission; cached information is never used as
+    /// a fallback, in either validation mode.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// lock.cancel(&keys, None, None, Validation::NoValidation).await?;
+    /// ```
     pub async fn cancel(
         &mut self,
         signer: &WalletAccount,
@@ -709,18 +765,28 @@ impl LockClient {
         meta: Option<TransactionMetadata>,
         validation: Validation,
     ) -> LockResult<TransactionHash> {
+        self.update_lock_info().await?;
         if validation == Validation::Validate {
-            self.validate_cancel(signer.address).await?;
+            self.validate_cancel_cached(signer.address)?;
         }
-        let operations =
-            Operations::new(vec![operations::cancel_lock(self.info.lock.clone(), memo)]);
+        let balance_references = self
+            .info
+            .funds
+            .iter()
+            .map(|fund| fund.amounts.len() as u64)
+            .sum();
+        let operations = [operations::cancel_lock(
+            self.info.lock.clone(),
+            balance_references,
+            memo,
+        )];
         self.sign_and_send(signer, &operations, meta).await
     }
 
     async fn sign_and_send(
         &mut self,
         signer: &WalletAccount,
-        operations: &Operations,
+        operations: &[OperationInput],
         meta: Option<TransactionMetadata>,
     ) -> LockResult<TransactionHash> {
         sign_and_send_with_client(&mut self.client, signer, operations, meta).await
@@ -903,10 +969,10 @@ fn created_lock_id_from_summary(summary: crate::types::BlockItemSummary) -> Lock
 
 fn resolve_pending_operations(
     config: LockConfig,
-    prepended_operations: Vec<Operation>,
+    prepended_operations: Vec<OperationInput>,
     appended_operations: Vec<AppendedOperation>,
     lock_id: LockId,
-) -> Operations {
+) -> Vec<OperationInput> {
     let mut ops = Vec::with_capacity(prepended_operations.len() + appended_operations.len() + 1);
     ops.extend(prepended_operations);
     ops.push(operations::create_lock(config));
@@ -934,11 +1000,14 @@ fn resolve_pending_operations(
                 payload.amount,
                 payload.memo,
             ),
-            AppendedOperation::Cancel(memo) => operations::cancel_lock(lock_id.clone(), memo),
+            AppendedOperation::Cancel {
+                balance_references,
+                memo,
+            } => operations::cancel_lock(lock_id.clone(), balance_references, memo),
         };
         ops.push(op);
     }
-    Operations::new(ops)
+    ops
 }
 
 fn account_available_balance(state: Option<&TokenAccountState>) -> LockResult<TokenAmount> {
@@ -952,7 +1021,7 @@ fn account_available_balance(state: Option<&TokenAccountState>) -> LockResult<To
 async fn sign_and_send_with_client(
     client: &mut Client,
     signer: &WalletAccount,
-    operations: &Operations,
+    operations: &[OperationInput],
     meta: Option<TransactionMetadata>,
 ) -> LockResult<TransactionHash> {
     let TransactionMetadata { expiry, nonce } = meta.unwrap_or_default();
@@ -993,7 +1062,7 @@ mod tests {
             LockRecipients, LockedTokenAmount,
         },
         protocol_level_tokens::{
-            CborHolderAccount, CoinInfo, Operation, RawCbor, TokenHolder, TokenTransferEvent,
+            CborHolderAccount, CoinInfo, RawCbor, TokenHolder, TokenTransferEvent,
         },
         transactions::TransactionType,
     };
@@ -1302,7 +1371,10 @@ mod tests {
                 "CCD".parse().unwrap(),
                 TokenAmount::from_raw(3, 0),
             )),
-            AppendedOperation::Cancel(None),
+            AppendedOperation::Cancel {
+                balance_references: 0,
+                memo: None,
+            },
         ];
         let lock_id = LockId::new(10001, 5, 0);
         let resolved = resolve_pending_operations(
@@ -1319,25 +1391,25 @@ mod tests {
             appended_operations,
             lock_id.clone(),
         );
-        assert_eq!(resolved.operations.len(), 5);
-        match &resolved.operations[0] {
-            Operation::TokenMint(_) => {}
+        assert_eq!(resolved.len(), 5);
+        match &resolved[0] {
+            OperationInput::TokenMint(_) => {}
             other => panic!("expected mint first, got {other:?}"),
         }
-        match &resolved.operations[1] {
-            Operation::LockCreate(_) => {}
+        match &resolved[1] {
+            OperationInput::LockCreate(_) => {}
             other => panic!("expected lockCreate second, got {other:?}"),
         }
-        match &resolved.operations[2] {
-            Operation::LockFund(details) => assert_eq!(details.lock, lock_id),
+        match &resolved[2] {
+            OperationInput::LockFund(details) => assert_eq!(details.lock, lock_id),
             other => panic!("expected lockFund third, got {other:?}"),
         }
-        match &resolved.operations[3] {
-            Operation::TokenBurn(_) => {}
+        match &resolved[3] {
+            OperationInput::TokenBurn(_) => {}
             other => panic!("expected burn fourth, got {other:?}"),
         }
-        match &resolved.operations[4] {
-            Operation::LockCancel(details) => assert_eq!(details.lock, lock_id),
+        match &resolved[4] {
+            OperationInput::LockCancel { details, .. } => assert_eq!(details.lock, lock_id),
             other => panic!("expected lockCancel fifth, got {other:?}"),
         }
     }

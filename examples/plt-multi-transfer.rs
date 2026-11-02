@@ -129,13 +129,7 @@ async fn main() -> anyhow::Result<()> {
     let expiry: TransactionTime =
         TransactionTime::from_seconds((chrono::Utc::now().timestamp() + 300) as u64);
 
-    let txn = send::operations(
-        &keys,
-        keys.address,
-        nonce,
-        expiry,
-        &transfers.into_iter().collect(),
-    );
+    let txn = send::operations(&keys, keys.address, nonce, expiry, &transfers);
 
     let item = BlockItem::AccountTransaction(txn);
 
