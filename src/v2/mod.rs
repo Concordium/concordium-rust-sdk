@@ -3074,7 +3074,9 @@ fn extract_metadata<T>(response: &tonic::Response<T>) -> endpoints::RPCResult<Bl
             if bytes.len() == 64 {
                 let mut hash = [0u8; 32];
                 if hex::decode_to_slice(bytes, &mut hash).is_err() {
-                    tonic::Status::unknown("Response does correctly encode the block hash.");
+                    return Err(endpoints::RPCError::CallError(tonic::Status::unknown(
+                        "Response does not correctly encode the block hash.",
+                    )));
                 }
                 Ok(hash.into())
             } else {
