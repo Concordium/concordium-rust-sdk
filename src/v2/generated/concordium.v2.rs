@@ -909,6 +909,26 @@ pub struct LockInfo {
     #[prost(message, optional, tag = "1")]
     pub lock_info: ::core::option::Option<plt::Cbor>,
 }
+/// Request for locks whose grants include an account at a selected block.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetLocksByGrantAccountRequest {
+    /// Block in whose state to resolve the account and query locks.
+    #[prost(message, optional, tag = "1")]
+    pub block_hash: ::core::option::Option<BlockHashInput>,
+    /// Account whose membership in the lock's grants is queried.
+    #[prost(message, optional, tag = "2")]
+    pub account_identifier: ::core::option::Option<AccountIdentifierInput>,
+}
+/// A lock's identifier and complete configuration.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct LockConfiguration {
+    /// Identifier of the lock.
+    #[prost(message, optional, tag = "1")]
+    pub lock_id: ::core::option::Option<plt::LockId>,
+    /// CBOR-encoded configuration.
+    #[prost(message, optional, tag = "2")]
+    pub lock_config: ::core::option::Option<plt::Cbor>,
+}
 /// Information about a finalized block that is part of the streaming response.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FinalizedBlockInfo {
@@ -6618,6 +6638,34 @@ pub mod queries_client {
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("concordium.v2.Queries", "GetLockList"));
+            self.inner.server_streaming(req, path, codec).await
+        }
+        /// Retrieve each lock whose grants include the account at the selected block,
+        /// exactly once, including grants with empty capabilities.
+        pub async fn get_locks_by_grant_account(
+            &mut self,
+            request: impl tonic::IntoRequest<super::GetLocksByGrantAccountRequest>,
+        ) -> std::result::Result<
+            tonic::Response<tonic::codec::Streaming<super::LockConfiguration>>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/concordium.v2.Queries/GetLocksByGrantAccount",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("concordium.v2.Queries", "GetLocksByGrantAccount"),
+                );
             self.inner.server_streaming(req, path, codec).await
         }
         /// Retrieve the list of accounts that exist at the end of the given block.
