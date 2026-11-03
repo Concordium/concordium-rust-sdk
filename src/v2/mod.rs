@@ -2915,9 +2915,6 @@ impl Client {
     }
 
     /// Retrieve the information about the given lock in the given block.
-    ///
-    /// This endpoint is only relevant starting from Concordium Protocol Version
-    /// 9 and onwards.
     pub async fn get_lock_info(
         &mut self,
         lock_id: protocol_level_tokens::LockId,
@@ -2936,10 +2933,35 @@ impl Client {
         })
     }
 
+    /// Retrieve locks whose grants include the account at the selected block.
+    pub async fn get_locks_by_grant_account(
+        &mut self,
+        account: &AccountIdentifier,
+        bi: impl IntoBlockIdentifier,
+    ) -> endpoints::QueryResult<
+        QueryResponse<
+            impl Stream<Item = Result<protocol_level_tokens::LockConfigurationResponse, tonic::Status>>,
+        >,
+    > {
+        let request = generated::GetLocksByGrantAccountRequest {
+            block_hash: Some((&bi.into_block_identifier()).into()),
+            account_identifier: Some(account.into()),
+        };
+        let response = self.client.get_locks_by_grant_account(request).await?;
+        let block_hash = extract_metadata(&response)?;
+        let stream = response.into_inner().map(|result| match result {
+            Ok(configuration) => {
+                protocol_level_tokens::LockConfigurationResponse::try_from(configuration)
+            }
+            Err(err) => Err(err),
+        });
+        Ok(QueryResponse {
+            block_hash,
+            response: stream,
+        })
+    }
+
     /// Retrieve the list of locks that exist at the end of the given block.
-    ///
-    /// This endpoint is only relevant starting from Concordium Protocol Version
-    /// 9 and onwards.
     pub async fn get_lock_list(
         &mut self,
         bi: impl IntoBlockIdentifier,
