@@ -3623,7 +3623,7 @@ pub struct BlockSpecialEvent {
     /// This field might be extended in future versions of the API.
     #[prost(
         oneof = "block_special_event::Event",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10"
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12"
     )]
     pub event: ::core::option::Option<block_special_event::Event>,
 }
@@ -3874,6 +3874,12 @@ pub mod block_special_event {
         /// The event can occur starting from protocol version 8.
         #[prost(message, tag = "10")]
         ValidatorPrimedForSuspension(ValidatorPrimedForSuspension),
+        /// A balance unlocked by automatic cancellation of an expired lock, starting in protocol version 11.
+        #[prost(message, tag = "11")]
+        UnlockAmount(super::plt::UnlockAmountEvent),
+        /// A lock destroyed by automatic cancellation after expiry, starting in protocol version 11.
+        #[prost(message, tag = "12")]
+        LockDestroyed(super::plt::LockDestroyEvent),
     }
 }
 /// A pending update.
