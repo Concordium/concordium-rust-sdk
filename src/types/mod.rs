@@ -880,8 +880,8 @@ impl TransactionStatus {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde_deprecated", serde(tag = "tag"))]
 /// In addition to the user initiated transactions the protocol generates some
-/// events which are deemed "Special outcomes". These are rewards for running
-/// the consensus and finalization protocols.
+/// events which are deemed "Special outcomes". These include protocol rewards,
+/// validator suspensions, and automatic token unlocks and lock destruction.
 pub enum SpecialTransactionOutcome {
     #[cfg_attr(feature = "serde_deprecated", serde(rename_all = "camelCase"))]
     /// Reward issued to all the bakers at the end of an epoch for baking blocks
@@ -1017,15 +1017,17 @@ pub enum SpecialTransactionOutcome {
         /// The account address of the validator.
         account: AccountAddress,
     },
+    /// Tokens were automatically moved from locked to available balance.
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "SpecialUnlockAmount"))]
+    UnlockAmount(protocol_level_tokens::UnlockAmountEvent),
+    /// A lock was automatically destroyed.
+    #[cfg_attr(feature = "serde_deprecated", serde(rename = "SpecialLockDestroyed"))]
+    LockDestroyed(protocol_level_tokens::LockDestroyEvent),
 }
 
 impl SpecialTransactionOutcome {
-    /// Return the list of addresses affected by the SpecialTransactionOutcome.
-    /// These are addresses that have their CCD balance
-    /// changed by rewards (validation_rewards, mint_rewards, block_rewards,
-    /// finalization_rewards and payday rewards). As well as validator addresses
-    /// that have been suspended/primed for suspension as part of the
-    /// SpecialTransactionOutcome.
+    /// Return addresses whose CCD or token balances changed, or whose validators
+    /// were suspended or primed for suspension, by this special outcome.
     pub fn affected_addresses(&self) -> Vec<AccountAddress> {
         match self {
             SpecialTransactionOutcome::BakingRewards { baker_rewards, .. } => {
@@ -1061,6 +1063,11 @@ impl SpecialTransactionOutcome {
             SpecialTransactionOutcome::ValidatorPrimedForSuspension { account, .. } => {
                 vec![*account]
             }
+            SpecialTransactionOutcome::UnlockAmount(event) => {
+                let TokenHolder::Account { address } = event.token_holder;
+                vec![address]
+            }
+            SpecialTransactionOutcome::LockDestroyed(_) => Vec::new(),
         }
     }
 }

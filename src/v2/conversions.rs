@@ -3613,6 +3613,17 @@ impl TryFrom<block_special_event::Event> for super::types::SpecialTransactionOut
                     account: event.account.require()?.try_into()?,
                 }
             }
+            block_special_event::Event::UnlockAmount(event) => {
+                Self::UnlockAmount(crate::protocol_level_tokens::UnlockAmountEvent {
+                    token_holder: event.token_holder.require()?.try_into()?,
+                    lock_id: event.lock_id.require()?.into(),
+                    token_id: event.token_id.require()?.try_into()?,
+                    amount: event.amount.require()?.try_into()?,
+                })
+            }
+            block_special_event::Event::LockDestroyed(event) => {
+                Self::LockDestroyed(event.try_into()?)
+            }
         };
         Ok(event)
     }
