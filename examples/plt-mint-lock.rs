@@ -83,7 +83,6 @@ async fn main() -> anyhow::Result<()> {
             ],
         }],
         tokens: vec![app.token_id.clone()],
-        keep_alive: false,
         memo: None,
         metadata: Some(metadata.encode_raw_cbor()),
     });
