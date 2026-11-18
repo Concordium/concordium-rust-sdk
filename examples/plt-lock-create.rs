@@ -49,7 +49,7 @@ async fn main() -> anyhow::Result<()> {
         grants: vec![LockControllerSimpleV0Grant {
             account: CborHolderAccount::from(keys.address),
             roles: vec![
-                LockControllerSimpleV0Capability::Fund,
+                LockControllerSimpleV0Capability::Hold,
                 LockControllerSimpleV0Capability::Send,
                 LockControllerSimpleV0Capability::Release,
                 LockControllerSimpleV0Capability::Cancel,

@@ -844,7 +844,7 @@ impl Validate for LockConfig {
 
 impl Validate for LockConfigSimpleV0 {
     fn validate_fund(&self, sender: AccountAddress, payload: &FundTokens) -> LockResult<()> {
-        ensure_capability_simple_v0(self, sender, LockControllerSimpleV0Capability::Fund)?;
+        ensure_capability_simple_v0(self, sender, LockControllerSimpleV0Capability::Hold)?;
         if !self.tokens.iter().any(|token| token == &payload.token_id) {
             return Err(LockError::TokenNotConfigured);
         }
@@ -1103,7 +1103,7 @@ mod tests {
                 grants: vec![LockControllerSimpleV0Grant {
                     account: holder(ADDRESS),
                     roles: vec![
-                        LockControllerSimpleV0Capability::Fund,
+                        LockControllerSimpleV0Capability::Hold,
                         LockControllerSimpleV0Capability::Send,
                         LockControllerSimpleV0Capability::Release,
                         LockControllerSimpleV0Capability::Cancel,
