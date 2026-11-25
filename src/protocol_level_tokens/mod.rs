@@ -5,6 +5,7 @@ use concordium_base::protocol_level_locks;
 use concordium_base::protocol_level_tokens;
 
 pub mod lock_client;
+mod lock_config;
 mod lock_info;
 mod operation_event;
 mod token_account_info;
@@ -13,7 +14,8 @@ mod token_event;
 mod token_info;
 mod token_reject_reason;
 
-pub use lock_info::*;
+pub use lock_config::{LockCapability, LockConfig, LockConfigV0, LockRole, LockVariant};
+pub use lock_info::{LockConfigurationResponse, LockInfo, LockInfoResponse};
 pub use operation_event::*;
 pub use protocol_level_locks::*;
 pub use protocol_level_tokens::*;

@@ -4,8 +4,8 @@ use clap::AppSettings;
 use concordium_base::{
     contracts_common::AccountAddress,
     protocol_level_locks::{
-        LockConfig, LockConfigSimpleV0, LockControllerSimpleV0Capability,
-        LockControllerSimpleV0Grant, LockMetadata, LockRecipients,
+        LockCreateConfig, LockMetadata, LockRecipients, SimpleLockConfigCapability,
+        SimpleLockConfigRoles, SimpleLockConfigV0,
     },
     protocol_level_tokens::{operations, CborHolderAccount, ConversionRule, TokenAmount, TokenId},
     transactions::{send, BlockItem},
@@ -72,18 +72,15 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Construct composed payload.
-    let config = LockConfig::SimpleV0(LockConfigSimpleV0 {
+    let config = LockCreateConfig::SimpleV0(SimpleLockConfigV0 {
         recipients: LockRecipients::Limited(vec![CborHolderAccount::from(app.recipient)]),
+        holders: vec![CborHolderAccount::from(keys.address)],
         expiry: TransactionTime::hours_after(1),
-        grants: vec![LockControllerSimpleV0Grant {
+        roles: vec![SimpleLockConfigRoles {
             account: CborHolderAccount::from(keys.address),
-            roles: vec![
-                LockControllerSimpleV0Capability::Fund,
-                LockControllerSimpleV0Capability::Send,
-            ],
+            roles: vec![SimpleLockConfigCapability::Send],
         }],
         tokens: vec![app.token_id.clone()],
-        memo: None,
         metadata: Some(metadata.encode_raw_cbor()),
     });
 
